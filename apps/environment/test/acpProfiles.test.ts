@@ -1,7 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off
 // Claude Code's and OpenCode's profiles (step 4b, plan §4 with review F3, F5, F6 and M0's findings): what each process
-// gets, whatever t3 asked. Expected values are M0's (docs/steps/step-4b/m0-local.json), not recomputed here. Since the
-// hard cut (SPI-1176) both run on their Model endpoints through the model relay, and are refused without one.
+// gets, whatever t3 asked. Expected values are M0's (docs/steps/step-4b/m0-local.json), not recomputed here. Both run
+// on their Model endpoints through the model relay, and are refused without one (SPI-1176).
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -134,7 +134,7 @@ describe("Claude Code on the Model endpoints through the model relay (SPI-1168)"
     expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe("comm2/claude-sonnet-5-5");
     expect(answer.env).toMatchObject({ ANTHROPIC_DEFAULT_SONNET_MODEL: "comm2/claude-sonnet-5-5", ANTHROPIC_DEFAULT_OPUS_MODEL: "comm2/claude-sonnet-5-5" });
     for (const name of ["HTTPS_PROXY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_CUSTOM_HEADERS"]) expect(env[name], name).toBe("");
-    // Nothing of the Model proxy's: its URL and its key helper are not this process's.
+    // No MODEL_PROXY_* setting and no key helper of the old design reach the process.
     expect(answer.files?.map((file) => file.text).join("")).not.toContain("proxy.example");
     expect(JSON.stringify(answer.env)).not.toContain("proxy.example");
   });
@@ -310,7 +310,7 @@ describe("OpenCode on the Model endpoints through the model relay (SPI-1169)", (
     // A model id holding `/` is its provider's model as is.
     expect(Object.keys(providers["t3flare-endpoint-or"]!.models)).toEqual(["anthropic/claude-opus-5-5"]);
     expect(json).toMatchObject({ model: "t3flare-endpoint-comm/claude-haiku-5-5", small_model: "t3flare-endpoint-oai/gpt-5-mini" });
-    // No key in the file: the plugin gives the handle; nothing of the Model proxy's.
+    // No key in the file: the plugin gives the handle; no MODEL_PROXY_* setting.
     expect(JSON.stringify(json)).not.toMatch(/apiKey|x-api-key|proxy\.example|"t3flare"/i);
     expect(json.plugins).toEqual(["/opt/t3flare/share/opencode-key-plugin"]);
   });

@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off globalTimers:off nodeBuiltinImport:off
 // SPI-1061 (plan §8, D16, D21): the stage stand-in for the owner's laptop. A stock `t3` from npm at an exact version, in
 // a Docker container on this machine (never as the owner's user, never against his home), with t3's Pi provider on the
-// stage's Model endpoint (`laptopAgent.ts`; the model proxy until the hard cut, SPI-1176), reachable from the cloud over the stage's named Cloudflare Tunnel (`T3FLARE_STANDIN=1` on deploy; its
+// stage's Model endpoint (`laptopAgent.ts`), reachable from the cloud over the stage's named Cloudflare Tunnel (`T3FLARE_STANDIN=1` on deploy; its
 // token in `.alchemy/stages/<stage>.standin.json`, read here and handed to the container's environment, never printed).
 // The harness reaches the same t3 at a loopback port, so it can watch while the connector is stopped. From step 3's
 // `lib/laptop.ts`.

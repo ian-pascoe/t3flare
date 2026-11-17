@@ -1,5 +1,5 @@
 // @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off
-// Step 3, M0 R6: the laptop's agent. t3's Pi provider on the npm laptop server, on the model proxy, runs one turn that
+// Step 3, M0 R6: the laptop's agent. t3's Pi provider on the npm laptop server, on the stage's Model endpoint (`laptopAgent.ts`), runs one turn that
 // calls `orchestrator_capabilities` (t3's MCP tool, through t3's own Pi bridge). Writes
 // docs/steps/step-3/m0-laptop-agent.json.
 //

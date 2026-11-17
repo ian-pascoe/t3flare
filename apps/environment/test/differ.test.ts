@@ -100,7 +100,7 @@ describe("differ", () => {
   });
 
   it("without the Session's record, names the error's HTTP status and keeps the raw text out", () => {
-    // The Model proxy's text classifier went at the hard cut (SPI-1176): a 429 with no record is the provider's error.
+    // No text is classified: a 429 with no record is the provider's error.
     const limited = failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "model_error", detail: "429 {\"error\":\"rate_limit_error\",\"key\":\"sk-secret\"}", startedAt: 0 }, now);
     expect(limited).toMatchObject({ class: "provider_error", message: "The model provider returned HTTP 429.", code: "429" });
     expect(limited.message).not.toContain("sk-secret");
@@ -117,7 +117,7 @@ describe("differ", () => {
     expect(bare.message).toBe("The selected model is not available: its Model endpoint was removed or no longer lists it. Pick another model.");
   });
 
-  it("points to the setup when a selection from before the hard cut found no endpoint to fall back to (SPI-1176)", () => {
+  it("points to the setup when an old selection found no endpoint to fall back to (SPI-1176)", () => {
     for (const detail of ["Model anthropic/claude-x is not available", "Model /claude-x is not available"]) {
       expect(failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "no_model", detail, startedAt: 0 }, now), detail).toMatchObject({
         class: "provider_error",
@@ -201,7 +201,7 @@ describe("differ", () => {
     });
   });
 
-  it("shows a record of the retired Model proxy's classifier (a push from before the hard cut) as the provider's error (SPI-1176)", () => {
+  it("shows a record of the retired Model proxy's classifier (an old push) as the provider's error (SPI-1176)", () => {
     const nowMs = DateTime.toEpochMillis(now);
     const old = { class: "usage_limit", code: "proxy_cooldown", row: 1, resetAt: nowMs + 60_000, stop: true, at: nowMs };
     const turn = { submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "model_error", detail: "t3flare model proxy: proxy_cooldown", startedAt: 0, settledAt: nowMs, proxy: { requests: 1, failure: old } } as unknown as TurnState;

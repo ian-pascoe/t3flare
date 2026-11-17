@@ -809,8 +809,7 @@ const inSetupState = (): boolean => {
 
 /**
  * A model error, classified (step 2a part 2 plan, section 3): the Session's record of the endpoint's answer first (its
- * credential, then its classified failure), else the error's HTTP status. (The Model proxy's record and its text
- * classifier went at the hard cut, SPI-1176: a turn from before it shows the plain provider error.)
+ * credential, then its classified failure), else the error's HTTP status.
  */
 export const failureOf = (turn: TurnState, now: DateTime.Utc, setup: () => boolean = inSetupState): OrchestrationV2ProviderFailure => {
   const reason = turn.reason ?? "unknown";
@@ -831,9 +830,9 @@ export const failureOf = (turn: TurnState, now: DateTime.Utc, setup: () => boole
     });
   }
   if (reason === "no_model") {
-    // pi-durable's detail names the ref (`Model <provider>/<id> is not available`): a Model endpoint's slug (SPI-1162). A
-    // selection from before the hard cut reaches the Session as it was only when no endpoint lists a model to fall back
-    // to (`adapter.ts` `modelOf`, SPI-1176): the Environment needs setup.
+    // pi-durable's detail names the ref (`Model <provider>/<id> is not available`): a Model endpoint's slug (SPI-1162). An
+    // old selection (`isRetiredSlug`) reaches the Session as it was only when no endpoint lists a model to fall back to
+    // (`adapter.ts` `modelOf`): the Environment needs setup.
     const slug = /^Model (\S+) is not available/.exec(detail)?.[1];
     // pi-durable's settlement may carry no detail at all: with no endpoint listing a model, that is setup too.
     if ((slug === undefined && setup()) || (slug !== undefined && (parseEndpointSlug(slug) === undefined || isRetiredSlug(slug)))) {

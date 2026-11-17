@@ -90,8 +90,7 @@ const errorText = (cause: unknown): string => {
 /**
  * A prompt's failure (review F9): a refused credential is a permission error, never a sign-in the agent could start
  * (ADR-0016). Anything else is the provider's. On a Model endpoint the CLI wrapper puts the model relay's classification
- * of the process's last answer in its place when there is one (SPI-1172, `relayFailure.ts`). (Until the hard cut,
- * SPI-1176, the Model proxy's answers were classified here by Commissary's texts.)
+ * of the process's last answer in its place when there is one (SPI-1172, `relayFailure.ts`).
  */
 export const cliPromptFailure = (cause: unknown): OrchestrationV2ProviderFailure => {
   const text = errorText(cause);

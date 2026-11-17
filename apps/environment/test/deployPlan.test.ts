@@ -1,6 +1,6 @@
 // SPI-1175: what `stage.ts deploy` binds and sets up (scripts/lib/deployPlan.ts), and which settings dev.env is read for.
-// Since the hard cut (SPI-1176) no model setting is bound: no MODEL_PROXY_* or COMMISSARY_* reaches alchemy, and the
-// stage's Model endpoint comes from T3FLARE_MODEL_ENDPOINT alone, on a laptop as in CI.
+// No model setting is bound: no MODEL_PROXY_* or COMMISSARY_* reaches alchemy, and the stage's Model endpoints come
+// from T3FLARE_MODEL_ENDPOINT alone, on a laptop as in CI.
 import { describe, expect, it } from "vitest";
 
 import { allDeploySettings, deployPlan, devEnvNames } from "../scripts/lib/deployPlan.ts";
@@ -33,7 +33,7 @@ describe("deployPlan", () => {
   it("refuses --no-model-proxy, which no longer means anything", () => {
     expect(deployPlan({ stage: "p1176", args: ["--web", "--no-model-proxy"], read: { ...REQUIRED }, env: laptop })).toEqual({
       ok: false,
-      error: "--no-model-proxy is gone: there is no Model proxy since the hard cut (SPI-1176); deploy without it",
+      error: "--no-model-proxy is gone: there is no Model proxy; deploy without it",
     });
   });
 

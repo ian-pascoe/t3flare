@@ -127,7 +127,7 @@ describe("Codex's investigation (`codex exec`)", () => {
     expect(answer.argv.slice(-11)).toEqual(["exec", "--json", "--ephemeral", "--skip-git-repo-check", "-s", "read-only", "--model", "gpt-5-mini", "--output-schema", "/var/lib/t3flare/cli/proc-1/output-schema.json", "-"]);
     expect(answer.argv).toContain('model_provider="t3flare-endpoint-openai"');
     expect(answer.modelRelay).toEqual(["openai"]);
-    // A model from before the hard cut runs on the default model.
+    // An old model runs on the default model.
     const old = launch(codexExecArgs("gpt-6-luna", "/t3/state/tmp/schema"));
     expect("refused" in old ? old.refused : old.argv.slice(-4, -3)).toEqual(["gpt-5-mini"]);
     expect(answer.argv).toContain('approval_policy="never"');

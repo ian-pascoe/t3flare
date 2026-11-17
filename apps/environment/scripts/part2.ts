@@ -14,8 +14,7 @@
 //                                                           made, the idle Environment woken at the reset, the resumed turn
 //   node scripts/stage.ts run step2a2 part2 stopped          with the Container stopped, a kill does not start it
 //   node scripts/stage.ts run step2a2 part2 overload         an overload (529): pi-durable retries it, then a provider error
-//                                                           (with --live only since the hard cut, SPI-1176: no overload
-//                                                           fault is left, the Model proxy's went with its fixtures)
+//                                                           (with --live only: there is no overload fault)
 //   node scripts/stage.ts run step2a2 part2 key [--live]     a turn whose endpoint refuses its key (the fault route's 401, or
 //                                                           with --live the endpoint's own, with a refused key saved): the
 //                                                           key error after 1 request, no pause
@@ -41,7 +40,7 @@ export const check = (name: string, ok: boolean, detail?: unknown) => {
   if (!ok) failures.push(`${name}: ${JSON.stringify(detail ?? null).slice(0, 800)}`);
   return ok;
 };
-/** The Session's turns as it would push them (each with its model proxy record). */
+/** The Session's turns as it would push them (each with its model record, `proxy`). */
 const sessionTurns = async (threadId: string) =>
   ((await admin("GET", `/_t3flare/agents/session?thread=${threadId}`)).json?.turns ?? {}) as Record<string, any>;
 

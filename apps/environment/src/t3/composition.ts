@@ -333,7 +333,7 @@ export const make = (options: CompositionOptions) => {
   );
 
   // t3flare: t3's usage-limit sources plus one source per subscription endpoint from the limit readings of its answers
-  // (SPI-1174; Commissary's accounts went with the Model proxy, SPI-1176).
+  // (SPI-1174).
   const layerUsageLimitSources = LimitSources.layer(
     () => ({ store: environmentServices().limits, endpoints: () => environmentServices().modelEndpoints?.() ?? EMPTY_ENDPOINTS }),
   );

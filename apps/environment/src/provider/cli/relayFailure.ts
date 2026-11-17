@@ -5,8 +5,7 @@
 //
 // - a relay failure this turn: t3's failure is that one: its class, its text naming the endpoint, its code, its reset
 //   (held to 30 s after now, as the differ holds a Durable turn's), so a usage limit pauses the thread until its reset;
-// - none: the adapter's own failure stands. (Until the hard cut, SPI-1176, the Model proxy's Commissary-text
-//   classification gave way here to a plain error naming the endpoint.)
+// - none: the adapter's own failure stands.
 import type { OrchestrationV2ProviderFailure } from "@t3tools/contracts";
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";

@@ -7,8 +7,7 @@ import { acpModelCapabilities } from "./acpFlavor.ts";
 
 /**
  * The picker's models of a CLI's endpoints: by slug, grouped by endpoint (the endpoint's id beside a label two endpoints
- * share), with the effort picker on reasoning models. The first is the default for a new thread, so it is never a Model
- * proxy model t3 keeps listed (U75).
+ * share), with the effort picker on reasoning models. The first is the default for a new thread.
  */
 export const relayPickerModels = (own: ReadonlyArray<ModelEndpoint>): ReadonlyArray<ServerProviderModel> => {
   const labels = new Map<string, number>();

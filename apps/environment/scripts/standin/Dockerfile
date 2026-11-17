@@ -1,5 +1,5 @@
 # SPI-1061 (plan §8, D16): the stage stand-in for the owner's laptop. A stock `t3` from npm at an exact version, with
-# t3's Pi provider (`pi`) on the model proxy, and `cloudflared` to run the stage's named tunnel. Its agents run in this
+# t3's Pi provider (`pi`) on the stage's Model endpoint (`lib/laptopAgent.ts`), and `cloudflared` to run the stage's named tunnel. Its agents run in this
 # container, never as the owner's user. Built and run by scripts/lib/standin.ts.
 FROM cloudflare/cloudflared:latest AS cloudflared
 

@@ -1,6 +1,6 @@
 // SPI-1170: the spawner's pi wiring (`spawnCli` for `pi --mode rpc`). With an endpoint that lists a model, the process
 // runs on the model relay (its handle asked for those endpoints) and its RPC lines name each endpoint's model by t3's
-// slug, a thread's retired Model proxy model by the default model's; with none, it is refused, saying so (SPI-1176).
+// slug, an old thread's `anthropic/…` model by the default model's; with none, it is refused, saying so (SPI-1176).
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
@@ -109,7 +109,7 @@ describe("spawnCli for pi", () => {
     expect(out).toBe('{"type":"response","command":"set_model","success":true,"data":{"provider":"comm","id":"claude-haiku-5-5"}}\n{"type":"agent_end"}\n');
   });
 
-  it("names the default model in a thread's set_model of the retired Model proxy's `anthropic` (SPI-1176)", async () => {
+  it("names the default model in a thread's set_model of an old thread's `anthropic` (SPI-1176)", async () => {
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     bind({ endpoints: { revision: 1, endpoints: [endpoint("comm", "anthropic-messages", ["claude-haiku-5-5"])] } });
     await exchange(['{"id":"c2","type":"set_model","provider":"anthropic","modelId":"claude-sonnet-5-5"}\n']);

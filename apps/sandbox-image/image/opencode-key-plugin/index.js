@@ -8,8 +8,7 @@
 //   it and a repository's `{env:T3FLARE_MODEL_HANDLE}` finds nothing. No helper is asked: a handle does not rotate
 //   while the process lives (SPI-1045's re-ask is not needed). No handle found: no key, failing closed.
 // Providers are patched by id: OpenCode adds the configured ones after a plugin's transform runs, so the ids come from the
-// configuration file. (Until the hard cut, SPI-1176, a configuration without endpoint providers was the Model proxy's, and
-// the plugin asked the key helper for its key.)
+// configuration file.
 import { readFileSync } from "node:fs";
 
 import { handleFrom, PLACEHOLDER, putHandle, relayProviders } from "./relay.js";

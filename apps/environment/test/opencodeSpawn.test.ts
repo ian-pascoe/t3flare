@@ -1,6 +1,6 @@
 // SPI-1169: the spawner's OpenCode wiring (`spawnCli` for `opencode acp`). With an endpoint whose API OpenCode speaks
 // that lists a model, the process runs on the model relay (its handle asked for those endpoints); with none, it is
-// refused, saying so (SPI-1176: until the hard cut, the Model proxy ran it then).
+// refused, saying so (SPI-1176).
 import * as Effect from "effect/Effect";
 import * as ChildProcess from "effect/process/ChildProcess";
 import type { EndpointApi, ModelEndpoints } from "@t3flare/models/endpoints";

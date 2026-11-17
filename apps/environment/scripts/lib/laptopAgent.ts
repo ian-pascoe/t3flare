@@ -2,8 +2,7 @@
 // Step 3, M0 R6: the laptop's agent is t3's own Pi provider (`pi --mode rpc`) with an isolated agent directory whose
 // models.json names the stage's Model endpoint (`T3FLARE_MODEL_ENDPOINT`, with its `models`, which `stage.ts run` passes
 // from ~/.config/t3flare/dev.env) as one pi provider. The key is never written: models.json names
-// `$T3FLARE_LAPTOP_MODEL_KEY`, which the laptop server's environment carries. (Until the hard cut, SPI-1176, the model
-// proxy's URL and key, as pi's `anthropic` provider.)
+// `$T3FLARE_LAPTOP_MODEL_KEY`, which the laptop server's environment carries.
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";

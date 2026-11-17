@@ -1,7 +1,6 @@
 // @effect-diagnostics globalDate:off
-// A Layer over t3's `UsageLimitSources` (ADR-0001: Layer first; parity G8, U58). t3's own sources, from the owner's
-// settings, stay as they are. (Until the hard cut, SPI-1176, Commissary's accounts were one more source, read from its
-// management API: they went with the Model proxy, so a Commissary endpoint's windows are counted once, below.)
+// A Layer over t3's `UsageLimitSources` (ADR-0001: Layer first; parity G8, U84). t3's own sources, from the owner's
+// settings, stay as they are.
 //
 // SPI-1174: each subscription endpoint whose answers report limit windows is one more source (`limits.ts`), from the
 // readings the Environment DO keeps: pushed a few seconds after readings are kept (a burst once), and looked at again

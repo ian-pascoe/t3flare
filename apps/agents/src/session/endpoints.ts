@@ -111,7 +111,7 @@ export class SessionEndpoints {
   }
 
   /**
-   * Models apart from the turns' (SPI-1176: prompt suggestions, which ran on the Model proxy before the hard cut): a
+   * Models apart from the turns' (prompt suggestions): a
    * provider per endpoint the Session holds, its key from the same memory, each answer a usage record, but no recording
    * fetch, so a failed answer never lands in a turn's record.
    */

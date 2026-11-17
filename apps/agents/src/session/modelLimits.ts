@@ -1,9 +1,9 @@
-// The Session's view of its Model endpoints' failures (step 2a part 2's design for the Model proxy, SPI-1172 per
-// endpoint API; ADR-0034 §8).
+// The Session's view of its Model endpoints' failures (step 2a part 2's design, SPI-1172 per endpoint API; ADR-0034
+// §8).
 //
 // pi-ai drops an error answer's headers, so `recordingFetch` makes each model request and keeps the last answer's status,
-// headers, error body and time. The `proxy-limits` extension's `afterResponse` hook (its name kept from the Model proxy's
-// time: a Session installs it under that name) runs on every failed response before pi-durable decides whether to retry
+// headers, error body and time. The `proxy-limits` extension's `afterResponse` hook (a kept name: a Session installs it under
+// that name) runs on every failed response before pi-durable decides whether to retry
 // it (pi-durable 1.5.0 `harness/generation.js`: the hook at :596, the retry classification at :627): a failed answer is
 // classified once by its endpoint's API and auth (`@t3flare/models/failures`) and recorded on the turn with the
 // endpoint's own text, and when no retry can succeed (a limit with a reset, a refused key) pi-durable is left a text no
@@ -12,8 +12,7 @@
 //
 // A test fault (`Fault`, stages only) answers in the endpoint's place, in a vendor's shape (`anthropicUsageLimit`,
 // `openaiQuota`, …), until its reset, so the limit path runs end to end without exhausting a real account. It counts as
-// a request, as the endpoint's answer would. The Model proxy's classifier and its Commissary-shaped faults went at the
-// hard cut (SPI-1176).
+// a request, as the endpoint's answer would.
 // @effect-diagnostics globalDate:off
 import { GenerationTask, defineExtension, type Extension, hook } from "@earendil-works/pi-durable";
 import type { EndpointApi, EndpointAuth } from "@t3flare/models/endpoints";
@@ -213,8 +212,8 @@ const classifyOnce = (message: AssistantMessage, options: ModelLimitsOptions): v
 };
 
 /**
- * The `afterResponse` hook: `classifyOnce` on each generation's response, before pi-durable decides to retry it. Its
- * name is the one the Model proxy's classifier had (`proxy-limits`): the Session installs it under that name.
+ * The `afterResponse` hook: `classifyOnce` on each generation's response, before pi-durable decides to retry it. The
+ * Session installs it as `proxy-limits`, a kept name.
  */
 export const modelLimits = (options: ModelLimitsOptions): Extension =>
   defineExtension({

@@ -1,7 +1,7 @@
 // Pi Durable's text generation on Model endpoints (SPI-1163): an `<endpointId>/<modelId>` selection runs as one request on
 // the agents Worker (`TEXT_GENERATION`), named by ids only, with no key; `default` is a small model of the
-// first endpoint that has one, else the endpoints' default model; a selection from before the hard cut (SPI-1176: the
-// Model proxy's `anthropic/…`, a bare id) is `default`; with no endpoint, it says to set one up. Every
+// first endpoint that has one, else the endpoints' default model; an old selection (SPI-1176:
+// `anthropic/…`, a bare id) is `default`; with no endpoint, it says to set one up. Every
 // failure on an endpoint's model names the endpoint and the model: `runText`'s own, and those t3's operations add after
 // the reply (a placeholder title) or before it (no investigation), through `makePiDurableTextGeneration`.
 import { ProviderInstanceId } from "@t3tools/contracts";
@@ -100,7 +100,7 @@ describe("runText on Model endpoints", () => {
     expect(detailOf(await run("openai/gpt-5-mini"))).toBe('The Model endpoint "openai" could not be used for text generation: this Environment has no binding to the agents Worker for it.');
   });
 
-  it("runs a selection from before the hard cut on the endpoints' small model, never anywhere else (SPI-1176)", async () => {
+  it("runs an old selection on the endpoints' small model, never anywhere else (SPI-1176)", async () => {
     const calls = bind(() => ({ ok: true, text: '{"title":"Fallen back"}' }));
     const fetched: Array<string> = [];
     vi.stubGlobal("fetch", async (url: string) => (fetched.push(url), Response.json({})));

@@ -2,8 +2,7 @@
 // SPI-1160's stage evidence: Commissary's MCP endpoint added by hand as an ordinary direct server, signed in with an
 // `x-api-key` header, through the Harness panel's admin API; then a Durable agent and a Codex agent each run a write
 // (with its card) and a read through it. Commissary's client API host and an API key with its `sandbox` toolkit come from
-// the shell (`T3FLARE_MCP_API_URL`, `T3FLARE_MCP_KEY`, exported inline; until the hard cut, SPI-1176, the Model proxy's
-// settings): the key goes into the add request and nowhere else, and no evidence file is written that holds it.
+// the shell (`T3FLARE_MCP_API_URL`, `T3FLARE_MCP_KEY`, exported inline): the key goes into the add request and nowhere else, and no evidence file is written that holds it.
 //
 //   node scripts/stage.ts run p1160 commissaryMcp add       add (or re-add) the server, test it   (add.json)
 //   node scripts/stage.ts run p1160 commissaryMcp durable   a Durable agent's write and read      (durable.json)
@@ -75,7 +74,7 @@ const add = async () => {
   const row = (listed.json?.servers ?? []).find((server: any) => server.name === SERVER);
   const tools = (row?.tools ?? []).map((tool: any) => `${tool.upstream}:${tool.class}`);
   writeEvidence("add.json", {
-    note: "Commissary's MCP endpoint added through the panel's admin API as a direct server, signed in with an x-api-key header (the stage's Model proxy key, passed in by the script, never printed)",
+    note: "Commissary's MCP endpoint added through the panel's admin API as a direct server, signed in with an x-api-key header (T3FLARE_MCP_KEY, passed in by the script, never printed)",
     added: { status: added.status, answer: added.json },
     tested: { status: tested.status, answer: tested.json },
     row: { name: row?.name, setting: row?.setting, secret: row?.secret === undefined ? null : { set: row.secret.set }, status: row?.status, error: row?.error, tools },

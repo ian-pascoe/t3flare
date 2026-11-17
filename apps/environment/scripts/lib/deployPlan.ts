@@ -1,7 +1,6 @@
 // What `stage.ts deploy` binds and sets up, decided before anything is built (SPI-1175), pure so it is tested
 // (deployPlan.test.ts): the deploy-wide settings it needs, prod's custom domain (prod's alone), and the stage's Model
-// endpoint. No model setting is bound: the Model proxy's (MODEL_PROXY_*, and COMMISSARY_* for the CLI agents' key and
-// the Usage page) went at the hard cut (SPI-1176).
+// endpoint. No model setting is bound.
 import { MODEL_ENDPOINT_VAR, type ModelEndpointSpecResult, stageEndpointSpec } from "./modelEndpointSpec.ts";
 
 /** Required on every deploy: the GitHub App. */
@@ -55,7 +54,7 @@ export const deployPlan = (input: {
   // domain). An environment that carries prod's T3FLARE_DOMAIN (a sourced dev.env) is refused, not stripped.
   const domain = env.T3FLARE_DOMAIN ?? "";
   if (stage !== "prod" && domain !== "") return { ok: false, error: `T3FLARE_DOMAIN is set (to ${domain}) for the stage ${stage}: only prod has a custom domain; unset it (was dev.env sourced into the shell?)` };
-  if (args.includes("--no-model-proxy")) return { ok: false, error: "--no-model-proxy is gone: there is no Model proxy since the hard cut (SPI-1176); deploy without it" };
+  if (args.includes("--no-model-proxy")) return { ok: false, error: "--no-model-proxy is gone: there is no Model proxy; deploy without it" };
   const secrets = Object.fromEntries(Object.entries(read).filter(([name]) => name !== MODEL_ENDPOINT_VAR));
   const missing = DEPLOY_SECRETS.filter((name) => secrets[name] === undefined);
   if (missing.length > 0) return { ok: false, error: `missing ${missing.join(", ")} (set them, or put them in ~/.config/t3flare/dev.env)` };

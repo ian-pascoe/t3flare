@@ -317,8 +317,7 @@ export interface TurnState {
    */
   readonly steers?: ReadonlyArray<string>;
   /**
-   * What the turn's model requests got (step 2a part 2); absent in pushes from before it. Named for the Model proxy it
-   * first recorded, kept as the wire name since the hard cut (SPI-1176).
+   * What the turn's model requests got (step 2a part 2); absent in pushes from before it. `proxy` is a kept wire name.
    */
   readonly proxy?: ProxyRecord;
 }
@@ -334,8 +333,7 @@ export interface ProxyRecord {
   readonly credential?: EndpointCredentialFailure;
   /**
    * SPI-1172: the turn's last failed answer from a Model endpoint, classified by the endpoint's API and auth when it came.
-   * Every failed answer replaces it: the last answer is the turn's. (A record from before the hard cut may also hold the
-   * Model proxy's `failure`; nothing reads it now.)
+   * Every failed answer replaces it: the last answer is the turn's. (An old record may also hold a `failure` nothing reads.)
    */
   readonly endpointFailure?: EndpointFailureRecord;
 }

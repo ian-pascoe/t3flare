@@ -5,7 +5,7 @@
 // - A Model endpoint's model (`<endpointId>/<modelId>`, SPI-1163) runs on the agents Worker, through pi-ai, over the
 //   `TEXT_GENERATION` service binding: the Environment's bundle never holds pi-ai. The call carries ids only; the agents
 //   Worker reads the endpoint and asks for its key as a Session does.
-// - `default`, and a selection from before the hard cut (SPI-1176: a bare id, the Model proxy's `anthropic/<id>`), is the
+// - `default`, and an old selection (`isRetiredSlug`: a bare id, `anthropic/<id>`), is the
 //   endpoints' small model (`defaultTextModel`), else their default model (`defaultSmallModel`). With no endpoint that
 //   lists a model, text generation says to set one up.
 //

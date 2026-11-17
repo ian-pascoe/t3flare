@@ -185,8 +185,7 @@ export default Alchemy.Stack(
       } as never)
       : undefined;
 
-    // Models are the owner's Model endpoints (ADR-0034), set in the Harness panel; no Worker holds a model setting (the
-    // Model proxy's MODEL_PROXY_* and COMMISSARY_* went at the hard cut, SPI-1176). The GitHub App (ADR-0013) comes from
+    // Models are the owner's Model endpoints (ADR-0034), set in the Harness panel; no Worker holds a model setting. The GitHub App (ADR-0013) comes from
     // ~/.config/t3flare/dev.env or CI's environment.
     // SPI-1162: the stage's credentials key, under which the Environment seals the Model endpoints' API keys. 256 random
     // bits made once per stage on its first deploy after this, kept in the stage's alchemy state (Cloudflare's, so CI and
@@ -239,7 +238,7 @@ export default Alchemy.Stack(
     }
 
     // Parity batch 2: a test stage's probe Worker (scripts/pbatch2/probe.ts), made when the stage asks (`T3FLARE_PROBE=1`),
-    // never for prod: an OTLP receiver (and, until the hard cut, SPI-1176, a stand-in for Commissary's management API).
+    // never for prod: an OTLP receiver.
     // The harness points t3's OTLP settings at it.
     const probe = stage !== "prod" && (yield* Config.String("T3FLARE_PROBE").pipe(Config.withDefault(""))) === "1";
     if (probe) {

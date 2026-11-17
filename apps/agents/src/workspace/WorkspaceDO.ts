@@ -506,7 +506,7 @@ export class WorkspaceDO extends ContainerHost {
 
   /**
    * The credentials the sync guard looks for: the git tokens handed out lately and the Model endpoints' credentials the
-   * model relay used (SPI-1167). (The Model proxy's Container key went with the key helper at the hard cut, SPI-1176.)
+   * model relay used (SPI-1167).
    */
   #patterns(): ReadonlyArray<CredentialPattern> {
     return [...this.#tokenPatterns, ...this.#endpointKeys.values()];

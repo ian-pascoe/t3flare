@@ -1,8 +1,8 @@
 // Prompt suggestions (SPI-996, parity G5): t3's labs flag `promptSuggestionsEnabled` asks a provider for the owner's
 // likely next message after a completed turn (`prompt_suggestion.updated`). t3's Codex adapter samples its own thread
 // with `CODEX_PROMPT_SUGGESTION_PROMPT` at low effort (t3code `CodexAdapterV2.ts`, `samplePromptSuggestion`); Claude
-// Code makes its own. A Durable agent has neither, so the Session asks a small model of its Model endpoints (SPI-1176:
-// the endpoints' small model, text generation's default rule; before the hard cut, the Model proxy's Claude Haiku), with
+// Code makes its own. A Durable agent has neither, so the Session asks a small model of its Model endpoints (the
+// endpoints' small model, text generation's default rule), with
 // the turn's request and answer only (bounded), never the whole thread: one cheap request per completed turn, only while
 // the owner has the labs flag on.
 // @effect-diagnostics asyncFunction:off globalTimers:off

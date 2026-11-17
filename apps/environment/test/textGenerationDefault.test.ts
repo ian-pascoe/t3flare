@@ -1,7 +1,6 @@
 // The text-generation setting's default (SPI-1163): while the owner has set no model, the setting names text generation's
-// default model, a small model of the first Model endpoint that has one (else the endpoints' default model; before the
-// hard cut, SPI-1176, the Model proxy's small model), and follows it as the endpoints change. A model the owner picked is
-// never replaced; a Pi Durable model from before the cut is not one the owner can still use, and is replaced.
+// default model, a small model of the first Model endpoint that has one (else the endpoints' default model), and follows it as the endpoints change. A model the owner picked is
+// never replaced; an old Pi Durable model is not one the owner can still use, and is replaced.
 import { ProviderInstanceId } from "@t3tools/contracts";
 import type { EndpointModel, ModelEndpoints } from "@t3flare/models/endpoints";
 import * as Effect from "effect/Effect";
@@ -88,7 +87,7 @@ describe("the text-generation setting's default", () => {
     expect(selection).toMatchObject({ instanceId: PI, model: "openai/gpt-5.4" });
   });
 
-  it("follows the endpoints while the owner has picked nothing, replacing a Pi Durable model from before the hard cut", async () => {
+  it("follows the endpoints while the owner has picked nothing, replacing an old Pi Durable model", async () => {
     for (const old of ["anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-5-5", "claude-opus-5-5"]) {
       const state = environment(withModels());
       const { seen } = await settingsAfter({ textGenerationModelSelection: { instanceId: PI, model: old } }, [

@@ -1,6 +1,6 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalRandom:off
 // Step 3, M4: delegation end to end with two servers on this machine, no owner (plan section 6, M4). A stock t3 from npm
-// at `--version` is the laptop, its Pi agent on the model proxy; it links to the stage at auto-accept-edits and its agent
+// at `--version` is the laptop, its Pi agent on the stage's Model endpoint (`laptopAgent.ts`); it links to the stage at auto-accept-edits and its agent
 // hands a task to the cloud's Durable agent with `delegate_task`. The harness answers the cloud child's question from the
 // laptop side (an outside MCP client of the laptop, `t3_pending_request` forwarded over the link) and approves its
 // `bash` as the owner on the cloud. Variants (`--variant`):

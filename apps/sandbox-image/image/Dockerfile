@@ -117,7 +117,7 @@ RUN set -e; found=0; \
 
 # The CLI agents (step 4a, plan §6), at fixed paths the CLI profiles name absolutely, after the mise layer so a CLI bump
 # rebuilds only this: Codex's checked binary, pi from a committed lock with the image's Node (`npm ci`, no scripts), and
-# pi's handle command on the model relay (SPI-1170; the Model proxy's key helper went at the hard cut, SPI-1176). Not mise: a project's toolchains must never shadow them.
+# pi's handle command on the model relay (SPI-1170). Not mise: a project's toolchains must never shadow them.
 COPY --from=codex --chown=0:0 /codex /opt/t3flare/bin/codex
 COPY cli/package.json cli/package-lock.json /opt/t3flare/pi/
 RUN cd /opt/t3flare/pi \

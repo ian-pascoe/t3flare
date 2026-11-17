@@ -1,8 +1,7 @@
 // t3flare's own usage records (SPI-1173), kept in the Environment DO's SQLite: what the Sessions, text generation and the
 // model relay record of each model answer on a Model endpoint (`@t3flare/models/usage`, through `recordUsage`), served
 // to t3's Usage page by our scan readers (`readers.ts`). Every endpoint's answers are counted here, Commissary's
-// included: Commissary's own request log was read beside these until the hard cut (SPI-1176), and the records of the
-// endpoints it counted were dropped then.
+// included, and nowhere else.
 //
 // Rolled up as they are written: one row per quarter hour, agent, endpoint, model, session and whether the cost is
 // known, its counts the sum of the answers'. The Usage page buckets by hour at the finest, so a quarter hour loses

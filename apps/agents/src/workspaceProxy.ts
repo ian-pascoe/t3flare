@@ -3,7 +3,7 @@
 // paths, which computer's proxy answers 404 (it forwards only `/api` and its connect callbacks):
 //
 // - the git credential helper's token request (`CREDENTIAL_PATH`, ADR-0013), passed to the Workspace DO as a bodiless GET
-//   (the Model proxy's key helper route, `/t3flare/model-key`, went at the hard cut, SPI-1176: it answers 404);
+//   (there is no `/t3flare/model-key` route: it answers 404 as any unknown path);
 // - the CLI agents' MCP relay (`/t3flare/mcp/<server>`, ADR-0028): one MCP message per request, with the process's
 //   tool handle, to the Workspace DO and on to the Environment DO;
 // - the CLI agents' model relay (`/t3flare/model/<endpointId>/…`, SPI-1167): the Workspace DO checks the process's model

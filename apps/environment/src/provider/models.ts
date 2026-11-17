@@ -1,6 +1,5 @@
 // The Pi Durable picker's models (ADR-0034): each Model endpoint's models as `<endpointId>/<modelId>`, grouped by endpoint,
-// each with its thinking picker (the option t3's Pi provider calls `thinking`). Until the hard cut (SPI-1176) the Model
-// proxy's catalog came first, grouped by vendor.
+// each with its thinking picker (the option t3's Pi provider calls `thinking`).
 import type { ModelCapabilities, ProviderOptionChoice, ServerProviderModel } from "@t3tools/contracts";
 import { createModelCapabilities } from "@t3tools/shared/model";
 import { DEFAULT_THINKING, THINKING_LEVELS } from "@t3flare/models";

@@ -56,9 +56,8 @@ const CORE_LOCK = "a core extension: always on";
 
 /**
  * A model setting (the Guardian's, the Advisor's, `web_search`'s): a Model endpoint's slug, `<endpointId>/<modelId>`, or
- * `default` (the endpoints' small model, text generation's default rule). Free text, since the endpoints are the owner's
- * (SPI-1176: until the hard cut it was one of the Model proxy's three Claude models). A value that names no endpoint (one
- * from before the cut) is read as `default`.
+ * `default` (the endpoints' small model, text generation's default rule). Free text, since the endpoints are the owner's. A
+ * value that names no endpoint (`isRetiredSlug`: an old value) is read as `default`.
  */
 const modelSetting = (title: string, description: string, fallback: string): SettingEntry => ({
   title,

@@ -249,7 +249,7 @@ export class AdvisorObserver {
   /** The Advisor Session for these settings: the stored one, or a new one with the agent's read-only tools. */
   async #session(harness: Harness, observed: Conversation, context: ChordContext): Promise<{ readonly conversation: Conversation; readonly stored: Stored; readonly fresh: boolean }> {
     const agent = await observed.agent(context);
-    // `inherit`, or a value that names no Model endpoint (one from before the hard cut, SPI-1176): the agent's own model.
+    // `inherit`, or a value that names no Model endpoint (`isRetiredSlug`: an old value): the agent's own model.
     const own = isRetiredSlug(this.#settings.model) ? undefined : parseEndpointSlug(this.#settings.model);
     const model = this.#settings.model === "inherit" || own === undefined ? agent.model : { provider: own.endpointId, modelId: own.modelId };
     if (model === undefined) throw new Error("no Advisor model: the agent has none to inherit");

@@ -61,7 +61,7 @@ export const cliAcceptance = async (cookie: string, cli: "codex" | "pi"): Promis
   await admin("POST", `/_t3flare/agents/workspace-stop?id=${workspace}`);
   const keyRoute = (await admin("POST", `/_t3flare/agents/workspace-call?id=${workspace}`, { exec: { script: "curl -s -o /dev/null -w '%{http_code}' http://computer.internal/t3flare/model-key?cli=x", timeoutMs: 180_000 } })).json?.result?.stdout;
   report.keyRouteWithoutCli = keyRoute;
-  // SPI-1176: the Model proxy's key route is gone; computer's proxy answers its path as any unknown one.
+  // No key route: computer's proxy answers `/t3flare/model-key` as any unknown path.
   check("the retired key route gives nothing", keyRoute !== "200", keyRoute);
   await admin("POST", `/_t3flare/agents/workspace-stop?id=${workspace}`);
   await admin("POST", `/_t3flare/agents/workspace-remove?id=${workspace}`);

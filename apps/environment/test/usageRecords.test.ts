@@ -236,8 +236,7 @@ describe("a dated model's listed one", () => {
   });
 });
 
-// Since the hard cut (SPI-1176) the page reads t3flare's own records alone: every endpoint's records are kept, Commissary's
-// included (its request log was read beside them before, and the records of the endpoints it counted were dropped).
+// The page reads t3flare's own records alone: every endpoint's records are kept, Commissary's included.
 describe("every endpoint's records, counted once, ours", () => {
   const two: ModelEndpoints = {
     revision: 7,

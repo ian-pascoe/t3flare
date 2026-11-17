@@ -19,8 +19,7 @@
 // per endpoint (`t3flare-endpoint-<id>`, its package by API), each at the relay's per-endpoint URL, and the image's
 // plugin gives each the process's model handle as its key, from OpenCode's own start environment.
 //
-// SPI-1176: without such an endpoint, either is refused, saying so (until the hard cut, the Model proxy was its provider
-// then, its key from the key helper).
+// SPI-1176: without such an endpoint, either is refused, saying so.
 import { type EndpointApi, type ModelEndpoint, parseEndpointSlug } from "@t3flare/models/endpoints";
 import { endpointProviderId, modelRelayUrl, modelRoutedRelayUrl } from "@t3flare/models/relay";
 import { CLI_HOMES } from "@t3flare/sandbox-image/process";

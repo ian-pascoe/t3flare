@@ -1,6 +1,6 @@
 // Codex's Model endpoints (SPI-1167): the endpoints that speak OpenAI Responses, Codex's model list (those endpoints'
 // models as `<endpointId>/<modelId>`, grouped by endpoint), and where each of t3's models goes in Codex (the guard's
-// route). Pure. (Until the hard cut, SPI-1176, the Model proxy's models came first.)
+// route). Pure.
 import type { ServerProviderModel } from "@t3tools/contracts";
 import { EMPTY_ENDPOINTS, endpointSlug, type ModelEndpoint, type ModelEndpoints } from "@t3flare/models/endpoints";
 import { endpointProviderId, endpointsOfApi } from "@t3flare/models/relay";

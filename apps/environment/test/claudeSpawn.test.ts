@@ -1,6 +1,6 @@
 // SPI-1168: the spawner's Claude Code wiring (`spawnCli` for `claude-agent-acp`). With an Anthropic Messages endpoint
 // that lists a model, the process runs on the model relay (its handle asked for those endpoints); with none, it is
-// refused, saying so (SPI-1176: until the hard cut, the Model proxy ran it then).
+// refused, saying so (SPI-1176).
 import * as Effect from "effect/Effect";
 import * as ChildProcess from "effect/process/ChildProcess";
 import type { ModelEndpoints } from "@t3flare/models/endpoints";

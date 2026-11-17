@@ -2,8 +2,7 @@
 // here whatever t3 asked: its binary in the image, an allowlisted environment (never `process.env`), the Model endpoints
 // whose API it speaks as its only model providers, through the model relay with a per-process handle (SPI-1167–1170),
 // and a home built fresh on the Container's own disk with only its session directory synced. A CLI with no endpoint for
-// its API is refused, saying so (SPI-1176: until the hard cut the Model proxy was its provider then, with the key
-// helper). The pure part: no I/O beyond reading the State directory for pi's extension.
+// its API is refused, saying so (SPI-1176). The pure part: no I/O beyond reading the State directory for pi's extension.
 import { isSignIn, type ModelEndpoint, parseEndpointSlug, SETUP_HINT, SIGN_IN_COMPAT } from "@t3flare/models/endpoints";
 import { endpointProviderId, MODEL_HANDLE_ENV, modelRelayUrl, type RelayedEndpoint } from "@t3flare/models/relay";
 import { CLI_TOOL_TIMEOUT_SEC, MCP_RELAY_PREFIX, RELAY_SERVERS_ENV, TOOL_HANDLE_ENV } from "@t3flare/harness-registry";
@@ -151,7 +150,7 @@ export const codexEndpointOverrides = (endpoints: ReadonlyArray<RelayedEndpoint>
 /**
  * The process's provider (SPI-1167): Codex runs a thread's turns only on its process's provider ("This chat uses <a>, but
  * your current provider is <b>"), so it is the session's model's (`codexModelRoute`): its endpoint's for an endpoint's
- * slug, the first endpoint's for none or one from before the hard cut.
+ * slug, the first endpoint's for none or an old one (`isRetiredSlug`).
  */
 export const codexProcessProvider = (endpoints: ReadonlyArray<CodexRouteEndpoint>, model: string | undefined): string => {
   const routed = codexModelRoute(model ?? "default", endpoints, endpointProviderId).provider;
@@ -208,7 +207,7 @@ const NO_CODEX_ENDPOINT = noEndpointFor("Codex", "OpenAI Responses");
  * `codex exec` for an investigation (parity G7: t3's review guide, `CodexTextGeneration`'s `-s read-only` run): only the
  * driver's own argv, read-only, never asking, no MCP servers, the output schema copied from the State directory into
  * the process's home. Its model goes as Codex names it (`codexModelRoute`: an endpoint's own id, on its provider, the
- * default model for one from before the hard cut), through the model relay as the app-server's do (SPI-1176).
+ * default model for an old one, `isRetiredSlug`), through the model relay as the app-server's do (SPI-1176).
  */
 const codexExecLaunch = (input: LaunchInput, context: ProfileContext): LaunchAnswer => {
   const model = input.args[7] ?? "";

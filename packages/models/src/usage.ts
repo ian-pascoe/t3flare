@@ -1,6 +1,5 @@
 // Usage records (SPI-1173): t3flare's own count of the tokens its agents spend on Model endpoints, which feeds t3's Usage
-// page beside Commissary's request log until the hard cut (SPI-1176). Three places make them, and the Environment DO keeps
-// them (`recordUsage`), but for an endpoint whose requests Commissary's log already counts:
+// page. Three places make them, and the Environment DO keeps them (`recordUsage`):
 //
 // - a Session, for each assistant message a Durable agent's model call answers on an endpoint (turns, compaction, the
 //   extensions' own calls): pi-ai's usage and cost;

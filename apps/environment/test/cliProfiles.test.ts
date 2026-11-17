@@ -1,6 +1,6 @@
 // CLI profiles (step 4a, plan §4 with the review's F2, F4, F5 and M0's findings): what a Codex or pi process gets,
-// whatever t3 asked. Expected values are the M0 probes' (docs/steps/step-4a/m0-local.json), not recomputed here. Since
-// the hard cut (SPI-1176) every CLI runs on its Model endpoints through the model relay, and is refused without one.
+// whatever t3 asked. Expected values are the M0 probes' (docs/steps/step-4a/m0-local.json), not recomputed here. Every
+// CLI runs on its Model endpoints through the model relay, and is refused without one (SPI-1176).
 import { describe, expect, it } from "vitest";
 
 import { CODEX_SESSIONS, PI_SESSIONS, type PiRelay, piRepoResourceArgs, type ProfileContext, profileLaunch, repoRootOf } from "../src/agents/cliProfiles.ts";
@@ -31,7 +31,7 @@ describe("Codex's profile", () => {
     expect(answer.argv.slice(0, 2)).toEqual(["/opt/t3flare/bin/codex", "app-server"]);
     const overrides = answer.argv.filter((_, index) => answer.argv[index - 1] === "-c");
     expect(overrides).toContain('model_provider="t3flare-endpoint-openai"');
-    // Nothing of the Model proxy's, which went at the hard cut (SPI-1176): no provider of its, no key helper.
+    // No MODEL_PROXY_* setting, no `anthropic` provider, no key helper.
     expect(overrides.filter((value) => value.startsWith("model_providers."))).toEqual([
       'model_providers.t3flare-endpoint-openai={name="t3flare-endpoint-openai",base_url="http://computer.internal/t3flare/model/openai",wire_api="responses",env_key="T3FLARE_MODEL_HANDLE",requires_openai_auth=false,supports_websockets=false,request_max_retries=1,stream_max_retries=1}',
     ]);
@@ -98,7 +98,7 @@ describe("Codex's profile", () => {
       return answer.argv.find((value) => value.startsWith("model_provider="));
     };
     expect(providerFor("openai/gpt-5-mini")).toBe('model_provider="t3flare-endpoint-openai"');
-    // SPI-1176: a model from before the hard cut (the proxy's bare id) and none run on the default model's provider.
+    // SPI-1176: an old model (the proxy's bare id) and none run on the default model's provider.
     expect(providerFor("gpt-6-luna")).toBe('model_provider="t3flare-endpoint-openai"');
     expect(providerFor(undefined)).toBe('model_provider="t3flare-endpoint-openai"');
     // A gone endpoint's slug names its own provider, which Codex does not have: Codex refuses the thread.
@@ -260,7 +260,7 @@ describe("pi's profile", () => {
         thinkingLevelMap: { xhigh: null },
         compat: { supportsStrictTools: true },
       });
-      // Nothing of the Model proxy's.
+      // No MODEL_PROXY_* setting.
       expect(models.providers.anthropic).toBeUndefined();
       expect(JSON.stringify(models)).not.toContain("proxy.example");
       expect(JSON.stringify(models)).not.toContain("t3flare-model-key");

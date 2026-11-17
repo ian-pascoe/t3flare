@@ -1,7 +1,7 @@
 // The Session's models (ADR-0034): one pi-ai provider per Model endpoint, under the endpoint's id, its models those the
 // endpoint lists; a model's ref is `{ provider: <endpointId>, modelId }`, its t3 slug `<endpointId>/<modelId>`. Each
 // resolves its key (or a sign-in's token) from the Environment at use time (ADR-0018) and never stores it. There is no
-// other provider: the Model proxy's `anthropic` went at the hard cut (SPI-1176).
+// other provider.
 import { type Api, type AssistantMessage, type Context, createModels, createProvider, type FetchFunction, type Model, type MutableModels, type Provider, type ProviderStreams } from "@earendil-works/pi-ai";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";

@@ -6,8 +6,8 @@
 //
 // "No model set" is: t3's own default (Codex's model, even where the CLI agents register a `codex` instance), an
 // instance this Environment does not have, the model this sync wrote last (kept in the Environment DO's storage,
-// recorded only once the setting holds it), or a Pi Durable model from before the hard cut (SPI-1176: `default`, a bare
-// id, the Model proxy's `anthropic/<id>`, the earlier seed's included; `isRetiredSlug`), which falls back to the default.
+// recorded only once the setting holds it), or an old Pi Durable model (`isRetiredSlug`: `default`, a bare id,
+// `anthropic/<id>`, the earlier seed's included), which falls back to the default.
 // Any other model is the owner's, and is never replaced; an owner who picks exactly one of those values is read as unset
 // (upstream-fragility U67). One sync runs at a time, so two endpoint changes in a row
 // never read the setting before the other has written it.
