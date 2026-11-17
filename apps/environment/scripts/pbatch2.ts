@@ -1,28 +1,14 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off anyUnknownInErrorContext:off
 // Parity batch 2's stage harness (docs/steps/parity-batch-2.md), through t3's own client protocol as the web client sends
-// it, against a stage deployed with `T3FLARE_PROBE=1` (its probe Worker: a Commissary stand-in and an OTLP receiver).
+// it, against a stage deployed with `T3FLARE_PROBE=1` (its probe Worker: an OTLP receiver).
 // Evidence goes to docs/steps/parity-batch-2/<part>.json, tokens and keys redacted.
 //
 //   node scripts/stage.ts run pbatch2 pbatch2 <part>
-//   parts: usage | registry | storage | otlp | otlp-off
+//   parts: registry | storage | otlp | otlp-off
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { WsRpcGroup } from "@t3tools/contracts";
-import * as Effect from "effect/Effect";
-import * as Stream from "effect/Stream";
-import { RpcClient } from "effect/rpc";
-
-import { admin, base, pair, protocol, sleep, wsCall, wsFirst } from "./lib/client.ts";
-
-/** The first event of a streaming WS method that `match` accepts, or undefined after `ms`. */
-const wsFind = (cookie: string, method: string, payload: unknown, match: (event: any) => boolean, ms: number): Promise<any> =>
-  Effect.runPromise(
-    Effect.gen(function* () {
-      const client = (yield* RpcClient.make(WsRpcGroup)) as unknown as Record<string, (input: unknown) => Stream.Stream<unknown, unknown>>;
-      return yield* Stream.runHead(client[method]!(payload).pipe(Stream.filter(match)));
-    }).pipe(Effect.provide(protocol(cookie)), Effect.scoped, Effect.timeoutOption(ms)),
-  ).then((head: any) => (head?._tag === "Some" && head.value?._tag === "Some" ? head.value.value : head?._tag === "Some" ? head.value : undefined));
+import { admin, base, pair, sleep, wsCall, wsFirst } from "./lib/client.ts";
 
 const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/parity-batch-2");
 const PROBE = `https://t3flare-probe-pbatch2.ian-g-pascoe.workers.dev`;
@@ -61,39 +47,7 @@ const [part] = process.argv.slice(2);
 const cookie = await pair();
 await admin("POST", "/_t3flare/disarm-bootstrap");
 
-const day = (offsetDays: number) => new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
-
 switch (part) {
-  case "usage": {
-    // t3's provider refresh refreshes the usage-limit sources too (ws.ts serverRefreshProviders).
-    await wsCall(cookie, "server.refreshProviders", {}).catch(() => undefined);
-    await sleep(3_000);
-    // The web client's own subscription, opted in: the sources arrive as a `usageLimitSourcesUpdated` event.
-    const update = await wsFind(cookie, "subscribeServerConfig", { usageLimitSources: true }, (event) => event?.type === "usageLimitSourcesUpdated", 30_000);
-    const sources = update?.payload?.sources ?? [];
-    const commissary = sources.find((source: any) => source.id === "commissary");
-    const summary = (await wsCall(cookie, "server.getUsageSummary", { sinceDay: day(-2), untilDay: day(0), timeZone: "UTC", awaitRefresh: true })) as any;
-    const byProvider: Record<string, { tokens: number; records: number; costUsd: number }> = {};
-    // Commissary's half of the page only: t3flare's own records (`t3flare://usage/…`, SPI-1173) are p1173's to check.
-    for (const bucket of (summary?.buckets ?? []).filter((entry: any) => String(entry.sourcePath ?? "").startsWith("commissary://"))) {
-      const entry = (byProvider[bucket.provider] ??= { tokens: 0, records: 0, costUsd: 0 });
-      entry.records += bucket.records ?? 0;
-      entry.tokens += (bucket.totals?.uncachedInputTokens ?? 0) + (bucket.totals?.cachedInputTokens ?? 0) + (bucket.totals?.cacheCreationTokens ?? 0) + (bucket.totals?.outputTokens ?? 0);
-      entry.costUsd += bucket.cost?.totalUsd ?? bucket.costUsd ?? 0;
-    }
-    const log = (await probeLog()).filter((entry) => entry.kind === "management");
-    const recordReads = log.filter((entry) => entry.route === "observability/usage/records");
-    const ok =
-      commissary !== undefined &&
-      commissary.error === undefined &&
-      commissary.accounts.map((a: any) => `${a.id}:${a.driver}`).join(",") === "c0ffee01:claudeAgent,c0ffee02:codex" &&
-      commissary.accounts[0].usageLimits.windows.length === 2 &&
-      ["pi", "codex", "claude", "opencode"].every((provider) => (byProvider[provider]?.records ?? 0) > 0) &&
-      log.every((entry) => entry.admitted && entry.sentManagementKey && entry.sentServiceToken) &&
-      recordReads.some((entry) => entry.query.before !== undefined);
-    writeEvidence("usage", { ok, limitSources: sources, summary: { sources: summary?.sources, pricing: summary?.pricing, byProvider, bucketSample: (summary?.buckets ?? []).slice(0, 6) }, managementCalls: log.slice(-12) });
-    break;
-  }
   case "registry": {
     const search = (await wsCall(cookie, "server.searchAcpRegistry", { query: "", limit: 100 })) as any;
     const agents = (search?.agents ?? []).map((agent: any) => ({ id: agent.id, distribution: agent.distribution, lead: String(agent.description).split(". ")[0] }));
@@ -153,6 +107,6 @@ switch (part) {
     break;
   }
   default:
-    console.error("usage: node scripts/stage.ts run pbatch2 pbatch2 usage|registry|storage|otlp|otlp-off");
+    console.error("usage: node scripts/stage.ts run pbatch2 pbatch2 registry|storage|otlp|otlp-off");
     process.exitCode = 2;
 }
