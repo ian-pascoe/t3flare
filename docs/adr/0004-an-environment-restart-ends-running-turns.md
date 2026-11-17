@@ -17,3 +17,12 @@ An aborted tool call's Container processes are killed by marker and process grou
 ## Refinement (step 3)
 
 **A question waits as an approval does across a Session restart** (`ask_user`, kept in the Session's storage and asked again by the rerun; `docs/steps/step-3/m3-question-question-mcp-restart.json`). **Across an Environment restart t3 keeps it answerable**: its startup recovery turns a pending `user_input` request into one answered by a message, but cancels its run and starts no continuation. For the owner's own thread that is enough (the answer starts a new run; `m3-env-restart.json`). For a thread delegated from another environment (`delegatedFrom`) it is not: the linked environment's follower would read the cancelled run as the task's end and complete it from that run's last reply (review C2). So once t3 takes commands after a boot, the Environment DO raises each such question again in a continuation of the cut run (`restartContinuationOfRunId`, which the follower's wait follows), with the question as t3 stored it, and dismisses the stale request; `/mcp` waits for that before it answers (`apps/environment/src/agents/questionRestart.ts`; `m3-env-restart-delegated.json`, and end to end `m4-question-restart.json`).
+
+## Refinement (in-app updates, ADR-0037, 2026-11-17): the code update strategies as deployed
+
+The text above said the environment Worker deploys with a deferred `max_delay` of about 30 minutes. It does not, and has
+not since the deploy that set it (`apps/environment/alchemy.run.ts`): **Environment: immediate; Agents Worker: deferred
+300 s** (Cloudflare's default). An active Environment DO adopts new code at once, as a restart: clients reconnect, and
+running turns continue from their Sessions with a re-prompt. The Agents Worker's Sessions keep up to 5 minutes to finish
+in-flight work. An in-app Update lands a deploy whenever the owner presses it; it neither warns about nor refuses
+running turns (plan D11, D12): the restart costs a re-prompt, as above.

@@ -79,3 +79,11 @@ Accepted, as in stock t3: a one-repo write token (at most an hour) is readable i
 an approved command, or any command at full access, can push. The leak scan (K6) still looks for the token in the
 Workspace's files; finding it in the Container's memory or environment during work is stock behaviour, not a leak.
 
+## Refinement (in-app updates, ADR-0037, 2026-11-17): a fourth permission list, for dispatching updates
+
+`GITHUB_APP_PERMISSIONS` raises `actions` from `read` to `write`; the owner accepts the change on the App's
+installation, which must include `ian-pascoe/t3flare`. Only a new, fourth list carries it:
+`UPDATE_DISPATCH_GITHUB_PERMISSIONS` (`actions: write`, `metadata: read`), beside the Container's, the Environment's and
+the skill fetch's. The Environment DO mints it for `ian-pascoe/t3flare` alone (the update target, set on prod only),
+per dispatch and per poll of an in-app Update's run, uses it for those requests and drops it, as the skill fetch does.
+It never reaches a Container, a Session or a log.

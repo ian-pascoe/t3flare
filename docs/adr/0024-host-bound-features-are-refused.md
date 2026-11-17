@@ -11,8 +11,9 @@ Stock t3 runs on the owner's own machine, and some of its features are about tha
 | Triage (`server.prepareTriage`) | clones t3's source and writes diagnostics on the host for a bug report | `triage` stripped |
 | jj and other VCS CLIs | not in the Workspace image | source-control discovery reports them "not found"; git and `gh` are emulated (ADR-0009, ADR-0013) |
 | Import of agent sessions | reads CLI session homes (`~/.codex`, `~/.claude`, …) on the host | there are none in the State directory |
-| Server self-update | the Environment is updated by the nightly bump and a deploy (ADR-0017) | `serverSelfUpdate`, `npmReleaseLookup` and the desktop-updater flags stripped |
-| Provider install and update | CLIs are pinned in the Workspace image (ADR-0015) and change only with it | a version changes only with a new image and deploy, never from a client |
+| Server self-update | the Environment is updated by the nightly bump and a deploy (ADR-0017); on prod a stock client's server Update lands one (ADR-0037) | `serverSelfUpdate` advertised as `respawn` on prod only; `npmReleaseLookup`, the progress and staging flags and the desktop-updater flags stripped |
+| Provider install | CLIs are pinned in the Workspace image (ADR-0015) and change only with it | install refused; a version changes only with a new image and deploy |
+| Provider update (amended, ADR-0037) | a CLI's version is its pin in the Workspace image | on prod, the update button of the pi CLI, Codex and Claude Code lands a CLI bump through CI (a new image and deploy), never an install in place; elsewhere, and for OpenCode, refused |
 
 ## Not refused: previews and the server browser (owner decision D4)
 

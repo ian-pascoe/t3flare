@@ -109,3 +109,13 @@ implement t3's modes.
 Accepted, as in stock t3: fewer prompts and more unasked actions inside the Container; a cloned repo's hooks and MCP
 servers run there as they would on a laptop.
 
+## Refinement (in-app updates, ADR-0037, 2026-11-17): CLI pins and CLI bumps
+
+Each CLI agent's version in the Workspace image is a **CLI pin**: `apps/sandbox-image/src/clis.ts`, equal to the
+Dockerfile's ARGs and the image's npm locks (`test/cliManifest.test.ts`, which also checks it against t3's compatibility
+manifest). A **CLI bump** moves one: `scripts/cli-bump.ts`, run by `cli-bump.yml`, resolves the newest version (latest
+only), edits the pin (Codex's version and tarball hashes, pi's lock, Claude's adapter and lock with the SDK it pins and
+that SDK's `claudeCodeVersion`), proves it on the `bump` stage, and lands it through the land workflow. On prod, t3's
+provider-update button starts one for the pi CLI, Codex or Claude Code (`t3flare-cli-update <cli>`, answered by the
+process router). OpenCode's pin still moves by hand. A running Container keeps its CLI until it restarts: Containers
+take the image at start.

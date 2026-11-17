@@ -32,3 +32,14 @@ empty and the capability was stripped as "refused for now (owner decision D5)".
 ## Refinement (G11, 2026-11-13): `serverBrowser` and `localServerStop` are advertised
 
 t3's server browser runs in Browser Run and a listed server is stopped by its process group in its Container (ADR-0031), so both capabilities are kept.
+
+## Refinement (in-app updates, ADR-0037, 2026-11-17): a third classification, advertised by t3flare
+
+Some capabilities t3 never sends from the DO, because the feature they describe is a launcher's or a desktop app's, and
+t3flare does the feature itself. These are **advertised by t3flare**: classified `advertise` in `capabilities.ts`, with
+t3's own value dropped and t3flare's value set by `cloudCapabilities(capabilities, advertised)` where its feature is
+configured. Today there is one: `serverSelfUpdate: "respawn"` on a stage with an update target (prod), whose server
+Update dispatches CI. `respawn` and not `boot-service`, so the client takes no accepting-`ready` baseline and an idle
+reset during the update does not read as its failure. Still stripped: `serverSelfUpdateProgress`,
+`serverUpdateStaging`, `serverUpdateThreadContinuation`, `serverInstallation`, `npmReleaseLookup`, `desktopAppUpdate`,
+`desktopAppChannelSwitch`.

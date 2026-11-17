@@ -8,3 +8,18 @@ The job is `pnpm run bump` (`scripts/bump.ts`), run nightly by `.github/workflow
 
 - **Stable release tags**: fewer bumps, but the owner's clients run nightly, so the cloud would lag the protocol his clients speak.
 - **`main`**: untagged commits include ones nightly CI rejected.
+
+## Refinement (in-app updates, ADR-0037, 2026-11-17): land mode, the hourly schedule, and the bookmark
+
+- **Land mode.** `bump.yml` takes `land`, `gate` and `update_id`. A stock client's server Update dispatches it with
+  `land: true` and the Update gate (`bump.ts --gate update`); a pass pushes `bump/<tag>` and the reusable land workflow
+  (`land.yml`) fast-forwards `main` to it and deploys prod by dispatching `deploy-prod.yml`. Everything else stays a
+  pull request for the owner to merge. The run is named by `run-name` (`Nightly bump`, `Update <id>`, `Verify <what>`),
+  checks out the tip of `main` when it starts, and queues in the `bump` group with `queue: max`.
+- **Hourly, with pre-proving.** The schedule is hourly. A first step exits before setup when the newest nightly is
+  already pinned or proposed; a new one gets the Full gate and a pull request, which closes the older bump pull requests.
+  An Update to a tag proposed on top of main skips the bump and only lands. After any landed Update a verify run puts
+  main through the Full gate and opens an issue on failure.
+- **The bookmark is not taken.** The first paragraph says a DO SQLite point-in-time bookmark is taken before t3's
+  migrations run. No code takes one. Recovery from a bad nightly on prod is Safe mode and a revert by the owner; a
+  pre-migration bookmark and an admin restore route are a follow-up (plan D15).

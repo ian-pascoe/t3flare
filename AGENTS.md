@@ -3,6 +3,7 @@
 ## Rules
 
 - Merging is a fast-forward push to `main`. Every push to `main` deploys prod through `.github/workflows/deploy-prod.yml`, so push only what has passed `pnpm run check`.
+- An in-app Update lands by itself: `land.yml` fast-forwards `main` with `GITHUB_TOKEN`, which starts no workflow, so it deploys prod by dispatching `deploy-prod.yml` with `checked_sha` ([ADR-0037](docs/adr/0037-stock-clients-update-buttons-land-a-bump-the-do-dispatches-ci-which-proves-and-fast-forwards-main.md)). Never dispatch `bump.yml` with `land`, `cli-bump.yml` without `dry_run`, or `land.yml` without `dry_run` by hand: each deploys prod.
 - Test deploys on a throwaway stage from `apps/environment/scripts/stage.ts`. Stage `prod` belongs to CI.
 - Credential files stay unread and unprinted: `~/.config/t3flare/dev.env`, `~/.alchemy/**`, `apps/environment/.alchemy/stages/*`, the gh config.
 - Never run pnpm or `vp` with a working directory inside `t3code/`: they install it as its own workspace and repoint t3's packages. Run t3 package scripts from the repo root (`pnpm --filter <name> run <script>`); mise exports `NPM_CONFIG_WORKSPACE_DIR` as a guard.

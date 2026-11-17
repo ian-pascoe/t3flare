@@ -406,3 +406,51 @@ _Avoid_: fork change, hack
 **Build shim**:
 A bundle-time substitute for a Node builtin or a dependency that cannot load in workerd, applied only to the modules that need it.
 _Avoid_: polyfill, Shadow
+
+**t3 pin**:
+The nightly tag the `t3code` submodule is at.
+_Avoid_: t3 version, upstream version
+
+**Server version**:
+The t3 pin without its `v`, stamped into the build: what the descriptor's `serverVersion` and the web client's `APP_VERSION` report.
+_Avoid_: app version, t3 version
+
+**t3 bump**:
+Moving the t3 pin to another nightly tag and proving it on the `bump` stage.
+_Avoid_: upgrade, sync
+
+**CLI pin**:
+A CLI agent's version in the Workspace image, as `apps/sandbox-image/src/clis.ts` names it.
+_Avoid_: CLI version
+
+**CLI bump**:
+The job that moves one CLI pin to its newest version, proves it and lands it.
+_Avoid_: CLI upgrade
+
+**Proposed pin**:
+A pin that passed a gate but is not on `main`: a `bump/*` branch, which records the gate it passed.
+_Avoid_: candidate, pending bump
+
+**Update gate**:
+The short proof an Update waits on: the check, the `bump` stage deploy and the acceptance test's core with one agent turn (a CLI bump: that CLI's sub-test).
+_Avoid_: fast gate, smoke
+
+**Full gate**:
+The nightly bump's whole proof, test:docker and every acceptance sub-test included; a landed Update's verify run.
+_Avoid_: full test, slow gate
+
+**Land**:
+Fast-forward `main` to a proposed pin, then deploy prod.
+_Avoid_: merge, release
+
+**Update**:
+A bump and land requested from a stock client's Update button, of either kind: the server's (a t3 bump) or a CLI's (a CLI bump).
+_Avoid_: self-update, upgrade
+
+**Stage**:
+One deployment of t3flare's Workers under its own name: `prod` (the owner's), `bump` (CI's proving stage), or a throwaway one.
+_Avoid_: environment (that is t3's), instance
+
+**Workspace image**:
+The Container image every Workspace runs: git, the CLI agents at their CLI pins, and the tools.
+_Avoid_: sandbox image (the code's name for it)

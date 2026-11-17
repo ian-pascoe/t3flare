@@ -64,11 +64,11 @@ The bump runs: the whole `pnpm run check` (`git apply --check` of the Patches, t
 
 ### U4. The descriptor's capability flags
 
-- **Where**: `composition.ts` serves t3's own descriptor (`ServerEnvironment.make`, `t3code/apps/server/src/environment/ServerEnvironment.ts:186`; capabilities `:221-292`) through `cloudCapabilities` (`apps/environment/src/t3/capabilities.ts`), which strips every flag classified `strip` there, with `label: "t3flare"` and `platform: { os: "linux", machine: "cloud" }`. The stock clients decide which features to show from these flags. Settings with no flag are locked by t3flare's managed policy (`t3/managedPolicy.ts`, ADR-0023; t3's `ManagedPolicy.fromDocument`).
+- **Where**: `composition.ts` serves t3's own descriptor (`ServerEnvironment.make`, `t3code/apps/server/src/environment/ServerEnvironment.ts:186`; capabilities `:221-292`) through `cloudCapabilities` (`apps/environment/src/t3/capabilities.ts`), which strips every flag classified `strip` there and sets the ones classified `advertise` from t3flare's own features (`serverSelfUpdate: "respawn"` on prod, [U88](#u88-the-respawn-server-update-and-its-outcome-in-app-updates-d2d7); ADR-0023's third classification), with `label: "t3flare"` and `platform: { os: "linux", machine: "cloud" }`. The stock clients decide which features to show from these flags. Settings with no flag are locked by t3flare's managed policy (`t3/managedPolicy.ts`, ADR-0023; t3's `ManagedPolicy.fromDocument`).
 - **Breaks when**: t3 adds a flag for a feature that needs the host (a local browser, a native helper, a self-update path), which happens often; renames a flag; adds a setting for a host-bound feature; or changes the managed policy document's schema.
 - **Detection**: typecheck (`CAPABILITIES … satisfies Record<keyof ExecutionEnvironmentCapabilities, …>`) and `test/capabilities.test.ts` fail on a new or removed flag, naming it (SPI-1012, T3). The policy test fails if t3 refuses the document. **Silent**: a new setting for a host-bound feature, and a flag t3 sends that its schema does not list.
 - **Blast radius**: the clients show a button or panel that fails in the cloud.
-- **Fix**: classify the new flag in `capabilities.ts` (keep, or strip with a one-line reason); lock a new host-bound setting in `managedPolicy.ts`.
+- **Fix**: classify the new flag in `capabilities.ts` (keep, strip with a one-line reason, or advertise t3flare's own value); lock a new host-bound setting in `managedPolicy.ts`.
 
 ### U5. MCP, `delegate_task` and `linkOrigin` (step 3)
 
@@ -90,11 +90,11 @@ The bump runs: the whole `pnpm run check` (`git apply --check` of the Patches, t
 
 ### U7. Client version skew: desktop, mobile, laptop
 
-- **Where**: the stock clients and the laptop's t3 update themselves on the nightly channel while the cloud stays pinned (ADR-0017); the owner's desktop already runs a newer nightly than the pin. The cloud advertises `serverVersion` and `orchestrationProtocolVersion` (`t3code/packages/contracts/src/environment.ts:13`, value 2) through the descriptor `composition.ts:449-475` builds. The web client is built from the pin (`stage.ts deploy … --web`); desktop and mobile are not.
-- **Breaks when**: a newer client calls a WebSocket method or HTTP endpoint the pin lacks, sends a field the pin's schema rejects, or expects a capability or stream the pin does not offer.
-- **Detection**: on `main`, **silent**: acceptance runs the pin's own client. Step 3 adds a stock npm t3 at its newest nightly as the laptop (`bump.ts` step "a stock t3 nightly from npm links to the bump stage", on `step-3`), which covers the Peer link only. That step can also fail on a broken upstream nightly the pin does not contain: read its detail before blaming the pin. Cheapest check: [T11](#gaps-in-detection), running the acceptance `/ws` client from the newest nightly's `@t3tools/contracts` against the bump stage.
-- **Blast radius**: the owner's desktop or phone shows errors, or features that fail, until the next bump lands.
-- **Fix**: bump. If the bump itself is blocked, the skew lasts as long as the block, so the bump is the fix.
+- **Where**: the stock clients and the laptop's t3 update themselves on the nightly channel while the cloud stays pinned (ADR-0017); the owner's desktop already runs a newer nightly than the pin. The cloud advertises `serverVersion` (the stamped Server version, [U87](#u87-the-server-version-stamp-in-app-updates-d1)) and `orchestrationProtocolVersion` (`t3code/packages/contracts/src/environment.ts:13`, value 2) through the descriptor `composition.ts` builds (`layerServerEnvironment`). The web client is built from the pin (`stage.ts deploy … --web`, with `APP_VERSION`); desktop and mobile are not. Since ADR-0037 a stock client offers its server Update on prod ([U88](#u88-the-respawn-server-update-and-its-outcome-in-app-updates-d2d7)): the skew lasts until the owner presses it, not until the next manual merge. A client whose protocol is newer than the pin's reaches that Update through `client-runtime/src/connection/outdatedHostUpdate.ts` (`updateOutdatedHost`), which opens a bare `/ws` with no `orchestrationProtocol` query.
+- **Breaks when**: a newer client calls a WebSocket method or HTTP endpoint the pin lacks, sends a field the pin's schema rejects, or expects a capability or stream the pin does not offer. For the protocol-blocked path: the pin's own `/ws` (`ws.ts` `hasCompatibleOrchestrationProtocol`) answers the bare socket 426 (true at `v0.1.11-nightly.20261117.4825`), and `OUTDATED_HOST_RESTART_TIMEOUT` (4 minutes) is shorter than an Update (5–18 minutes), so that path reports failure while the Update goes on.
+- **Detection**: on `main`, **silent**: acceptance runs the pin's own client. The Full gate adds a stock npm t3 at its newest nightly as the laptop (`bump.ts` step "a stock t3 nightly from npm links to the bump stage"), which covers the Peer link only; it can also fail on a broken upstream nightly the pin does not contain: read its detail before blaming the pin. `test/outdatedHostUpdate.test.ts` runs t3's outdated-host update against our descriptor and answer, and records that its socket carries no protocol. Cheapest check: [T11](#gaps-in-detection), running the acceptance `/ws` client from the newest nightly's `@t3tools/contracts` against the bump stage.
+- **Blast radius**: the owner's desktop or phone shows errors, or features that fail, until he presses Update. A protocol-blocked client cannot press it (426), and must be updated from a client on the pin's protocol or by the hourly bump's pull request.
+- **Fix**: press Update (or merge the proposed pin). If the bump itself is blocked, the skew lasts as long as the block, so the bump is the fix.
 
 ### U8. The SQL adapter and the PRAGMAs it answers
 
@@ -1628,6 +1628,54 @@ Moved from U58 when its Commissary readers went (SPI-1176).
 - **Detection**: typecheck (every service shape and contract type above); `test/acpRegistry.test.ts`, `databaseStorage.test.ts`, `otlp.test.ts`. **Silent**: a new registry agent defaults to "key from its environment" (refused, which is safe). Cheapest check: `scripts/pbatch2.ts registry|storage|otlp` on a stage deployed with `T3FLARE_PROBE=1`.
 - **Blast radius**: a registry list that offers an agent we cannot run (prepare still refused); a Storage page without a size; no OTLP export.
 - **Fix**: diff `AcpRegistrySupport.ts`, `DatabaseStorage.ts`, `cli/config.ts` between tags.
+
+### U87. The Server version stamp (in-app updates D1)
+
+- **Where**: `apps/environment/serverVersion.ts` reads `git -C t3code describe --tags --exact-match HEAD`; `build.ts`'s `serverVersionStamp` plugin serves `t3code/apps/server/package.json` (by real path) with that version, so every `import packageJson from "../package.json"` in t3's server (about 20 readers: `ServerEnvironment.ts`, `serverRuntimeState.ts`, `cloud/selfUpdate.ts`, our `updates/selfUpdate.ts`) sees it; `scripts/stage.ts` passes it to `prepare:web` as `APP_VERSION`, which `t3code/apps/web/vite.config.ts` (`configuredAppVersion`) reads first. Off an exact tag the manifest's own version (`0.1.10`) stands, and `stage.ts deploy prod` refuses. t3's release CI does the same by writing the manifest (`t3code/scripts/update-release-package-versions.ts`).
+- **Breaks when**: t3 reads its version some other way (a define, a generated module, `process.env`), moves the server manifest, renames `APP_VERSION`, or changes its tag format (`v<x.y.z>-nightly.<date>.<run>`).
+- **Detection**: acceptance step 2c asserts the tag, the descriptor's `serverVersion` and a web script's `APP_VERSION` agree (`scripts/lib/versionAgreement.ts`); deploy-prod's smoke check asserts `serverVersion` is the tag; `build.ts` prints the stamped version and `dist/build-report.json` records it. **Silent**: a reader that bypasses the manifest (a second version source) reports `0.1.10` while the descriptor is right.
+- **Blast radius**: every stock client says the Environment is out of date (or not, when it is), and offers an Update to a version that is already running, which the target policy refuses.
+- **Fix**: `git -C t3code grep -n "packageJson.version\|APP_VERSION"` between tags; stamp the new source.
+
+### U88. The `respawn` server Update and its outcome (in-app updates D2–D7)
+
+- **Where**: `apps/environment/src/updates/selfUpdate.ts` replaces `ServerSelfUpdate.layer` and `ServiceLauncherClient.layer` in `composition.ts` (`CloudSelfUpdate.layer` on the routes, `layerLauncherClient` as `layerLauncher`); `ws.ts` reads the service by tag (`[WS_METHODS.serverUpdateServer]`). It leans on: the `respawn` literal of `ServerSelfUpdateCapability` and `ServerSelfUpdateMethod` (`contracts/src/environment.ts`); the client's handling in `client-runtime/src/state/server.ts`: `respawn` takes no accepting-`ready` baseline (only `boot-service` does), the unary `serverUpdateServer` is used because `serverSelfUpdateProgress` is stripped, and the wait for a `ready` lasts `SERVER_UPDATE_RESUME_TIMEOUT` (32 minutes); `matchesServerUpdateReadyEvent` matches `ready.payload.updateOutcome.id` to the answer's `updateId`, and `validateServerUpdateReadyEvent` wants `committed` with `serverVersion` equal to the target, else fails with the outcome's `reason`; `serverRuntimeStartup.ts` puts `launcher.prepareTrial(...)`'s outcome on its startup `ready` (a failure there fails the boot, so ours never fails); `ServerLifecycleEvents.publish` keeps only the newest event per type and `ws.ts`'s `subscribeServerLifecycle` replays it, which is how the failed outcome reaches a client that reconnects.
+- **Breaks when**: t3 drops or renames `respawn`, gives it a baseline, changes the outcome's shape or how the client matches it, shortens the resume timeout below an Update's length, changes `prepareTrial`'s signature, or stops replaying the newest `ready`.
+- **Detection**: typecheck (the service shapes, the outcome schema, the literal); `test/updates.test.ts` (outcomes, `prepareTrial`), `test/capabilities.test.ts`, `test/outdatedHostUpdate.test.ts`. **Silent**: a client-side change in matching or timeouts: the client then reports a failure (or waits) while the Update lands. Cheapest check: a trial Update on a throwaway stage with an update target pointing at a fork.
+- **Blast radius**: the Update lands, but the button says it failed, or spins until its timeout.
+- **Fix**: `git -C t3code diff <old>..<new> -- packages/client-runtime/src/state/server.ts apps/server/src/cloud apps/server/src/serverRuntimeStartup.ts`.
+
+### U89. The provider-update runner contract (in-app updates D21)
+
+- **Where**: `apps/environment/src/updates/cliUpdate.ts`: the pi CLI's, Codex's and Claude's drivers (`provider/cli/piDriver.ts`, `codexDriver.ts`, `acpDriver.ts`) return `makeProviderMaintenanceCapabilities` with `updateExecutable: "t3flare-cli-update"`, `updateArgs: [<cli>]`, `updateLockKey: "t3flare-cli:<cli>"` and a `lookupLatestVersion`, and an `enrichSnapshot` through `enrichProviderSnapshotWithVersionAdvisory`. t3's `provider/providerMaintenanceRunner.ts` runs the command through the `ChildProcessSpawner` (our `agents/processRouter.ts`, route `update`) with a 30-minute timeout (`UPDATE_TIMEOUT_MINUTES`); `resolveSpawnCommand` passes the name through on Linux; before running it checks compatibility against the manifest (`broken`/`unsupported` refuse), returns "Already up to date" when a refresh's advisory is `current`, waits for the instances sharing the lock key through the installation gate, and after it re-checks for `unchanged`. `ws.ts` routes `server.updateProvider` to the runner under `providers:manage`.
+- **Breaks when**: t3 changes `ProviderMaintenanceCapabilities` or `makeProviderMaintenanceCapabilities`, the runner's timeout, its use of the spawner, its lock-key or gate logic, or the RPC's authorization.
+- **Detection**: typecheck; `test/cliUpdate.test.ts`. **Silent**: a runner that times out sooner (the command is killed while CI goes on; pressing again joins the run), or one that no longer re-checks after the command (a success card for an unchanged pin).
+- **Blast radius**: the card's Update button fails or hangs; the CLI bump itself still lands or fails in CI.
+- **Fix**: `git -C t3code diff <old>..<new> -- apps/server/src/provider/providerMaintenanceRunner.ts packages/provider-core/src/server/maintenanceResolver.ts`.
+
+### U90. The npm-to-release version mapping per CLI (in-app updates D22)
+
+- **Where**: `lookupLatestCliVersion` (`updates/cliUpdate.ts`) and `scripts/cli-bump.ts`: Codex is npm's `@openai/codex@latest`, whose versions equal the `rust-v<version>` GitHub releases the Dockerfile downloads (`codex-x86_64-unknown-linux-musl.tar.gz`, `codex-aarch64-…` for test:docker); pi is `@earendil-works/pi-coding-agent`; Claude Code is the `claudeCodeVersion` of the `@anthropic-ai/claude-agent-sdk` the newest `@agentclientprotocol/claude-agent-acp` pins (`cliManifest.test.ts` also assumes SDK `0.3.N` ships Claude Code `2.1.N`).
+- **Breaks when**: Codex's npm version stops matching a release tag or the tarball names change; the adapter pins the SDK by a range the lookup reads differently; the SDK drops `claudeCodeVersion`; pi's package moves.
+- **Detection**: the CLI bump's `pin` step (a download or lock that fails), then `check` (`cliManifest.test.ts`); `test/cliPins.test.ts`. **Silent**: an advisory that names a version CI will not land (the card offers an Update that ends unchanged).
+- **Blast radius**: a CLI update that fails or ends unchanged; the pin stays.
+- **Fix**: `npm view <package> --json` and the release page; adjust `cliPins.ts` and the lookup.
+
+### U91. The hourly bump, the land job and `queue: max` (in-app updates D4, D9)
+
+- **Where**: `.github/workflows/bump.yml`, `cli-bump.yml`, `land.yml`, `deploy-prod.yml`. Not t3's, but GitHub's: `queue: max` on `concurrency` (documented; actionlint does not know it yet); `run-name` from inputs, read back as a run's `display_title` by the DO (`updates/actions.ts`) and by `land.yml` (`gh run list … displayTitle`); a `GITHUB_TOKEN` push that starts no workflow, so `land.yml` dispatches `deploy-prod.yml`; the early exit's parse of `git ls-remote --tags` against bump.ts's tag format.
+- **Breaks when**: GitHub changes how runs are titled or listed, `queue` changes meaning, or t3 changes its tag format.
+- **Detection**: a trial run of each workflow (`land` + `dry_run`, `cli-bump` + `dry_run`, plan D16). **Silent**: an Update whose run the DO never finds expires after 45 minutes as failed.
+- **Blast radius**: Updates that fail to start or to report; no prod change without a successful land.
+- **Fix**: the run's log; `gh run list --workflow bump.yml --json displayTitle,event,createdAt`.
+
+### U92. The 32-minute resume timeout against the Update's length (in-app updates D7)
+
+- **Where**: t3's `SERVER_UPDATE_RESUME_TIMEOUT` (32 minutes, `client-runtime/src/state/server.ts`) against our record's 45-minute expiry (`UPDATE_EXPIRY_MS`, `updates/records.ts`), the 20-minute job timeout of Update runs, and the failed outcome's replay window (`FAILED_REPLAY_MS`, 35 minutes).
+- **Breaks when**: t3 shortens the timeout, or an Update (queued behind other bump runs) takes longer than it.
+- **Detection**: **silent**: the client says it could not confirm the update; the record still settles, and a reconnecting client sees the outcome.
+- **Blast radius**: a misleading "could not confirm" for an Update that landed or failed later.
+- **Fix**: keep the windows ordered: job timeout < client timeout < replay window < expiry.
 
 ## Gaps in detection
 
