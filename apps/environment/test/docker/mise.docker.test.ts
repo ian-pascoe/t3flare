@@ -122,6 +122,8 @@ def request(flow):
     docker(["run", "-d", "--name", PROXY, "--network", NET, "-v", `${work}:/home/mitmproxy/.mitmproxy`, MITMPROXY, "mitmdump", "-q", "-s", "/home/mitmproxy/.mitmproxy/log.py"]);
     for (let tries = 0; !fs.existsSync(path.join(work, "mitmproxy-ca-cert.pem")) && tries < 60; tries++) spawnSync("sleep", ["1"]);
     const requestsFile = path.join(work, "requests.jsonl");
+    const proxyState = docker(["inspect", "-f", "{{.State.Status}} {{.State.ExitCode}}", PROXY], { quiet: true }).stdout.trim();
+    check("the logging proxy runs", proxyState.startsWith("running") && fs.existsSync(path.join(work, "mitmproxy-ca-cert.pem")), { proxyState, logs: docker(["logs", "--tail", "30", PROXY], { quiet: true }).stderr.slice(-1500), files: fs.readdirSync(work) });
 
     /** One fresh Container: `script` in bash under `env`, offline unless `proxied` (then through the logging proxy). */
     const run = (env: Readonly<Record<string, string>>, script: string, options: { proxied?: boolean; hostsYml?: boolean; gitHelper?: boolean; plainGit?: boolean } = {}): Run => {

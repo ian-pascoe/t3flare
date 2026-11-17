@@ -71,7 +71,7 @@ it("Claude Code reaches the model relay with its handle, which no Claude process
       .map((line) => JSON.parse(line) as { path: string; model: string; apiKeyIsHandle: boolean; bearerIsHandle: boolean; bash: boolean });
     const shellEnv = read("shell-env.txt");
     const holders = read("holders.txt").split("\n").map((line) => line.trim()).filter((line) => line !== "");
-    const report = { models: result.models, shellEnvWritten: shellEnv !== "", watchLog: read("watch.log").slice(-600), stopReason: result.stopReason, errors: result.errors, toolCalls: result.toolCalls, relayed, holders, claude: read("claude-count.txt").trim(), forgedOther: read("forged-other.txt"), forgedStart: read("forged-start.txt"), helperBytes: read("helper-bytes.txt").trim() };
+    const report = { models: result.models, shellEnvWritten: shellEnv !== "", watchLog: read("watch.log").slice(-600), stopReason: result.stopReason, errors: result.errors, toolCalls: result.toolCalls, toolResults: result.toolResults, stderr: String(result.stderr ?? "").slice(-800), relayed, holders, claude: read("claude-count.txt").trim(), forgedOther: read("forged-other.txt"), forgedStart: read("forged-start.txt"), helperBytes: read("helper-bytes.txt").trim() };
     const text = JSON.stringify(report);
     expect(text.includes(handle), "the handle reached the report").toBe(false);
     expect(relayed.length, text).toBeGreaterThan(0);

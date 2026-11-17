@@ -16,7 +16,7 @@ const log = fs.createWriteStream(process.env.LOG ?? "/dev/null", { flags: "a" })
 const started = Date.now();
 const note = (dir, msg) => log.write(`${JSON.stringify({ t: Date.now() - started, dir, msg })}\n`);
 const child = spawn(command[0], command.slice(1), { stdio: ["pipe", "pipe", "pipe"], env: process.env });
-const summary = { commandUpdates: [], sessionId: null, errors: [], stderr: "", text: "", toolCalls: [], requests: {} };
+const summary = { commandUpdates: [], sessionId: null, errors: [], stderr: "", text: "", toolCalls: [], toolResults: [], requests: {} };
 let nextId = 1;
 const pending = new Map();
 let lastUpdate = 0;
@@ -65,6 +65,11 @@ child.stdout.on("data", (chunk) => {
       }
       if (update.sessionUpdate === "agent_message_chunk" && update.content?.type === "text") summary.text += update.content.text;
       if (update.sessionUpdate === "tool_call") summary.toolCalls.push({ title: update.title ?? null, kind: update.kind ?? null });
+      // What a finished tool call returned, cut short: why a command failed is in it.
+      if (update.sessionUpdate === "tool_call_update" && (update.status === "completed" || update.status === "failed") && summary.toolResults.length < 4) {
+        const text = (update.content ?? []).map((part) => part.content?.text ?? part.text ?? "").join("") || JSON.stringify(update.rawOutput ?? null);
+        summary.toolResults.push({ status: update.status, output: String(text).slice(0, 400) });
+      }
     }
   }
 });
