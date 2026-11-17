@@ -1,40 +1,187 @@
-// What the land workflow checks before it fast-forwards `main` to a proposed pin (ADR-0037; in-app updates plan D4):
-// the branch is exactly one commit on `origin/main`, it changes only the files its kind of update may change, and a t3
-// bump's gitlink is the upstream tag's commit. `scripts/land-check.ts` gathers the facts with git; this decides.
-import { CLI_PIN_FILES } from "./cliPins.ts";
+// What a trusted job checks before a proposed pin is published as proven or lands on `main` (ADR-0037; in-app
+// updates plan D4; review F2, F3). The facts come from git and GitHub (`scripts/land-check.ts`, `scripts/updates-ci.ts`);
+// the files themselves were written by a job that ran upstream code, so nothing here trusts their content: each rule
+// checks it. Dependency-free.
+import { compareVersions, CLI_PIN_FILES, EXACT_VERSION, NIGHTLY_TAG, type Pin, T3_PIN_FILES } from "../../src/updates/pins.ts";
 
-export type LandKind = "t3" | "cli";
-
-/** `scripts/bump.ts`'s PINNED_FILES and the submodule: all a t3 bump commits. */
-export const T3_PIN_FILES = ["t3code", "package.json", "pnpm-workspace.yaml", "pnpm-lock.yaml", "mise.toml"] as const;
-
-export const LAND_ALLOWLIST: Record<LandKind, ReadonlyArray<string>> = { t3: T3_PIN_FILES, cli: CLI_PIN_FILES };
+export const LAND_ALLOWLIST = { t3: T3_PIN_FILES, cli: CLI_PIN_FILES } as const;
 
 export interface LandFacts {
-  readonly kind: LandKind;
-  /** `git merge-base --is-ancestor origin/main <branch>` passed. */
+  readonly pin: Pin;
+  /** `git merge-base --is-ancestor origin/main <candidate>` passed. */
   readonly mainIsAncestor: boolean;
-  /** `git rev-list --count origin/main..<branch>`. */
+  /** `git rev-list --count origin/main..<candidate>`. */
   readonly commits: number;
-  /** `git diff --name-only origin/main <branch>`. */
+  /** `git diff --name-only origin/main <candidate>`. */
   readonly files: ReadonlyArray<string>;
-  /** A t3 bump: the branch's `t3code` gitlink and the upstream tag's commit. */
-  readonly gitlink?: string;
-  readonly tagCommit?: string;
+  /** A t3 bump: the candidate's `t3code` gitlink, and the commit of the tag the caller named (never the report's). */
+  readonly gitlink?: string | undefined;
+  readonly tagCommit?: string | undefined;
 }
 
-/** Why the branch may not land, or undefined. */
+/** Why the candidate may not land by its shape (one commit, its kind's files, the tag's gitlink), or undefined. */
 export const landRefusal = (facts: LandFacts): string | undefined => {
   if (!facts.mainIsAncestor) return "origin/main is not an ancestor of the branch: main moved on, or the branch is not a bump of it";
   if (facts.commits !== 1) return `the branch is ${facts.commits} commits on origin/main, not one`;
-  const allowed = new Set(LAND_ALLOWLIST[facts.kind]);
+  const allowed = new Set<string>(LAND_ALLOWLIST[facts.pin.kind]);
   const outside = facts.files.filter((file) => !allowed.has(file));
-  if (outside.length > 0) return `a ${facts.kind} bump may not change ${outside.join(", ")}`;
+  if (outside.length > 0) return `a ${facts.pin.kind} bump may not change ${outside.join(", ")}`;
   if (facts.files.length === 0) return "the branch changes nothing";
-  if (facts.kind === "t3") {
+  if (facts.pin.kind === "t3") {
     if (facts.gitlink === undefined || facts.tagCommit === undefined || facts.gitlink !== facts.tagCommit) {
-      return `the t3code gitlink ${facts.gitlink ?? "?"} is not the tag's commit ${facts.tagCommit ?? "?"}`;
+      return `the t3code gitlink ${facts.gitlink ?? "?"} is not ${facts.pin.tag}'s commit ${facts.tagCommit ?? "?"}`;
     }
   }
   return undefined;
+};
+
+/**
+ * Land, or only deploy (F2): when main already holds the pin (or a newer one), there is nothing to push, and the land
+ * deploys main's tip. That is how a press recovers a land whose push went through and whose deploy failed, whether or
+ * not the branch is still there.
+ */
+export const landMode = (pin: Pin, main: { readonly tag?: string | undefined; readonly cliVersion?: string | undefined }): "land" | "deploy-only" => {
+  if (pin.kind === "t3") return main.tag !== undefined && NIGHTLY_TAG.test(main.tag) && compareVersions(main.tag.slice(1), pin.tag.slice(1)) >= 0 ? "deploy-only" : "land";
+  return main.cliVersion !== undefined && compareVersions(main.cliVersion, pin.version) >= 0 ? "deploy-only" : "land";
+};
+
+/** A t3 bump's root package.json: only `packageManager` and `engines.node` move (gen-workspace.ts's two fields). */
+export const t3ManifestRefusal = (before: string, after: string): string | undefined => {
+  const strip = (text: string) => {
+    const json = JSON.parse(text) as { packageManager?: unknown; engines?: Record<string, unknown> };
+    const { packageManager: _, engines, ...rest } = json;
+    const { node: __, ...otherEngines } = engines ?? {};
+    return JSON.stringify({ ...rest, engines: otherEngines });
+  };
+  return strip(before) === strip(after) ? undefined : "package.json changes more than packageManager and engines.node";
+};
+
+type LockDocuments = ReadonlyArray<{ readonly packages?: Readonly<Record<string, unknown>> } | null | undefined>;
+
+const stable = (value: unknown): string =>
+  value !== null && typeof value === "object"
+    ? Array.isArray(value)
+      ? `[${value.map(stable).join(",")}]`
+      : `{${Object.keys(value)
+          .sort()
+          .map((key) => `${JSON.stringify(key)}:${stable((value as Record<string, unknown>)[key])}`)
+          .join(",")}}`
+    : JSON.stringify(value);
+
+export interface LockProvenance {
+  /** Entries neither lock vouches for that are not plain registry packages (a tarball URL, git, a directory): refused. */
+  readonly refused: ReadonlyArray<string>;
+  /** Entries neither lock vouches for, resolved from the npm registry by integrity alone: checked against the registry. */
+  readonly registry: ReadonlyArray<{ readonly name: string; readonly version: string; readonly integrity: string }>;
+}
+
+/**
+ * The t3 bump's pnpm lock (F3). A package entry main's lock or t3's lock at the tag holds exactly is vouched for. pnpm
+ * resolves t3flare's own packages against the registry, so a bump can bring new versions neither holds (the first trial:
+ * `@smithy/core@3.41.0`); those must be plain registry entries (`resolution: {integrity}` and nothing else), and
+ * `land-check.ts` asks the npm registry that each name@version has that integrity. Anything else is refused.
+ */
+export const lockProvenance = (after: LockDocuments, main: LockDocuments, t3: LockDocuments): LockProvenance => {
+  const vouched = new Map<string, Set<string>>();
+  for (const documents of [main, t3]) {
+    for (const document of documents) {
+      for (const [key, entry] of Object.entries(document?.packages ?? {})) vouched.set(key, (vouched.get(key) ?? new Set()).add(stable(entry)));
+    }
+  }
+  const refused: Array<string> = [];
+  const registry: Array<{ name: string; version: string; integrity: string }> = [];
+  for (const document of after) {
+    for (const [key, entry] of Object.entries(document?.packages ?? {})) {
+      if (vouched.get(key)?.has(stable(entry))) continue;
+      const match = /^(@?[^@]+)@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/.exec(key);
+      const resolution = (entry as { resolution?: Record<string, unknown> } | null)?.resolution;
+      const integrity = resolution?.integrity;
+      if (match === null || resolution === undefined || Object.keys(resolution).length !== 1 || typeof integrity !== "string" || !/^sha512-[A-Za-z0-9+/]+=*$/.test(integrity)) {
+        refused.push(key);
+      } else registry.push({ name: match[1]!, version: match[2]!, integrity });
+    }
+  }
+  return { refused, registry };
+};
+
+/** A proposed t3 branch as the plan sees it: its proof (A1) and whether it sits on main. */
+export interface ProposedBranch {
+  readonly gate: "update" | "full" | undefined;
+  readonly mainIsAncestor: boolean;
+  readonly commits: number;
+}
+
+export interface T3PlanInput {
+  readonly event: "schedule" | "workflow_dispatch";
+  /** The dispatch's `tag`, `land` and `verify` inputs. */
+  readonly tag?: string | undefined;
+  readonly land: boolean;
+  readonly verify: boolean;
+  /** The newest nightly on t3code's origin, and the tag main's gitlink is. */
+  readonly newest?: string | undefined;
+  readonly mainTag?: string | undefined;
+  /** `bump/<tag>` of the tag the run is about, when it exists. */
+  readonly branch?: ProposedBranch | undefined;
+}
+
+export type T3Plan = { readonly mode: "skip" | "bump" | "land"; readonly tag: string; readonly reason: string };
+
+const atOrAbove = (tag: string | undefined, target: string) => tag !== undefined && NIGHTLY_TAG.test(tag) && compareVersions(tag.slice(1), target.slice(1)) >= 0;
+
+/**
+ * What a `bump.yml` run does, decided by a trusted job before any upstream code runs (review F1, F2, A1):
+ * - hourly: skip a nightly main already pins, or one already proposed through the Full gate; else bump it.
+ * - an Update (`land`): land when main already pins it (land.yml then only deploys) or a branch the trusted publish job
+ *   proved (either gate) sits one commit on main; else bump it through the Update gate first.
+ * - anything else (by hand, verify): bump.
+ */
+export const planT3 = (input: T3PlanInput): T3Plan | string => {
+  if (input.verify) return { mode: "bump", tag: "", reason: "verify main's own pin through the Full gate" };
+  if (input.event === "schedule") {
+    const newest = input.newest;
+    if (newest === undefined) return { mode: "skip", tag: "", reason: "no nightly tag" };
+    if (atOrAbove(input.mainTag, newest)) return { mode: "skip", tag: newest, reason: `${newest} is already pinned` };
+    if (input.branch?.gate === "full") return { mode: "skip", tag: newest, reason: `${newest} is already proposed through the Full gate` };
+    return { mode: "bump", tag: newest, reason: input.branch?.gate === "update" ? `${newest} was proven by the Update gate only; the Full gate proposes it` : `${newest} is new` };
+  }
+  if (!input.land) return { mode: "bump", tag: input.tag ?? "", reason: "a bump by hand" };
+  if (input.tag === undefined || !NIGHTLY_TAG.test(input.tag)) return `an Update needs a nightly tag, not ${JSON.stringify(input.tag)}`;
+  if (atOrAbove(input.mainTag, input.tag)) return { mode: "land", tag: input.tag, reason: `main already pins ${input.mainTag}; deploy it` };
+  const branch = input.branch;
+  if (branch !== undefined && branch.gate !== undefined && branch.mainIsAncestor && branch.commits === 1) {
+    return { mode: "land", tag: input.tag, reason: `bump/${input.tag} is proven (${branch.gate} gate) on top of main` };
+  }
+  return { mode: "bump", tag: input.tag, reason: `bump/${input.tag} is not proven on top of main` };
+};
+
+/**
+ * A bump job's report, read by a trusted job (review F1): untrusted input, so every field it uses is checked against a
+ * strict pattern, and a t3 report must pin the tag the caller asked for. Returns what the job may act on, or why not.
+ */
+export const readBumpReport = (
+  text: string,
+  expect: { readonly kind: "t3"; readonly tag?: string | undefined } | { readonly kind: "cli"; readonly cli: string; readonly running?: string | undefined },
+): { readonly changed: boolean; readonly to: string; readonly gate: "update" | "full"; readonly land: boolean } | string => {
+  let report: Record<string, unknown>;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return "the report is not a JSON object";
+    report = parsed as Record<string, unknown>;
+  } catch {
+    return "the report is not JSON";
+  }
+  if (report.ok !== true) return "the report is not a pass";
+  if (typeof report.changed !== "boolean") return "report.changed is not a boolean";
+  const changed = report.changed;
+  if (expect.kind === "t3") {
+    if (typeof report.to !== "string" || !NIGHTLY_TAG.test(report.to)) return `report.to is not a nightly tag: ${JSON.stringify(report.to)}`;
+    if (report.gate !== "update" && report.gate !== "full") return `report.gate is ${JSON.stringify(report.gate)}`;
+    if (expect.tag !== undefined && report.to !== expect.tag) return `the report pins ${report.to}, not the requested ${expect.tag}`;
+    return { changed, to: report.to, gate: report.gate, land: changed };
+  }
+  if (report.cli !== expect.cli) return `the report is not ${expect.cli}'s`;
+  if (typeof report.to !== "string" || !EXACT_VERSION.test(report.to)) return `report.to is not a version: ${JSON.stringify(report.to)}`;
+  if (expect.running !== undefined && !EXACT_VERSION.test(expect.running)) return `the running version is not a version: ${JSON.stringify(expect.running)}`;
+  // F2: a press while prod runs an older pin than main's newest lands nothing new, and only deploys.
+  return { changed, to: report.to, gate: "update", land: changed || (expect.running !== undefined && expect.running !== report.to) };
 };

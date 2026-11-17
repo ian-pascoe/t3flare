@@ -58,7 +58,7 @@ const mapStore = (): UpdateStore => {
 const fakeRuns = (conclusion: string) => {
   const dispatched: Array<Readonly<Record<string, string>>> = [];
   let polls = 0;
-  const run = (): WorkflowRun => ({ id: 5, url: "https://github.com/o/r/actions/runs/5", status: polls > 1 ? "completed" : "in_progress", conclusion: polls > 1 ? conclusion : null });
+  const run = (): WorkflowRun => ({ id: 5, url: "https://github.com/o/r/actions/runs/5", status: polls > 1 ? "completed" : "in_progress", conclusion: polls > 1 ? conclusion : null, startedAt: 0 });
   const client: ActionsClient = {
     dispatch: async (_workflow, inputs) => void dispatched.push(inputs),
     findRun: async (workflow, runName) => (workflow === "cli-bump.yml" && runName === `CLI update ${dispatched.at(-1)?.update_id}` ? run() : undefined),
@@ -81,7 +81,7 @@ describe("t3flare-cli-update", () => {
   it("dispatches cli-bump.yml for the CLI and exits 0 once its run lands", async () => {
     const { client, dispatched } = fakeRuns("success");
     const answer = await runCliUpdate(["pi"], options(client));
-    expect(dispatched).toEqual([{ cli: "pi", update_id: "c1", dry_run: "false" }]);
+    expect(dispatched).toEqual([{ cli: "pi", update_id: "c1", dry_run: "false", running: CLIS.pi.version }]);
     expect(answer.exitCode).toBe(0);
   });
 

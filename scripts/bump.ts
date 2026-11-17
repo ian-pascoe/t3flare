@@ -37,6 +37,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import { keptReportJson } from "../apps/environment/scripts/lib/modelEndpointSpec.ts";
+import { newestNightly, PINNED_FILES } from "../apps/environment/src/updates/pins.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const t3 = path.join(root, "t3code");
@@ -102,21 +103,9 @@ const step = (name: string, run: () => { ok: boolean; detail?: string }, detailC
   return result.ok;
 };
 
-/** `v<version>-nightly.<yyyymmdd>.<run>`, ordered by date then run. */
-const NIGHTLY = /^v[\d.]+-nightly\.(\d{8})\.(\d+)$/;
-const newestNightly = (tags: Array<string>) =>
-  tags
-    .filter((tag) => NIGHTLY.test(tag))
-    .sort((a, b) => {
-      const [, da, ra] = NIGHTLY.exec(a)!;
-      const [, db, rb] = NIGHTLY.exec(b)!;
-      return da === db ? Number(ra) - Number(rb) : da!.localeCompare(db!);
-    })
-    .at(-1);
 
 let lockLine: string | undefined;
 let rollbackResult: { ok: boolean; t3code: string; pinnedFiles: string; install: string } | undefined;
-const PINNED_FILES = ["package.json", "pnpm-workspace.yaml", "pnpm-lock.yaml", "mise.toml"];
 const from = sh("git", ["describe", "--tags", "--exact-match", "HEAD"], t3, { quiet: true }).output.trim() || sh("git", ["rev-parse", "HEAD"], t3, { quiet: true }).output.trim();
 const fromCommit = sh("git", ["rev-parse", "HEAD"], t3, { quiet: true }).output.trim();
 

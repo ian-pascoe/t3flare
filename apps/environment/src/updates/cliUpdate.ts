@@ -1,4 +1,4 @@
-// @effect-diagnostics globalFetch:off globalDate:off globalTimers:off effectFnOpportunity:off
+// @effect-diagnostics globalFetch:off globalDate:off globalTimers:off effectFnOpportunity:off cryptoRandomUUID:off
 // CLI updates from t3's stock provider-update button (ADR-0037; in-app updates plan D21, D22): the pi CLI, Codex and
 // Claude Code each get a real `update` capability on a stage with an update target (prod, D14), whose command is
 // `t3flare-cli-update <cli>`. t3's `ProviderMaintenanceRunner` runs it through the `ChildProcessSpawner`, which is our
@@ -25,14 +25,27 @@ import * as Option from "effect/Option";
 import * as HttpClient from "effect/http/HttpClient";
 
 import { environmentServices } from "../agents/bindings.ts";
-import type { CliName, Updates } from "./records.ts";
+import { isUpdatableCli, pinVersionOf, type UpdatableCli } from "./pins.ts";
+import type { Updates } from "./records.ts";
 
 /** The command t3's runner spawns; the process router answers it (`agents/processRouter.ts`). */
 export const CLI_UPDATE_COMMAND = "t3flare-cli-update";
+/** The environment variable carrying this isolate's update token (review A4). */
+export const CLI_UPDATE_TOKEN_ENV = "T3FLARE_CLI_UPDATE_TOKEN";
+
+let token: string | undefined;
+/**
+ * This isolate's token for `t3flare-cli-update` (review A4). Other t3 paths spawn commands a client can set (a custom
+ * text generator's command, a project's setup script), so the router answers the command only with this token in its
+ * environment. It goes into the update capability's `env`, which t3's runner passes to the spawn and never sends to a
+ * client (the advisory carries only the display command; the running message only the executable and argv). Made at
+ * first use: workerd forbids randomness at module load.
+ */
+export const cliUpdateToken = (): string => (token ??= crypto.randomUUID());
 export const CLI_UPDATE_WORKFLOW = "cli-bump.yml";
 export const cliUpdateRunName = (id: string) => `CLI update ${id}`;
 
-const CLI_LABELS: Record<CliName, string> = { pi: "the pi CLI", codex: "Codex", claude: "Claude Code" };
+const CLI_LABELS: Record<UpdatableCli, string> = { pi: "the pi CLI", codex: "Codex", claude: "Claude Code" };
 
 /** How long one npm request may take (t3's own lookup allows 4 s). */
 const LOOKUP_TIMEOUT_MS = 4_000;
@@ -41,7 +54,6 @@ const POLL_MS = 20_000;
 /** The command gives up a little after t3's runner (30 minutes) would kill it. */
 const COMMAND_DEADLINE_MS = 31 * 60_000;
 
-const isCli = (value: string | undefined): value is CliName => value === "pi" || value === "codex" || value === "claude";
 
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -56,7 +68,7 @@ const stringField = (document: Record<string, unknown> | null, field: string): s
 };
 
 /** The newest version of `cli` as its card compares it with the pin, or null when npm does not say. */
-export const lookupLatestCliVersion = async (cli: CliName, fetchFn: Fetch = (url, init) => fetch(url, init)): Promise<string | null> => {
+export const lookupLatestCliVersion = async (cli: UpdatableCli, fetchFn: Fetch = (url, init) => fetch(url, init)): Promise<string | null> => {
   try {
     if (cli === "codex") return stringField(await npmDocument(fetchFn, "@openai%2Fcodex/latest"), "version");
     if (cli === "pi") return stringField(await npmDocument(fetchFn, `${CLIS.pi.package.replace("/", "%2F")}/latest`), "version");
@@ -80,7 +92,7 @@ const configuredUpdates = (): Updates | undefined => {
  * `cli`'s maintenance capabilities: with an update target, a real `update` (`t3flare-cli-update <cli>`, its own lock key)
  * and the npm advisory; without one, manual-only as before (ADR-0024).
  */
-export const cliMaintenance = (provider: ProviderDriverKind, cli: CliName, options: { readonly configured?: boolean; readonly fetch?: Fetch } = {}): ProviderMaintenanceCapabilities =>
+export const cliMaintenance = (provider: ProviderDriverKind, cli: UpdatableCli, options: { readonly configured?: boolean; readonly fetch?: Fetch } = {}): ProviderMaintenanceCapabilities =>
   (options.configured ?? configuredUpdates() !== undefined)
     ? makeProviderMaintenanceCapabilities({
         provider,
@@ -89,6 +101,7 @@ export const cliMaintenance = (provider: ProviderDriverKind, cli: CliName, optio
         updateArgs: [cli],
         updateLockKey: `t3flare-cli:${cli}`,
         platform: "linux",
+        env: { [CLI_UPDATE_TOKEN_ENV]: cliUpdateToken() },
         latestVersion: null,
         lookupLatestVersion: Effect.promise(() => lookupLatestCliVersion(cli, options.fetch)),
       })
@@ -135,7 +148,7 @@ export const runCliUpdate = async (
   options: { readonly updates?: Updates | undefined; readonly now?: () => number; readonly sleep?: (ms: number) => Promise<void> } = {},
 ): Promise<CommandAnswer> => {
   const cli = argv[0];
-  if (!isCli(cli) || argv.length !== 1) return { exitCode: 2, stdout: "", stderr: `usage: ${CLI_UPDATE_COMMAND} pi|codex|claude\n` };
+  if (!isUpdatableCli(cli) || argv.length !== 1) return { exitCode: 2, stdout: "", stderr: `usage: ${CLI_UPDATE_COMMAND} pi|codex|claude\n` };
   const updates = "updates" in options ? options.updates : configuredUpdates();
   if (updates === undefined) return { exitCode: 1, stdout: "", stderr: "This Environment has no update target; only prod updates its CLIs.\n" };
   const now = options.now ?? (() => Date.now());
@@ -150,7 +163,8 @@ export const runCliUpdate = async (
       label: CLI_LABELS[cli],
       workflow: CLI_UPDATE_WORKFLOW,
       runName: cliUpdateRunName,
-      inputs: (id) => ({ cli, update_id: id, dry_run: "false" }),
+      // `running`: the pin this build runs, so CI only deploys when main already holds the newest (review F2).
+      inputs: (id) => ({ cli, update_id: id, dry_run: "false", running: pinVersionOf(cli, CLIS) }),
     });
   } catch (error) {
     return { exitCode: 1, stdout: "", stderr: `${error instanceof Error ? error.message : String(error)}\n` };
@@ -170,3 +184,10 @@ export const runCliUpdate = async (
     await sleep(POLL_MS);
   }
 };
+
+/**
+ * Whether a spawn is t3's provider-update runner running a CLI update (review A4): exactly `t3flare-cli-update <cli>`,
+ * with this isolate's token in its environment. Anything else is not answered (a missing binary).
+ */
+export const isCliUpdateSpawn = (command: string, argv: ReadonlyArray<string>, env: Readonly<Record<string, unknown>> | undefined): boolean =>
+  command === CLI_UPDATE_COMMAND && argv.length === 1 && isUpdatableCli(argv[0]) && token !== undefined && env?.[CLI_UPDATE_TOKEN_ENV] === token;

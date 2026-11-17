@@ -36,7 +36,7 @@ import { bindScratchCheckout, isScratchDir, scratchProjectOf } from "./scratch.t
 import { workspaceRpc } from "./workspaceClient.ts";
 import { CLI_NAMES, spawnCli } from "./cliProcess.ts";
 import { HTML_BROWSER_EXECUTABLE, spawnHtmlBrowser } from "../preview/htmlBrowser.ts";
-import { CLI_UPDATE_COMMAND, runCliUpdate } from "../updates/cliUpdate.ts";
+import { isCliUpdateSpawn, runCliUpdate } from "../updates/cliUpdate.ts";
 
 /** Commands t3 tried to spawn that nothing answers (step 1's report). */
 export const spawnAttempts = new Map<string, number>();
@@ -450,8 +450,6 @@ const routeOf = (
   spawnCwd: string | undefined,
 ): ((env: Readonly<Record<string, unknown>> | undefined, stdin: string | undefined) => Promise<Answer>) | null => {
   if (name === "gh") return ghRouteOf(argv);
-  // In-app updates (ADR-0037, plan D21): t3's provider-update command dispatches a CLI bump and follows its run.
-  if (name === CLI_UPDATE_COMMAND) return async () => ({ ...(await runCliUpdate(argv)), route: "update" });
   if (name !== "git") return null;
   if (argv.length === 1 && argv[0] === "--version") return async () => ({ exitCode: 0, stdout: `${GIT_VERSION}\n`, stderr: "", route: "emulated" });
   // `git -C <dir> …`: the directory is the command's cwd.
@@ -514,7 +512,11 @@ export const spawn = (command: ChildProcess.Command) =>
         Effect.tapError((error) => Effect.sync(() => record({ at: started, command: name, argv: traceArgv(args.slice(0, 4)), cwd: cwd ?? null, route: "error", exitCode: null, ms: Date.now() - started, detail: String(error).slice(0, 300) }))),
       );
     }
-    const route = routeOf(name, args, cwd);
+    // In-app updates (ADR-0037, plan D21): t3's provider-update runner's command dispatches a CLI bump and follows its
+    // run; only with this isolate's token in its environment and exactly its argv (review A4), else a missing binary.
+    const route = isCliUpdateSpawn(command.command, args, command.options.env as Readonly<Record<string, unknown>> | undefined)
+      ? async () => ({ ...(await runCliUpdate(args)), route: "update" as const })
+      : routeOf(name, args, cwd);
     if (route === null) {
       spawnAttempts.set(name, (spawnAttempts.get(name) ?? 0) + 1);
       record({ at: Date.now(), command: name, argv: traceArgv(args), cwd: cwd ?? null, route: "not-found", exitCode: null, ms: 0 });

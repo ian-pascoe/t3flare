@@ -1,18 +1,26 @@
 // @effect-diagnostics extendsNativeError:off
 // In-app Updates' state (ADR-0037; in-app updates plan D7, D9, D19): one record per target in the Environment DO's
 // storage (`t3`, and one per CLI), so a press survives the DO's resets. A press dispatches the target's workflow, and
-// the record follows the run that dispatch made until it ends, or for 45 minutes, after which it reads as failed. The
+// the record follows the run that dispatch made until it ends, or for 60 minutes from its start (UPDATE_EXPIRY_MS), after which it reads as failed. The
 // same target pressed again re-attaches to the record in flight; a different one is refused while it runs.
 //
 // Promise-based and free of t3: the Effect layers (`selfUpdate.ts`) and the process router (`cliUpdate.ts`) drive it.
 import type { ActionsClient } from "./actions.ts";
+import type { UpdatableCli } from "./pins.ts";
 
-/** A record still in flight this long after its dispatch has failed. */
-export const UPDATE_EXPIRY_MS = 45 * 60_000;
+/**
+ * How long a record may stay in flight (review A2). Measured from its run's start, not its dispatch: a run waits its
+ * turn in the `bump` concurrency group behind other bumps (`queue: max`) for as long as they take. 60 minutes covers the
+ * run's own timeouts (the bump job's 20, publish's 15 and the land's 35 are ceilings; a run that hits them has failed
+ * already), and orders after t3's 32-minute client wait and the 35-minute replay of a failed outcome (U92).
+ */
+export const UPDATE_EXPIRY_MS = 60 * 60_000;
+/** A run still waiting its turn this long after the dispatch has failed. */
+export const QUEUED_CEILING_MS = 3 * 60 * 60_000;
+/** A dispatch whose run GitHub never lists within this has failed. */
+export const UNLISTED_MS = 15 * 60_000;
 
-export type CliName = "pi" | "codex" | "claude";
-export const CLI_NAMES: ReadonlyArray<CliName> = ["pi", "codex", "claude"];
-export type UpdateKey = "t3" | `cli:${CliName}`;
+export type UpdateKey = "t3" | `cli:${UpdatableCli}`;
 
 export interface UpdateOutcome {
   readonly status: "succeeded" | "failed";
@@ -34,6 +42,8 @@ export interface UpdateRecord {
   readonly runName: string;
   readonly dispatchedAt: number;
   readonly run: { readonly id: number; readonly url: string } | null;
+  /** When its run left the queue; null while it waits (or before it is found). */
+  readonly startedAt?: number | null;
   /** Null while in flight. */
   readonly outcome: UpdateOutcome | null;
 }
@@ -99,14 +109,23 @@ export const updates = (deps: {
     }
     if (current.run !== null) {
       const run = await actions.getRun(current.run.id);
+      if ((current.startedAt ?? null) === null && run.startedAt !== null) current = save({ ...current, startedAt: run.startedAt });
       if (run.status === "completed") {
         if (run.conclusion === "success") return settleWith(current, "succeeded", `${current.label}: ${run.url}`);
         const step = await actions.failedStep(run.id).catch(() => undefined);
         return settleWith(current, "failed", `The update to ${current.label} failed${step === undefined ? "" : ` at "${step}"`} (${run.conclusion ?? "no conclusion"}). Press Update to retry: ${run.url}`);
       }
     }
-    if (deps.now() - current.dispatchedAt > UPDATE_EXPIRY_MS) {
-      return settleWith(current, "failed", `The update to ${current.label} did not finish within ${UPDATE_EXPIRY_MS / 60_000} minutes${current.run === null ? " (its run never started)" : `: ${current.run.url}`}.`);
+    const now = deps.now();
+    const startedAt = current.startedAt ?? null;
+    if (current.run === null && now - current.dispatchedAt > UNLISTED_MS) {
+      return settleWith(current, "failed", `The update to ${current.label} never started: GitHub lists no run for it ${UNLISTED_MS / 60_000} minutes after its dispatch.`);
+    }
+    if (startedAt !== null && now - startedAt > UPDATE_EXPIRY_MS) {
+      return settleWith(current, "failed", `The update to ${current.label} did not finish within ${UPDATE_EXPIRY_MS / 60_000} minutes of its start: ${current.run?.url ?? ""}`);
+    }
+    if (startedAt === null && now - current.dispatchedAt > QUEUED_CEILING_MS) {
+      return settleWith(current, "failed", `The update to ${current.label} waited its turn for ${QUEUED_CEILING_MS / 3_600_000} hours without starting: ${current.run?.url ?? ""}`);
     }
     return current;
   };

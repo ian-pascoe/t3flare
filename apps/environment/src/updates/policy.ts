@@ -5,8 +5,7 @@
 import type { ServerSelfUpdateInput } from "@t3tools/contracts";
 import { compareSemverVersions } from "@t3tools/shared/semver";
 
-/** `<x.y.z>-nightly.<yyyymmdd>.<run>`: a t3 nightly's version, whose tag is `v` and the version. */
-export const NIGHTLY_VERSION = /^\d+\.\d+\.\d+-nightly\.\d{8}\.\d+$/;
+import { NIGHTLY_VERSION } from "./pins.ts";
 
 /** Why the Cloud Environment refuses to update to `input`'s target from `current`, or undefined to accept it. */
 export const serverUpdateRefusal = (input: ServerSelfUpdateInput, current: string): string | undefined => {

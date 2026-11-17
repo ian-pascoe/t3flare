@@ -19,27 +19,16 @@
 //     sub-test. The full test:docker and every CLI's sub-test run in the verify run after the land (D18).
 //  5. Report. On any failure the edited files go back; with --commit a passing pin is committed.
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 
 import { keptReportJson } from "../apps/environment/scripts/lib/modelEndpointSpec.ts";
-import {
-  type BumpableCli,
-  CLI_PIN_FILES,
-  codexTarballs,
-  lockedVersion,
-  withClisFields,
-  withDependency,
-  withDockerfileArg,
-} from "../apps/environment/scripts/lib/cliPins.ts";
+import { applyCliPin, CLI_PIN_FILES, defaultPinIo, latestPackageOf } from "../apps/environment/scripts/lib/cliPins.ts";
+import { isUpdatableCli, pinVersionOf, type UpdatableCli } from "../apps/environment/src/updates/pins.ts";
 import { CLIS } from "../apps/sandbox-image/src/clis.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const environment = path.join(root, "apps/environment");
-const image = path.join(root, "apps/sandbox-image/image");
-const clisFile = path.join(root, "apps/sandbox-image/src/clis.ts");
 const args = process.argv.slice(2);
 const flag = (name: string) => args.includes(`--${name}`);
 const option = (name: string) => (args.includes(`--${name}`) ? args[args.indexOf(`--${name}`) + 1] : undefined);
@@ -50,11 +39,11 @@ const cli = option("cli");
 // Every pnpm command belongs to this workspace, never t3code's (AGENTS.md).
 process.env.NPM_CONFIG_WORKSPACE_DIR = root;
 
-if (cli !== "pi" && cli !== "codex" && cli !== "claude") {
+if (!isUpdatableCli(cli)) {
   console.error("usage: pnpm run cli-bump --cli pi|codex|claude [--version <v>] [--commit] [--no-deploy] [--report <file>]");
   process.exit(2);
 }
-const which: BumpableCli = cli;
+const which: UpdatableCli = cli;
 
 interface Step {
   readonly name: string;
@@ -70,7 +59,7 @@ const sh = (command: string, commandArgs: Array<string>, cwd: string, options: {
   const result = spawnSync(command, commandArgs, { cwd, encoding: "utf8", env: { ...process.env, FORCE_COLOR: "0" }, maxBuffer: 256 * 1024 * 1024 });
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
   if (!options.quiet) process.stdout.write(output);
-  return { ok: result.status === 0, output, stdout: result.stdout ?? "" };
+  return { ok: result.status === 0, output };
 };
 
 const step = async (name: string, run: () => { ok: boolean; detail?: string } | Promise<{ ok: boolean; detail?: string }>, detailChars = DETAIL_CHARS): Promise<boolean> => {
@@ -89,11 +78,8 @@ const step = async (name: string, run: () => { ok: boolean; detail?: string } | 
   return result.ok;
 };
 
-/** `npm view <spec> <field>` from outside the workspace (npm warns about workspaces there), or "". */
-const npmView = (spec: string, field: string) => (spawnSync("npm", ["view", spec, field], { cwd: os.tmpdir(), encoding: "utf8" }).stdout ?? "").trim();
-
-/** The pin now: Codex's and pi's version, the Claude adapter's. */
-const from = which === "claude" ? CLIS.claude.packageVersion : CLIS[which].version;
+/** The pin now, as the branch names it: Codex's and pi's version, the Claude adapter's. */
+const from = pinVersionOf(which, CLIS);
 let to: string | undefined = option("version");
 let changedTo: Record<string, string> = {};
 
@@ -102,6 +88,7 @@ const finish = (ok: boolean, note?: string): never => {
     ok,
     cli: which,
     gate: "update",
+    // The pin as the branch names it, before and after (`from`, `to`).
     from,
     to: to ?? null,
     changed: to !== undefined && to !== from,
@@ -122,63 +109,20 @@ const rollback = () => {
   sh("git", ["checkout", "--", ...CLI_PIN_FILES], root);
 };
 
-const sha256Of = async (url: string): Promise<string> => {
-  const response = await fetch(url, { redirect: "follow" });
-  if (!response.ok || response.body === null) throw new Error(`${url} answered ${response.status}`);
-  const hash = createHash("sha256");
-  for await (const chunk of response.body) hash.update(chunk);
-  return hash.digest("hex");
-};
-
-/** npm's lock for `dir` after its package.json changed, without installing or running anything. */
-const relockNpm = (dir: string) => sh("npm", ["install", "--package-lock-only", "--ignore-scripts", "--no-audit", "--no-fund"], dir);
-
-const edit = (file: string, change: (text: string) => string) => fs.writeFileSync(file, change(fs.readFileSync(file, "utf8")));
-
-const editPin = async (): Promise<{ ok: boolean; detail?: string }> => {
-  const version = to!;
-  if (which === "codex") {
-    const tarballs = codexTarballs(version);
-    const [amd64, arm64] = await Promise.all([sha256Of(tarballs.amd64), sha256Of(tarballs.arm64)]);
-    edit(path.join(image, "Dockerfile"), (text) => withDockerfileArg(withDockerfileArg(text, "CODEX_VERSION", version), "CODEX_SHA256", amd64));
-    changedTo = { version, sha256: amd64, sha256Arm64: arm64 };
-    edit(clisFile, (text) => withClisFields(text, "codex", changedTo));
-    return { ok: true, detail: JSON.stringify(changedTo) };
-  }
-  if (which === "pi") {
-    edit(path.join(image, "cli/package.json"), (text) => withDependency(text, CLIS.pi.package, version));
-    const relocked = relockNpm(path.join(image, "cli"));
-    if (!relocked.ok) return { ok: false, detail: relocked.output };
-    const locked = lockedVersion(fs.readFileSync(path.join(image, "cli/package-lock.json"), "utf8"), CLIS.pi.package);
-    if (locked !== version) return { ok: false, detail: `the lock installs ${CLIS.pi.package}@${String(locked)}, not ${version}` };
-    changedTo = { version };
-    edit(clisFile, (text) => withClisFields(text, "pi", changedTo));
-    return { ok: true, detail: JSON.stringify(changedTo) };
-  }
-  edit(path.join(image, "claude/package.json"), (text) => withDependency(text, CLIS.claude.package, version));
-  const relocked = relockNpm(path.join(image, "claude"));
-  if (!relocked.ok) return { ok: false, detail: relocked.output };
-  const lock = fs.readFileSync(path.join(image, "claude/package-lock.json"), "utf8");
-  const sdkVersion = lockedVersion(lock, "@anthropic-ai/claude-agent-sdk");
-  if (sdkVersion === undefined) return { ok: false, detail: "the lock installs no @anthropic-ai/claude-agent-sdk" };
-  const claudeCode = npmView(`@anthropic-ai/claude-agent-sdk@${sdkVersion}`, "claudeCodeVersion");
-  if (claudeCode === "") return { ok: false, detail: `npm names no claudeCodeVersion for @anthropic-ai/claude-agent-sdk@${sdkVersion}` };
-  changedTo = { version: claudeCode, packageVersion: version, sdkVersion };
-  edit(clisFile, (text) => withClisFields(text, "claude", changedTo));
-  return { ok: true, detail: JSON.stringify(changedTo) };
-};
-
 const resolved = await step(`resolve ${which}'s newest version`, () => {
   if (to !== undefined) return { ok: true, detail: `given: ${to}` };
-  const pkg = which === "codex" ? "@openai/codex" : which === "pi" ? CLIS.pi.package : CLIS.claude.package;
-  to = npmView(`${pkg}@latest`, "version") || undefined;
+  const pkg = latestPackageOf(which);
+  to = defaultPinIo.npmView(`${pkg}@latest`, "version") || undefined;
   return to === undefined ? { ok: false, detail: `npm has no latest ${pkg}` } : { ok: true, detail: `${from} → ${to}` };
 });
 if (!resolved) finish(false);
 if (to === from) finish(true, "unchanged: the pin is already the newest version");
 
 const ok =
-  (await step(`pin ${which} ${to}`, editPin)) &&
+  (await step(`pin ${which} ${to}`, async () => {
+    changedTo = await applyCliPin(root, which, to!);
+    return { ok: true, detail: JSON.stringify(changedTo) };
+  })) &&
   (await step("check (pnpm run check: patches, typecheck, lint, test; the CLI manifest)", () => {
     const result = sh("pnpm", ["run", "check"], root);
     return { ok: result.ok, detail: result.output };

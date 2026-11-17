@@ -8,8 +8,14 @@ name: CLI bump
 # acceptance test's core plus that CLI's sub-test; the full test:docker and every CLI's sub-test run in the verify run
 # after the land (bump.yml, D18). Shares the `bump` concurrency group with bump.yml (`queue: max`, nothing cancelled).
 #
-# Needs the `bump` environment's secrets, as bump.yml (see there); prod's never reach it: land.yml deploys prod by
-# dispatching deploy-prod.yml.
+# Trust (review F1), as bump.yml: only the `bump` job runs upstream and dependency code, with a token that reads contents
+# and nothing else; it hands the proven commit to the trusted `publish` job as an artifact (a git bundle and its report).
+# `publish` checks the commit with main's own `scripts/land-check.ts` (the pin made again from main's files and compared
+# byte for byte), then pushes `bump/cli-<cli>-<version>`, marks it proven, and calls land.yml. `running` is the version
+# prod runs (the Environment DO sends it): when main already holds the newest pin and prod does not run it, the run only
+# deploys (review F2).
+#
+# Needs the `bump` environment's secrets, as bump.yml (see there), in the bump job only; prod's never reach it.
 
 run-name: ${{ inputs.update_id && format('CLI update {0}', inputs.update_id) || format('CLI bump {0}', inputs.cli) }}
 
@@ -27,11 +33,11 @@ on:
         description: "Prove the newest version on the bump stage; commit, push and land nothing"
         type: boolean
         default: false
+      running:
+        description: "The version of the CLI prod runs (as its bump branch names it), from the Environment DO"
+        required: false
 
-permissions:
-  contents: write
-  actions: write
-  issues: write
+permissions: {}
 
 concurrency:
   group: bump
@@ -39,14 +45,14 @@ concurrency:
   queue: max
 
 jobs:
+  # Untrusted: runs upstream and dependency code; its token reads contents only.
   bump:
     runs-on: ubuntu-latest
     # An Update's run fails within 20 minutes (ADR-0037, D7).
     timeout-minutes: ${{ inputs.update_id && 20 || 45 }}
     environment: bump
-    outputs:
-      branch: ${{ steps.push.outputs.branch }}
-      to: ${{ steps.push.outputs.to }}
+    permissions:
+      contents: read
     env:
       NPM_CONFIG_WORKSPACE_DIR: ${{ github.workspace }}
     steps:
@@ -56,6 +62,9 @@ jobs:
           ref: main
           fetch-depth: 0
           persist-credentials: false
+
+      - id: base
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - run: git submodule update --init t3code
 
@@ -94,38 +103,77 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Bundle the pin
+        if: success() && inputs.dry_run != true
+        run: |
+          if [ "$(git rev-parse HEAD)" != "$BASE" ]; then git bundle create pin.bundle HEAD "^$BASE"; fi
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cli-bump-report
-          path: cli-bump-report.json
+          name: cli-bump
+          path: |
+            cli-bump-report.json
+            pin.bundle
           if-no-files-found: ignore
 
-      # The proven pin on its own branch, `bump/cli-<cli>-<version>`, for the land job.
-      - name: Push the new pin
-        id: push
-        if: success() && inputs.dry_run != true
+  # Trusted: checks the proven commit and publishes it; main's scripts, plain Node, never the bump's code.
+  publish:
+    needs: bump
+    if: needs.bump.result == 'success' && inputs.dry_run != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      statuses: write
+    outputs:
+      land: ${{ steps.report.outputs.land }}
+      to: ${{ steps.report.outputs.to }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-bump
+          path: ${{ runner.temp }}/cli-bump
+      - name: Read the report
+        id: report
+        run: node scripts/updates-ci.ts read-report --kind cli --cli "$CLI" --running "$RUNNING" --file "$RUNNER_TEMP/cli-bump/cli-bump-report.json"
+        env:
+          CLI: ${{ inputs.cli }}
+          RUNNING: ${{ inputs.running }}
+      - name: Check, push and mark it proven
+        if: steps.report.outputs.changed == 'true'
         run: |
-          to=$(jq -r .to cli-bump-report.json)
-          changed=$(jq -r .changed cli-bump-report.json)
-          if [ "$changed" != "true" ]; then echo "Unchanged: $CLI is already at its newest version."; exit 0; fi
-          branch="bump/cli-$CLI-$to"
-          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$branch"
-          echo "branch=$branch" >> "$GITHUB_OUTPUT"
-          echo "to=$to" >> "$GITHUB_OUTPUT"
+          git bundle verify "$RUNNER_TEMP/cli-bump/pin.bundle"
+          git fetch --quiet "$RUNNER_TEMP/cli-bump/pin.bundle" "HEAD:refs/remotes/candidate"
+          node scripts/land-check.ts --ref refs/remotes/candidate --kind cli --cli "$CLI" --version "$TO"
+          sha=$(git rev-parse refs/remotes/candidate)
+          branch=$(node scripts/updates-ci.ts land-plan --kind cli --cli "$CLI" --version "$TO" | sed -n 's/^branch=//p')
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$sha:refs/heads/$branch"
+          node scripts/updates-ci.ts set-proven --sha "$sha" --gate update --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
         env:
           GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
           CLI: ${{ inputs.cli }}
+          TO: ${{ steps.report.outputs.to }}
 
   land:
-    needs: bump
-    if: inputs.dry_run != true && needs.bump.outputs.branch != ''
+    needs: publish
+    if: needs.publish.outputs.land == 'true'
     permissions:
       contents: write
       actions: write
-      issues: write
     uses: ./.github/workflows/land.yml
     with:
       kind: cli
-      branch: ${{ needs.bump.outputs.branch }}
-      verify: ${{ inputs.cli }} ${{ needs.bump.outputs.to }}
+      cli: ${{ inputs.cli }}
+      version: ${{ needs.publish.outputs.to }}

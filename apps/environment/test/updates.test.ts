@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { actionsClient, updateRepoOf, type ActionsClient, type WorkflowRun } from "../src/updates/actions.ts";
 import { serverUpdateRefusal, tagOf } from "../src/updates/policy.ts";
-import { UPDATE_EXPIRY_MS, UpdateRefused, updates, type PressRequest, type UpdateRecord } from "../src/updates/records.ts";
+import { QUEUED_CEILING_MS, UNLISTED_MS, UPDATE_EXPIRY_MS, UpdateRefused, updates, type PressRequest, type UpdateRecord } from "../src/updates/records.ts";
 import { committedOutcome, FAILED_REPLAY_MS, failedOutcome, makeLauncherClient, readyWithOutcome } from "../src/updates/selfUpdate.ts";
 import * as Effect from "effect/Effect";
 
@@ -46,12 +46,14 @@ const fakeActions = () => {
     client,
     dispatched,
     /** GitHub lists the run of the newest dispatch, named as its workflow names it. */
-    start: (name: string) => {
+    start: (name: string, startedAt: number | null = 0) => {
       const id = nextRun++;
       const last = dispatched.at(-1)!;
-      runs.set(id, { id, url: `https://github.com/o/r/actions/runs/${id}`, status: "in_progress", conclusion: null, name, workflow: last.workflow });
+      runs.set(id, { id, url: `https://github.com/o/r/actions/runs/${id}`, status: startedAt === null ? "pending" : "in_progress", conclusion: null, startedAt, name, workflow: last.workflow });
       return id;
     },
+    /** The run leaves the queue at `at`. */
+    begin: (id: number, at: number) => runs.set(id, { ...runs.get(id)!, status: "in_progress", startedAt: at }),
     end: (id: number, conclusion: string) => runs.set(id, { ...runs.get(id)!, status: "completed", conclusion }),
   };
 };
@@ -121,15 +123,42 @@ describe("the update records", () => {
     expect(next).toMatchObject({ attached: false, record: { id: "id-2" } });
   });
 
-  it("expires an Update in flight to failed after 45 minutes; pressing again is the retry", async () => {
-    const { actions, subject, advance } = setup();
+  it("expires an Update to failed 60 minutes after its run started; pressing again is the retry", async () => {
+    const { actions, subject, advance, now } = setup();
     await subject.press(serverPress(NEXT));
-    actions.start("Update id-1");
-    advance(UPDATE_EXPIRY_MS + 1);
+    actions.start("Update id-1", now());
+    await subject.settle("t3");
+    advance(UPDATE_EXPIRY_MS - 1);
+    expect((await subject.settle("t3"))?.outcome).toBeNull();
+    advance(2);
     const settled = await subject.settle("t3");
     expect(settled?.outcome?.status).toBe("failed");
-    expect(settled?.outcome?.reason).toMatch(/did not finish within 45 minutes/);
+    expect(settled?.outcome?.reason).toMatch(/did not finish within 60 minutes of its start/);
     expect(await subject.press(serverPress(NEXT))).toMatchObject({ attached: false, record: { id: "id-2" } });
+  });
+
+  it("does not expire a run waiting its turn in the bump group; measures from when it starts (review A2)", async () => {
+    const { actions, subject, advance, now } = setup();
+    await subject.press(serverPress(NEXT));
+    const run = actions.start("Update id-1", null);
+    advance(UPDATE_EXPIRY_MS * 2);
+    expect((await subject.settle("t3"))?.outcome).toBeNull();
+    actions.begin(run, now());
+    expect((await subject.settle("t3"))?.startedAt).toBe(now());
+    advance(UPDATE_EXPIRY_MS - 1);
+    expect((await subject.settle("t3"))?.outcome).toBeNull();
+  });
+
+  it("fails a run still queued past the ceiling, and a dispatch GitHub never lists", async () => {
+    const queued = setup();
+    await queued.subject.press(serverPress(NEXT));
+    queued.actions.start("Update id-1", null);
+    queued.advance(QUEUED_CEILING_MS + 1);
+    expect((await queued.subject.settle("t3"))?.outcome?.reason).toMatch(/waited its turn for 3 hours/);
+    const unlisted = setup();
+    await unlisted.subject.press(serverPress(NEXT));
+    unlisted.advance(UNLISTED_MS + 1);
+    expect((await unlisted.subject.settle("t3"))?.outcome?.reason).toMatch(/never started/);
   });
 
   it("returns a dispatch error at press time, and leaves nothing in flight", async () => {
@@ -214,8 +243,8 @@ describe("GitHub Actions through a fake dispatch and runs endpoint", () => {
       if (pathname.endsWith("/runs")) {
         return Response.json({
           workflow_runs: [
-            { id: 7, html_url: "https://github.com/ian-pascoe/t3flare/actions/runs/7", status: "queued", conclusion: null, name: "Nightly bump", display_title: "Update other" },
-            { id: 8, html_url: "https://github.com/ian-pascoe/t3flare/actions/runs/8", status: "in_progress", conclusion: null, name: "Nightly bump", display_title: "Update u1" },
+            { id: 7, html_url: "https://github.com/ian-pascoe/t3flare/actions/runs/7", status: "queued", conclusion: null, name: "Nightly bump", display_title: "Update other", run_started_at: "2026-11-17T12:00:01Z" },
+            { id: 8, html_url: "https://github.com/ian-pascoe/t3flare/actions/runs/8", status: "in_progress", conclusion: null, name: "Nightly bump", display_title: "Update u1", run_started_at: "2026-11-17T12:00:05Z" },
           ],
         });
       }
@@ -240,7 +269,7 @@ describe("GitHub Actions through a fake dispatch and runs endpoint", () => {
   it("finds the run by its run-name among the dispatches since, and names its failed step", async () => {
     const { requests, client } = fakeGitHub();
     const run = await client.findRun("bump.yml", "Update u1", Date.UTC(2026, 10, 17, 12, 0, 0, 500));
-    expect(run).toEqual({ id: 8, url: "https://github.com/ian-pascoe/t3flare/actions/runs/8", status: "in_progress", conclusion: null });
+    expect(run).toEqual({ id: 8, url: "https://github.com/ian-pascoe/t3flare/actions/runs/8", status: "in_progress", conclusion: null, startedAt: Date.UTC(2026, 10, 17, 12, 0, 5) });
     expect(decodeURIComponent(requests[0]!.url)).toContain("event=workflow_dispatch");
     expect(decodeURIComponent(requests[0]!.url)).toContain("created=>=2026-11-17T12:00:00Z");
     expect(await client.getRun(8)).toMatchObject({ status: "completed", conclusion: "failure" });

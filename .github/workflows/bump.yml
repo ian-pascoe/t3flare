@@ -5,34 +5,31 @@ name: Nightly bump
 # any step fails.
 #
 # Four kinds of run, each named by `run-name` (the Environment DO finds an Update's run by it, ADR-0037):
-#   Nightly bump      hourly: the newest nightly, when it is neither pinned nor proposed yet, through the Full gate, as a
-#                     pull request (PR-only; a newer proposal closes the older ones). The early exit runs before setup.
+#   Nightly bump      hourly: the newest nightly, unless main pins it or it is proposed through the Full gate already,
+#                     through the Full gate, as a pull request (PR-only; a newer proposal closes the older ones).
 #   Update <id>       a stock client's server Update (the Environment DO dispatches it with `tag`, `land: true`,
-#                     `gate: update` and `update_id`): the Update gate, then the land workflow (land.yml). When
-#                     `bump/<tag>` already exists on top of main, the bump is skipped and the branch lands as it is.
+#                     `gate: update` and `update_id`): the Update gate, then land.yml. A tag main already pins only
+#                     deploys (a retry of a land whose deploy failed); a `bump/<tag>` proven on top of main lands as it is.
 #   Verify <what>     dispatched by land.yml after an Update landed (`verify`, `force`, `dry_run`): main's pin through the
-#                     Full gate. A failure opens an issue naming what landed and the failed step (D18).
+#                     Full gate. A failure of any kind opens an issue naming what landed and the failed step (D18).
 #   (by hand)         `tag`, `force`, `dry_run` as before.
-# Every run checks out the tip of main when it starts, not the dispatch's commit. This workflow and cli-bump.yml share the
-# `bump` concurrency group with `queue: max`: runs wait their turn in order, none is cancelled for a newer one (the default
-# `queue: single` would cancel a pending Update when another is queued).
 #
-# Needs, made by `pnpm --filter @t3flare/infra run ci:setup` (infra/github.ts):
-#   secrets.CLOUDFLARE_API_TOKEN   the account token `t3flare-ci-bump`
-#   vars.CLOUDFLARE_ACCOUNT_ID     the account the stages deploy to
-#   secrets.T3FLARE_MODEL_ENDPOINT   the Model endpoints stage.ts and the acceptance test set up through the panel's API
-#     (SPI-1175): a list with one per API, an Anthropic Messages one first (its small model runs the real turn; Claude
-#     Code, OpenCode and pi run on it) and an OpenAI Responses one (Codex). A CLI with no endpoint for its API fails the
-#     acceptance test by name. Unset: skipped, said so in the log and the report, and the stage has no model, so the
-#     real turn fails.
-# and by `pnpm --filter @t3flare/infra run github-app:setup`: secrets.T3FLARE_GITHUB_APP_ID, secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY.
-# and the repository setting that lets Actions create pull requests (infra/allow-actions-prs.ts).
-# The stage's own bootstrap and admin tokens are made fresh by the job; nothing else is stored.
-# The secrets reach only the Bump step, except T3FLARE_MODEL_ENDPOINT, which the "Mask the Model endpoint" step before it
-# also receives: that step runs node on apps/environment/scripts/mask-endpoint.ts alone (no dependency code, no install)
-# and writes only GitHub's mask commands to the log. The Bump step's install runs no dependency build script
-# (pnpm-workspace.yaml's allowBuilds, review H4), but its check and deploy run dependency code, as they must. Prod's
-# secrets never reach this workflow: the land job deploys prod by dispatching deploy-prod.yml.
+# Trust (review F1): only the `bump` job runs upstream and dependency code, and its token reads contents and nothing else.
+# It hands the proven commit to the others as an artifact (a git bundle and its report). `plan`, `publish`,
+# `verify-issue` and land.yml run on fresh runners with plain Node and main's own scripts (`scripts/updates-ci.ts`,
+# `scripts/land-check.ts`), treat the report as untrusted input, and check the commit's content before they push it, mark
+# it proven (`t3flare/proven`, which Container tokens cannot set) or land it.
+#
+# Every run checks out the tip of main when it starts. This workflow and cli-bump.yml share the `bump` concurrency group
+# with `queue: max`: runs wait their turn in order, none is cancelled for a newer one.
+#
+# Needs, made by `pnpm --filter @t3flare/infra run ci:setup` (infra/github.ts), on the `bump` environment (the bump job's
+# only): secrets.CLOUDFLARE_API_TOKEN (`t3flare-ci-bump`), vars.CLOUDFLARE_ACCOUNT_ID, secrets.T3FLARE_MODEL_ENDPOINT
+# (SPI-1175: the Model endpoints the stage and the acceptance test set up; unset, the real turn fails), and from
+# `github-app:setup` secrets.T3FLARE_GITHUB_APP_ID and secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY; and the repository setting
+# that lets Actions create pull requests (infra/allow-actions-prs.ts). The stage's own tokens are made fresh by the job.
+# The secrets reach only the Bump step, and the Model endpoint the masking step before it (node on mask-endpoint.ts
+# alone). Prod's secrets never reach this workflow: land.yml deploys prod by dispatching deploy-prod.yml.
 
 run-name: ${{ inputs.verify && format('Verify {0}', inputs.verify) || inputs.update_id && format('Update {0}', inputs.update_id) || 'Nightly bump' }}
 
@@ -69,11 +66,7 @@ on:
         description: "What landed, when this run verifies it through the Full gate (land.yml dispatches it)"
         required: false
 
-permissions:
-  contents: write
-  pull-requests: write
-  actions: write
-  issues: write
+permissions: {}
 
 concurrency:
   group: bump
@@ -81,84 +74,71 @@ concurrency:
   queue: max
 
 jobs:
-  bump:
+  # Trusted: decides before any upstream code runs. Reads tags, branches and the `t3flare/proven` statuses.
+  plan:
     runs-on: ubuntu-latest
-    # An Update's run fails within 20 minutes (ADR-0037, D7). The Full gate: test:docker (an image build and four CLI
-    # turns) and the acceptance test's CLI turns.
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: read
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      tag: ${{ steps.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+      - name: Plan
+        id: plan
+        run: node scripts/updates-ci.ts plan-t3 --event "$EVENT" --tag "$TAG" --land "$LAND" --verify "$VERIFY"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ inputs.tag }}
+          LAND: ${{ inputs.land }}
+          VERIFY: ${{ inputs.verify }}
+
+  # Untrusted: runs upstream and dependency code. Its token reads contents only; it publishes nothing itself.
+  bump:
+    needs: plan
+    if: needs.plan.outputs.mode == 'bump'
+    runs-on: ubuntu-latest
+    # An Update's run fails within 20 minutes (ADR-0037, D7). The Full gate: test:docker and the acceptance CLI turns.
     timeout-minutes: ${{ inputs.update_id && 20 || 60 }}
     environment: bump
-    outputs:
-      branch: ${{ steps.propose.outputs.branch }}
-      to: ${{ steps.propose.outputs.to }}
+    permissions:
+      contents: read
     env:
       NPM_CONFIG_WORKSPACE_DIR: ${{ github.workspace }}
     steps:
-      # The tip of main, whatever commit the dispatch named (ADR-0037: a queued run proves on the main it lands on).
-      # The submodule is fetched by hand, not by the action: the action walks t3code's nested gitlinks recursively,
-      # and one of them (.repos/alchemy-effect/submodules/distilled) has no URL, which fails the checkout.
+      # The tip of main, whatever commit the dispatch named. The submodule is fetched by hand, not by the action: the
+      # action walks t3code's nested gitlinks recursively, and one of them has no URL, which fails the checkout.
       - uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
           persist-credentials: false
 
-      # The hourly run's early exit, before any setup: the newest nightly is already pinned (main's gitlink) or proposed
-      # (a `bump/<tag>` branch).
-      - name: Anything new?
-        id: pending
-        if: github.event_name == 'schedule'
-        run: |
-          url=$(git config -f .gitmodules submodule.t3code.url)
-          newest=$(git ls-remote --tags "$url" 'v*-nightly.*' | node -e '
-            const lines = require("fs").readFileSync(0, "utf8").trim().split("\n").filter(Boolean).map((l) => l.split("\t"));
-            const tags = new Map();
-            for (const [sha, ref] of lines) {
-              const m = /^refs\/tags\/(v[\d.]+-nightly\.(\d{8})\.(\d+))(\^\{\})?$/.exec(ref);
-              if (m && (m[4] || !tags.has(m[1]))) tags.set(m[1], { sha, date: m[2], run: Number(m[3]) });
-            }
-            const [tag, info] = [...tags].sort(([, a], [, b]) => a.date === b.date ? a.run - b.run : a.date.localeCompare(b.date)).at(-1) ?? [];
-            if (tag) console.log(`${tag} ${info.sha}`);
-          ')
-          read -r tag sha <<< "$newest"
-          pinned=$(git ls-tree HEAD t3code | awk '{print $3}')
-          if [ -z "$tag" ]; then echo "No nightly tag."; echo "skip=true" >> "$GITHUB_OUTPUT"
-          elif [ "$sha" = "$pinned" ]; then echo "$tag is already pinned."; echo "skip=true" >> "$GITHUB_OUTPUT"
-          elif [ -n "$(git ls-remote --heads origin "bump/$tag")" ]; then echo "$tag is already proposed."; echo "skip=true" >> "$GITHUB_OUTPUT"
-          else echo "$tag is new."; echo "skip=false" >> "$GITHUB_OUTPUT"; fi
+      - id: base
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      # An Update's fast path: `bump/<tag>` already proven on top of main (the hourly run proposed it) lands as it is.
-      - name: Already proven?
-        id: fast
-        if: inputs.land && inputs.tag != ''
-        run: |
-          branch="bump/$TAG"
-          if git fetch --quiet origin "+refs/heads/$branch:refs/remotes/origin/$branch" 2>/dev/null \
-            && git merge-base --is-ancestor origin/main "origin/$branch"; then
-            echo "$branch is proven on top of main; landing it as it is."
-            echo "branch=$branch" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          TAG: ${{ inputs.tag }}
+      - run: git submodule update --init t3code
 
-      - if: steps.pending.outputs.skip != 'true' && steps.fast.outputs.branch == ''
-        run: git submodule update --init t3code
+      # Node, pnpm and Vite+ at package.json's versions, then a frozen install (ADR-0030).
+      - uses: ./.github/actions/setup
 
-      # Node, pnpm and Vite+ at package.json's versions, then a frozen install (ADR-0030). bump.ts's own install is not
-      # frozen: a new pin's lock must change (review H3).
-      - if: steps.pending.outputs.skip != 'true' && steps.fast.outputs.branch == ''
-        uses: ./.github/actions/setup
-
-      # SPI-1175: GitHub masks only the whole secret, so its key and header values are masked each on its own, before any
-      # step that could print one. The commands go to the runner's log only, never a file.
+      # SPI-1175: GitHub masks only the whole secret, so its key and header values are masked each on its own.
       - name: Mask the Model endpoint
-        if: steps.pending.outputs.skip != 'true' && steps.fast.outputs.branch == ''
         run: node apps/environment/scripts/mask-endpoint.ts
         env:
           T3FLARE_MODEL_ENDPOINT: ${{ secrets.T3FLARE_MODEL_ENDPOINT }}
 
       - name: Bump
-        id: bump
-        if: steps.pending.outputs.skip != 'true' && steps.fast.outputs.branch == ''
         run: |
           args=(--report bump-report.json --gate "${GATE:-full}")
           if [ "$DRY_RUN" != "true" ]; then args+=(--commit); fi
@@ -170,7 +150,7 @@ jobs:
           git config user.email "t3flare-bump@users.noreply.github.com"
           pnpm run bump "${args[@]}"
         env:
-          TAG: ${{ inputs.tag }}
+          TAG: ${{ needs.plan.outputs.tag }}
           FORCE: ${{ inputs.force }}
           DRY_RUN: ${{ inputs.dry_run }}
           GATE: ${{ inputs.gate }}
@@ -193,71 +173,131 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      # The proven commit, for the trusted publish job: a bundle of the one commit on top of the base.
+      - name: Bundle the pin
+        if: success() && inputs.dry_run != true
+        run: |
+          if [ "$(git rev-parse HEAD)" != "$BASE" ]; then git bundle create pin.bundle HEAD "^$BASE"; fi
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bump-report
-          path: bump-report.json
+          name: bump
+          path: |
+            bump-report.json
+            pin.bundle
           if-no-files-found: ignore
 
-      # A new pin that passed: push it on its own branch. Landing runs propose nothing (the land job lands it); others
-      # propose it as a pull request, which closes the older bump pull requests it supersedes. The owner merges those.
-      - name: Propose the new pin
-        id: propose
-        if: success() && inputs.dry_run != true && steps.pending.outputs.skip != 'true'
+  # Trusted: checks the proven commit and publishes it. Runs main's scripts with plain Node; never the bump's code.
+  publish:
+    needs: [plan, bump]
+    if: needs.bump.result == 'success' && inputs.dry_run != true && !inputs.verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      statuses: write
+    outputs:
+      changed: ${{ steps.report.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: bump
+          path: ${{ runner.temp }}/bump
+      - name: Read the report
+        id: report
+        run: node scripts/updates-ci.ts read-report --kind t3 --file "$RUNNER_TEMP/bump/bump-report.json" --tag "$TAG"
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+      - name: Check the proven commit
+        id: check
+        if: steps.report.outputs.changed == 'true'
         run: |
-          if [ -n "$FAST_BRANCH" ]; then
-            echo "branch=$FAST_BRANCH" >> "$GITHUB_OUTPUT"
-            echo "to=${FAST_BRANCH#bump/}" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          to=$(jq -r .to bump-report.json)
-          changed=$(jq -r .changed bump-report.json)
-          if [ "$changed" != "true" ]; then echo "No new pin."; exit 0; fi
-          branch="bump/$to"
-          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$branch"
-          echo "branch=$branch" >> "$GITHUB_OUTPUT"
-          echo "to=$to" >> "$GITHUB_OUTPUT"
-          if [ "$LAND" = "true" ]; then exit 0; fi
-          gh pr create --head "$branch" --base main --title "chore: bump t3code to $to" \
-            --body "Pinned by the nightly bump job; the ${GATE:-full} gate passed on the \`bump\` stage. See the run's report: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+          git bundle verify "$RUNNER_TEMP/bump/pin.bundle"
+          git fetch --quiet "$RUNNER_TEMP/bump/pin.bundle" "HEAD:refs/remotes/candidate"
+          node scripts/updates-ci.ts install-yaml
+          node scripts/land-check.ts --kind t3 --tag "$TO" --ref refs/remotes/candidate
+          echo "sha=$(git rev-parse refs/remotes/candidate)" >> "$GITHUB_OUTPUT"
+        env:
+          TO: ${{ steps.report.outputs.to }}
+      - name: Push and mark it proven
+        if: steps.report.outputs.changed == 'true'
+        run: |
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$SHA:refs/heads/bump/$TO"
+          node scripts/updates-ci.ts set-proven --sha "$SHA" --gate "$GATE" --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.check.outputs.sha }}
+          TO: ${{ steps.report.outputs.to }}
+          GATE: ${{ steps.report.outputs.gate }}
+      # Not an Update: a pull request for the owner, which closes the older bump pull requests it supersedes.
+      - name: Propose it
+        if: steps.report.outputs.changed == 'true' && inputs.land != true
+        run: |
+          branch="bump/$TO"
+          gh pr create --head "$branch" --base main --title "chore: bump t3code to $TO" \
+            --body "Pinned by the nightly bump job; the $GATE gate passed on the \`bump\` stage. See the run's report: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
             || echo "A pull request for $branch already exists."
-          gh pr list --state open --json number,headRefName --jq '.[] | select(.headRefName | startswith("bump/v")) | select(.headRefName != "'"$branch"'") | .number' \
+          gh pr list --state open --json number,headRefName --jq '.[] | select(.headRefName | test("^bump/v[0-9]")) | select(.headRefName != "'"$branch"'") | .number' \
             | while read -r number; do gh pr close "$number" --comment "Superseded by $branch." || true; done
         env:
           GH_TOKEN: ${{ github.token }}
-          LAND: ${{ inputs.land }}
-          GATE: ${{ inputs.gate }}
-          FAST_BRANCH: ${{ steps.fast.outputs.branch }}
+          TO: ${{ steps.report.outputs.to }}
+          GATE: ${{ steps.report.outputs.gate }}
 
-      # D18: a verify run that fails opens an issue (GitHub Issues sync to Linear). No automatic revert: migrations only
-      # go forward; the owner reverts, or turns on Safe mode (D15).
-      - name: Open an issue for a failed verify run
-        if: failure() && inputs.verify
+  # D18, review A3: a verify run that does not pass, for any reason (a failure, a timeout, a cancellation), opens an
+  # issue (GitHub Issues sync to Linear). No automatic revert: migrations only go forward.
+  verify-issue:
+    needs: [plan, bump]
+    if: always() && inputs.verify && needs.bump.result != 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: bump
+          path: ${{ runner.temp }}/bump
+      - name: Open an issue
         run: |
-          step=$(jq -r '[.steps[] | select(.ok == false) | .name][0] // "setup"' bump-report.json 2>/dev/null || echo "setup")
-          gh issue create --title "Verify failed after landing $VERIFY" \
-            --body "The Full gate failed on main after **$VERIFY** landed through an in-app Update (ADR-0037).
-
-          - Failed step: \`$step\`
-          - Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
-
-          Prod runs it. Recovery: Safe mode, then a revert by the owner (in-app updates plan D15)."
+          node scripts/updates-ci.ts issue-body --verify "$VERIFY" --file "$RUNNER_TEMP/bump/bump-report.json" \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > "$RUNNER_TEMP/issue.md"
+          gh issue create --title "Verify did not pass after an in-app Update landed" --body-file "$RUNNER_TEMP/issue.md"
         env:
           GH_TOKEN: ${{ github.token }}
           VERIFY: ${{ inputs.verify }}
 
-  # ADR-0037: an Update lands its proven pin, from a fresh runner that holds no stage secrets.
+  # ADR-0037: an Update lands its proven pin, or only deploys a pin main already holds (review F2).
   land:
-    needs: bump
-    if: inputs.land && needs.bump.outputs.branch != ''
+    needs: [plan, publish]
+    if: always() && inputs.land && needs.plan.result == 'success' && (needs.plan.outputs.mode == 'land' || (needs.publish.result == 'success' && needs.publish.outputs.changed == 'true'))
     permissions:
       contents: write
       actions: write
-      issues: write
+      statuses: read
     uses: ./.github/workflows/land.yml
     with:
       kind: t3
-      branch: ${{ needs.bump.outputs.branch }}
-      tag: ${{ needs.bump.outputs.to }}
-      verify: t3code ${{ needs.bump.outputs.to }}
+      tag: ${{ needs.plan.outputs.tag }}

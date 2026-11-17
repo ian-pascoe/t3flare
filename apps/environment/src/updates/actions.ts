@@ -31,7 +31,12 @@ export interface WorkflowRun {
   readonly status: string;
   /** Set once `status` is `completed`: `success`, `failure`, `cancelled`, `timed_out`, … */
   readonly conclusion: string | null;
+  /** When it left the queue (`run_started_at`), once its status says it did; null while it waits its turn. */
+  readonly startedAt: number | null;
 }
+
+/** The statuses of a run still waiting its turn (the `bump` group's queue, a runner, an approval). */
+const WAITING = new Set(["queued", "waiting", "pending", "requested"]);
 
 export class ActionsError extends Error {
   override readonly name = "ActionsError";
@@ -44,9 +49,13 @@ interface RunJson {
   readonly conclusion: string | null;
   readonly name?: string;
   readonly display_title?: string;
+  readonly run_started_at?: string | null;
 }
 
-const runOf = (json: RunJson): WorkflowRun => ({ id: json.id, url: json.html_url, status: json.status, conclusion: json.conclusion });
+const runOf = (json: RunJson): WorkflowRun => {
+  const started = WAITING.has(json.status) ? Number.NaN : Date.parse(json.run_started_at ?? "");
+  return { id: json.id, url: json.html_url, status: json.status, conclusion: json.conclusion, startedAt: Number.isFinite(started) ? started : null };
+};
 
 export interface ActionsClient {
   /** Dispatches `workflow` on `main` with `inputs`. */

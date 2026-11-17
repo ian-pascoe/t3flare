@@ -1,51 +1,129 @@
-// `node scripts/land-check.ts --kind t3|cli --branch <branch> [--tag <tag>]`: may this proposed pin land (ADR-0037;
-// in-app updates plan D4)? Run by the land workflow on a fresh checkout before it fast-forwards `main`; exits 0 to land,
-// 1 with the reason otherwise. The rules are `apps/environment/scripts/lib/land.ts`'s.
+// `node scripts/land-check.ts --ref <candidate> (--kind t3 --tag <tag> | --kind cli --cli <cli> --version <v>)`
+//
+// May this proposed pin be published as proven, or land (ADR-0037; review F3)? Run by the trusted jobs (`bump.yml`'s
+// publish, `cli-bump.yml`'s publish, `land.yml`) on a runner that ran no upstream code, with plain Node: no install but
+// `yaml` at main's locked version for a t3 bump (`scripts/updates-ci.ts install-yaml`). The pin comes from the caller's
+// inputs, never from the bump's report. Exits 0 with `{"ok":true,"sha":…}` as its last line, 1 with the reason.
+//
+//  1. The shape (`land.ts` `landRefusal`): one commit on `--base` (origin/main), only its kind's files, and for a t3 bump
+//     the `t3code` gitlink equal to the tag's commit on t3code's origin.
+//  2. The content. Step 1 passed, so every file outside the allowlist, these scripts included, is main's own.
+//     - CLI bump: only that CLI's fields moved (`cliPinRefusal`), and the pin made again here from main's files
+//       (`applyCliPin`: the tarballs downloaded and hashed, the npm lock resolved with `--package-lock-only
+//       --ignore-scripts`, which runs no package code) is byte for byte the proposed one.
+//     - t3 bump: package.json moves only packageManager and engines.node; in a worktree of the candidate with t3code at
+//       the tag (data: nothing of it runs), `gen-workspace.ts --check` regenerates pnpm-workspace.yaml, package.json's two
+//       fields and mise.toml from t3code and requires them equal; `verify-lock.ts` checks the lock's t3 closures, one
+//       effect, the patches and the vendored links; and every package entry in the lock is one main's lock or t3's lock
+//       at the tag holds as it is, or a plain npm registry entry whose integrity the registry confirms (`lockProvenance`).
+//       The lock is not regenerated: `pnpm install` resolves our own packages against the registry, which is neither
+//       deterministic nor free of dependency code.
 import { spawnSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 
-import { type LandKind, landRefusal } from "../apps/environment/scripts/lib/land.ts";
+import { applyCliPin, CLI_PIN_FILES, cliPinRefusal, type PinFiles } from "../apps/environment/scripts/lib/cliPins.ts";
+import { landRefusal, lockProvenance, t3ManifestRefusal } from "../apps/environment/scripts/lib/land.ts";
+import { COMMIT, pinOf, type Pin } from "../apps/environment/src/updates/pins.ts";
+import { tagCommitOf } from "./lib/updatesGit.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const args = process.argv.slice(2);
 const option = (name: string) => (args.includes(`--${name}`) ? args[args.indexOf(`--${name}`) + 1] : undefined);
-const kind = option("kind");
-const branch = option("branch");
-const tag = option("tag");
-if ((kind !== "t3" && kind !== "cli") || branch === undefined || (kind === "t3" && tag === undefined)) {
-  console.error("usage: node scripts/land-check.ts --kind t3|cli --branch <branch> [--tag <t3 tag>]");
-  process.exit(2);
-}
 
-const git = (...gitArgs: Array<string>) => {
-  const result = spawnSync("git", gitArgs, { cwd: root, encoding: "utf8" });
-  return { ok: result.status === 0, out: (result.stdout ?? "").trim() };
+const git = (gitArgs: ReadonlyArray<string>, cwd = root) => {
+  const result = spawnSync("git", gitArgs, { cwd, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+  return { ok: result.status === 0, out: (result.stdout ?? "").trim(), err: (result.stderr ?? "").trim(), raw: result.stdout ?? "" };
 };
 
-const ref = `origin/${branch}`;
-const gitlink = kind === "t3" ? /^160000 commit ([0-9a-f]{40})\tt3code$/m.exec(git("ls-tree", ref, "t3code").out)?.[1] : undefined;
-// The tag's commit, from t3code's own origin (.gitmodules), peeled when it is an annotated tag.
-const tagCommit = (() => {
-  if (kind !== "t3") return undefined;
-  const url = git("config", "-f", ".gitmodules", "submodule.t3code.url").out;
-  const lines = (spawnSync("git", ["ls-remote", url, `refs/tags/${tag!}`, `refs/tags/${tag!}^{}`], { encoding: "utf8" }).stdout ?? "")
-    .split("\n")
-    .filter((line) => line !== "")
-    .map((line) => line.split("\t") as [string, string]);
-  return (lines.find(([, name]) => name.endsWith("^{}")) ?? lines[0])?.[0];
-})();
+const refuse = (reason: string): never => {
+  console.error(`land-check: refused: ${reason}`);
+  process.exit(1);
+};
+
+const pinned = pinOf({ kind: option("kind"), tag: option("tag"), cli: option("cli"), version: option("version") });
+if (typeof pinned === "string") refuse(pinned);
+const pin = pinned as Pin;
+const ref = option("ref") ?? refuse("--ref is required");
+const base = option("base") ?? "origin/main";
+const sha = git(["rev-parse", "--verify", `${ref}^{commit}`]).out;
+if (!COMMIT.test(sha)) refuse(`${ref} is not a commit`);
+
+// 1. The shape.
+const submoduleUrl = git(["config", "-f", ".gitmodules", "submodule.t3code.url"]).out;
+const gitlink = pin.kind === "t3" ? /^160000 commit ([0-9a-f]{40})\tt3code$/m.exec(git(["ls-tree", sha, "t3code"]).out)?.[1] : undefined;
 const facts = {
-  kind: kind as LandKind,
-  mainIsAncestor: git("merge-base", "--is-ancestor", "origin/main", ref).ok,
-  commits: Number(git("rev-list", "--count", `origin/main..${ref}`).out || "0"),
-  files: git("diff", "--name-only", "origin/main", ref).out.split("\n").filter((file) => file !== ""),
-  ...(gitlink === undefined ? {} : { gitlink }),
-  ...(tagCommit === undefined || tagCommit === "" ? {} : { tagCommit }),
+  pin,
+  mainIsAncestor: git(["merge-base", "--is-ancestor", base, sha]).ok,
+  commits: Number(git(["rev-list", "--count", `${base}..${sha}`]).out || "0"),
+  files: git(["diff", "--name-only", base, sha]).out.split("\n").filter((file) => file !== ""),
+  gitlink,
+  tagCommit: pin.kind === "t3" ? tagCommitOf(submoduleUrl, pin.tag) : undefined,
 };
 console.log(JSON.stringify(facts));
-const refusal = landRefusal(facts);
-if (refusal !== undefined) {
-  console.error(`land: refused: ${refusal}`);
-  process.exit(1);
+const shape = landRefusal(facts);
+if (shape !== undefined) refuse(shape);
+
+const show = (at: string, file: string) => {
+  const result = git(["show", `${at}:${file}`]);
+  if (!result.ok) refuse(`${file} is not at ${at}`);
+  return result.raw;
+};
+
+// 2. The content.
+if (pin.kind === "cli") {
+  const files = (at: string) => Object.fromEntries(CLI_PIN_FILES.map((file) => [file, show(at, file)])) as PinFiles;
+  const before = files(base);
+  const after = files(sha);
+  const fields = cliPinRefusal(pin.cli, pin.version, before, after);
+  if (fields !== undefined) refuse(fields);
+  // The pin made again from main's files.
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "land-check-"));
+  for (const [file, text] of Object.entries(before)) {
+    fs.mkdirSync(path.dirname(path.join(scratch, file)), { recursive: true });
+    fs.writeFileSync(path.join(scratch, file), text);
+  }
+  await applyCliPin(scratch, pin.cli, pin.version).catch((error: unknown) => refuse(`could not make the pin again: ${String(error)}`));
+  const differing = CLI_PIN_FILES.filter((file) => fs.readFileSync(path.join(scratch, file), "utf8") !== after[file]);
+  fs.rmSync(scratch, { recursive: true, force: true });
+  if (differing.length > 0) refuse(`made again from main, the pin differs in ${differing.join(", ")}`);
+} else {
+  const manifest = t3ManifestRefusal(show(base, "package.json"), show(sha, "package.json"));
+  if (manifest !== undefined) refuse(manifest);
+  const yaml = path.join(root, "node_modules/yaml");
+  if (!fs.existsSync(yaml)) refuse("yaml is not installed (scripts/updates-ci.ts install-yaml)");
+  const tree = fs.mkdtempSync(path.join(os.tmpdir(), "land-check-tree-"));
+  const added = git(["worktree", "add", "--detach", tree, sha]);
+  if (!added.ok) refuse(`git worktree add: ${added.err}`);
+  // `refuse` exits: the worktree goes on exit, whatever the outcome.
+  process.on("exit", () => void git(["worktree", "remove", "--force", tree]));
+  {
+    // t3code at the gitlink, as data: no script of it runs.
+    const submodule = git(["submodule", "update", "--init", "t3code"], tree);
+    if (!submodule.ok) refuse(`git submodule update: ${submodule.err}`);
+    fs.mkdirSync(path.join(tree, "node_modules"), { recursive: true });
+    fs.symlinkSync(fs.realpathSync(yaml), path.join(tree, "node_modules/yaml"));
+    for (const script of ["scripts/gen-workspace.ts", "scripts/verify-lock.ts"]) {
+      const result = spawnSync(process.execPath, [script, ...(script.endsWith("gen-workspace.ts") ? ["--check"] : [])], { cwd: tree, encoding: "utf8" });
+      if (result.status !== 0) refuse(`${script} failed on the candidate: ${`${result.stdout}${result.stderr}`.slice(-2000)}`);
+    }
+    const { readLock } = await import("./lock.ts");
+    const mainLockFile = path.join(tree, "main-pnpm-lock.yaml");
+    fs.writeFileSync(mainLockFile, show(base, "pnpm-lock.yaml"));
+    const provenance = lockProvenance(
+      readLock(path.join(tree, "pnpm-lock.yaml")).documents,
+      readLock(mainLockFile).documents,
+      readLock(path.join(tree, "t3code/pnpm-lock.yaml")).documents,
+    );
+    if (provenance.refused.length > 0) refuse(`the lock holds entries neither main's nor t3's lock vouches for, outside the npm registry: ${provenance.refused.slice(0, 10).join(", ")}`);
+    for (const entry of provenance.registry) {
+      const response = await fetch(`https://registry.npmjs.org/${entry.name.replace("/", "%2F")}/${entry.version}`, { headers: { accept: "application/json" } });
+      const published = response.ok ? ((await response.json()) as { dist?: { integrity?: string } }).dist?.integrity : undefined;
+      if (published !== entry.integrity) refuse(`${entry.name}@${entry.version}'s integrity is not the npm registry's (${String(published)})`);
+    }
+    console.log(JSON.stringify({ lockFromRegistry: provenance.registry.map((entry) => `${entry.name}@${entry.version}`) }));
+  }
 }
-console.log(`land: ${ref} may land`);
+
+console.log(JSON.stringify({ ok: true, sha }));
