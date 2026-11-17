@@ -160,9 +160,6 @@ import * as RelayTracing from "t3/src/cloud/relayTracing.ts";
 import * as CloudManagedEndpointRuntime from "t3/src/cloud/ManagedEndpointRuntime.ts";
 import * as RelayClientLedger from "t3/src/cloud/RelayClientLedger.ts";
 import * as CloudCliTokenManager from "t3/src/cloud/CliTokenManager.ts";
-import * as ServerSelfUpdate from "t3/src/cloud/selfUpdate.ts";
-import * as DesktopAppUpdate from "t3/src/desktopUpdate/DesktopAppUpdate.ts";
-import * as ServiceLauncherClient from "t3/src/cloud/serviceLauncherClient.ts";
 import * as ProcessDiagnostics from "t3/src/diagnostics/ProcessDiagnostics.ts";
 import * as HostResources from "t3/src/resourceTelemetry/HostResources.ts";
 import * as ProcessResourceMonitor from "t3/src/diagnostics/ProcessResourceMonitor.ts";
@@ -201,6 +198,7 @@ import * as RedactingConsole from "../host/redactingConsole.ts";
 import { environmentServices } from "../agents/bindings.ts";
 import { webhookBaseUrl } from "./webhookOrigin.ts";
 import { cloudCapabilities } from "./capabilities.ts";
+import * as CloudSelfUpdate from "../updates/selfUpdate.ts";
 import { layerManagedPolicy } from "./managedPolicy.ts";
 import { layerPeerLinksWithoutCause } from "./peerLinks.ts";
 import * as ConnectService from "../connect/service.ts";
@@ -337,7 +335,6 @@ export const make = (options: CompositionOptions) => {
     Layer.provideMerge(layerDesktopTelemetryReceiver),
   );
   const layerHostPowerMonitor = HostPowerMonitor.layer.pipe(Layer.provide(layerDesktopTelemetryReceiver));
-  const layerDesktopAppUpdate = DesktopAppUpdate.layer.pipe(Layer.provide(layerDesktopTelemetryReceiver));
   const layerBackground = BackgroundPolicy.layer.pipe(
     Layer.provide(layerHostPowerMonitor),
     Layer.provideMerge(layerServerSettings),
@@ -500,7 +497,8 @@ export const make = (options: CompositionOptions) => {
           ...descriptor,
           label: "t3flare",
           platform: { ...descriptor.platform, os: "linux" as const, machine: "cloud" as const },
-          capabilities: cloudCapabilities(descriptor.capabilities),
+          // In-app updates (ADR-0037, plan D14): the server Update only where an update target is configured (prod).
+          capabilities: cloudCapabilities(descriptor.capabilities, environmentServices().updates?.configured === true ? { serverSelfUpdate: "respawn" } : {}),
         })),
       }),
     ),
@@ -805,7 +803,8 @@ export const make = (options: CompositionOptions) => {
     Layer.provide(CloudSpeech.layer.pipe(Layer.provide(SecretResolver.layer))),
     Layer.provide(layerServerSettings),
     Layer.provide(PreviewAutomationBroker.layer),
-    Layer.provide(ServerSelfUpdate.layer.pipe(Layer.provide(layerDesktopAppUpdate))),
+    // t3flare (ADR-0037, in-app updates plan D3): the server Update dispatches CI, which proves and lands the bump.
+    Layer.provide(CloudSelfUpdate.layer),
     Layer.provide(layerCommandReadiness),
     Layer.provide(ServerHttp.layerBrowserApiCors),
     // t3flare: no response compression in t3; Cloudflare's edge compresses, and workerd
@@ -830,7 +829,8 @@ export const make = (options: CompositionOptions) => {
       const activation = yield* Deferred.make<void>();
       const layerActivation = Layer.succeed(ServerActivation.ServerActivation, Deferred.await(activation));
       const routesReady = yield* Deferred.make<void>();
-      const layerLauncher = ServiceLauncherClient.layer;
+      // t3flare (ADR-0037, plan D3): no launcher; its `prepareTrial` reports a landed server Update committed.
+      const layerLauncher = CloudSelfUpdate.layerLauncherClient;
 
       const layerHttpListening = Layer.effectDiscard(
         Effect.gen(function* () {

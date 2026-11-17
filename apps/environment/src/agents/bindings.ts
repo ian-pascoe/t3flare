@@ -14,6 +14,7 @@ import type { LimitStore } from "../usage/limits.ts";
 import type { UsageStore } from "../usage/records.ts";
 import type { BrowserRunBinding, BrowserRunFetcher } from "../preview/browserRun.ts";
 import type { PreviewStore } from "../preview/store.ts";
+import type { Updates } from "../updates/records.ts";
 
 export interface EnvironmentServices {
   readonly agents: AgentsBindings;
@@ -52,6 +53,8 @@ export interface EnvironmentServices {
   readonly containerPreviews: (workspace: string) => BrowserRunFetcher;
   /** G11: the Browser Run sessions this Environment holds, and the server browser's profiles (`preview/store.ts`). */
   readonly previewStore: PreviewStore;
+  /** In-app Updates (ADR-0037): their records and dispatches. Absent (tests) or unconfigured (every stage but prod): none. */
+  readonly updates?: Updates;
 }
 
 let current: EnvironmentServices | undefined;

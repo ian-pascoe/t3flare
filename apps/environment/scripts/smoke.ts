@@ -9,8 +9,12 @@
 // beta) answering them would send t3's own MCP clients to Access's authorization server, and this is the check every
 // prod deploy runs. Public, no credential; t3 answers them, so they boot it in the Environment DO (no Container).
 //
-//   node scripts/stage.ts run <stage> smoke [<commit>]
+// With a Server version (in-app updates plan D16), t3's descriptor must report it: the pin's tag without its `v`, as
+// the build stamps it (`serverVersion.ts`). A stock client offers an Update whenever the two differ.
+//
+//   node scripts/stage.ts run <stage> smoke [<commit> [<server version>]]
 const expected = (process.argv[2] ?? "").slice(0, 12);
+const expectedServerVersion = process.argv[3] ?? "";
 const url = process.env.T3_URL ?? "";
 const deadline = Date.now() + 360_000;
 
@@ -55,6 +59,11 @@ const attempt = async (): Promise<string | undefined> => {
   console.log(JSON.stringify({ build: health.build, safeMode: health.safeMode, runtime: health.runtime }));
   if (expected !== "" && health.build?.commit !== expected) return `build ${health.build?.commit}, expected ${expected}`;
   if (health.safeMode?.on) return "the Environment is in safe mode";
+  if (expectedServerVersion !== "") {
+    const descriptor = await wellKnown("/.well-known/t3/environment");
+    const serverVersion = descriptor.json?.serverVersion;
+    if (serverVersion !== expectedServerVersion) return `t3's descriptor reports serverVersion ${String(serverVersion)}, expected ${expectedServerVersion}`;
+  }
   return rootOAuthFailure();
 };
 

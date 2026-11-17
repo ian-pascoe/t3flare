@@ -56,6 +56,7 @@ import { closeLeftoverSessions } from "./preview/sessions.ts";
 import { previewStore } from "./preview/store.ts";
 import { limitStore, limitWiring } from "./usage/limits.ts";
 import { acceptUsage, usageStore } from "./usage/records.ts";
+import { environmentUpdates } from "./updates/environment.ts";
 
 /** SPI-1163: the model the text-generation setting was last pointed at as its default. */
 const SEEDED_TEXT_MODEL_KEY = "t3flare:text-generation-default";
@@ -90,6 +91,8 @@ export interface EnvironmentEnv extends AgentsBindings {
   readonly T3FLARE_CONNECT_SERVICE_TOKEN?: string;
   /** Test stages: the stage-only probes and faults answer (step 4a's process probe). */
   readonly T3FLARE_FAULTS?: string;
+  /** In-app Updates' target (ADR-0037, plan D14): `owner/name` of the repository whose CI lands an Update. Set on prod only. */
+  readonly T3FLARE_UPDATE_REPO?: string;
   /** The t3 host as deployed (alchemy.run.ts): the panel's Origin, the OAuth redirect's host, the CLIs' `/mcp`. */
   readonly T3FLARE_HOST?: string;
   /** The harness panel's admin host (ADR-0026): what a change's `Origin` must name. */
@@ -237,6 +240,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       // SAFETY: the Worker's entry (`worker.ts`) exports `ContainerPreviews`; `ctx.exports` is untyped here.
       containerPreviews: (workspace) => (ctx.exports as unknown as EnvironmentExports).ContainerPreviews({ props: { workspace } }),
       previewStore: previewStore(ctx.storage.sql),
+      updates: environmentUpdates({ target: env.T3FLARE_UPDATE_REPO, store: ctx.storage.kv, github: () => this.github }),
     });
     // G11 (review M5): the browsers an earlier instance of this object acquired went with its sockets; Browser Run would
     // keep them until their keep-alive. Closed now, from this object's own list (never Browser Run's account-wide one).

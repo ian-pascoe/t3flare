@@ -12,6 +12,7 @@
 // 2. Auth: the descriptor reports `remote-reachable`; the root `/.well-known/oauth-authorization-server` and
 //    `oauth-protected-resource` documents are t3's, not Access's (ADR-0036); the bootstrap token is refused until pairing
 //    is armed, pairs while armed (what the web client's /pair#token=… does), and is refused again once disarmed.
+// 2c. The Server version: the pin's tag, the descriptor's `serverVersion` and the web client's APP_VERSION agree.
 // 3. A stock-protocol client over /ws (t3's own WsRpcGroup): create a project and threads, list them, open one.
 // 4. Turn-item fixtures written through t3's EventSink (admin route), then t3's heavy queries on them: the
 //    thread window (bounded snapshot over HTTP and subscribeThread), the shell snapshot, and search.
@@ -37,7 +38,9 @@ import * as fs from "node:fs";
 
 import { defaultTextModel } from "@t3flare/models/endpoints";
 
+import { t3ServerVersion } from "../serverVersion.ts";
 import { adminClient, ensureModelEndpoint } from "./lib/modelEndpoint.ts";
+import { checkVersionAgreement } from "./lib/versionAgreement.ts";
 import { cliCoverage, keptReportJson, stageEndpointSpec } from "./lib/modelEndpointSpec.ts";
 
 const arg = (name: string, fallback: string) => {
@@ -166,6 +169,12 @@ check(
   protectedResource.status === 200 && protectedResource.json?.resource === `${base.origin}/mcp` && Array.isArray(protectedResource.json?.authorization_servers) && protectedResource.json.authorization_servers.every((server: unknown) => server === base.origin),
   report.rootWellKnown,
 );
+
+// 2c. The Server version (in-app updates plan D1, D16): the pin's tag, t3's descriptor's `serverVersion` and the web
+// client's APP_VERSION agree, else every stock client reads the stage as out of date.
+const versions = await checkVersionAgreement(base, t3ServerVersion().tag);
+report.serverVersion = versions;
+for (const failure of versions.failures) check(`server version: ${failure}`, false);
 
 await admin("POST", "/_t3flare/disarm-bootstrap");
 const refusedBefore = await pair();

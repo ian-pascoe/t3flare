@@ -19,6 +19,7 @@ import * as url from "node:url";
 
 import { credentialsFile, secretsFile as secretsFileOf, standinFile } from "../stage-files.ts";
 import { buildWorker } from "../build.ts";
+import { t3ServerVersion } from "../serverVersion.ts";
 import { buildAgentsWorker } from "../../agents/build.ts";
 import { isDurableObjectClassNotFound } from "./deploy-retry.ts";
 import { adminClient, ensureModelEndpoint } from "./lib/modelEndpoint.ts";
@@ -169,8 +170,15 @@ switch (command) {
       process.exit(1);
     }
     for (const note of plan.notes) console.log(`t3flare: ${note}`);
+    // The Server version (in-app updates plan D1): the pin's tag, stamped into the Worker (build.ts) and the web client
+    // (APP_VERSION). prod is always on a tag: a stock client compares its own version with it to offer an Update.
+    const serverVersion = t3ServerVersion();
+    if (stage === "prod" && !serverVersion.exact) {
+      console.error("t3flare: t3code is not at an exact tag (git -C t3code describe --tags --exact-match HEAD); prod deploys only a tagged pin");
+      process.exit(2);
+    }
     if (rest.includes("--web") || !fs.existsSync(path.join(here, "dist/web/index.html"))) {
-      const web = spawnSync("pnpm", ["run", "prepare:web"], { cwd: here, stdio: "inherit" });
+      const web = spawnSync("pnpm", ["run", "prepare:web"], { cwd: here, stdio: "inherit", env: { ...process.env, APP_VERSION: serverVersion.version } });
       if (web.status !== 0) process.exit(web.status ?? 1);
     }
     await buildWorker();

@@ -23,6 +23,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { Plugin } from "rolldown";
 
+import { stampedManifest, t3ServerVersion } from "./serverVersion.ts";
 import { T3_CONNECT_DEFINES } from "./src/t3/connectPublicConfig.ts";
 
 const here = import.meta.dirname;
@@ -90,6 +91,10 @@ const DEPENDENCY_STUBS: Record<string, string> = {
 
 export interface BuildReport {
   readonly t3: string;
+  /** The Server version stamped into t3's server manifest (`serverVersion.ts`). */
+  readonly serverVersion: string;
+  /** It came from an exact tag (else it is the manifest's own). */
+  readonly serverVersionExact: boolean;
   readonly commit: string;
   readonly builtAt: string;
   readonly patches: ReadonlyArray<string>;
@@ -223,6 +228,21 @@ const shadows = (applied: Set<string>): Plugin => {
 const STUB_PREFIX = "\0t3flare-stub:";
 const T3_SERVER_PACKAGE = path.join(T3_ROOT, "apps/server/package.json");
 
+/**
+ * The Server version stamp (in-app updates plan D1): t3's server manifest, served with the pin's version, so every
+ * reader of `packageJson.version` (the descriptor's `serverVersion`, the runtime state, the update target's check) sees
+ * the tag, as a t3 release build's manifest does.
+ */
+const serverVersionStamp = (version: string): Plugin => {
+  const manifest = fs.realpathSync(T3_SERVER_PACKAGE);
+  return {
+    name: "t3flare:server-version",
+    load(id) {
+      return id === manifest ? stampedManifest(fs.readFileSync(manifest, "utf8"), version) : null;
+    },
+  };
+};
+
 const dependencyStubs = (): Plugin => ({
   name: "t3flare:dependency-stubs",
   resolveId(source) {
@@ -321,13 +341,15 @@ export const buildWorker = async (options: { readonly quiet?: boolean } = {}): P
   const probe = { modules: 0, bindings: 0 };
   const applied: Array<string> = [];
   const shadowed = new Set<string>();
-  const identity = { t3: t3Version(), commit: ourCommit(), builtAt: new Date().toISOString() };
+  const serverVersion = t3ServerVersion();
+  const identity = { t3: t3Version(), serverVersion: serverVersion.version, commit: ourCommit(), builtAt: new Date().toISOString() };
   const bundle = await rolldown({
     input: path.join(here, "src/worker.ts"),
     cwd: here,
     external: ["lightningcss", "fsevents", "cloudflare:workers"],
     plugins: [
       patchedT3Modules(applied),
+      serverVersionStamp(serverVersion.version),
       shadows(shadowed),
       t3NodeFsAlias(fsAlias),
       dependencyStubs(),
@@ -357,6 +379,7 @@ export const buildWorker = async (options: { readonly quiet?: boolean } = {}): P
   }
   const report: BuildReport = {
     ...identity,
+    serverVersionExact: serverVersion.exact,
     patches: applied,
     shadows: [...shadowed].sort(),
     buildShims: {
@@ -371,7 +394,7 @@ export const buildWorker = async (options: { readonly quiet?: boolean } = {}): P
   fs.writeFileSync(path.join(here, "dist/build-report.json"), `${JSON.stringify(report, null, 2)}\n`);
   if (!options.quiet) {
     console.log(
-      `t3flare: built ${(bytes / 1024 / 1024).toFixed(2)} MiB for t3 ${report.t3}; ${applied.length} patches, ${shadowed.size} shadows, ` +
+      `t3flare: built ${(bytes / 1024 / 1024).toFixed(2)} MiB for t3 ${report.t3} (Server version ${serverVersion.version}${serverVersion.exact ? "" : ", not an exact tag"}); ${applied.length} patches, ${shadowed.size} shadows, ` +
         `${fsAlias.rewritten} node:fs imports aliased in ${fsAlias.importers.size} t3 modules, ` +
         `module-state probe in ${probe.modules} modules (${probe.bindings} bindings)`,
     );

@@ -45,6 +45,17 @@ describe("the descriptor's capabilities", () => {
       localServerStop: true,
     });
   });
+
+  it("advertises t3flare's own server Update only where it is configured (in-app updates plan D2, D14)", () => {
+    const fromT3 = { repositoryIdentity: true, serverSelfUpdate: "boot-service", serverSelfUpdateProgress: true, serverUpdateStaging: true } as ExecutionEnvironmentCapabilities;
+    expect(cloudCapabilities(fromT3)).toEqual({ repositoryIdentity: true });
+    expect(cloudCapabilities(fromT3, { serverSelfUpdate: "respawn" })).toEqual({ repositoryIdentity: true, serverSelfUpdate: "respawn" });
+    // The stock client takes no accepting-`ready` baseline for `respawn`, so an idle reset does not read as a failure.
+    expect(CAPABILITIES.serverSelfUpdate).toHaveProperty("advertise");
+    for (const key of ["serverSelfUpdateProgress", "serverUpdateStaging", "serverUpdateThreadContinuation", "serverInstallation", "npmReleaseLookup", "desktopAppUpdate"] as const) {
+      expect(CAPABILITIES[key], key).toHaveProperty("strip");
+    }
+  });
 });
 
 describe("t3flare's managed policy", () => {

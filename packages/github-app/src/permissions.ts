@@ -1,5 +1,6 @@
 // The GitHub permissions t3flare asks for (ADR-0013; adapted from cloudpid@ae5a7b73:packages/config/src/github-permissions.ts).
-// Three lists, so a permission the App gains reaches a token only by being added to that token's list on purpose.
+// One list per kind of token (Container, Environment, skill fetch, update dispatch), so a permission the App gains reaches
+// a token only by being added to that token's list on purpose.
 
 /** A permission's level on a repository. */
 export type GitHubPermissionLevel = "read" | "write";
@@ -14,7 +15,9 @@ export const GITHUB_APP_PERMISSIONS = {
   workflows: "write",
   checks: "read",
   statuses: "read",
-  actions: "read",
+  // `write` for in-app updates (ADR-0037): the Environment DO dispatches t3flare's own bump workflows. Only
+  // `UPDATE_DISPATCH_GITHUB_PERMISSIONS` carries it; the owner accepts the change on the installation.
+  actions: "write",
   issues: "read",
   metadata: "read",
 } as const satisfies GitHubPermissions;
@@ -57,5 +60,15 @@ export const ENVIRONMENT_GITHUB_PERMISSIONS = {
  */
 export const SKILL_FETCH_GITHUB_PERMISSIONS = {
   contents: "read",
+  metadata: "read",
+} as const satisfies GitHubPermissions;
+
+/**
+ * The Environment DO's token for an in-app Update (ADR-0037): dispatch t3flare's bump workflows and read their runs, on
+ * the repository the update target names (`ian-pascoe/t3flare`) only. Minted per dispatch and per poll, used for those
+ * requests and dropped; never a Container's or a Session's.
+ */
+export const UPDATE_DISPATCH_GITHUB_PERMISSIONS = {
+  actions: "write",
   metadata: "read",
 } as const satisfies GitHubPermissions;

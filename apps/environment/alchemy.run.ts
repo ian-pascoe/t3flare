@@ -331,6 +331,9 @@ export default Alchemy.Stack(
         ...(stage === "prod" ? {} : { T3FLARE_CONNECT_KEEP_ACCOUNT_TOKEN: "1", T3FLARE_CONNECT_SERVICE_TOKEN: "1" }),
         // Step 4a: the process channel's probe program and stage-only checks answer on test stages only.
         ...(stage === "prod" ? {} : { T3FLARE_FAULTS: "1" }),
+        // In-app Updates (ADR-0037, plan D14): only prod has an update target. A press on any other stage would land a
+        // bump on main, which deploys prod.
+        ...(stage === "prod" ? { T3FLARE_UPDATE_REPO: "ian-pascoe/t3flare" } : {}),
         ...(sweepGraceMs === "" ? {} : { T3FLARE_SWEEP_GRACE_MS: sweepGraceMs }),
       },
       assets: {
