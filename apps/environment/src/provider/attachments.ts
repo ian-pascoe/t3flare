@@ -65,11 +65,12 @@ const asText = (bytes: Uint8Array): string | null => {
 /**
  * The prompt text and inline images of one message (`startTurn`'s or `steerTurn`'s). With `skills` (the Pi Durable
  * adapter's; SPI-1147), its Skill mentions and a leading Slash command expand first, within the same text budget; the
- * ACP flavors pass none, so their agents get the message as typed.
+ * ACP flavors pass none, so their agents get the message as typed. `reservedChars`: input text sent beside this one (t3's
+ * ACP adapter writes the message's own block), taken from the budget a file's text may use.
  */
 export const turnPrompt = Effect.fn("PiDurable.turnPrompt")(function* (
   message: { readonly text: string; readonly attachments: ReadonlyArray<ChatAttachment> },
-  options: { readonly acceptsImages: boolean; readonly reader: AttachmentReader; readonly skills?: MessageSkills },
+  options: { readonly acceptsImages: boolean; readonly reader: AttachmentReader; readonly skills?: MessageSkills; readonly reservedChars?: number },
 ) {
   const budget = PROVIDER_SEND_TURN_MAX_INPUT_CHARS - 200 * message.attachments.length;
   const catalog = options.skills !== undefined && hasCommandOrSigil(message.text) ? yield* options.skills.load() : undefined;
@@ -78,7 +79,7 @@ export const turnPrompt = Effect.fn("PiDurable.turnPrompt")(function* (
   const images: Array<ImageInput> = [];
   let imageChars = 0;
   // Each file's text is cut to what is left of the input budget after the message and every attachment's note.
-  let textLeft = PROVIDER_SEND_TURN_MAX_INPUT_CHARS - messageText.length - 200 * message.attachments.length;
+  let textLeft = PROVIDER_SEND_TURN_MAX_INPUT_CHARS - (options.reservedChars ?? 0) - messageText.length - 200 * message.attachments.length;
   for (const attachment of message.attachments) {
     const label = `${attachment.type} "${attachment.name}"`;
     const inlineImage = attachment.type === "image" && isProviderSendTurnSupportedImageMimeType(attachment.mimeType);

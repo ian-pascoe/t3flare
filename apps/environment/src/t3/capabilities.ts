@@ -18,6 +18,9 @@ export const CAPABILITIES = {
   fileAttachments: keep,
   pullRequests: keep,
   pullRequestChecks: keep,
+  // t3's issue trackers: a git host's through the stock source-control drivers (as pull requests), Linear over fetch
+  // with its key in the DO's secret store.
+  issues: keep,
   sideChats: keep,
   vcsBranchStatus: keep,
   inlineMessageContext: keep,
@@ -28,6 +31,8 @@ export const CAPABILITIES = {
   storageCleanupRun: keep,
   databaseStorage: keep,
   otlpEndpointCheck: keep,
+  // Settings' check button: a fresh read through the SecretResolver the Environment already uses.
+  secretSourceCheck: keep,
   projectWorktreeCleanup: keep,
   settledWorktreeCleanup: keep,
   worktreesDirectory: keep,
@@ -64,12 +69,14 @@ export const CAPABILITIES = {
   npmReleaseLookup: strip(`offers an npm update: ${SELF_UPDATE}`),
   serverInstallation: strip(SELF_UPDATE),
   serverSelfUpdateProgress: strip(SELF_UPDATE),
+  serverUpdateStaging: strip(SELF_UPDATE),
   serverUpdateThreadContinuation: strip(SELF_UPDATE),
   // Read per request from T3 Connect's link state; step 3+ (the publish-only link) needs it.
   agentActivityPublishing: keep,
   projectCloneTracking: keep,
   projectOrganization: keep,
   ignoredFileListing: keep,
+  ignoredFileSearch: keep,
   environmentIcon: keep,
   desktopAppUpdate: strip("the desktop app's own updater, on a desktop host"),
   desktopAppChannelSwitch: strip("the desktop app's own updater, on a desktop host"),
@@ -80,6 +87,8 @@ export const CAPABILITIES = {
   mcpModeLimitHeader: keep,
   linkFence: keep,
   mcpApprovalCodes: keep,
+  // Automatic pairing codes bound to a Peer link (step 3's links, as `peerLinks`).
+  peerLinkPairingCodes: keep,
   mcpHostedApproval: keep,
   triage: strip("clones t3's source and writes host diagnostics on the host (host-bound)"),
   oneTimeSchedules: keep,
@@ -91,6 +100,8 @@ export const CAPABILITIES = {
   // The thread shell's families and older settled threads: t3's own `/ws` reads over its own SQL.
   shellThreadFamilies: keep,
   shellOlderSettled: keep,
+  // t3 publishes a pull request refresh when a linked thread's answers change: its own `/ws` push.
+  linkedThreadRefreshes: keep,
 } as const satisfies Record<keyof ExecutionEnvironmentCapabilities, Classification>;
 
 /** The capabilities the Cloud Environment advertises: t3's, without the stripped ones. */

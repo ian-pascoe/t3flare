@@ -179,7 +179,7 @@ export const snapshotOf = (spec: AcpCliDriverSpec, enabled: boolean) =>
   });
 
 export interface AcpFlavorOptions {
-  readonly buildPrompt?: AcpAdapterV2Flavor["buildPrompt"];
+  readonly prompt?: AcpPromptHooks;
   /** The unguarded runtime (tests replay a recorded agent); by default the CLI through the process channel. */
   readonly spawn?: AcpAdapterV2Flavor["makeRuntime"];
   /** SPI-1168, SPI-1169: the Model endpoints as stored now, for the CLI's model ids (an endpoint's by its slug). Absent: none. */
@@ -201,7 +201,7 @@ export const acpFlavor = (cli: AcpCli, driver: ProviderDriverKind, options: AcpF
   promptFailure: (cause) => cliPromptFailure(cause),
   requiresSignIn: () => false,
   resolveModelId: (selection) => (cli === "claude" ? claudeModelId : opencodeModelId)(selection.model, options.modelEndpoints?.()),
-  ...(options.buildPrompt === undefined ? {} : { buildPrompt: options.buildPrompt }),
+  ...options.prompt,
   // Review F1: the plan is captured when Claude asks to leave plan mode (guardedRuntime), not after the turn settles.
   registerExtensions: ({ runtime, captureProposedPlan }) =>
     Effect.sync(() => {
@@ -219,31 +219,42 @@ export const acpFlavor = (cli: AcpCli, driver: ProviderDriverKind, options: AcpF
     : {}),
 });
 
+/** The prompt hooks of a flavor (`acpPromptBuilder`'s). */
+export type AcpPromptHooks = Pick<AcpAdapterV2Flavor, "buildAttachmentPrompt" | "rewriteUserText">;
+
 /**
  * Prompts (plan §3.5): SPI-993's rules for Durable agents, images inline when the agent takes them, text files inline.
+ * t3's adapter writes the message's text itself (its instructions, and a line per attachment) and appends what
+ * `buildAttachmentPrompt` returns: here, each attachment's note, a readable file's text, and the images.
  * SPI-1151: with `opencodeSkills` (OpenCode's flavor only), a message's Skill mentions embed as OpenCode's skill tool
- * returns them, read for the turn's thread (`CliTurn`: t3's adapter gives the builder no cwd).
+ * returns them, read for the turn's thread (`CliTurn`: t3's adapter gives the hooks no cwd), through `rewriteUserText`.
  */
 export const acpPromptBuilder = (
   host: ProviderHost.ProviderHost["Service"],
   fileSystem: FileSystem.FileSystem,
   opencodeSkills?: SkillsAccess,
-): NonNullable<AcpAdapterV2Flavor["buildPrompt"]> => {
+): AcpPromptHooks => {
   const reader = attachmentReader(host, fileSystem);
-  return (input) =>
-    Effect.gen(function* () {
-      const turn = yield* CliTurn;
-      const threadSkills = opencodeSkills === undefined || turn === undefined ? undefined : messageSkillsFor(turn.cwd, opencodeSkills, true);
-      return yield* turnPrompt(
-        { text: input.text, attachments: input.attachments as ReadonlyArray<ChatAttachment> },
-        { acceptsImages: input.promptCapabilities?.image === true, reader, ...(threadSkills === undefined ? {} : { skills: threadSkills }) },
-      );
-    }).pipe(
+  const buildAttachmentPrompt: NonNullable<AcpAdapterV2Flavor["buildAttachmentPrompt"]> = (input) =>
+    turnPrompt(
+      { text: "", attachments: input.attachments as ReadonlyArray<ChatAttachment> },
+      // The message's text is t3's block, already in the prompt: a file's text gets what is left of the budget.
+      { acceptsImages: input.promptCapabilities?.image === true, reader, reservedChars: input.text.length },
+    ).pipe(
       Effect.map(({ text, images }): ReadonlyArray<EffectAcpSchema.ContentBlock> => [
-        { type: "text", text },
+        ...(text.length === 0 ? [] : [{ type: "text" as const, text }]),
         ...images.map((image) => ({ type: "image" as const, data: image.data, mimeType: image.mimeType })),
       ]),
     );
+  if (opencodeSkills === undefined) return { buildAttachmentPrompt };
+  const rewriteUserText: NonNullable<AcpAdapterV2Flavor["rewriteUserText"]> = (text) =>
+    Effect.gen(function* () {
+      const turn = yield* CliTurn;
+      if (turn === undefined) return text;
+      const expanded = yield* turnPrompt({ text, attachments: [] }, { acceptsImages: false, reader, skills: messageSkillsFor(turn.cwd, opencodeSkills, true) });
+      return expanded.text;
+    });
+  return { buildAttachmentPrompt, rewriteUserText };
 };
 
 /**
@@ -295,8 +306,8 @@ export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <
   const fileSystem = yield* FileSystem.FileSystem;
   // SPI-1151: a picked Skill reaches the CLI as its own: Claude Code's mention rewritten (the wrapper), OpenCode's embedded.
   const skillsAccess = environmentSkillsAccess();
-  const buildPrompt = acpPromptBuilder(host, fileSystem, spec.cli === "opencode" ? skillsAccess : undefined);
-  const adapter = yield* makeAcpAdapterV2(acpAdapterOptions(instanceId, acpFlavor(spec.cli, spec.driver, { buildPrompt, modelEndpoints: () => environmentServices().modelEndpoints?.() }), continuationRequests)).pipe(
+  const prompt = acpPromptBuilder(host, fileSystem, spec.cli === "opencode" ? skillsAccess : undefined);
+  const adapter = yield* makeAcpAdapterV2(acpAdapterOptions(instanceId, acpFlavor(spec.cli, spec.driver, { prompt, modelEndpoints: () => environmentServices().modelEndpoints?.() }), continuationRequests)).pipe(
     Effect.provideService(McpProviderSessions.McpProviderSessions, relayed),
   );
   return {

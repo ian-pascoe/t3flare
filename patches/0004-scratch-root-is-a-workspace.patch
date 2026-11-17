@@ -1,12 +1,12 @@
 diff --git a/apps/server/src/project/ManagedProjectFolders.ts b/apps/server/src/project/ManagedProjectFolders.ts
-index 2731699707..c8581d786b 100644
+index d526c381fb..c9f41e5d32 100644
 --- a/apps/server/src/project/ManagedProjectFolders.ts
 +++ b/apps/server/src/project/ManagedProjectFolders.ts
-@@ -255,7 +255,8 @@ const make = Effect.gen(function* () {
+@@ -259,7 +259,8 @@ const make = Effect.gen(function* () {
        Effect.flatMap(
          (repositoryRoot): Effect.Effect<Result.Result<string, ScratchUnavailableError>> => {
            if (repositoryRoot === null) {
--            return Effect.succeed(Result.succeed(path.resolve(config.baseDir, "scratch")));
+-            return Effect.succeed(Result.succeed(scratchFolderRoot(config.baseDir, path)));
 +            // t3flare: the No project folder is a Workspace (`/w/t3-scratch`, parity G4), so its threads run in a Container.
 +            return Effect.succeed(Result.succeed("/w/t3-scratch"));
            }

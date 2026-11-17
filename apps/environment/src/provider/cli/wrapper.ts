@@ -120,7 +120,7 @@ export interface WrapOptions {
 
 /**
  * The turn t3's adapter is starting now (SPI-1151): its thread's cwd, for a prompt builder that t3's adapter gives no
- * cwd (the ACP flavors' `buildPrompt`, OpenCode's Skill embed). Set around the adapter's `startTurn`.
+ * cwd (OpenCode's Skill embed, its flavor's `rewriteUserText`). Set around the adapter's `startTurn`.
  */
 export const CliTurn = Context.Reference<{ readonly cwd: string | null } | undefined>("t3flare/CliTurn", { defaultValue: () => undefined });
 

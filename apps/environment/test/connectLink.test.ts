@@ -21,6 +21,7 @@ import * as ConnectReachability from "t3/src/cloud/ConnectReachability.ts";
 import * as EnvironmentKeys from "t3/src/cloud/environmentKeys.ts";
 import * as ManagedEndpointRuntime from "t3/src/cloud/ManagedEndpointRuntime.ts";
 import * as ServerConfigModule from "t3/src/config.ts";
+import * as ServerSettings from "t3/src/serverSettings.ts";
 import * as ServerEnvironment from "t3/src/environment/ServerEnvironment.ts";
 import * as ManagedPolicy from "t3/src/policy/ManagedPolicy.ts";
 import * as AgentAwarenessRelay from "t3/src/relay/AgentAwarenessRelay.ts";
@@ -87,7 +88,14 @@ const run = <A, E>(h: Harness, policy: ConnectService.ConnectPolicy, use: (conne
   return Effect.runPromise(
     Effect.flatMap(ConnectService.Connect, use).pipe(
       Effect.provide(ConnectService.layer(policy, makePublishRecorder({ read: () => undefined, write: () => undefined }))),
-      Effect.provide(CloudLink.layer.pipe(Layer.provide(EnvironmentKeys.layer), Layer.provide(ManagedPolicy.layerTest()))),
+      Effect.provide(
+        CloudLink.layer.pipe(
+          Layer.provide(EnvironmentKeys.layer),
+          Layer.provide(ManagedPolicy.layerTest()),
+          // t3 reads its settings since v0.1.11-nightly.20261117.4825.
+          Layer.provide(ServerSettings.layerTest({})),
+        ),
+      ),
       Effect.provideService(ConnectReachability.ConnectReachability, ConnectReachability.ConnectReachability.of({ check: Effect.die("unused"), latest: Effect.succeedNone })),
       Effect.provideService(HttpServer.HttpServer, HttpServer.HttpServer.of({ address: NetAddress.inetAddressFromIpStringUnsafe("127.0.0.1", 443), serve: (() => Effect.void) as never })),
       Effect.provideService(ServerSecretStore.ServerSecretStore, store),

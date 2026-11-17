@@ -306,6 +306,10 @@ export const make = Effect.gen(function* () {
     registerTerminalProcesses: () => Effect.void,
     unregisterTerminal: () => Effect.void,
     trackAgent: () => () => undefined,
+    // Codex's adapter asks which of its commands a stop signals, from each process's environment. A stop here goes
+    // through the Workspace and reads no environments, so no watcher is told: Codex sees the command end by itself, as
+    // before t3 added the hook.
+    watchAgentCommandStops: () => Effect.void,
     stopServer,
   });
 });

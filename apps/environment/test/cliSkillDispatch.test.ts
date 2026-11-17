@@ -181,8 +181,8 @@ const promptFor = (cli: "claude" | "opencode", text: string, files: Record<strin
       });
     const driver = ProviderDriverKind.make(cli === "claude" ? "claudeAgent" : "opencode");
     const instanceId = ProviderInstanceId.make(cli === "claude" ? "claudeAgent" : "opencode");
-    const buildPrompt = acpPromptBuilder(yield* ProviderHost.ProviderHost, fileSystem, cli === "opencode" ? access : undefined);
-    const adapter = yield* makeAcpAdapterV2({ instanceId, flavor: acpFlavor(cli, driver, { spawn, buildPrompt }), selfInvocation: { command: "none", entrypoint: undefined } });
+    const promptHooks = acpPromptBuilder(yield* ProviderHost.ProviderHost, fileSystem, cli === "opencode" ? access : undefined);
+    const adapter = yield* makeAcpAdapterV2({ instanceId, flavor: acpFlavor(cli, driver, { spawn, prompt: promptHooks }), selfInvocation: { command: "none", entrypoint: undefined } });
     const wrapped = wrapCliAdapter(adapter, {
       sessions: new Map(),
       ...(cli === "claude" ? { rewriteTurnText: claudeMentionRewrite(access) } : {}),
@@ -234,6 +234,8 @@ describe("through t3's ACP adapter", () => {
       `<skill_content name="fruit-code">\n# Skill: fruit-code\n\nRead reference/code.md for the code.\n\nBase directory for this skill: ${T3}/fruit-code\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\n</skill_content>`,
     );
     expect(asked).toEqual(["opencode"]);
+    // t3's adapter writes the message's block itself and appends the flavor's attachment blocks: the text goes once.
+    expect(blocks.filter((block) => block.type === "text" && block.text?.includes("what is it? $fruit-code"))).toHaveLength(1);
   });
 
   it("Claude Code gets an Environment skill's mention noted at the mount, and the Environment's of a same-named pair (SPI-1153)", async () => {
@@ -268,5 +270,30 @@ describe("through t3's ACP adapter", () => {
     const { blocks, asked } = await run(promptFor("opencode", "/review now", {}));
     expect(blocks[0]?.text).toBe("/review now");
     expect(asked).toEqual(["opencode"]);
+  });
+});
+
+describe("the ACP flavors' attachment blocks (t3's buildAttachmentPrompt)", () => {
+  const host = { resolveAttachmentPath: () => null } as unknown as ProviderHost.ProviderHost["Service"];
+  const attachment = { type: "file", id: "a1", name: "notes.txt", mimeType: "text/plain", sizeBytes: 5 } as never;
+
+  it("are the attachments' notes alone: the message's text is t3's own block", async () => {
+    const blocks = await Effect.runPromise(
+      Effect.gen(function* () {
+        const { buildAttachmentPrompt } = acpPromptBuilder(host, yield* FileSystem.FileSystem);
+        return yield* buildAttachmentPrompt!({ text: "the message", attachments: [attachment], resolveAttachmentPath: () => null, promptCapabilities: undefined, agentVersion: undefined, currentModel: undefined });
+      }).pipe(Effect.provide(NodeServices.layer)),
+    );
+    expect(blocks).toEqual([{ type: "text", text: '[Attached file "notes.txt" is unavailable: t3 has no saved file for it.]' }]);
+  });
+
+  it("are none without attachments", async () => {
+    const blocks = await Effect.runPromise(
+      Effect.gen(function* () {
+        const { buildAttachmentPrompt } = acpPromptBuilder(host, yield* FileSystem.FileSystem);
+        return yield* buildAttachmentPrompt!({ text: "the message", attachments: [], resolveAttachmentPath: () => null, promptCapabilities: undefined, agentVersion: undefined, currentModel: undefined });
+      }).pipe(Effect.provide(NodeServices.layer)),
+    );
+    expect(blocks).toEqual([]);
   });
 });

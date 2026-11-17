@@ -50,6 +50,10 @@ import * as CloudSpeech from "t3/src/speech/CloudSpeech.ts";
 import { speechHttpApiLayer } from "t3/src/speech/http.ts";
 import * as PullRequestProviderRegistry from "t3/src/pullRequest/PullRequestProviderRegistry.ts";
 import * as PullRequestService from "t3/src/pullRequest/PullRequestService.ts";
+import * as IssueService from "t3/src/issue/IssueService.ts";
+import * as IssueTrackerConnections from "t3/src/issue/IssueTrackerConnections.ts";
+import * as IssueTrackerBindings from "t3/src/persistence/IssueTrackerBindings.ts";
+import * as IssueTrackerRegistry from "t3/src/issue/IssueTrackerRegistry.ts";
 import * as PullRequestFilesViewed from "t3/src/persistence/PullRequestFilesViewed.ts";
 import * as PullRequestReviewGuides from "t3/src/persistence/PullRequestReviewGuides.ts";
 import * as PullRequestReviewGuideService from "t3/src/pullRequest/PullRequestReviewGuideService.ts";
@@ -68,6 +72,7 @@ import * as SourceControlBuiltInDrivers from "t3/src/sourceControl/builtInDriver
 import * as SourceControlSignIn from "t3/src/sourceControl/SourceControlSignIn.ts";
 import { BUILT_IN_SOURCE_CONTROL_DRIVER_LIST } from "t3/src/sourceControl/sourceControlDefinitions.ts";
 import * as TextGeneration from "t3/src/textGeneration/TextGeneration.ts";
+import * as SecretCheck from "t3/src/secrets/SecretCheck.ts";
 import * as SecretResolver from "t3/src/secrets/SecretResolver.ts";
 import * as ProviderInstanceRegistryHydration from "t3/src/provider/ProviderInstanceRegistryHydration.ts";
 import * as ProjectSettingsOverrideSweep from "t3/src/provider/ProjectSettingsOverrideSweep.ts";
@@ -123,6 +128,8 @@ import * as VcsProjectConfig from "t3/src/vcs/VcsProjectConfig.ts";
 import * as VcsProcess from "t3/src/vcs/VcsProcess.ts";
 import * as VcsProvisioningService from "t3/src/vcs/VcsProvisioningService.ts";
 import * as VcsStatusBroadcaster from "t3/src/vcs/VcsStatusBroadcaster.ts";
+import * as VcsAutomaticFetchInterval from "t3/src/vcs/VcsAutomaticFetchInterval.ts";
+import * as UsageLimitSources from "t3/src/usage/UsageLimitSources.ts";
 import * as ProjectCloneTracker from "t3/src/project/ProjectCloneTracker.ts";
 import * as GitWorkflowService from "t3/src/git/GitWorkflowService.ts";
 import * as ReviewService from "t3/src/review/ReviewService.ts";
@@ -149,6 +156,7 @@ import * as CloudLink from "t3/src/cloud/CloudLink.ts";
 import * as ConnectReachability from "t3/src/cloud/ConnectReachability.ts";
 import * as RelayTracing from "t3/src/cloud/relayTracing.ts";
 import * as CloudManagedEndpointRuntime from "t3/src/cloud/ManagedEndpointRuntime.ts";
+import * as RelayClientLedger from "t3/src/cloud/RelayClientLedger.ts";
 import * as CloudCliTokenManager from "t3/src/cloud/CliTokenManager.ts";
 import * as ServerSelfUpdate from "t3/src/cloud/selfUpdate.ts";
 import * as DesktopAppUpdate from "t3/src/desktopUpdate/DesktopAppUpdate.ts";
@@ -172,6 +180,7 @@ import * as ProjectStore from "t3/src/orchestration-v2/ProjectStore.ts";
 import * as ThreadSearch from "t3/src/orchestration-v2/ThreadSearch.ts";
 import * as ThreadSettlementService from "t3/src/orchestration-v2/ThreadSettlementService.ts";
 import * as ThreadPullRequestService from "t3/src/orchestration-v2/ThreadPullRequestService.ts";
+import * as ThreadIssueService from "t3/src/orchestration-v2/ThreadIssueService.ts";
 import * as RunFinalizationService from "t3/src/orchestration-v2/RunFinalizationService.ts";
 import * as ProjectionMaintenance from "t3/src/orchestration-v2/ProjectionMaintenance.ts";
 import * as ProjectionStoreV2 from "t3/src/orchestration-v2/ProjectionStore.ts";
@@ -401,6 +410,11 @@ export const make = (options: CompositionOptions) => {
     Layer.provide(SourceControlRateLimit.layer),
   );
 
+  // As t3's `server.ts`: both read the one registry, so a tracker connected in Settings is the instance the listing reads.
+  const layerIssueService = Layer.merge(IssueService.layer, IssueTrackerConnections.layer).pipe(
+    Layer.provide(Layer.merge(IssueTrackerRegistry.layer, IssueTrackerBindings.layer)),
+  );
+
   const layerGitManager = GitManager.layer.pipe(
     Layer.provide(Layer.merge(ProjectionStoreV2.layer, ProjectStore.layer)),
     Layer.provideMerge(RuntimeLayer.layerProjectSetupScriptRunner),
@@ -440,8 +454,6 @@ export const make = (options: CompositionOptions) => {
     Layer.provideMerge(
       VcsStatusBroadcaster.layer.pipe(
         Layer.provide(layerGitWorkflow),
-        // t3flare: no automatic fetches: each would start the Workspace's Container (step 2a plan, section 2).
-        Layer.provide(Layer.succeed(VcsStatusBroadcaster.VcsAutomaticFetchInterval, Effect.succeed(Duration.zero))),
         Layer.provide(VcsStatusBroadcaster.layerAutoPullPolicy.pipe(Layer.provide(ProjectStore.layer))),
       ),
     ),
@@ -502,9 +514,22 @@ export const make = (options: CompositionOptions) => {
     Layer.provide(layerSecretStore),
   );
 
+  const untracked = Effect.succeed(Effect.void);
   const layerCloudManagedEndpointRuntime = Layer.mergeAll(
     layerRelayClient,
-    CloudManagedEndpointRuntime.layer.pipe(Layer.provide(layerSecretStore), Layer.provide(layerRelayClient)),
+    CloudManagedEndpointRuntime.layer.pipe(
+      Layer.provide(layerSecretStore),
+      Layer.provide(layerRelayClient),
+      // t3flare (G12): no relay client process is ever started here, so none is tracked; stock's ledger reads `/proc`
+      // and `ps` and keeps files in the State directory to stop a crashed server's leftovers.
+      Layer.provide(
+        Layer.succeed(RelayClientLedger.RelayClientLedger, {
+          track: Effect.fn("RelayClientLedger.untracked")(function* () {
+            return yield* untracked;
+          }),
+        }),
+      ),
+    ),
   );
 
   // t3flare (parity G12): no relay; the t3 host is public and serves t3's hook route itself (`/api/hooks/:hookId/:token`,
@@ -515,6 +540,7 @@ export const make = (options: CompositionOptions) => {
   );
 
   const layerOrchestrationV2Runtime = RuntimeLayer.layerProduction.pipe(
+    Layer.provide(UsageLimitSources.layerResetFallback),
     Layer.provide(layerScheduledTaskWebhookOrigin),
     Layer.provide(ProviderUsageAnalytics.layer),
     Layer.provide(layerCheckpointStore),
@@ -589,6 +615,7 @@ export const make = (options: CompositionOptions) => {
       () => environmentServices().sql.databaseSize,
     ),
     layerThreadPullRequestWorker,
+    // t3flare: no KeepAwake: it holds `caffeinate` or `systemd-inhibit` on the host while agents work; there is no host.
     DelegatedTaskAnalytics.layer,
     Layer.effectDiscard(
       Effect.gen(function* () {
@@ -634,14 +661,17 @@ export const make = (options: CompositionOptions) => {
     Layer.provideMerge(layerOrchestrationApplication),
     Layer.provideMerge(RuntimeLayer.layerEventInfrastructure),
     Layer.provideMerge(Layer.merge(ProjectStore.layer, ThreadSearch.layer)),
+    Layer.provideMerge(SecretCheck.layer),
     Layer.provideMerge(SecretResolver.layer),
+    // Above the settings it writes when a theme is applied (as t3's `server.ts`).
+    Layer.provideMerge(EnvironmentTheme.layer),
     Layer.provideMerge(layerServerSettings),
     Layer.provideMerge(layerSourceControlProviderRegistry),
     Layer.provideMerge(layerGit),
     Layer.provideMerge(layerVcs),
     Layer.provideMerge(Layer.mergeAll(layerTerminal, layerPreview, layerDevice)),
     Layer.provideMerge(layerPersistence),
-    Layer.provideMerge(Layer.mergeAll(Keybindings.layer, EnvironmentTheme.layer, layerUsageLimitSources)),
+    Layer.provideMerge(Layer.mergeAll(Keybindings.layer, layerUsageLimitSources)),
     Layer.provideMerge(ProviderRegistry.layer),
     Layer.provideMerge(ProviderInstanceRegistryHydration.layer.pipe(Layer.provide(layerPersistence))),
     // One gate for the server, below hydration, as t3's server.ts: layers memoize by reference.
@@ -754,6 +784,9 @@ export const make = (options: CompositionOptions) => {
     Layer.provide(RemoteDelegation.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
     Layer.provide(PeerLinkRequests.layer),
     Layer.provide(layerPullRequestService),
+    // As t3's `server.ts`: one instance serves the MCP link calls and refreshes snapshots on thread events.
+    Layer.provide(ThreadIssueService.layer),
+    Layer.provide(layerIssueService),
     Layer.provide(
       ServerBrowser.layer.pipe(Layer.provide(Layer.merge(DesktopBrowserChannel.layer, PreviewAgentActivity.layer))),
     ),
@@ -841,6 +874,12 @@ export const make = (options: CompositionOptions) => {
   // t3flare: t3's Console (and the loggers writing through it) drops the boot pairing URL and redacts
   // credentials, so no token reaches Workers Logs (ADR-0010).
   const layer = layerMakeServer.pipe(
+    // t3flare: no automatic fetches: each would start the Workspace's Container (step 2a plan, section 2). Both the
+    // status broadcaster and GitVcsDriver's status reads take the interval, and GitVcsDriver is built in several places,
+    // so it goes in context here, above every build (a Context.Reference: a missing one is t3's non-zero default).
+    Layer.provide(
+      Layer.succeed(VcsAutomaticFetchInterval.VcsAutomaticFetchInterval, Effect.succeed(Duration.zero)),
+    ),
     Layer.provide(layerConfig),
     Layer.provide(layerPlatformServices),
     Layer.provide(RedactingConsole.layer),
