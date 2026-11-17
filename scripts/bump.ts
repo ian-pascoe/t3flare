@@ -12,7 +12,8 @@
 //  4. `pnpm run check`, the whole of it: every Patch applies (`git apply --check`), typecheck, lint, tests.
 //  5. `test:docker` (step 4a): the pinned CLIs in Docker, launched by our profiles against the new t3, on a stand-in
 //     model relay (the real-model turns are the acceptance test's, on the stage's Model endpoint).
-//  6. Build the Worker and the web client, deploy the `bump` stage, and run the acceptance test against it
+//  6. Build the Worker and the web client, deploy the `bump` stage, turn its safe mode off (a new build starts fresh),
+//     and run the acceptance test against it
 //     (scripts/acceptance.ts: pairing, a /ws client, turn-item fixtures and t3's heavy queries, and since step 2a
 //     `--real-turn`: a Durable agent turn on a fresh clone of the fixture, both Workers and the Container image;
 //     `--terminal --worktree` (step 2b): a terminal, a worktree thread's setup script, its removal, the sweep's dry run;
@@ -184,11 +185,19 @@ const ok =
     const result = sh(process.execPath, ["scripts/stage.ts", "deploy", stage, "--web"], environment);
     return { ok: result.ok, detail: result.output };
   }) &&
+  // A new build on CI's own stage starts fresh: boots the last build failed (safe mode after three, which only the owner
+  // or this turns off, ADR-0010) say nothing about this one.
+  step(`the ${stage} stage starts its new build fresh (safe mode off)`, () => {
+    const result = sh(process.execPath, ["scripts/stage.ts", "run", stage, "admin", "POST", "/_t3flare/safe-mode?on=0"], environment);
+    return { ok: result.ok && /^200 /m.test(result.output), detail: result.output };
+  }) &&
   step(`acceptance test against the ${stage} stage`, () => {
     const out = path.join(environment, "dist/bump-acceptance.json");
     fs.rmSync(out, { force: true });
     const result = sh(process.execPath, ["scripts/stage.ts", "run", stage, "acceptance", "--threads", "12", "--runs", "4", "--real-turn", "--terminal", "--worktree", "--peer", "--codex", "--pi", "--claude", "--opencode", "--out", out], environment, { quiet: true });
-    return { ok: result.ok, detail: fs.existsSync(out) ? fs.readFileSync(out, "utf8") : result.output };
+    // A failed start answers every route with one line; the boot record says why.
+    const health = result.ok ? "" : `\n${sh(process.execPath, ["scripts/stage.ts", "run", stage, "health", "bootRecord,safeMode,runtime"], environment, { quiet: true }).output}`;
+    return { ok: result.ok, detail: `${fs.existsSync(out) ? fs.readFileSync(out, "utf8") : result.output}${health}` };
   }) &&
   step(`a stock t3 nightly from npm links to the ${stage} stage and forwards a launch`, () => {
     // stdout alone, outside the workspace (npm warns about workspaces on stderr there).
