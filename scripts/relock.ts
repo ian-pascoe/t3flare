@@ -4,7 +4,8 @@
 //
 //  1. gen-workspace.ts writes pnpm-workspace.yaml (t3's patches limited to what the current lock installs);
 //  2. seed-lock.ts seeds pnpm-lock.yaml from t3's lock;
-//  3. `pnpm install --no-frozen-lockfile` resolves our packages against it (CI defaults to frozen, review H3);
+//  3. `pnpm install --no-frozen-lockfile --fix-lockfile` resolves our packages against it (CI defaults to frozen, review
+//     H3), keeping our own resolutions seed-lock.ts carried over and mending what they referenced of t3's graph;
 //  4. again from 1 while gen-workspace.ts changes pnpm-workspace.yaml: what our packages install can bring a t3 patch
 //     into play (alchemy) or out of it. Two rounds settle it; a third means the two disagree, and fails.
 //  5. verify-lock.ts.

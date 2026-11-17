@@ -11,9 +11,11 @@
 //  3. Write the settings header pnpm computes for our root: t3's catalogs and packageExtensions checksum, t3's
 //     overrides plus ours, our patches (sha256 of each file), no pnpmfile checksum. A header that differs from the
 //     config makes pnpm re-resolve everything, which moves t3's packages (review M1; measured in M0).
-//  4. Our own importers are not kept: pnpm resolves them against the seeded t3 graph. Kept, their entries (a newer
-//     version of a name t3 also installs) win pnpm's deduplication and move t3's transitive dependencies (measured
-//     in M0: tldts). verify-lock.ts fails on any such move, and docs/steps/pnpm/lock-diff.ts shows ours.
+//  4. Our own importers are kept as the current lock resolves them, with what they install that t3's graph does not name
+//     (ADR-0037, review B2: a bump moves only what t3 moved, which the land check then holds it to). Names t3 installs
+//     are left out: kept, our entries (a newer version of a name t3 also installs) win pnpm's deduplication and move
+//     t3's transitive dependencies (measured in M0: tldts). pnpm resolves those against the seeded t3 graph, and
+//     relock.ts's `--fix-lockfile` mends the references left dangling. verify-lock.ts fails on any move of t3's graph.
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";

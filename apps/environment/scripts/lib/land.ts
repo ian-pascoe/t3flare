@@ -145,10 +145,25 @@ export interface T3LockInput {
 export const t3LockRefusal = (input: T3LockInput): string | undefined => {
   const { after, main, t3 } = input;
   const [lock, base] = [after.main, main.main];
-  for (const field of ["lockfileVersion", "settings", "catalogs", "packageExtensionsChecksum"]) {
+  for (const field of ["lockfileVersion", "settings", "packageExtensionsChecksum"]) {
     if (!sameJson(lock[field], t3.main[field])) return `the lock's ${field} is not t3's`;
   }
-  if (!sameJson(lock.overrides ?? {}, input.afterWorkspace.overrides ?? {})) return "the lock's overrides are not the workspace's";
+  // pnpm keeps only the catalog entries the install uses: each must be t3's.
+  for (const [catalog, entries] of Object.entries<Json>(lock.catalogs ?? {})) {
+    for (const [name, entry] of Object.entries(entries)) {
+      if (!sameJson(entry, t3.main.catalogs?.[catalog]?.[name])) return `the lock's catalog entry ${name} is not t3's`;
+    }
+  }
+  // The workspace's overrides, with `catalog:` read from its catalog, as pnpm records them.
+  const workspace = input.afterWorkspace;
+  const resolved = Object.fromEntries(
+    Object.entries<string>(workspace.overrides ?? {}).map(([key, value]) => {
+      const name = /^(@?[^@]+)/.exec(key.split(">").at(-1)!)?.[1] ?? key;
+      const catalog = /^catalog:(.*)$/.exec(value);
+      return [key, catalog === null ? value : catalog[1] === "" || catalog[1] === "default" ? workspace.catalog?.[name] : workspace.catalogs?.[catalog[1]!]?.[name]];
+    }),
+  );
+  if (!sameJson(lock.overrides ?? {}, resolved)) return "the lock's overrides are not the workspace's";
   if (!sameJson(lock.patchedDependencies ?? {}, input.patchHashes)) return "the lock's patchedDependencies are not the workspace's patches";
   const env = (documents: ReadonlyArray<Json>, mainDocument: Json) => documents.filter((document) => document !== mainDocument);
   if (!sameJson(env(after.documents, lock), env(t3.documents, t3.main))) return "pnpm's own document is not t3's";
@@ -170,6 +185,9 @@ export const t3LockRefusal = (input: T3LockInput): string | undefined => {
       if (!sameJson(Object.keys(now).sort(), Object.keys(was).sort())) return `${dir}'s ${field} are not main's`;
       for (const name of Object.keys(now)) {
         if (sameJson(now[name], was[name])) continue;
+        // A peer suffix only (the same package at the same version, its peers moved): its snapshot is checked below.
+        const peerOnly = now[name].specifier === was[name].specifier && bareKey(`${name}@${String(now[name].version)}`) === bareKey(`${name}@${String(was[name].version)}`);
+        if (peerOnly) continue;
         if (!moved.has(name)) return `${dir} repoints ${name}, which t3 did not move`;
         if (now[name].specifier !== was[name].specifier && !String(was[name].specifier).startsWith("catalog:")) return `${dir} changes ${name}'s specifier`;
         const key = importerKey(name, String(now[name].version));
@@ -231,7 +249,7 @@ export interface T3PlanInput {
   readonly branch?: ProposedBranch | undefined;
 }
 
-export type T3Plan = { readonly mode: "skip" | "bump" | "land"; readonly tag: string; readonly reason: string };
+export type T3Plan = { readonly mode: "skip" | "bump" | "land"; readonly tag: string; readonly reason: string; readonly proven?: boolean };
 
 const atOrAbove = (tag: string | undefined, target: string) => tag !== undefined && NIGHTLY_TAG.test(tag) && compareVersions(tag.slice(1), target.slice(1)) >= 0;
 
@@ -253,10 +271,15 @@ export const planT3 = (input: T3PlanInput): T3Plan | string => {
   }
   if (!input.land) return { mode: "bump", tag: input.tag ?? "", reason: "a bump by hand" };
   if (input.tag === undefined || !NIGHTLY_TAG.test(input.tag)) return `an Update needs a nightly tag, not ${JSON.stringify(input.tag)}`;
-  if (atOrAbove(input.mainTag, input.tag)) return { mode: "land", tag: input.tag, reason: `main already pins ${input.mainTag}; deploy it` };
+  // D6, review A11: an Update moves prod to exactly the client's tag. Main already past it means prod is about to move
+  // past it too: refused, so the client is told why, rather than deploying the newer pin and failing its check later.
+  if (input.mainTag !== undefined && NIGHTLY_TAG.test(input.mainTag) && compareVersions(input.mainTag.slice(1), input.tag.slice(1)) > 0) {
+    return `prod is moving to ${input.mainTag}, newer than ${input.tag}: update to ${input.mainTag} once it is deployed`;
+  }
+  if (input.mainTag === input.tag) return { mode: "land", tag: input.tag, reason: `main already pins ${input.tag}; deploy it` };
   const branch = input.branch;
   if (branch !== undefined && branch.gate !== undefined && branch.mainIsAncestor && branch.commits === 1) {
-    return { mode: "land", tag: input.tag, reason: `bump/${input.tag} is proven (${branch.gate} gate) on top of main` };
+    return { mode: "land", tag: input.tag, reason: `bump/${input.tag} is proven (${branch.gate} gate) on top of main`, proven: true };
   }
   return { mode: "bump", tag: input.tag, reason: `bump/${input.tag} is not proven on top of main` };
 };
@@ -267,8 +290,10 @@ export const planT3 = (input: T3PlanInput): T3Plan | string => {
  */
 export const readBumpReport = (
   text: string,
-  expect: { readonly kind: "t3"; readonly tag?: string | undefined } | { readonly kind: "cli"; readonly cli: string; readonly running?: string | undefined },
-): { readonly changed: boolean; readonly to: string; readonly gate: "update" | "full"; readonly land: boolean } | string => {
+  expect:
+    | { readonly kind: "t3"; readonly gate: "update" | "full"; readonly tag?: string | undefined }
+    | { readonly kind: "cli"; readonly cli: string; readonly running?: string | undefined },
+): { readonly changed: boolean; readonly to: string; readonly gate: "update" | "full"; readonly callLand: boolean } | string => {
   let report: Record<string, unknown>;
   try {
     const parsed: unknown = JSON.parse(text);
@@ -282,13 +307,15 @@ export const readBumpReport = (
   const changed = report.changed;
   if (expect.kind === "t3") {
     if (typeof report.to !== "string" || !NIGHTLY_TAG.test(report.to)) return `report.to is not a nightly tag: ${JSON.stringify(report.to)}`;
-    if (report.gate !== "update" && report.gate !== "full") return `report.gate is ${JSON.stringify(report.gate)}`;
+    // Review A8: the gate is the one the run was asked for; the report must say it ran that one.
+    if (report.gate !== expect.gate) return `the report's gate is ${JSON.stringify(report.gate)}, not the requested ${expect.gate}`;
     if (expect.tag !== undefined && report.to !== expect.tag) return `the report pins ${report.to}, not the requested ${expect.tag}`;
-    return { changed, to: report.to, gate: report.gate, land: changed };
+    return { changed, to: report.to, gate: expect.gate, callLand: changed };
   }
   if (report.cli !== expect.cli) return `the report is not ${expect.cli}'s`;
   if (typeof report.to !== "string" || !EXACT_VERSION.test(report.to)) return `report.to is not a version: ${JSON.stringify(report.to)}`;
   if (expect.running !== undefined && !EXACT_VERSION.test(expect.running)) return `the running version is not a version: ${JSON.stringify(expect.running)}`;
-  // F2: a press while prod runs an older pin than main's newest lands nothing new, and only deploys.
-  return { changed, to: report.to, gate: "update", land: changed || (expect.running !== undefined && expect.running !== report.to) };
+  // F2: a press while prod runs an older pin than main's newest lands nothing new, and only deploys (land.yml then
+  // deploys main, whatever `to` says).
+  return { changed, to: report.to, gate: "update", callLand: changed || (expect.running !== undefined && expect.running !== report.to) };
 };
