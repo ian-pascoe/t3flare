@@ -97,14 +97,13 @@ describe("Claude Code's Model endpoints", () => {
     expect(claudeModelsOf(undefined)).toEqual([]);
   });
 
-  it("names an endpoint's model to Claude Code by its slug; an old selection is its model's endpoint's, else the default model (SPI-1176)", () => {
+  it("names an endpoint's model to Claude Code by its slug; an old selection is the default model (SPI-1176)", () => {
     expect(claudeModelId("comm/claude-haiku-5-5", endpoints)).toBe("comm/claude-haiku-5-5");
-    // Old selections (`anthropic/…`, bare ids, t3's stock Claude default among them): the first Anthropic Messages
-    // endpoint listing a model of that id, so an old thread keeps its model.
-    for (const old of ["anthropic/claude-haiku-5-5", "claude-haiku-5-5"]) expect(claudeModelId(old, endpoints), old).toBe("comm/claude-haiku-5-5");
-    expect(claudeModelId("claude-opus-5-5", endpoints)).toBe("comm2/claude-opus-5-5");
-    // None lists it, or `default`: the default model, the list's first.
-    for (const old of ["anthropic/claude-fable-1", "gpt-5-mini", "default"]) expect(claudeModelId(old, endpoints), old).toBe("comm/claude-sonnet-5-5");
+    // Old selections (`anthropic/…`, bare ids, t3's stock Claude default among them) and `default`: the default model,
+    // the list's first, even where an endpoint lists a model of the old id (`comm`'s haiku, `comm2`'s opus): ADR-0034 §3.
+    for (const old of ["anthropic/claude-haiku-5-5", "claude-haiku-5-5", "claude-opus-5-5", "anthropic/claude-fable-1", "default"]) {
+      expect(claudeModelId(old, endpoints), old).toBe("comm/claude-sonnet-5-5");
+    }
     // Another API's endpoint, or a gone one: kept, so Claude Code's session does not offer it and t3's adapter refuses it.
     expect(claudeModelId("openai/gpt-5-mini", endpoints)).toBe("openai/gpt-5-mini");
     expect(claudeModelId("gone/x", endpoints)).toBe("gone/x");

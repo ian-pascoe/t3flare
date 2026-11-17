@@ -2,7 +2,6 @@
 // t3's spawns of a CLI agent (step 4a): `codex app-server` and `pi --mode rpc …` in a Workspace run there, through the
 // process channel, as a streaming `ChildProcessHandle`. Fail closed: only the argv our drivers send, only in a
 // Workspace, only through a CLI profile (cliProfiles.ts) that fixes the binary, the environment and the home.
-import { retiredSelectionSlug } from "@t3flare/models/endpoints";
 import { endpointsOfApi } from "@t3flare/models/relay";
 import { newHandle, toWorkspace } from "@t3flare/workspace-client";
 import * as Effect from "effect/Effect";
@@ -192,7 +191,7 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     // SPI-1170: pi on the relay names an endpoint's model by its own provider id; t3's adapter by the endpoint's.
     const relayEndpointIds = new Set(launch.modelRelay ?? []);
     const piLineMaps: LineMaps | undefined =
-      name === "pi" && relayEndpointIds.size > 0 ? { toCli: (line) => piLineToPi(line, relayEndpointIds, (modelId) => retiredSelectionSlug(`anthropic/${modelId}`, piRelay?.endpoints ?? [], piRelay?.model)), fromCli: (line) => piLineFromPi(line, relayEndpointIds) } : undefined;
+      name === "pi" && relayEndpointIds.size > 0 ? { toCli: (line) => piLineToPi(line, relayEndpointIds, piRelay?.model), fromCli: (line) => piLineFromPi(line, relayEndpointIds) } : undefined;
     const handle = handleOf(process, endOnDone, piLineMaps);
     // A stdin given as a Stream is piped in, as Node's spawner does (t3's `codex exec` prompt, parity G7).
     const input = typeof stdin === "object" && stdin !== null && "stream" in stdin ? stdin.stream : stdin;

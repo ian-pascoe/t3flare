@@ -1,7 +1,8 @@
 // pi's Model endpoints (SPI-1170): pi speaks every endpoint API (it is pi-ai's coding agent, and an endpoint's API is
 // one pi-ai speaks), so every endpoint the relay carries for pi (every sign-in too, SPI-1171) that lists a model is pi's.
-// pi runs on them through the model relay (without one it is refused at its spawn, SPI-1176): one pi provider per endpoint (`t3flare-endpoint-<id>`, prefixed so no endpoint id changes one of
-// pi's built-in providers) at the relay's per-endpoint URL, so a model switch between two endpoints, across APIs, stays
+// pi runs on them through the model relay (without one it is refused at its spawn, SPI-1176): one pi provider per
+// endpoint (`t3flare-endpoint-<id>`, prefixed so no endpoint id changes one of pi's built-in providers) at the relay's
+// per-endpoint URL, so a model switch between two endpoints, across APIs, stays
 // in the thread's process. Pure.
 //
 // t3's slugs stay `<endpointId>/<modelId>`. t3's Pi adapter names a model to pi by its `{ provider, modelId }` (RPC
@@ -47,11 +48,11 @@ const RETIRED_PROVIDER = "anthropic";
 
 /**
  * A line t3's Pi adapter sends pi (one RPC command): a `set_model` naming an endpoint id as its provider names that
- * endpoint's pi provider instead; one naming `anthropic` (an old thread's, `RETIRED_PROVIDER`) names the slug `fallback` gives
- * for its model id (an endpoint model of that id, else the slug pi starts on) instead (SPI-1176). Every other line, and a provider that is no endpoint's of the process (a
- * built-in, an endpoint that is gone), passes as it is.
+ * endpoint's pi provider instead; one naming `anthropic` (an old thread's, `RETIRED_PROVIDER`) names the default
+ * model, `fallback` (the slug pi starts on, `piRelayOf`), instead (SPI-1176). Every other line, and a provider that is
+ * no endpoint's of the process (a built-in, an endpoint that is gone), passes as it is.
  */
-export const piLineToPi = (line: string, endpointIds: ReadonlySet<string>, fallback?: string | ((modelId: string) => string | undefined)): string => {
+export const piLineToPi = (line: string, endpointIds: ReadonlySet<string>, fallback?: string): string => {
   if (!line.includes('"set_model"')) return line;
   let command: unknown;
   try {
@@ -61,9 +62,7 @@ export const piLineToPi = (line: string, endpointIds: ReadonlySet<string>, fallb
   }
   if (typeof command !== "object" || command === null || (command as { type?: unknown }).type !== "set_model") return line;
   const provider = (command as { provider?: unknown }).provider;
-  const modelId = (command as { modelId?: unknown }).modelId;
-  const target = typeof fallback === "function" ? fallback(typeof modelId === "string" ? modelId : "") : fallback;
-  const retired = provider === RETIRED_PROVIDER ? (target === undefined ? undefined : parseEndpointSlug(target)) : undefined;
+  const retired = provider === RETIRED_PROVIDER ? (fallback === undefined ? undefined : parseEndpointSlug(fallback)) : undefined;
   if (retired !== undefined && endpointIds.has(retired.endpointId)) return JSON.stringify({ ...command, provider: endpointProviderId(retired.endpointId), modelId: retired.modelId });
   if (typeof provider !== "string" || !endpointIds.has(provider)) return line;
   return JSON.stringify({ ...command, provider: endpointProviderId(provider) });

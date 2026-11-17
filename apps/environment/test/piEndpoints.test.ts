@@ -92,10 +92,6 @@ describe("pi's RPC lines on the relay", () => {
       provider: "t3flare-endpoint-comm",
       modelId: "c",
     });
-    // Given as a function of the old model id: the endpoint that lists it (`retiredSelectionSlug`), else the default.
-    const sameId = (modelId: string) => (modelId === "claude-sonnet-5-5" ? "comm/claude-sonnet-5-5" : "comm/c");
-    expect(JSON.parse(piLineToPi('{"type":"set_model","provider":"anthropic","modelId":"claude-sonnet-5-5"}', ids, sameId))).toMatchObject({ provider: "t3flare-endpoint-comm", modelId: "claude-sonnet-5-5" });
-    expect(JSON.parse(piLineToPi('{"type":"set_model","provider":"anthropic","modelId":"claude-x"}', ids, sameId))).toMatchObject({ provider: "t3flare-endpoint-comm", modelId: "c" });
     // A default that is no endpoint of the process's names nothing in its place.
     const line = '{"type":"set_model","provider":"anthropic","modelId":"claude-sonnet-5-5"}';
     expect(piLineToPi(line, ids, "gone/m")).toBe(line);

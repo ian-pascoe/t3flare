@@ -1,5 +1,5 @@
-// A model list as an endpoint serves it (SPI-1162's discovery): Anthropic's paged `/v1/models` or the OpenAI-shaped `/models`, both `{ data: [{ id, … }] }`. Every field but
-// the id is optional.
+// A model list as an endpoint serves it (SPI-1162's discovery): Anthropic's paged `/v1/models` or the OpenAI-shaped
+// `/models`, both `{ data: [{ id, … }] }`. Every field but the id is optional.
 //
 // Commissary lists a model that is not Claude under an alias in Anthropic's shape, `claude-fable-5-dd-` and its real id
 // spelled backwards (`claude-fable-5-dd-eerf-maeb` is `beam-free`): an endpoint at Commissary reads it back to the real

@@ -70,13 +70,14 @@ describe("OpenCode's Model endpoints", () => {
     expect(opencodeModelsOf({ revision: 1, endpoints: [endpoints.endpoints[0]!] })).toEqual([]);
   });
 
-  it("names an endpoint's model by its provider, a model id holding `/` kept whole; an old selection is the default model (SPI-1176)", () => {
+  it("names an endpoint's model by its provider, a model id holding `/` kept whole; an old selection the default model (SPI-1176)", () => {
     expect(opencodeModelId("comm/claude-haiku-5-5", endpoints)).toBe("t3flare-endpoint-comm/claude-haiku-5-5");
     expect(opencodeModelId("or/anthropic/claude-opus-5-5", endpoints)).toBe("t3flare-endpoint-or/anthropic/claude-opus-5-5");
-    // An old selection whose model an endpoint OpenCode reaches lists: that endpoint's; else `default`'s, the first model.
-    for (const old of ["anthropic/claude-haiku-5-5", "claude-haiku-5-5"]) expect(opencodeModelId(old, endpoints), old).toBe("t3flare-endpoint-comm/claude-haiku-5-5");
-    expect(opencodeModelId("gpt-5-mini", endpoints)).toBe("t3flare-endpoint-openai/gpt-5-mini");
-    for (const old of ["anthropic/claude-fable-1", "gemini-x", "default"]) expect(opencodeModelId(old, endpoints), old).toBe("t3flare-endpoint-comm/claude-sonnet-5-5");
+    // An old selection (`anthropic/…`, a bare id) and `default`: the default model, the first, even where an endpoint
+    // OpenCode reaches lists a model of the old id (`comm`'s haiku, `openai`'s gpt-5-mini): ADR-0034 §3.
+    for (const old of ["anthropic/claude-haiku-5-5", "claude-haiku-5-5", "gpt-5-mini", "gemini-x", "default"]) {
+      expect(opencodeModelId(old, endpoints), old).toBe("t3flare-endpoint-comm/claude-sonnet-5-5");
+    }
     // Another API's endpoint, an endpoint that is gone: its provider's model, which the session does not offer (t3's
     // adapter refuses it before any request).
     expect(opencodeModelId("gem/gemini-x", endpoints)).toBe("t3flare-endpoint-gem/gemini-x");

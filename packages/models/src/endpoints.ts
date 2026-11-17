@@ -275,19 +275,11 @@ export const findEndpointModel = (endpoints: ModelEndpoints, slug: string): { re
 export const isRetiredSlug = (slug: string): boolean => slug === "default" || parseEndpointSlug(slug) === undefined || slug.startsWith("anthropic/");
 
 /**
- * Where an old selection (`isRetiredSlug`) runs among `endpoints`, in the owner's order: the first endpoint that lists a
- * model of its id (`anthropic/<id>`'s, or a bare id), so an old thread keeps its model on the endpoint that serves it
- * now; else `fallback` (the default model). `default` has no id of its own: `fallback`.
+ * The slug a selection runs on: an old one (`isRetiredSlug`) on `defaultSlug`, the default model of the agent's
+ * endpoints (ADR-0034 §3: never on an endpoint that happens to list its id), or as it was when there is none; any other
+ * slug as it is.
  */
-export const retiredSelectionSlug = (
-  slug: string,
-  endpoints: ReadonlyArray<{ readonly id: string; readonly models: ReadonlyArray<{ readonly id: string }> }>,
-  fallback: string | undefined,
-): string | undefined => {
-  const id = slug.startsWith("anthropic/") ? slug.slice("anthropic/".length) : slug;
-  const listing = id === "default" ? undefined : endpoints.find((endpoint) => endpoint.models.some((model) => model.id === id));
-  return listing === undefined ? fallback : endpointSlug(listing.id, id);
-};
+export const selectionSlug = (slug: string, defaultSlug: string | undefined): string => (isRetiredSlug(slug) ? (defaultSlug ?? slug) : slug);
 
 /** The default model (SPI-1176): the first model of the first endpoint, in the owner's order, that lists one. */
 export const defaultModelSlug = (endpoints: ModelEndpoints): string | undefined => {

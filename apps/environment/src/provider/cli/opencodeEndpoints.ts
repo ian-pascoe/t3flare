@@ -4,7 +4,7 @@
 // takes a base URL per provider, so no model-routed URL is needed), and a model switch between two endpoints stays in
 // the thread's process. Its small model is the text-generation model when that is one of these endpoints' models. Pure.
 import type { ServerProviderModel } from "@t3tools/contracts";
-import { isRetiredSlug, type ModelEndpoint, type ModelEndpoints, retiredSelectionSlug } from "@t3flare/models/endpoints";
+import { type ModelEndpoint, type ModelEndpoints, selectionSlug } from "@t3flare/models/endpoints";
 import { relayedEndpoints } from "@t3flare/models/relay";
 
 import { opencodeEndpointModel, type OpenCodeRelay, opencodeServes } from "../../agents/acpProfiles.ts";
@@ -26,12 +26,11 @@ export const opencodeModelsOf = (endpoints: ModelEndpoints | undefined): Readonl
 
 /**
  * The model as OpenCode names it: an endpoint's slug as its provider's model (`t3flare-endpoint-<id>/<model>`). An old
- * model (`isRetiredSlug`) is an endpoint model of its id, else the default model, the list's first. A slug
+ * model (`isRetiredSlug`) is the default model, the list's first (`selectionSlug`). A slug
  * of an endpoint OpenCode does not reach is its provider's model all the same, which the session does not offer: t3's
  * adapter refuses it before any request.
  */
 export const opencodeModelId = (slug: string, endpoints: ModelEndpoints | undefined): string => {
-  const own = opencodeEndpoints(endpoints);
-  const chosen = isRetiredSlug(slug) ? (retiredSelectionSlug(slug, own, relayPickerModels(own)[0]?.slug) ?? slug) : slug;
+  const chosen = selectionSlug(slug, relayPickerModels(opencodeEndpoints(endpoints))[0]?.slug);
   return opencodeEndpointModel(chosen) ?? chosen;
 };

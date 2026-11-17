@@ -72,14 +72,10 @@ describe("a Pi Durable selection's model (modelOf)", () => {
     expect(modelOf(selection("openai/vendor/x"), ENDPOINTS).model).toEqual({ provider: "openai", modelId: "vendor/x" });
   });
 
-  it("runs an old selection (anthropic/…, a bare id) on the endpoint that lists its model, else on the default model", () => {
-    // The old thread keeps its model where an endpoint serves it now (SPI-1176, `retiredSelectionSlug`).
-    for (const old of ["anthropic/claude-haiku-5-5", "claude-haiku-5-5"]) {
-      expect(modelOf(selection(old, "high"), ENDPOINTS), old).toEqual({ model: { provider: "commissary", modelId: "claude-haiku-5-5" }, thinking: "high" });
-    }
-    expect(modelOf(selection("gpt-4.1"), ENDPOINTS).model).toEqual({ provider: "openai", modelId: "gpt-4.1" });
-    // No endpoint lists it, or `default`: the default model, the first endpoint's first.
-    for (const old of ["anthropic/claude-sonnet-5-5", "claude-opus-5-5", "gpt-6-luna", "default"]) {
+  it("runs an old selection (anthropic/…, a bare id, default) on the default model, the first endpoint's first", () => {
+    // Even where an endpoint lists a model of the old id (`commissary`'s haiku, `openai`'s gpt-4.1): ADR-0034 §3, so
+    // no endpoint answers for an old selection by accident.
+    for (const old of ["anthropic/claude-haiku-5-5", "claude-haiku-5-5", "gpt-4.1", "anthropic/claude-sonnet-5-5", "claude-opus-5-5", "gpt-6-luna", "default"]) {
       expect(modelOf(selection(old, "high"), ENDPOINTS), old).toEqual({ model: { provider: "openai", modelId: "gpt-5-mini" }, thinking: "high" });
     }
   });

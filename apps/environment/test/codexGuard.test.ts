@@ -106,9 +106,9 @@ describe("the Codex request guard", () => {
       expect(route("work/org/model-a")).toEqual({ provider: "t3flare-endpoint-work", model: "org/model-a" });
       // An old bare id, `anthropic/…`, and what is no slug: the first endpoint's first model.
       for (const old of ["gpt-6-luna", "anthropic/claude-haiku-5-5", "openai/"]) expect(route(old), old).toEqual({ provider: "t3flare-endpoint-openai", model: "gpt-5-mini" });
-      // An old id a Responses endpoint lists: that endpoint's model, so an old thread keeps it.
+      // Even where another Responses endpoint lists a model of the old id: the default model (ADR-0034 §3).
       const listing = [{ id: "openai", models: [{ id: "gpt-5-mini" }] }, { id: "work", models: [{ id: "gpt-6-luna" }] }];
-      expect(codexModelRoute("gpt-6-luna", listing, (id) => `t3flare-endpoint-${id}`)).toEqual({ provider: "t3flare-endpoint-work", model: "gpt-6-luna" });
+      expect(codexModelRoute("gpt-6-luna", listing, (id) => `t3flare-endpoint-${id}`)).toEqual({ provider: "t3flare-endpoint-openai", model: "gpt-5-mini" });
       // An endpoint that is gone: its own provider, which Codex does not have.
       expect(route("other/x")).toEqual({ provider: "t3flare-endpoint-other", model: "x" });
     });
