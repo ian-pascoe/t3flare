@@ -343,12 +343,12 @@ _Avoid_: prompt, snippet, MCP prompt
 One configured way to reach an agent or model provider, with its own credentials. Used in t3's sense.
 
 **Model endpoint**:
-One of the owner's own ways to reach models: where to send requests, with an API key, a sign-in or none, and the models it serves. Every model call t3flare makes goes to one (since the hard cut, SPI-1176, which retired the Model proxy). Set up in the Harness panel; see `docs/model-endpoints.md`.
+One of the owner's own ways to reach models: where to send requests, with an API key, a sign-in or none, and the models it serves. Every model call t3flare makes goes to one. Set up in the Harness panel.
 _Avoid_: provider (that is t3's or pi-ai's), connection, backend
 
 **Model relay**:
 How a CLI agent reaches a Model endpoint without holding its credential: the agent presents a Handle, and the endpoint's own credential is used in its place.
-_Avoid_: model proxy (the retired Model proxy was another thing), gateway, intercept
+_Avoid_: model proxy, gateway, intercept
 
 **Model-routed URL**:
 The Model relay's one base URL for every Model endpoint a process may use: the endpoint is chosen per request, from the model the request names. For a CLI agent that takes one base URL per process.
@@ -356,14 +356,14 @@ _Avoid_: router, catch-all endpoint, wildcard endpoint
 
 **Usage record**:
 t3flare's own count of one model answer's tokens on a Model endpoint, with its agent, endpoint, model, time and cost when known, made by a Session, text generation or the Model relay for t3's Usage page; never a key, a Handle, a prompt or an answer's text. On the page, Pi Durable's turns, text generation and Pi's all count in one Pi row, told apart by their source.
-_Avoid_: usage log, telemetry, request log (that is Commissary's)
+_Avoid_: usage log, telemetry, request log
 
 **Limit reading**:
 The usage windows one Model endpoint answer reported in its vendor's rate-limit headers (ChatGPT's primary and secondary, Claude's five-hour and weekly): for each, the share used and when it resets, with when the answer came. Never a token or an account.
-_Avoid_: quota report (that is Commissary's), usage record (that counts tokens)
+_Avoid_: quota report, usage record (that counts tokens)
 
 **Subscription**:
-The owner's own signed-in plan with a model vendor (ChatGPT plan usage, a Claude Pro or Max plan, GitHub Copilot), as opposed to an API key: a Model endpoint's sign-in, made in the Harness panel, its tokens held and refreshed by the Credential broker and never in a Container. (Before the hard cut, SPI-1176, subscriptions sat in the Model proxy instead.)
+The owner's own signed-in plan with a model vendor (ChatGPT plan usage, a Claude Pro or Max plan, GitHub Copilot), as opposed to an API key: a Model endpoint's sign-in, made in the Harness panel.
 _Avoid_: Subscription login, OAuth, account
 
 **Credential broker**:

@@ -15,7 +15,7 @@ Line numbers are from `main` at `b75fa52`, with t3code pinned at `v0.1.9-nightly
    | regenerate the workspace and install (`:157`) | t3 added a workspace setting ("classify it") or changed its lock's layout: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); a patch no longer applies or matches nothing, or t3's lock moved a dependency: [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
    | lock matches t3's, one effect (`:161`) | a t3 importer installs other versions than in t3's lock, a second `effect`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030), [U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins) |
    | check (`:167`) | `check:patches`: [U10](#u10-patches); `check:workspace`: [U50](#u50-the-root-workspace-and-lock-are-generated-from-t3s-adr-0030); typecheck, lint or tests, by the file the error names: `t3/composition.ts` [U1](#u1-the-composition-root-restates-t3s-serverts); `provider/*` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), but `provider/skills.ts`, `skillsSnapshot.test.ts` and `skillExpansion.test.ts` [U64](#u64-skills-and-prompt-templates-for-the-durable-agent-spi-1001); `provider/cli/claudeSkills.ts`, `builtInCommands.ts`, `cliSkills.test.ts` and `cliSkillDispatch.test.ts` [U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151); `shadows/*` [U11](#u11-the-shadow-builtindriversts); `terminal/*` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter); `workspace/*` [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `agents/seedSettings.ts` [U19](#u19-settings-seeds), [U67](#u67-text-generations-default-model-follows-the-model-endpoints-spi-1163); `provider/textGeneration.ts` and `endpointTextGeneration.test.ts` [U68](#u68-text-generation-names-the-endpoint-on-t3s-own-failures-spi-1163); `provider/cli/codexGuard.ts`, `codexEndpoints.ts`, `codexDriver.ts`, `cliProfiles.test.ts`'s Codex cases [U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U69](#u69-codex-on-model-endpoints-through-the-model-relay-spi-1167); `provider/cli/claudeEndpoints.ts`, `acpProfiles.test.ts`'s relay cases [U75](#u75-claude-code-on-model-endpoints-through-the-model-relay-spi-1168); `provider/cli/opencodeEndpoints.ts`, `relayModels.ts`, `acpProfiles.test.ts`'s OpenCode relay cases [U76](#u76-opencode-on-model-endpoints-through-the-model-relay-spi-1169); `credentials/*`, agents' `session/planUsage.ts`, `sessionSignIn.test.ts` [U77](#u77-sign-ins-on-pi-ai-chatgpt-plan-usages-request-rules-and-the-credential-broker-spi-1164); `provider/cli/piEndpoints.ts`, `cliProcess.ts`'s line maps, `cliProfiles.test.ts`'s pi relay cases, `piSpawn.test.ts`, `piDriver.test.ts`, `piHandleCommand.test.ts` [U78](#u78-pi-on-model-endpoints-through-the-model-relay-spi-1170); `usage/records.ts`, `usage/readers.ts`, `usageRecords.test.ts`, `usagePage.test.ts`, agents' `workspace/relayUsage.ts`, `relayUsage.test.ts`, `sessionUsage.test.ts` [U79](#u79-the-usage-page-from-t3flares-own-usage-records-spi-1173); `models/src/failures.ts`, `redact.ts`, `modelFailures.test.ts`, `endpointFailures.test.ts` [U80](#u80-usage-limits-and-refused-credentials-classified-per-api-spi-1172); `credentials/claude.ts`, `claudeSignIn.test.ts`, `claudeBroker.test.ts`, agents' `claudeSignInShape.test.ts` [U81](#u81-the-claude-sign-in-on-pi-ai-claude-codes-oauth-client-and-request-shape-spi-1165); `credentials/copilot.ts`, `copilotSignIn.test.ts`, `copilotBroker.test.ts`, agents' `session/copilot.ts`, `copilotSignInShape.test.ts` [U82](#u82-the-github-copilot-sign-in-on-pi-ai-the-device-flow-the-copilot-token-and-its-request-shape-spi-1166); agents' `workspace/relaySignIns.ts`, `session/signInRequests.ts`, `session/claudeSignIn.ts`, `modelRelaySignIns.test.ts` [U83](#u83-subscription-sign-ins-through-the-model-relay-each-clis-request-on-a-vendors-subscription-shape-spi-1171); `models/src/limits.ts`, `usage/limits.ts`, `usage/limitSources.ts`, `limitMeters.test.ts`, agents' `limitReadings.test.ts` [U84](#u84-limit-meters-for-subscription-endpoints-vendors-limit-headers-and-t3s-limit-source-contract-spi-1174); `provider/readiness.ts`, the drivers' snapshots, `endpointsPicker.test.ts`, the CLIs' `*ModelId`/`codexModelRoute`/`piLineToPi` fallbacks, `cliSpawnRefusal.test.ts` [U85](#u85-the-setup-state-and-the-fallback-of-old-selections-spi-1176) |
-   | the CLI agents in Docker (`:172`) | `cli.docker.test.ts`: the CLIs' turns, egress and resume ([U29](#u29-our-codex-registration-client-factory-and-request-guard-step-4a), [U69](#u69-codex-on-model-endpoints-through-the-model-relay-spi-1167), [U30](#u30-our-pi-registration-the-extension-copy-and-processgroupts-step-4a), [U32](#u32-the-clis-own-configuration-surfaces-step-4a)); `skills.docker.test.ts`: a CLI moved a skill or command root; `envSkills.docker.test.ts`: a CLI stopped reading the Environment skill set through its link, or changed its winner of a same-named pair ([U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151)); `claudeRelay.docker.test.ts`, `opencodeRelay.docker.test.ts` and `piRelay.docker.test.ts`: a CLI's path, key header or handle holders on the model relay ([U75](#u75-claude-code-on-model-endpoints-through-the-model-relay-spi-1168), [U76](#u76-opencode-on-model-endpoints-through-the-model-relay-spi-1169), [U78](#u78-pi-on-model-endpoints-through-the-model-relay-spi-1170)) |
+   | the CLI agents in Docker (`:172`) | `skills.docker.test.ts`: a CLI moved a skill or command root; `envSkills.docker.test.ts`: a CLI stopped reading the Environment skill set through its link, or changed its winner of a same-named pair ([U65](#u65-the-cli-agents-skills-and-slash-commands-in-t3s-composer-spi-1151)); `claudeRelay.docker.test.ts`, `opencodeRelay.docker.test.ts` and `piRelay.docker.test.ts`: a CLI's path, key header or handle holders on the model relay ([U75](#u75-claude-code-on-model-endpoints-through-the-model-relay-spi-1168), [U76](#u76-opencode-on-model-endpoints-through-the-model-relay-spi-1169), [U78](#u78-pi-on-model-endpoints-through-the-model-relay-spi-1170)). Codex has no Docker test (its relay turns run on a stage: [U69](#u69-codex-on-model-endpoints-through-the-model-relay-spi-1167)) |
    | deploy the bump stage (`:176`) | a module-load failure in workerd ([U9](#u9-build-shims)), a missing Shadow export ([U11](#u11-the-shadow-builtindriversts)), alchemy ([U20](#u20-dependencies-that-ride-t3s-lock-alchemy-beta-patchesdeps-transitive-pins)), compat flags ([U21](#u21-cloudflare-compatibility-date-and-flags)) |
    | acceptance test (`:180`) | by the failure's prefix and the report key: `sqlAdapter` [U8](#u8-the-sql-adapter-and-the-pragmas-it-answers); the reboot check [U9](#u9-build-shims); pairing [U16](#u16-auth-pairing-and-the-workers-route-prefixes); `realTurn` [U3](#u3-the-provider-contract-provideradapterv2-and-the-differ), [U6](#u6-the-process-routers-git-argv-table), [U17](#u17-workspace-layers-workspaceentries-workspacefilesystem-homedirectory-and-checkpoints); `step 2b:` [U12](#u12-terminalmanager-through-makewithoptions-and-the-pty-adapter), [U18](#u18-git-worktree-list-and-the-worktree-verbs); `peer:` (step 3) [U5](#u5-mcp-delegate_task-and-linkorigin-step-3); fixtures [U26](#u26-the-acceptance-tests-own-fixtures); `text generation names the Model endpoints' default` and the report's `modelEndpoint`/`textGeneration` (SPI-1175) [U67](#u67-text-generations-default-model-follows-the-model-endpoints-spi-1163); `claude:`/`opencode:` (step 4b) [U33](#u33-our-acp-flavors-on-t3s-acp-adapter-step-4b), [U35](#u35-claude-codes-and-opencodes-configuration-surfaces-step-4b) |
    | stock t3 nightly links and forwards (step 3) | the laptop half of [U7](#u7-client-version-skew-desktop-mobile-laptop) |
@@ -99,7 +99,7 @@ The bump runs: the whole `pnpm run check` (`git apply --check` of the Patches, t
 - **Where**: t3's SQL client is the stock `@effect/sql-sqlite-do` client over our adapter (`platform/sql.ts:16`, ADR-0006). `platform/sqlAdapter.ts` works around DO SQLite's limits: `MAX_BOUND_PARAMETERS` 100 (inlines literals, `:15`, `inlineParameters` `:80`, which assumes positional `?`), `MAX_COMPOUND_TERMS` 5 (regroups `UNION` chains, `:16`, `:211`), and on DO SQLite's "nested too deep" (`:360`) runs each CTE alone through `json_each` (`materializeCtes`, `:318`). It answers the read form of `PRAGMA auto_vacuum`, `page_count` and `freelist_count` with 0 (`STORAGE_PRAGMA_READ` `:399`, in `adaptedExec` `:402`), which DO SQLite refuses and t3's `DatabaseStorage` reads every minute (`t3code/apps/server/src/persistence/DatabaseStorage.ts:80-81`, `:108-111`): `auto_vacuum` 0 means t3 never runs `incremental_vacuum`. `PRAGMA page_size` and `ProjectionMaintenance`'s reads (`orchestration-v2/ProjectionMaintenance.ts:301-302`) go to DO SQLite as they are. t3's `Sqlite.layerSetup` PRAGMAs never run (U1).
 - **Breaks when**: t3 adds a heavier query (more CTEs, a recursive one), a statement with numbered placeholders, a PRAGMA in another form (`PRAGMA main.page_count`, `pragma_page_count()`), or a new use of these PRAGMAs (a `VACUUM` when `auto_vacuum` is 0).
 - **Detection**: acceptance step 5 runs t3's heavy queries on 12 threads × 4 runs of fixtures and fails on any statement DO SQLite refuses (`sqlStats.errors`, admin health), except refusals with `SQLITE_AUTH` (`scripts/acceptance.ts:252-254`), which it only counts as `pragmaRefusals`. Only the queries those flows run are covered. **Silent**: a new refused PRAGMA, or any statement refused as unauthorized. Cheapest check: [T14](#gaps-in-detection), failing on `pragmaRefusals` now that the storage PRAGMAs are answered.
-- **Blast radius**: a thread or search that fails to load, for every client. (The Storage page's database row no longer reads these answers: `t3/databaseStorage.ts`, U58.)
+- **Blast radius**: a thread or search that fails to load, for every client. (The Storage page's database row no longer reads these answers: `t3/databaseStorage.ts`, U86.)
 - **Fix**: the statement is in `sqlStats.errors` (`GET /_t3flare/health`); reproduce it in `apps/environment/test/sqlAdapter.test.ts` (Node) and `sqlAdapter.workerd.test.ts`, which also pins the PRAGMA answers.
 
 ### U9. Build shims
@@ -126,7 +126,7 @@ The bump runs: the whole `pnpm run check` (`git apply --check` of the Patches, t
 
 ### U11. The Shadow `builtInDrivers.ts`
 
-- **Where**: `apps/environment/src/shadows/builtInDrivers.ts` replaces `t3code/apps/server/src/provider/builtInDrivers.ts` (exports at `:20`, `:33`, `:47`, `:58`): `BUILT_IN_DRIVERS = [PiDurableDriver]`, `BUILT_IN_USAGE_DRIVERS = []`. The redirect (`SHADOWS` `build.ts:54-57`, `shadows` `:183-203`) applies only to relative imports from t3's modules (today `provider/ProviderInstanceRegistryHydration.ts:24` and `usage/UsageService.ts:34`). Parity batch 2: `BUILT_IN_USAGE_DRIVERS` lists four of our drivers again (Pi Durable, Codex, Claude Code, OpenCode), each with one scan reader (`usage/readers.ts` `usageReader`) that reads t3flare's own usage records ([U79](#u79-the-usage-page-from-t3flares-own-usage-records-spi-1173)) and, until the hard cut (SPI-1176), Commissary's request log ([U58](#u58-usage-and-limits-from-commissary-until-the-hard-cut-the-acp-registrys-refusals-the-storage-pages-database-row-otlp-from-settings-parity-batch-2-g8-g13)). `test/usagePage.test.ts` runs t3's `UsageService` over this module.
+- **Where**: `apps/environment/src/shadows/builtInDrivers.ts` replaces `t3code/apps/server/src/provider/builtInDrivers.ts` (exports at `:20`, `:33`, `:47`, `:58`): `BUILT_IN_DRIVERS = [PiDurableDriver]`, `BUILT_IN_USAGE_DRIVERS = []`. The redirect (`SHADOWS` `build.ts:54-57`, `shadows` `:183-203`) applies only to relative imports from t3's modules (today `provider/ProviderInstanceRegistryHydration.ts:24` and `usage/UsageService.ts:34`). Parity batch 2: `BUILT_IN_USAGE_DRIVERS` lists four of our drivers again (Pi Durable, Codex, Claude Code, OpenCode), each with one scan reader (`usage/readers.ts` `usageReader`) that reads t3flare's own usage records ([U79](#u79-the-usage-page-from-t3flares-own-usage-records-spi-1173)). `test/usagePage.test.ts` runs t3's `UsageService` over this module.
 - **Breaks when**: t3 adds an export to the module (its importers find nothing in ours), renames the module, or imports it through a package path the redirect does not see.
 - **Detection**: a new export that something imports fails the build (deploy step) or reads as `undefined`. **Silent**: an import the redirect misses brings t3's stock drivers back beside ours (probes, spawn attempts, CLI providers in the picker). Cheapest check: [T5](#gaps-in-detection), asserting the build report's `shadows` equals `SHADOWS`.
 - **Blast radius**: the provider picker lists CLI agents that cannot run, or the Environment does not build.
@@ -293,7 +293,7 @@ Fixed by ADR-0030: `scripts/bump.ts` runs the whole `pnpm run check`, as prod's 
 
 - **Where**: Codex's `-c` keys (`cliProfiles.ts` `codexOverrides`: the provider's `auth` command, `allow_login_shell`, the `features.*` that reach github.com and chatgpt.com, `shell_environment_policy.*`), pi's `models.json`/`settings.json` shape and its `PI_*` variables (`PI_CODING_AGENT_SESSION_DIR`, `PI_OFFLINE`).
 - **Breaks when**: a CLI bump renames a key (Codex 0.167.2 already refuses a process-level `approval_policy="untrusted"`) or adds a default network call. These move with `clis.ts`, not with t3.
-- **Detection**: `test:docker` (in the bump job) fails on a tunnel to any host at all for pi (`piRelay.docker.test.ts`), on an internal network whose only way out is a CONNECT logger; it covers the settings we pass, not a new call a CLI makes only in a feature we never use. Codex's own run (`cli.docker.test.ts`, on the real Model proxy) went at the hard cut (SPI-1176), so Codex's egress is checked only by `acceptance --codex` on the bump stage until a stand-in test replaces it. Re-run M0's local probes (`docs/steps/step-4a/probes`: `p10b.sh`, `p8.sh`) on a CLI bump for what it does not cover; `acceptance --codex --pi` for the rest.
+- **Detection**: `test:docker` (in the bump job) fails on a tunnel to any host at all for pi (`piRelay.docker.test.ts`), on an internal network whose only way out is a CONNECT logger; it covers the settings we pass, not a new call a CLI makes only in a feature we never use. Codex has no Docker run: its egress is checked only by `acceptance --codex` on the bump stage. Re-run M0's local probes (`docs/steps/step-4a/probes`: `p10b.sh`, `p8.sh`) on a CLI bump for what it does not cover; `acceptance --codex --pi` for the rest.
 
 ### U33. Our ACP flavors on t3's ACP adapter (step 4b)
 
@@ -522,18 +522,14 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
 - **Blast radius**: review guides fail ("Codex gave no answer" or a git refusal); hook URLs missing; PR watches checked only while a client is connected.
 - **Fix**: diff `PullRequestReviewGuideService.ts`, `CodexTextGeneration.ts`, `ScheduledTaskService.ts` and `PullRequestWatchReactor.ts` between tags.
 
-### U58. Usage and limits from t3flare's records, the ACP registry's refusals, the Storage page's database row, OTLP from settings (parity batch 2: G8, G13)
+### U58. Retired: Commissary's usage and limit readers (SPI-1176)
 
-- **Where**:
-  - Limit meters (G8): `apps/environment/src/usage/limitSources.ts`, a Layer over t3's `UsageLimitSources` (`t3code/apps/server/src/usage/UsageLimitSources.ts`: `current`, `streamChanges`, `refresh`, `consumeResetCredit`), adding sources of kind `cliproxy` (the only kind `UsageLimitSourceSnapshot` admits, `contracts/src/providerUsageLimits.ts`) with t3's driver kinds (`claudeAgent`, `codex`, `antigravity`, `grok`, `opencode`). ws.ts calls `refresh` from `serverRefreshProviders`. Since SPI-1174 the Layer adds one source per subscription endpoint from our own limit readings, and since SPI-1176 only those (Commissary's accounts, read from its management API, went with the Model proxy) ([U84](#u84-limit-meters-for-subscription-endpoints-vendors-limit-headers-and-t3s-limit-source-contract-spi-1174)).
-  - Usage page (G8): `usage/readers.ts`, scan readers (`ProviderUsageReader` `kind: "scan"`, `provider-core/src/server/usage.ts`) on our drivers in the Shadow's `BUILT_IN_USAGE_DRIVERS` (U11); `UsageService.collectDirs` runs them with `volumeId` given, so `readDirectoryVolumeId` is never called on our `t3flare://` paths. `UsageRecord`'s fields, `UsageProviderKind`'s literals. Each reader reads t3flare's own records ([U79](#u79-the-usage-page-from-t3flares-own-usage-records-spi-1173)); until the hard cut (SPI-1176) it also read Commissary's request log for the Model proxy's traffic, and the Environment dropped the records of endpoints keyed with a key that log counted.
-  - ACP registry (G13): `provider/acpRegistry.ts`, a Layer over `AcpRegistrySupport.AcpRegistryCatalog` (`search`, `prepare`, `inspect`, `resolve`, `uninstallManagedBinary`) in place of `layerFromHost`, merged with t3's `AcpRegistryRuntimeCoordinator.layer`; the agent lists `BUILT_IN_EQUIVALENT` and `VENDOR_SIGN_IN` against the registry's ids.
-  - Storage page: `t3/databaseStorage.ts`, a Layer over `persistence/DatabaseStorage.ts` (`status`, `requestReclaim`, `reclaim`) reading `SqlStorage.databaseSize`; `DatabaseStorageStatus`'s fields.
-  - OTLP: `t3/otlp.ts` builds `ServerConfig`'s `otlp*` fields from `settings.json` with t3's `parsePersistedServerObservabilitySettings` and `OtelEnvironment.resolveSignalEndpoint` (as `cli/config.ts` does); `composition.ts` mounts `ServerHttp.layerOtlpTracesProxyRoute`.
-- **Breaks when**: t3 adds a usage-limit source kind or changes the service's shape; renames or adds `UsageProviderKind`s or `UsageRecord` fields; makes `AcpRegistryCatalog` methods or the registry's ids change; changes `DatabaseStorageStatus`, or moves where it reads the OTLP settings or their schema.
-- **Detection**: typecheck (every service shape and contract type above); `test/usageRecords.test.ts`, `usagePage.test.ts`, `limitMeters.test.ts`, `acpRegistry.test.ts`, `databaseStorage.test.ts`, `otlp.test.ts`. **Silent**: a new registry agent defaults to "key from its environment" (refused, which is safe). Cheapest check: `scripts/pbatch2.ts registry|storage|otlp` on a stage deployed with `T3FLARE_PROBE=1` (its `usage` step read the Commissary stand-in's log, gone since SPI-1176).
-- **Blast radius**: no meters; a Usage page without our records; a registry list that offers an agent we cannot run (prepare still refused); a Storage page without a size; no OTLP export.
-- **Fix**: diff `UsageLimitSources.ts`, `UsageService.ts`, `provider-core/src/server/usage.ts`, `AcpRegistrySupport.ts`, `DatabaseStorage.ts`, `cli/config.ts` between tags.
+The Usage page's reader of Commissary's request log and the limit source of Commissary's accounts went with the Model
+proxy at the hard cut (SPI-1176). The Usage page's readers are
+[U79](#u79-the-usage-page-from-t3flares-own-usage-records-spi-1173); the limit-source Layer
+(`usage/limitSources.ts`) is [U84](#u84-limit-meters-for-subscription-endpoints-vendors-limit-headers-and-t3s-limit-source-contract-spi-1174);
+the rest of parity batch 2's leans (the ACP registry, the Storage page, OTLP) moved to
+[U86](#u86-the-acp-registrys-refusals-the-storage-pages-database-row-otlp-from-settings-parity-batch-2-g13).
 
 ### U59. The preview browser: a Shadow of `ServerBrowserContexts`, the HTML-render bridge, and `@cloudflare/playwright` (G11)
 
@@ -1005,8 +1001,9 @@ environment or file holds it beyond that.
   - **claude-agent-acp starts `claude` with its own `process.env`**: the preload's delete keeps the handle out of
     `claude`'s environment, and so out of the environment of its Bash, hooks and helpers.
   - **Claude Code resolves its own aliases through `ANTHROPIC_DEFAULT_{HAIKU,SONNET,OPUS}_MODEL`**: its `default` model
-    (`claude-opus-5-5` unpinned) and its subagents' `sonnet`/`opus` are pinned to slugs, so every request the routed URL
-    gets names one (`test:docker` runs a session whose model nobody sets; p1168's log has no routed refusal). The
+    (`claude-opus-5-5` unpinned) and its subagents' `sonnet`/`opus` are pinned to slugs (`familyModelOf`: the family's
+    first model pi-ai's catalog knows, since a resumed session calls the alias and a dated model an endpoint lists may
+    be dead, SPI-1176), so every request the routed URL gets names one (`test:docker` runs a session whose model nobody sets; p1168's log has no routed refusal). The
     session's model list is `default` plus `availableModels`.
   - **t3's ACP adapter refuses a model not in that list before any request** (`validateModelSelection`: "The requested
     model is not available in this session"), so a model that is no endpoint's slug fails with t3's "The agent did not
@@ -1267,9 +1264,7 @@ is a pass-through observer: a vendor change that it cannot read loses records, a
   (`environment.ts` `usageSender`); the Environment's `recordUsage` RPC (`usage/records.ts` `acceptUsage`), its
   store (`usage/records.ts`) and the scan readers (`usage/readers.ts` `usageReader`, in the Shadow's
   `BUILT_IN_USAGE_DRIVERS`, U11).
-- **Every endpoint, counted once, ours** (SPI-1176). Until the hard cut each reader also read Commissary's request log
-  (U58) for the Model proxy's traffic, and the Environment dropped the records of endpoints keyed with a key that log
-  counted. Both went with the proxy: every endpoint, Commissary's included, is counted from our own records.
+- **Every endpoint, counted once, ours**: every endpoint, Commissary's included, is counted from our own records only.
 - It leans on:
   - **pi-ai's answers**: an `AssistantMessageEventStream`'s `result()` resolves with the final message (an error's
     too), whose `usage` is `input` (uncached), `cacheRead`, `cacheWrite`, `output`, `reasoning` (a part of `output`)
@@ -1308,8 +1303,7 @@ is a pass-through observer: a vendor change that it cannot read loses records, a
   split, a dated model, t3's aggregator pricing an unpriced model, retention, the row cap and the hourly prune, a
   failed source, the stale and future guards, the read window's floor, and `acceptUsage` as the RPC runs it, every endpoint counted once), `usagePage.test.ts` (t3's `UsageService` over the
   Shadow). **Silent**: a vendor's new usage shape (records stop for that API; the relay still answers). Cheapest check:
-  a turn per agent on a stage, then t3's Usage page (`scripts/p1173.ts` did it beside Commissary's log; removed with it
-  at SPI-1176).
+  a turn per agent on a stage (`scripts/p1176.ts` runs one each), then t3's Usage page.
 - **Blast radius**: the Usage page undercounts an agent or an API, or misprices a model. Never a turn, never a key: a record holds counts, names and a time.
 - **Fix**: on a pi-ai bump, re-read `Usage` in `dist/types.d.ts` and `openai-completions.js`'s `stream_options`; on an
   OpenCode bump, `openai-chat.ts`'s; on a vendor's change, add its shape to `relayUsage.ts` with a recorded answer in
@@ -1553,9 +1547,8 @@ its web client's meter logic, which nothing of ours restates.
     source's `error` becomes a notice beside the meters (our staleness text: "Last read 3 hours ago …"), Codex windows
     pool by kind. The composer's `/usage-limits` report labels every source account "CLI Proxy" (`sourceLabel`, fixed
     for t3's only source kind `cliproxy`), ours included: it reads "<endpoint label> · <endpoint id>" beside that.
-  - **A gateway double count until SPI-1176** (P3), ended: an endpoint whose gateway passes a subscription's headers
-    through (Commissary in front of a Claude account) gets our meter; Commissary's own source (U58), which listed the
-    same account from its quota report, went at the hard cut, so the account shows once, as our meter.
+  - **A gateway that passes a subscription's headers through** (Commissary in front of a Claude account): the
+    endpoint gets our meter, and the account shows once, as that meter (no other source lists it).
 - **Breaks when**: a vendor renames a header, changes a unit (a percentage for Claude's fraction, milliseconds for a
   reset) or stops sending a window; OpenAI adds the Codex headers to plan usage under other names; pi-ai stops taking a
   request's `fetch` on Anthropic Messages or OpenAI Responses (the Session's reader sits on it); t3 adds a source kind,
@@ -1582,7 +1575,11 @@ fails for it.
     pointing to the Harness panel, while it has no model (Pi Durable with no endpoint that lists one; each CLI with none
     of its API). t3's web client shows such a provider as "Needs attention" with the message
     (`apps/web/src/components/settings/providerStatus.ts` `getProviderSummary`) and a banner on its threads
-    (`chat/ProviderStatusBanner.tsx`, keyed by status, auth and message). A CLI's spawn with no endpoint is refused by
+    (`chat/ProviderStatusBanner.tsx`, keyed by status, auth and message). t3's registry would keep a provider's earlier
+    models when its snapshot lists none, so the setup state would still list them: patch 0006 stops that for every
+    t3flare driver, by a list of their driver kinds in `shouldRetainMissingProviderModels`
+    ([U66](#u66-patch-0006-a-removed-endpoints-models-leave-the-picker-spi-1162-spi-1176), where its lean lives; only
+    `scripts/p1176.ts` covers the list, as t3's patched registry is built, not unit-tested). A CLI's spawn with no endpoint is refused by
     its profile (`agents/cliProfiles.ts` `noEndpointFor`). t3 would show its own "Failed to open <driver> provider
     session" text, so the CLI wrapper (`provider/cli/wrapper.ts` `withSpawnRefusal`) puts a `ProviderSetupError` with
     the refusal under t3's open error: t3's turn start reads a cause chain's curated messages first
@@ -1593,8 +1590,9 @@ fails for it.
     (ours); the ACP flavor's `resolveModelId` (`claudeModelId`, `opencodeModelId`), which t3's ACP adapter calls before
     `validateModelSelection`; t3's Pi adapter sending a slug as `set_model { provider, modelId }`
     (`provider-pi/src/server/rpc.ts` `resolvePiModelSlug`), which `piLineToPi` rewrites for `anthropic`; and Codex's
-    `thread/*` and `turn/start` params, which the request guard routes (`codexModelRoute`). Text generation and its
-    setting fall back in ours (`textModelOf`, `seedSettings.ts`).
+    `thread/*` and `turn/start` params, which the request guard routes (`codexModelRoute`). Each runs an old selection
+    on the endpoint that lists a model of its id, else on the default model (`retiredSelectionSlug`). Text generation
+    and its setting fall back in ours (`textModelOf`, `seedSettings.ts`).
 - **Breaks when**: t3 hides or disables a `warning` provider, needs `auth.status` to be one of its sign-in states to
   offer it, drops `message` from the summary or the banner, or picks a default model for a provider with none; t3's ACP
   adapter stops calling `resolveModelId` (an old Claude or OpenCode thread is refused, "The agent did not accept the
@@ -1611,6 +1609,19 @@ fails for it.
   picks another. Turns on an endpoint's model are untouched.
 - **Fix**: diff `providerStatus.ts`, `ProviderStatusBanner.tsx`, `snapshotProbe.ts`, the ACP adapter's model selection and
   `provider-pi/src/server/{adapter,rpc}.ts` between tags.
+
+### U86. The ACP registry's refusals, the Storage page's database row, OTLP from settings (parity batch 2: G13)
+
+Moved from U58 when its Commissary readers went (SPI-1176).
+
+- **Where**:
+  - ACP registry (G13): `provider/acpRegistry.ts`, a Layer over `AcpRegistrySupport.AcpRegistryCatalog` (`search`, `prepare`, `inspect`, `resolve`, `uninstallManagedBinary`) in place of `layerFromHost`, merged with t3's `AcpRegistryRuntimeCoordinator.layer`; the agent lists `BUILT_IN_EQUIVALENT` and `VENDOR_SIGN_IN` against the registry's ids.
+  - Storage page: `t3/databaseStorage.ts`, a Layer over `persistence/DatabaseStorage.ts` (`status`, `requestReclaim`, `reclaim`) reading `SqlStorage.databaseSize`; `DatabaseStorageStatus`'s fields.
+  - OTLP: `t3/otlp.ts` builds `ServerConfig`'s `otlp*` fields from `settings.json` with t3's `parsePersistedServerObservabilitySettings` and `OtelEnvironment.resolveSignalEndpoint` (as `cli/config.ts` does); `composition.ts` mounts `ServerHttp.layerOtlpTracesProxyRoute`.
+- **Breaks when**: t3 makes `AcpRegistryCatalog` methods or the registry's ids change; changes `DatabaseStorageStatus`, or moves where it reads the OTLP settings or their schema.
+- **Detection**: typecheck (every service shape and contract type above); `test/acpRegistry.test.ts`, `databaseStorage.test.ts`, `otlp.test.ts`. **Silent**: a new registry agent defaults to "key from its environment" (refused, which is safe). Cheapest check: `scripts/pbatch2.ts registry|storage|otlp` on a stage deployed with `T3FLARE_PROBE=1`.
+- **Blast radius**: a registry list that offers an agent we cannot run (prepare still refused); a Storage page without a size; no OTLP export.
+- **Fix**: diff `AcpRegistrySupport.ts`, `DatabaseStorage.ts`, `cli/config.ts` between tags.
 
 ## Gaps in detection
 
