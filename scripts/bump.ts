@@ -49,6 +49,8 @@ interface Step {
 }
 
 const steps: Array<Step> = [];
+/** test:docker's failures each carry a long probe record; 4000 characters held barely one. */
+const DOCKER_DETAIL_CHARS = 24_000;
 
 const sh = (command: string, commandArgs: Array<string>, cwd: string, options: { quiet?: boolean; env?: Record<string, string> } = {}) => {
   const result = spawnSync(command, commandArgs, {
@@ -73,7 +75,7 @@ const step = (name: string, run: () => { ok: boolean; detail?: string }): boolea
   }
   if (failAt !== undefined && name.startsWith(failAt)) result = { ok: false, detail: `forced to fail by --fail-at ${failAt}` };
   const seconds = Math.round((performance.now() - started) / 100) / 10;
-  steps.push({ name, ok: result.ok, seconds, ...(result.detail === undefined ? {} : { detail: result.detail.slice(-4000) }) });
+  steps.push({ name, ok: result.ok, seconds, ...(result.detail === undefined ? {} : { detail: result.detail.slice(name.startsWith("the CLI agents in Docker") ? -DOCKER_DETAIL_CHARS : -4000) }) });
   console.log(`== ${name}: ${result.ok ? "ok" : "FAILED"} (${seconds} s)`);
   return result.ok;
 };
@@ -176,7 +178,7 @@ const ok =
   step("the CLI agents in Docker (test:docker: the pinned Codex and pi, launched as the Workspace launches them)", () => {
     // In the log whole: the report keeps only the last 4000 characters, which a few failures overrun.
     const result = sh("pnpm", ["run", "test:docker"], environment);
-    return { ok: result.ok, detail: result.output.slice(-4000) };
+    return { ok: result.ok, detail: result.output.slice(-DOCKER_DETAIL_CHARS) };
   }) &&
   step(`deploy the ${stage} stage (build, web client)`, () => {
     const result = sh(process.execPath, ["scripts/stage.ts", "deploy", stage, "--web"], environment);
