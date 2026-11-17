@@ -123,7 +123,7 @@ describe("the update records", () => {
     expect(next).toMatchObject({ attached: false, record: { id: "id-2" } });
   });
 
-  it("expires an Update to failed 100 minutes after its run started; pressing again is the retry", async () => {
+  it("expires an Update to failed 110 minutes after its run started; pressing again is the retry", async () => {
     const { actions, subject, advance, now } = setup();
     await subject.press(serverPress(NEXT));
     actions.start("Update id-1", now());
@@ -133,7 +133,7 @@ describe("the update records", () => {
     advance(2);
     const settled = await subject.settle("t3");
     expect(settled?.outcome?.status).toBe("failed");
-    expect(settled?.outcome?.reason).toMatch(/did not finish within 100 minutes of its start/);
+    expect(settled?.outcome?.reason).toMatch(/did not finish within 110 minutes of its start/);
     expect(await subject.press(serverPress(NEXT))).toMatchObject({ attached: false, record: { id: "id-2" } });
   });
 

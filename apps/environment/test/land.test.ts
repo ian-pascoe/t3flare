@@ -201,6 +201,19 @@ describe("a t3 bump's lock against main's (B2)", () => {
     expect(t3LockRefusal(input(moved, unknown))).toMatch(/points react at react@19\.2\.0, which neither/);
   });
 
+  it("refuses a moved dependency repointed to a workspace link, in an importer or in a snapshot", () => {
+    const linked = (lock: Record<string, any>) => void (lock.importers["apps/environment"].dependencies.react = { specifier: "catalog:", version: "link:../../anything" });
+    expect(t3LockRefusal(input(moved, linked))).toMatch(/points react at a workspace link/);
+    // main's rolldown also depends on `a`, which t3 moves 1.0.0 → 1.1.0.
+    const withA = (a: string) => {
+      const candidate = input({ ...base, a: "1.1.0" }, (lock) => void (lock.snapshots["rolldown@1.2.13"] = { dependencies: { b: "1.0.0", a } }));
+      candidate.main.main.snapshots["rolldown@1.2.13"] = { dependencies: { b: "1.0.0", a: "1.0.0" } };
+      return candidate;
+    };
+    expect(t3LockRefusal(withA("1.1.0"))).toBeUndefined();
+    expect(t3LockRefusal(withA("link:../../anything"))).toMatch(/changes rolldown@1\.2\.13 outside t3's graph/);
+  });
+
   it("accepts a peer-suffix variant of one of main's snapshots, and refuses one that changes anything else", () => {
     const peer = (deps: Record<string, string>) => (lock: Record<string, any>) => {
       lock.importers["apps/environment"].dependencies.rolldown = { specifier: "^1.2.0", version: "1.2.13(typescript@7.0.2)" };

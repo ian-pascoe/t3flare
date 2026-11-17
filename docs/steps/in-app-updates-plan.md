@@ -109,7 +109,7 @@ Settled with the owner on 2026-11-17 after a four-round design interview. The fa
 ### D7 State and reporting
 
 - **Record:** one per target (`t3`, and one per CLI) in DO storage: `{id, target, from, dispatchedAt, run, startedAt}`.
-  As built (reviews A2, A10, cycle 3) it expires to failed 100 minutes after the DO first sees its run out of the queue
+  As built (reviews A2, A10, cycle 3) it expires to failed 110 minutes after the DO first sees its run out of the queue
   (not 45 from the dispatch: a run waits its turn in the `bump` group, and the land waits out deploy-prod's 45 minutes);
   3 hours queued, or 15 minutes with no run listed, has failed too.
 - **Presses:**

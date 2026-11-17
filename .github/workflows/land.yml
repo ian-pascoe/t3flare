@@ -46,7 +46,7 @@ jobs:
       group: ${{ github.event_name == 'workflow_dispatch' && github.workflow == 'Land' && 'bump' || format('land-{0}', github.run_id) }}
       cancel-in-progress: false
     # Long enough to wait out deploy-prod's own 45 minutes and a queue in its group; with the bump job's 20 and publish's
-    # 15 this stays within an Update's 100 minutes from its start (ADR-0037, U92).
+    # 15 and plan's 5 this stays within an Update's 110 minutes from its start (ADR-0037, U92).
     timeout-minutes: 60
     permissions:
       contents: write

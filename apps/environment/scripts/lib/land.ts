@@ -202,7 +202,8 @@ export const t3LockRefusal = (input: T3LockInput): string | undefined => {
         if (now[name].specifier !== was[name].specifier && !String(was[name].specifier).startsWith("catalog:")) return `${dir} changes ${name}'s specifier`;
         if (targetName(name, version) !== targetName(name, previous)) return `${dir} points ${name} at another package`;
         const key = importerKey(name, version);
-        if (key !== undefined && !known(key)) return `${dir} points ${name} at ${bareKey(key)}, which neither t3's graph nor a lock holds`;
+        if (key === undefined) return `${dir} points ${name} at a workspace link`;
+        if (!known(key)) return `${dir} points ${name} at ${bareKey(key)}, which neither t3's graph nor a lock holds`;
       }
     }
   }
@@ -220,7 +221,10 @@ export const t3LockRefusal = (input: T3LockInput): string | undefined => {
       for (const name of Object.keys(a)) {
         if (a[name] === b[name]) continue;
         if (targetName(name, String(a[name])) !== targetName(name, String(b[name]))) return false;
-        if (moved.has(name)) continue;
+        if (moved.has(name)) {
+          if (importerKey(name, String(a[name])) === undefined) return false;
+          continue;
+        }
         if (bareKey(`${name}@${a[name]}`) !== bareKey(`${name}@${b[name]}`)) return false;
       }
     }

@@ -107,7 +107,7 @@ CI, never by updating the Environment in place:
    none is cancelled for a newer one. Every run checks out the tip of `main` when it starts.
 10. **State and outcome.** The Environment DO keeps one record per target (`t3`, one per CLI) in its storage, and finds
    the run by its `run-name` (`Update <id>`, `CLI update <id>`). The same target pressed again joins the run in flight;
-   another is refused. A record has failed 100 minutes after the DO first saw its run out of the queue (a run waiting its
+   another is refused. A record has failed 110 minutes after the DO first saw its run out of the queue (a run waiting its
    turn in the `bump` group is not counted until then; 3 hours queued, or 15 minutes unlisted, has failed). A fiber in t3's runtime follows the run while the
    DO is awake (no alarm), and settles lazily at boot and at the next press. Success is the new build booting:
    `prepareTrial` of our `ServiceLauncherClient` reports the update committed when the stored target is the stamped

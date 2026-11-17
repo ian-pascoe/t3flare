@@ -9,8 +9,8 @@ name: Deploy prod
 #
 # The land workflow (land.yml, ADR-0037) dispatches this with `checked_sha`, the commit it just fast-forwarded main to: a
 # push made with GITHUB_TOKEN starts no workflow, so this dispatch is what deploys a landed Update. The job deploys
-# exactly that commit, and only while it is main's tip, on any stage: this workflow never builds code that is not on
-# main (review cycle 3). The run's name carries the stage and the commit, which is how land.yml finds it.
+# exactly that commit, and only while it is main's tip, on any stage: a dispatch never builds a commit other than
+# main's tip (review cycle 3). The run's name carries the stage and the commit, which is how land.yml finds it.
 # The pnpm store cache (restored, and saved after a pass, under the lock's key) is used on prod only, where the code is
 # main's; a `bump` stage deploy neither restores nor saves it (ADR-0037 §4).
 #
