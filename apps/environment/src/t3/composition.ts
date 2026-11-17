@@ -42,6 +42,8 @@ import * as ServerConfig from "t3/src/config.ts";
 import * as ServerHttp from "t3/src/http.ts";
 import * as Ws from "t3/src/ws.ts";
 import * as AgentScopeLive from "t3/src/process/agentScope.ts";
+import { AgentScope } from "@t3tools/shared/AgentScope";
+import * as ProviderProcesses from "t3/src/process/providerProcesses.ts";
 import * as ExternalLauncher from "t3/src/process/externalLauncher.ts";
 import * as PullRequestHttp from "t3/src/pullRequest/http.ts";
 import * as SpeechModelStore from "t3/src/speech/SpeechModelStore.ts";
@@ -810,6 +812,15 @@ export const make = (options: CompositionOptions) => {
     // would compress a body t3 already gzipped a second time.
   );
 
+  // t3flare: t3's AgentScope without its ProviderProcesses layer, which on Linux reads `/proc/sys/kernel/random/boot_id`
+  // (workerd has none: t3 would not boot), records the server's CLI processes in the State directory and kills a crashed
+  // server's leftovers. No CLI runs in this process (each runs in its Workspace's Container), so the reference keeps its
+  // own default: no records, no other owner.
+  const layerAgentScope = Layer.effect(AgentScope, AgentScopeLive.make).pipe(
+    Layer.provide(ProcessRunner.layer),
+    Layer.provideMerge(Layer.succeed(ProviderProcesses.ProviderProcesses, { hasOtherLiveOwner: false })),
+  );
+
   const layerMakeServer = Layer.unwrap(
     Effect.gen(function* () {
       // t3flare: no server ownership lock, PATH fixing, runtime-state file, Tailscale
@@ -865,7 +876,7 @@ export const make = (options: CompositionOptions) => {
         ),
         Layer.provideMerge(FetchHttpClient.layer),
         Layer.provide(VcsProcess.layer),
-        Layer.provideMerge(AgentScopeLive.layer),
+        Layer.provideMerge(layerAgentScope),
         Layer.provideMerge(layerPlatformServices),
       );
     }),
