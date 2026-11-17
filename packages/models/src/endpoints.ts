@@ -236,8 +236,8 @@ export const EMPTY_ENDPOINTS: ModelEndpoints = { revision: 0, endpoints: [] };
 /** 1–32 of a–z, 0–9 and `-`, starting and ending with a letter or digit. */
 export const ENDPOINT_ID = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
 /**
- * Ids an endpoint may not take: `anthropic` named the retired Model proxy's models (`anthropic/<id>`), which still sit in
- * old threads and settings and fall back to the default model (SPI-1176, `isRetiredSlug`), so no endpoint may answer
+ * Ids an endpoint may not take: `anthropic` begins old model selections (`anthropic/<id>`), which still sit in old threads
+ * and settings and fall back to the default model (SPI-1176, `isRetiredSlug`), so no endpoint may answer
  * for them; `default` is t3's word for the default model.
  */
 export const RESERVED_ENDPOINT_IDS: ReadonlyArray<string> = ["anthropic", "default"];
@@ -268,11 +268,26 @@ export const findEndpointModel = (endpoints: ModelEndpoints, slug: string): { re
 };
 
 /**
- * Whether a model selection is from before the hard cut (SPI-1176): t3's `default`, a bare id (the Model proxy's ids as
- * Codex and Claude Code named them, or t3's own stock defaults), or the proxy's `anthropic/<id>`. None names a Model
+ * Whether a model selection is an old one that names no Model endpoint (SPI-1176): t3's `default`, a bare id (as Codex
+ * and Claude Code once named models, or t3's own stock defaults), or `anthropic/<id>`. None names a Model
  * endpoint, so each falls back to the default model. A slug of an endpoint that is gone is not one: it fails, saying so.
  */
 export const isRetiredSlug = (slug: string): boolean => slug === "default" || parseEndpointSlug(slug) === undefined || slug.startsWith("anthropic/");
+
+/**
+ * Where an old selection (`isRetiredSlug`) runs among `endpoints`, in the owner's order: the first endpoint that lists a
+ * model of its id (`anthropic/<id>`'s, or a bare id), so an old thread keeps its model on the endpoint that serves it
+ * now; else `fallback` (the default model). `default` has no id of its own: `fallback`.
+ */
+export const retiredSelectionSlug = (
+  slug: string,
+  endpoints: ReadonlyArray<{ readonly id: string; readonly models: ReadonlyArray<{ readonly id: string }> }>,
+  fallback: string | undefined,
+): string | undefined => {
+  const id = slug.startsWith("anthropic/") ? slug.slice("anthropic/".length) : slug;
+  const listing = id === "default" ? undefined : endpoints.find((endpoint) => endpoint.models.some((model) => model.id === id));
+  return listing === undefined ? fallback : endpointSlug(listing.id, id);
+};
 
 /** The default model (SPI-1176): the first model of the first endpoint, in the owner's order, that lists one. */
 export const defaultModelSlug = (endpoints: ModelEndpoints): string | undefined => {
@@ -312,8 +327,8 @@ export const defaultTextModel = (endpoints: ModelEndpoints): string | undefined 
 export const defaultSmallModel = (endpoints: ModelEndpoints): string | undefined => defaultTextModel(endpoints) ?? defaultModelSlug(endpoints);
 
 /**
- * The slug a model setting names (the Guardian's, `web_search`'s): its own when it is an endpoint's slug; `default`, or a
- * value from before the hard cut (`isRetiredSlug`), the endpoints' small model. Undefined: no endpoint lists a model.
+ * The slug a model setting names (the Guardian's, `web_search`'s): its own when it is an endpoint's slug; `default`, or an
+ * old value (`isRetiredSlug`), the endpoints' small model. Undefined: no endpoint lists a model.
  */
 export const modelSettingSlug = (setting: string, endpoints: ModelEndpoints): string | undefined => (isRetiredSlug(setting) ? defaultSmallModel(endpoints) : setting);
 

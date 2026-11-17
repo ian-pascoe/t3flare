@@ -178,7 +178,8 @@ Report: [`docs/steps/spi-1168.md`](../steps/spi-1168.md); evidence: `docs/steps/
    slugs, its background model (`ANTHROPIC_DEFAULT_HAIKU_MODEL`) the text-generation model when that is one of their
    models (else their small model), its handle requested for those endpoints (`modelRelay`). Every alias Claude Code
    resolves on its own is pinned to a slug, since the routed URL refuses any other model: `ANTHROPIC_DEFAULT_SONNET_MODEL`
-   and `ANTHROPIC_DEFAULT_OPUS_MODEL` are the first model of that family in the owner's order, else the first model
+   and `ANTHROPIC_DEFAULT_OPUS_MODEL` are the first model of that family in the owner's order that pi-ai's catalog
+   knows (SPI-1176: a list can name dated models its server no longer serves), else the family's first, else the first model
    (Claude Code's own `default` and its subagents' `sonnet`/`opus` resolve through them). A model t3 names that is not
    a slug (t3's stock Claude default `claude-opus-5-5`, an earlier proxy model) is not in the session's model list, and
    t3's ACP adapter refuses it before any request ("The agent did not accept the model"). Until the hard cut

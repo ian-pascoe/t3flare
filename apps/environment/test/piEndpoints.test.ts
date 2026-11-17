@@ -62,7 +62,7 @@ describe("pi's model list", () => {
     expect(list.some((entry) => entry.slug.startsWith("anthropic/"))).toBe(false);
   });
 
-  it("is empty without such an endpoint: there is no Model proxy's catalog to fall back to (SPI-1176)", () => {
+  it("is empty without such an endpoint: there is no other catalog to fall back to (SPI-1176)", () => {
     expect(piModelsOf(endpoints(endpoint("empty", "anthropic-messages", [])))).toEqual([]);
     expect(piModelsOf(undefined)).toEqual([]);
   });
@@ -85,13 +85,17 @@ describe("pi's RPC lines on the relay", () => {
     expect(JSON.parse(piLineToPi('{"type":"set_model","provider":"t3flare-endpoint-x","modelId":"m"}', ids)).provider).toBe("t3flare-endpoint-t3flare-endpoint-x");
   });
 
-  it("names the default model in place of the retired Model proxy's `anthropic` (a thread from before the hard cut, SPI-1176)", () => {
+  it("names the default model in place of an old thread's `anthropic` (an old thread's, SPI-1176)", () => {
     expect(JSON.parse(piLineToPi('{"id":"c4","type":"set_model","provider":"anthropic","modelId":"claude-sonnet-5-5"}', ids, "comm/c"))).toEqual({
       id: "c4",
       type: "set_model",
       provider: "t3flare-endpoint-comm",
       modelId: "c",
     });
+    // Given as a function of the old model id: the endpoint that lists it (`retiredSelectionSlug`), else the default.
+    const sameId = (modelId: string) => (modelId === "claude-sonnet-5-5" ? "comm/claude-sonnet-5-5" : "comm/c");
+    expect(JSON.parse(piLineToPi('{"type":"set_model","provider":"anthropic","modelId":"claude-sonnet-5-5"}', ids, sameId))).toMatchObject({ provider: "t3flare-endpoint-comm", modelId: "claude-sonnet-5-5" });
+    expect(JSON.parse(piLineToPi('{"type":"set_model","provider":"anthropic","modelId":"claude-x"}', ids, sameId))).toMatchObject({ provider: "t3flare-endpoint-comm", modelId: "c" });
     // A default that is no endpoint of the process's names nothing in its place.
     const line = '{"type":"set_model","provider":"anthropic","modelId":"claude-sonnet-5-5"}';
     expect(piLineToPi(line, ids, "gone/m")).toBe(line);

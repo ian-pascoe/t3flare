@@ -6,7 +6,7 @@
 // in it. Its background model (`ANTHROPIC_DEFAULT_HAIKU_MODEL`) is the text-generation model when that is one of these
 // endpoints' models. Pure.
 import type { ServerProviderModel } from "@t3tools/contracts";
-import { endpointSlug, isRetiredSlug, type ModelEndpoint, type ModelEndpoints } from "@t3flare/models/endpoints";
+import { endpointSlug, isRetiredSlug, type ModelEndpoint, type ModelEndpoints, retiredSelectionSlug } from "@t3flare/models/endpoints";
 import { endpointsOfApi } from "@t3flare/models/relay";
 
 import type { ClaudeRelay } from "../../agents/acpProfiles.ts";
@@ -24,12 +24,16 @@ export const claudeEndpoints = (endpoints: ModelEndpoints | undefined): Readonly
 const familyOf = (family: string) => new RegExp(`(?:^|[-_./:])${family}(?:$|[-_.:])`, "i");
 
 /**
- * The slug Claude Code's `opus` or `sonnet` alias resolves to: the first model of that family in the owner's order, else
- * the first model listed (so the alias still names a slug the relay routes, never Claude Code's own id).
+ * The slug Claude Code's `opus` or `sonnet` alias resolves to: the first model of that family in the owner's order that
+ * pi-ai's catalog knows (an endpoint's list can name a dated model its server no longer serves, which pi-ai's catalog
+ * dropped: Commissary lists `claude-3-7-sonnet-20250219` first and answers 503 for it), else the family's first, else
+ * the first model listed (so the alias still names a slug the relay routes, never Claude Code's own id). A resumed
+ * session calls the alias.
  */
 const familyModelOf = (own: ReadonlyArray<ModelEndpoint>, family: "opus" | "sonnet"): string | undefined => {
-  const slugs = own.flatMap((endpoint) => endpoint.models.map((model) => ({ slug: endpointSlug(endpoint.id, model.id), id: model.id })));
-  return (slugs.find((entry) => familyOf(family).test(entry.id)) ?? slugs[0])?.slug;
+  const slugs = own.flatMap((endpoint) => endpoint.models.map((model) => ({ slug: endpointSlug(endpoint.id, model.id), id: model.id, known: model.known })));
+  const ofFamily = slugs.filter((entry) => familyOf(family).test(entry.id));
+  return (ofFamily.find((entry) => entry.known) ?? ofFamily[0] ?? slugs[0])?.slug;
 };
 
 /** Claude Code's relay configuration for the endpoints as stored now, or undefined when there is no such endpoint. */
@@ -53,10 +57,13 @@ export const claudeRelayOf = (endpoints: ModelEndpoints | undefined, textModel: 
 export const claudeModelsOf = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ServerProviderModel> => relayPickerModels(claudeEndpoints(endpoints));
 
 /**
- * The model as Claude Code names it: an Anthropic Messages endpoint's by its slug (the relay routes by it). A model from
- * before the hard cut (SPI-1176, `isRetiredSlug`: the Model proxy's ids, t3's stock Claude default) is the default model,
- * the list's first. Any other slug (an endpoint that is gone) stays as it is: Claude Code's session does not offer it,
+ * The model as Claude Code names it: an Anthropic Messages endpoint's by its slug (the relay routes by it). An old
+ * model (`isRetiredSlug`: a bare id, t3's stock Claude default, `anthropic/<id>`) is an endpoint model of its
+ * id, else the default model, the list's first (`retiredSelectionSlug`). Any other slug (an endpoint that is gone) stays as it is: Claude Code's session does not offer it,
  * and t3's adapter refuses it before any request.
  */
-export const claudeModelId = (slug: string, endpoints: ModelEndpoints | undefined): string =>
-  isRetiredSlug(slug) ? (relayPickerModels(claudeEndpoints(endpoints))[0]?.slug ?? slug) : slug;
+export const claudeModelId = (slug: string, endpoints: ModelEndpoints | undefined): string => {
+  if (!isRetiredSlug(slug)) return slug;
+  const own = claudeEndpoints(endpoints);
+  return retiredSelectionSlug(slug, own, relayPickerModels(own)[0]?.slug) ?? slug;
+};

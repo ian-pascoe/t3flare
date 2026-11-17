@@ -1,7 +1,7 @@
 // OpenCode's Model endpoints (SPI-1169): with an endpoint whose API OpenCode speaks (Anthropic Messages, OpenAI
 // Responses, OpenAI-compatible Completions) and that lists a model, OpenCode runs on those endpoints through the model
 // relay, one provider each; its list is their models by slug, its model ids their providers'; with none, no model (it
-// needs setup and a spawn is refused, SPI-1176). A selection from before the hard cut falls back to the default model.
+// needs setup and a spawn is refused, SPI-1176). An old selection falls back to the default model.
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import { describe, expect, it } from "vitest";
 
@@ -70,11 +70,13 @@ describe("OpenCode's Model endpoints", () => {
     expect(opencodeModelsOf({ revision: 1, endpoints: [endpoints.endpoints[0]!] })).toEqual([]);
   });
 
-  it("names an endpoint's model by its provider, a model id holding `/` kept whole; a selection from before the hard cut is the default model (SPI-1176)", () => {
+  it("names an endpoint's model by its provider, a model id holding `/` kept whole; an old selection is the default model (SPI-1176)", () => {
     expect(opencodeModelId("comm/claude-haiku-5-5", endpoints)).toBe("t3flare-endpoint-comm/claude-haiku-5-5");
     expect(opencodeModelId("or/anthropic/claude-opus-5-5", endpoints)).toBe("t3flare-endpoint-or/anthropic/claude-opus-5-5");
-    // The Model proxy's (`anthropic/…`, a bare id) and `default`: the first model, the picker's default.
-    for (const old of ["anthropic/claude-haiku-5-5", "claude-haiku-5-5", "default"]) expect(opencodeModelId(old, endpoints), old).toBe("t3flare-endpoint-comm/claude-sonnet-5-5");
+    // An old selection whose model an endpoint OpenCode reaches lists: that endpoint's; else `default`'s, the first model.
+    for (const old of ["anthropic/claude-haiku-5-5", "claude-haiku-5-5"]) expect(opencodeModelId(old, endpoints), old).toBe("t3flare-endpoint-comm/claude-haiku-5-5");
+    expect(opencodeModelId("gpt-5-mini", endpoints)).toBe("t3flare-endpoint-openai/gpt-5-mini");
+    for (const old of ["anthropic/claude-fable-1", "gemini-x", "default"]) expect(opencodeModelId(old, endpoints), old).toBe("t3flare-endpoint-comm/claude-sonnet-5-5");
     // Another API's endpoint, an endpoint that is gone: its provider's model, which the session does not offer (t3's
     // adapter refuses it before any request).
     expect(opencodeModelId("gem/gemini-x", endpoints)).toBe("t3flare-endpoint-gem/gemini-x");

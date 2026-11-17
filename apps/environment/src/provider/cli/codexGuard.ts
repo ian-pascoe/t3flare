@@ -8,10 +8,10 @@
 // SPI-1167: a model of a Model endpoint is `<endpointId>/<modelId>` in t3; Codex gets the model's own id and the
 // endpoint's provider (`codexModelRoute`), named by the guard on every thread request. A thread stays on its provider:
 // a turn on a model of another provider is refused (Codex's `turn/start` cannot move a thread to another provider).
-// SPI-1176: a model from before the hard cut (the Model proxy's bare ids) runs on the default model, the first Responses
-// endpoint's first model.
+// SPI-1176: an old model (`isRetiredSlug`: a bare id) runs on a Responses endpoint's model of its id, else the default
+// model, the first Responses endpoint's first model.
 
-import { isRetiredSlug, parseEndpointSlug } from "@t3flare/models/endpoints";
+import { endpointSlug, isRetiredSlug, parseEndpointSlug, retiredSelectionSlug } from "@t3flare/models/endpoints";
 
 /** Refused with their own reason (review F5): `feedback/*` uploads logs to the vendor, `account/*` is a vendor login. */
 const REFUSED_PREFIXES: ReadonlyArray<[string, string]> = [
@@ -63,8 +63,9 @@ export interface CodexRouteEndpoint {
 
 /**
  * A model's route (SPI-1167): a slug whose part before the first `/` is the id of one of Codex's (OpenAI Responses)
- * endpoints goes to that endpoint's provider with the rest as its id. A model from before the hard cut (SPI-1176,
- * `isRetiredSlug`: the Model proxy's bare ids, `default`) goes to the default model, the first endpoint's first model.
+ * endpoints goes to that endpoint's provider with the rest as its id. An old model (SPI-1176,
+ * `isRetiredSlug`: a bare id, `default`) goes to an endpoint model of its id, else the default model, the first
+ * endpoint's first model (`retiredSelectionSlug`).
  * Any other slug (an endpoint that is gone, or not Codex's) names its own endpoint's provider, which Codex does not have,
  * so Codex refuses it; with no endpoint at all, the model goes as sent to no provider.
  */
@@ -73,7 +74,8 @@ export const codexModelRoute = (model: string, endpoints: ReadonlyArray<CodexRou
   if (slug !== undefined && endpoints.some((endpoint) => endpoint.id === slug.endpointId)) return { provider: providerOf(slug.endpointId), model: slug.modelId };
   if (slug === undefined || isRetiredSlug(model)) {
     const first = endpoints.find((endpoint) => endpoint.models.length > 0);
-    return first === undefined ? { provider: "", model } : { provider: providerOf(first.id), model: first.models[0]!.id };
+    const chosen = parseEndpointSlug(retiredSelectionSlug(model, endpoints, first === undefined ? undefined : endpointSlug(first.id, first.models[0]!.id)) ?? "");
+    return chosen === undefined ? { provider: "", model } : { provider: providerOf(chosen.endpointId), model: chosen.modelId };
   }
   return { provider: providerOf(slug.endpointId), model: slug.modelId };
 };
@@ -121,7 +123,7 @@ const turnModel = (next: Record<string, unknown>, context: TurnContext): string 
   const route = context.route(next.model);
   const threadProvider = typeof next.threadId === "string" ? context.threadProvider?.(next.threadId) : undefined;
   if (threadProvider !== undefined && threadProvider !== route.provider) {
-    return `this Codex thread runs on another Model endpoint than ${next.model} (or on the Model proxy, before the hard cut); Codex cannot move a thread between them: start a new thread for this model`;
+    return `this Codex thread runs on another Model endpoint than ${next.model}; Codex cannot move a thread between them: start a new thread for this model`;
   }
   next.model = route.model;
   const mode = record(next.collaborationMode);

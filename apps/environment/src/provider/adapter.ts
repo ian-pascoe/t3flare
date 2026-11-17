@@ -40,7 +40,7 @@ import * as Schedule from "effect/Schedule";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 
-import { defaultModelSlug, EMPTY_ENDPOINTS, endpointSlug, findEndpointModel, isRetiredSlug, type ModelEndpoints, parseEndpointSlug } from "@t3flare/models/endpoints";
+import { defaultModelSlug, EMPTY_ENDPOINTS, endpointSlug, findEndpointModel, isRetiredSlug, type ModelEndpoints, parseEndpointSlug, retiredSelectionSlug } from "@t3flare/models/endpoints";
 import { toWorkspace } from "@t3flare/workspace-client";
 
 import { environmentServices } from "../agents/bindings.ts";
@@ -65,13 +65,13 @@ const THINKING = new Set(["off", "minimal", "low", "medium", "high", "xhigh", "m
 
 /**
  * pi-ai's model and thinking level for a t3 model selection: a Model endpoint's slug, `<endpointId>/<modelId>`, as
- * `{ provider: <endpointId>, modelId }` (ADR-0034 §2). A selection from before the hard cut (SPI-1176: t3's `default`, a
- * bare id, the Model proxy's `anthropic/<id>`; `isRetiredSlug`) falls back to the default model (`defaultModelSlug`). With
+ * `{ provider: <endpointId>, modelId }` (ADR-0034 §2). An old selection (`isRetiredSlug`: t3's `default`, a
+ * bare id, `anthropic/<id>`) runs on an endpoint model of its id, else the default model (`retiredSelectionSlug`). With
  * no endpoint to fall back to it is passed on as it is, and the Session refuses it as a model it does not have. A slug of
  * an endpoint that is gone is passed on too: the turn fails saying so (SPI-1162).
  */
 export const modelOf = (selection: ModelSelection, endpoints: ModelEndpoints): { readonly model: ModelRef; readonly thinking: ThinkingLevel | null } => {
-  const slug = isRetiredSlug(selection.model) ? (defaultModelSlug(endpoints) ?? selection.model) : selection.model;
+  const slug = isRetiredSlug(selection.model) ? (retiredSelectionSlug(selection.model, endpoints.endpoints, defaultModelSlug(endpoints)) ?? selection.model) : selection.model;
   const parsed = parseEndpointSlug(slug);
   const model = parsed === undefined ? { provider: "", modelId: slug } : { provider: parsed.endpointId, modelId: parsed.modelId };
   const thinking = getModelSelectionStringOptionValue(selection, "thinking");

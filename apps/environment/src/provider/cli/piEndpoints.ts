@@ -8,8 +8,8 @@
 // `set_model`) and reads pi's own back (`get_available_models`, `get_state`, an assistant message's `provider`), so the
 // process's RPC lines are mapped at the channel: an endpoint id to its provider on the way in, a provider to its
 // endpoint id on the way out. pi's session files keep its own provider ids, which follow from the endpoint's id (which
-// never changes), so a session resumes in a new process. A `set_model` naming the Model proxy's `anthropic` (a thread
-// from before the hard cut, SPI-1176) names the default model's endpoint and model instead.
+// never changes), so a session resumes in a new process. A `set_model` naming `anthropic` (an old thread's provider,
+// which no endpoint can have) names the default model's endpoint and model instead.
 import type { ServerProviderModel } from "@t3tools/contracts";
 import { type ModelEndpoint, type ModelEndpoints, parseEndpointSlug } from "@t3flare/models/endpoints";
 import { endpointIdOfProvider, endpointProviderId, relayedEndpoints } from "@t3flare/models/relay";
@@ -42,16 +42,16 @@ export const piRelayOf = (endpoints: ModelEndpoints | undefined): PiRelay | unde
 /** pi's model list: the endpoints pi serves, their models (`pickerOf`); empty without one. */
 export const piModelsOf = (endpoints: ModelEndpoints | undefined): ReadonlyArray<ServerProviderModel> => pickerOf(piEndpoints(endpoints));
 
-/** The Model proxy's provider in a `set_model` of a thread from before the hard cut (SPI-1176). */
+/** An old thread's provider in a `set_model`: a reserved endpoint id (`RESERVED_ENDPOINT_IDS`). */
 const RETIRED_PROVIDER = "anthropic";
 
 /**
  * A line t3's Pi adapter sends pi (one RPC command): a `set_model` naming an endpoint id as its provider names that
- * endpoint's pi provider instead; one naming the retired Model proxy's `anthropic` names the default model (`fallback`,
- * the slug pi starts on) instead (SPI-1176). Every other line, and a provider that is no endpoint's of the process (a
+ * endpoint's pi provider instead; one naming `anthropic` (an old thread's, `RETIRED_PROVIDER`) names the slug `fallback` gives
+ * for its model id (an endpoint model of that id, else the slug pi starts on) instead (SPI-1176). Every other line, and a provider that is no endpoint's of the process (a
  * built-in, an endpoint that is gone), passes as it is.
  */
-export const piLineToPi = (line: string, endpointIds: ReadonlySet<string>, fallback?: string): string => {
+export const piLineToPi = (line: string, endpointIds: ReadonlySet<string>, fallback?: string | ((modelId: string) => string | undefined)): string => {
   if (!line.includes('"set_model"')) return line;
   let command: unknown;
   try {
@@ -61,7 +61,9 @@ export const piLineToPi = (line: string, endpointIds: ReadonlySet<string>, fallb
   }
   if (typeof command !== "object" || command === null || (command as { type?: unknown }).type !== "set_model") return line;
   const provider = (command as { provider?: unknown }).provider;
-  const retired = provider === RETIRED_PROVIDER ? (fallback === undefined ? undefined : parseEndpointSlug(fallback)) : undefined;
+  const modelId = (command as { modelId?: unknown }).modelId;
+  const target = typeof fallback === "function" ? fallback(typeof modelId === "string" ? modelId : "") : fallback;
+  const retired = provider === RETIRED_PROVIDER ? (target === undefined ? undefined : parseEndpointSlug(target)) : undefined;
   if (retired !== undefined && endpointIds.has(retired.endpointId)) return JSON.stringify({ ...command, provider: endpointProviderId(retired.endpointId), modelId: retired.modelId });
   if (typeof provider !== "string" || !endpointIds.has(provider)) return line;
   return JSON.stringify({ ...command, provider: endpointProviderId(provider) });

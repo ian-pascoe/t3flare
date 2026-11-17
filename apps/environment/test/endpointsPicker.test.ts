@@ -1,7 +1,6 @@
 // The Pi Durable picker with Model endpoints (SPI-1162): every endpoint's models as `<endpointId>/<modelId>`, grouped by
-// endpoint, a reasoning model with the thinking picker. Since the hard cut (SPI-1176) they are its only models: with
-// none, the provider needs setup and points to the Harness panel, and a selection from before the cut falls back to the
-// default model.
+// endpoint, a reasoning model with the thinking picker. They are its only models (SPI-1176): with none, the provider
+// needs setup and points to the Harness panel, and an old selection falls back to the default model.
 import type { ModelSelection } from "@t3tools/contracts";
 import { type ModelEndpoints, NO_ENDPOINT_MESSAGE } from "@t3flare/models/endpoints";
 import { describe, expect, it } from "vitest";
@@ -44,7 +43,7 @@ describe("snapshotModels with Model endpoints", () => {
     expect(models.filter((entry) => entry.isDefault === true).map((entry) => entry.slug)).toEqual(["openai/gpt-5-mini"]);
   });
 
-  it("is empty without an endpoint: there is no Model proxy to list (SPI-1176)", () => {
+  it("is empty without an endpoint: there is nothing else to list (SPI-1176)", () => {
     expect(snapshotModels({ revision: 0, endpoints: [] })).toEqual([]);
     expect(snapshotModels()).toEqual([]);
   });
@@ -73,8 +72,14 @@ describe("a Pi Durable selection's model (modelOf)", () => {
     expect(modelOf(selection("openai/vendor/x"), ENDPOINTS).model).toEqual({ provider: "openai", modelId: "vendor/x" });
   });
 
-  it("falls back to the default model for a selection from before the hard cut: the proxy's anthropic/…, a bare id, default", () => {
-    for (const old of ["anthropic/claude-sonnet-5-5", "anthropic/claude-haiku-5-5", "claude-opus-5-5", "gpt-6-luna", "default"]) {
+  it("runs an old selection (anthropic/…, a bare id) on the endpoint that lists its model, else on the default model", () => {
+    // The old thread keeps its model where an endpoint serves it now (SPI-1176, `retiredSelectionSlug`).
+    for (const old of ["anthropic/claude-haiku-5-5", "claude-haiku-5-5"]) {
+      expect(modelOf(selection(old, "high"), ENDPOINTS), old).toEqual({ model: { provider: "commissary", modelId: "claude-haiku-5-5" }, thinking: "high" });
+    }
+    expect(modelOf(selection("gpt-4.1"), ENDPOINTS).model).toEqual({ provider: "openai", modelId: "gpt-4.1" });
+    // No endpoint lists it, or `default`: the default model, the first endpoint's first.
+    for (const old of ["anthropic/claude-sonnet-5-5", "claude-opus-5-5", "gpt-6-luna", "default"]) {
       expect(modelOf(selection(old, "high"), ENDPOINTS), old).toEqual({ model: { provider: "openai", modelId: "gpt-5-mini" }, thinking: "high" });
     }
   });

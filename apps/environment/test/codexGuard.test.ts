@@ -101,11 +101,14 @@ describe("the Codex request guard", () => {
     ];
     const route = (model: string) => codexModelRoute(model, endpoints, (id) => `t3flare-endpoint-${id}`);
 
-    it("routes an endpoint's slug to its provider with the model's own id; one from before the hard cut to the default model (SPI-1176)", () => {
+    it("routes an endpoint's slug to its provider with the model's own id; an old one to the default model (SPI-1176)", () => {
       expect(route("openai/gpt-5-mini")).toEqual({ provider: "t3flare-endpoint-openai", model: "gpt-5-mini" });
       expect(route("work/org/model-a")).toEqual({ provider: "t3flare-endpoint-work", model: "org/model-a" });
-      // The Model proxy's bare id, its `anthropic/…`, and what is no slug: the first endpoint's first model.
+      // An old bare id, `anthropic/…`, and what is no slug: the first endpoint's first model.
       for (const old of ["gpt-6-luna", "anthropic/claude-haiku-5-5", "openai/"]) expect(route(old), old).toEqual({ provider: "t3flare-endpoint-openai", model: "gpt-5-mini" });
+      // An old id a Responses endpoint lists: that endpoint's model, so an old thread keeps it.
+      const listing = [{ id: "openai", models: [{ id: "gpt-5-mini" }] }, { id: "work", models: [{ id: "gpt-6-luna" }] }];
+      expect(codexModelRoute("gpt-6-luna", listing, (id) => `t3flare-endpoint-${id}`)).toEqual({ provider: "t3flare-endpoint-work", model: "gpt-6-luna" });
       // An endpoint that is gone: its own provider, which Codex does not have.
       expect(route("other/x")).toEqual({ provider: "t3flare-endpoint-other", model: "x" });
     });
@@ -123,7 +126,7 @@ describe("the Codex request guard", () => {
       const context = { ...sandboxed, route, threadProvider: (thread: string) => (thread === "t1" ? "t3flare-endpoint-openai" : undefined) };
       const answer = guardRequest("turn/start", { threadId: "t1", model: "openai/gpt-5-mini", collaborationMode: { mode: "default", settings: { model: "openai/gpt-5-mini" } } }, context);
       expect(answer).toMatchObject({ params: { model: "gpt-5-mini", collaborationMode: { mode: "default", settings: { model: "gpt-5-mini" } } } });
-      // A model from before the hard cut runs on the default model, here the thread's own provider's (SPI-1176).
+      // An old model runs on the default model, here the thread's own provider's (SPI-1176).
       expect(guardRequest("turn/start", { threadId: "t1", model: "gpt-6-luna" }, context)).toMatchObject({ params: { model: "gpt-5-mini" } });
       expect(guardRequest("turn/start", { threadId: "t1", model: "work/m" }, context)).toHaveProperty("refused");
       // A thread the client has not seen yet is not judged.

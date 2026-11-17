@@ -1,7 +1,7 @@
 // Claude Code's Model endpoints (SPI-1168): with an Anthropic Messages endpoint, Claude Code runs on those endpoints
 // through the model relay, its models their slugs (the relay routes each request by its model), its background model
 // the text-generation model when that is one of theirs; with none, no model (it needs setup, and a spawn is refused:
-// SPI-1176). A selection from before the hard cut falls back to the default model.
+// SPI-1176). An old selection falls back to the default model.
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import { describe, expect, it } from "vitest";
 
@@ -70,6 +70,18 @@ describe("Claude Code's Model endpoints", () => {
     expect(claudeRelayOf(haikuOnly, undefined)).toMatchObject({ opusModel: "comm/claude-haiku-5-5", sonnetModel: "comm/claude-haiku-5-5" });
   });
 
+  it("prefers a model of the family pi-ai's catalog knows: a dated one listed first may be one the server no longer serves (SPI-1176)", () => {
+    // Commissary's list, in its order: dated models pi-ai dropped first (it answers 503 for them).
+    const listed: ModelEndpoints = {
+      revision: 1,
+      endpoints: [{ ...endpoints.endpoints[1]!, models: [model("claude-3-7-sonnet-20250219"), model("claude-opus-4-1-20250805"), model("claude-opus-4-5", { known: true }), model("claude-sonnet-4-5", { known: true })] }],
+    };
+    expect(claudeRelayOf(listed, undefined)).toMatchObject({ opusModel: "comm/claude-opus-4-5", sonnetModel: "comm/claude-sonnet-4-5" });
+    // None of the family known: its first.
+    const unknown: ModelEndpoints = { revision: 1, endpoints: [{ ...endpoints.endpoints[1]!, models: [model("claude-haiku-5-5", { known: true }), model("claude-sonnet-x")] }] };
+    expect(claudeRelayOf(unknown, undefined)).toMatchObject({ sonnetModel: "comm/claude-sonnet-x" });
+  });
+
   it("lists the endpoints' models by slug, grouped by endpoint, with the effort picker on reasoning models; none without an endpoint", () => {
     const listed = claudeModelsOf(endpoints);
     expect(listed.map((row) => [row.slug, row.subProvider, row.name])).toEqual([
@@ -85,10 +97,14 @@ describe("Claude Code's Model endpoints", () => {
     expect(claudeModelsOf(undefined)).toEqual([]);
   });
 
-  it("names an endpoint's model to Claude Code by its slug; a selection from before the hard cut is the default model (SPI-1176)", () => {
+  it("names an endpoint's model to Claude Code by its slug; an old selection is its model's endpoint's, else the default model (SPI-1176)", () => {
     expect(claudeModelId("comm/claude-haiku-5-5", endpoints)).toBe("comm/claude-haiku-5-5");
-    // The Model proxy's (`anthropic/…`, and its bare ids, t3's stock Claude default among them) and `default`.
-    for (const old of ["anthropic/claude-haiku-5-5", "claude-haiku-5-5", "claude-opus-5-5", "default"]) expect(claudeModelId(old, endpoints), old).toBe("comm/claude-sonnet-5-5");
+    // Old selections (`anthropic/…`, bare ids, t3's stock Claude default among them): the first Anthropic Messages
+    // endpoint listing a model of that id, so an old thread keeps its model.
+    for (const old of ["anthropic/claude-haiku-5-5", "claude-haiku-5-5"]) expect(claudeModelId(old, endpoints), old).toBe("comm/claude-haiku-5-5");
+    expect(claudeModelId("claude-opus-5-5", endpoints)).toBe("comm2/claude-opus-5-5");
+    // None lists it, or `default`: the default model, the list's first.
+    for (const old of ["anthropic/claude-fable-1", "gpt-5-mini", "default"]) expect(claudeModelId(old, endpoints), old).toBe("comm/claude-sonnet-5-5");
     // Another API's endpoint, or a gone one: kept, so Claude Code's session does not offer it and t3's adapter refuses it.
     expect(claudeModelId("openai/gpt-5-mini", endpoints)).toBe("openai/gpt-5-mini");
     expect(claudeModelId("gone/x", endpoints)).toBe("gone/x");
