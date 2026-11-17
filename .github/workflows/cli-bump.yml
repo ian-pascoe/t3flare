@@ -1,0 +1,131 @@
+name: CLI bump
+
+# ADR-0037 (in-app updates plan D22): move one CLI agent's pin in the Workspace image (the pi CLI, Codex or Claude Code)
+# to its newest version, prove it on the `bump` stage, and land it. t3's provider-update button dispatches it through the
+# Environment DO (`t3flare-cli-update <cli>`, D21), which finds the run by its name, `CLI update <update_id>`.
+# `pnpm run cli-bump` (scripts/cli-bump.ts) does the work: a version equal to the pin ends the run as unchanged, and a
+# failure leaves the pin as it was. The gate is `pnpm run check`, a `bump` stage deploy with the new image, and the
+# acceptance test's core plus that CLI's sub-test; the full test:docker and every CLI's sub-test run in the verify run
+# after the land (bump.yml, D18). Shares the `bump` concurrency group with bump.yml (`queue: max`, nothing cancelled).
+#
+# Needs the `bump` environment's secrets, as bump.yml (see there); prod's never reach it: land.yml deploys prod by
+# dispatching deploy-prod.yml.
+
+run-name: ${{ inputs.update_id && format('CLI update {0}', inputs.update_id) || format('CLI bump {0}', inputs.cli) }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      cli:
+        description: "The CLI agent to bump"
+        type: choice
+        options: [pi, codex, claude]
+      update_id:
+        description: "The in-app Update's id, which names the run"
+        required: false
+      dry_run:
+        description: "Prove the newest version on the bump stage; commit, push and land nothing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+concurrency:
+  group: bump
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    # An Update's run fails within 20 minutes (ADR-0037, D7).
+    timeout-minutes: ${{ inputs.update_id && 20 || 45 }}
+    environment: bump
+    outputs:
+      branch: ${{ steps.push.outputs.branch }}
+      to: ${{ steps.push.outputs.to }}
+    env:
+      NPM_CONFIG_WORKSPACE_DIR: ${{ github.workspace }}
+    steps:
+      # The tip of main, whatever commit the dispatch named. The submodule by hand (see bump.yml).
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - run: git submodule update --init t3code
+
+      - uses: ./.github/actions/setup
+
+      - name: Mask the Model endpoint
+        run: node apps/environment/scripts/mask-endpoint.ts
+        env:
+          T3FLARE_MODEL_ENDPOINT: ${{ secrets.T3FLARE_MODEL_ENDPOINT }}
+
+      - name: CLI bump
+        run: |
+          args=(--cli "$CLI" --report cli-bump-report.json)
+          if [ "$DRY_RUN" != "true" ]; then args+=(--commit); fi
+          git config user.name "t3flare-bump"
+          git config user.email "t3flare-bump@users.noreply.github.com"
+          pnpm run cli-bump "${args[@]}"
+        env:
+          CLI: ${{ inputs.cli }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          T3FLARE_MODEL_ENDPOINT: ${{ secrets.T3FLARE_MODEL_ENDPOINT }}
+          T3FLARE_GITHUB_APP_ID: ${{ secrets.T3FLARE_GITHUB_APP_ID }}
+          T3FLARE_GITHUB_APP_PRIVATE_KEY: ${{ secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY }}
+
+      - name: Report
+        if: always()
+        run: |
+          if [ -f cli-bump-report.json ]; then
+            {
+              echo "## CLI bump"
+              echo '```json'
+              jq '{ok, cli, gate, from, to, changed, pins, note, steps: [.steps[] | {name, ok, seconds}], acceptance: (.acceptance | if . then {ok, failures} else null end)}' cli-bump-report.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cli-bump-report
+          path: cli-bump-report.json
+          if-no-files-found: ignore
+
+      # The proven pin on its own branch, `bump/cli-<cli>-<version>`, for the land job.
+      - name: Push the new pin
+        id: push
+        if: success() && inputs.dry_run != true
+        run: |
+          to=$(jq -r .to cli-bump-report.json)
+          changed=$(jq -r .changed cli-bump-report.json)
+          if [ "$changed" != "true" ]; then echo "Unchanged: $CLI is already at its newest version."; exit 0; fi
+          branch="bump/cli-$CLI-$to"
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "to=$to" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLI: ${{ inputs.cli }}
+
+  land:
+    needs: bump
+    if: inputs.dry_run != true && needs.bump.outputs.branch != ''
+    permissions:
+      contents: write
+      actions: write
+      issues: write
+    uses: ./.github/workflows/land.yml
+    with:
+      kind: cli
+      branch: ${{ needs.bump.outputs.branch }}
+      verify: ${{ inputs.cli }} ${{ needs.bump.outputs.to }}

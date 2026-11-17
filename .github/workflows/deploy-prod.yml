@@ -5,6 +5,12 @@ name: Deploy prod
 # web client; the read-only admin health route, which must report this commit; and the host's root OAuth documents,
 # which must still be t3's, ADR-0036. The two documents boot t3 in the Environment DO; no Container).
 # Docs-only pushes are skipped. A manual run may deploy the `bump` stage instead, to try the job without touching prod.
+# The smoke check also asserts that t3's descriptor reports the pin's tag as its `serverVersion` (in-app updates D16).
+#
+# The land workflow (land.yml, ADR-0037) dispatches this with `checked_sha`, the commit it just fast-forwarded main to: a
+# push made with GITHUB_TOKEN starts no workflow, so this dispatch is what deploys a landed Update. The job deploys
+# exactly that commit, and on prod only while it is still main's tip. The run's name carries the stage and the commit,
+# which is how land.yml finds it.
 #
 # Needs, made by `pnpm --filter @t3flare/infra run ci:setup` (infra/github.ts) on the GitHub environment `prod` (main only):
 #   secrets.CLOUDFLARE_API_TOKEN   the account token `t3flare-ci-prod`
@@ -21,6 +27,8 @@ name: Deploy prod
 # T3FLARE_MODEL_ENDPOINT also reaches the "Mask the Model endpoint" step, which runs node on
 # apps/environment/scripts/mask-endpoint.ts alone (no dependency code) and writes only GitHub's mask commands to the log.
 
+run-name: ${{ inputs.checked_sha && format('Deploy {0} {1}', inputs.stage, inputs.checked_sha) || '' }}
+
 on:
   push:
     branches: [main]
@@ -34,6 +42,9 @@ on:
         type: choice
         options: [prod, bump]
         default: prod
+      checked_sha:
+        description: "The commit to deploy (land.yml: the proven pin it landed); on prod it must be main's tip"
+        required: false
 
 permissions:
   contents: read
@@ -60,9 +71,25 @@ jobs:
       # The submodule is fetched by hand, not by the action (see bump.yml).
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.checked_sha || github.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
+      # A landed commit deploys to prod only while main is still it (stage.ts also refuses anything but main).
+      - name: The checked commit is main
+        if: inputs.checked_sha && env.STAGE == 'prod'
+        run: |
+          main=$(git rev-parse origin/main)
+          if [ "$main" != "$CHECKED_SHA" ]; then echo "main is $main, not the checked $CHECKED_SHA"; exit 1; fi
+        env:
+          CHECKED_SHA: ${{ inputs.checked_sha }}
+
       - run: git submodule update --init t3code
+
+      # The Server version the smoke check expects: the pin's tag without its `v` (stage.ts refuses prod off a tag).
+      - name: Server version
+        id: version
+        run: echo "server=$(git -C t3code describe --tags --exact-match HEAD | sed 's/^v//')" >> "$GITHUB_OUTPUT"
 
       # Node, pnpm and Vite+ at package.json's versions, then a frozen install (ADR-0030).
       - uses: ./.github/actions/setup
@@ -91,9 +118,11 @@ jobs:
 
       - name: Smoke check
         working-directory: apps/environment
-        run: node scripts/stage.ts run "$STAGE" smoke "$GITHUB_SHA"
+        run: node scripts/stage.ts run "$STAGE" smoke "$COMMIT" "$SERVER_VERSION"
         # The same secrets as Deploy.
         env:
+          COMMIT: ${{ inputs.checked_sha || github.sha }}
+          SERVER_VERSION: ${{ steps.version.outputs.server }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           T3FLARE_GITHUB_APP_ID: ${{ secrets.T3FLARE_GITHUB_APP_ID }}
           T3FLARE_GITHUB_APP_PRIVATE_KEY: ${{ secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY }}

@@ -1,0 +1,138 @@
+name: Land
+
+# ADR-0037: land a proposed pin. Fast-forward `main` to a proven `bump/*` branch, deploy prod by dispatching
+# deploy-prod.yml (a push made with GITHUB_TOKEN starts no workflow, so the push alone would deploy nothing), and follow
+# that run: its conclusion is the Update's outcome. Then delete the landed `bump/*` branches at or below the landed
+# version and dispatch the verify run (bump.yml through the Full gate, D18).
+#
+# Called by bump.yml (`kind: t3`) and cli-bump.yml (`kind: cli`) on a fresh runner with no stage secrets: the branch was
+# proven by a job that ran upstream code, so this job checks it by git alone before it lands:
+#   - the branch is one commit on origin/main;
+#   - it changes only the files its kind may (`apps/environment/scripts/lib/land.ts`: t3code and bump.ts's PINNED_FILES;
+#     the Workspace image's CLI pins);
+#   - a t3 bump's gitlink is the upstream tag's commit.
+# `dry_run` (by hand, to try the job): checks, then deploys the branch's commit to the `bump` stage instead of landing it.
+
+on:
+  workflow_call:
+    inputs:
+      kind: { type: string, required: true }
+      branch: { type: string, required: true }
+      tag: { type: string, required: false, default: "" }
+      verify: { type: string, required: false, default: "" }
+      dry_run: { type: boolean, required: false, default: false }
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: "t3 or cli"
+        type: choice
+        options: [t3, cli]
+      branch:
+        description: "The proven branch (bump/<tag>, bump/cli-<cli>-<version>)"
+        required: true
+      tag:
+        description: "A t3 bump's tag"
+        required: false
+      verify:
+        description: "What lands, for the verify run's name"
+        required: false
+      dry_run:
+        description: "Check, then deploy the branch to the bump stage; land nothing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+jobs:
+  land:
+    runs-on: ubuntu-latest
+    # By hand it waits in the `bump` group like any bump; called, it runs in its caller's run (a group of its own, so a
+    # caller holding `bump` does not wait for itself).
+    concurrency:
+      group: ${{ github.event_name == 'workflow_dispatch' && github.workflow == 'Land' && 'bump' || format('land-{0}', github.run_id) }}
+      cancel-in-progress: false
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+
+      - name: Check the branch
+        id: check
+        run: |
+          git fetch --quiet origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+          args=(--kind "$KIND" --branch "$BRANCH")
+          if [ -n "$TAG" ]; then args+=(--tag "$TAG"); fi
+          node scripts/land-check.ts "${args[@]}"
+          echo "sha=$(git rev-parse "origin/$BRANCH")" >> "$GITHUB_OUTPUT"
+        env:
+          KIND: ${{ inputs.kind }}
+          BRANCH: ${{ inputs.branch }}
+          TAG: ${{ inputs.tag }}
+
+      # A fast-forward only: a push that is not one is refused, and nothing is forced.
+      - name: Fast-forward main
+        if: inputs.dry_run != true
+        run: git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$SHA:refs/heads/main"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.check.outputs.sha }}
+
+      - name: Deploy
+        run: |
+          stage=prod
+          if [ "$DRY_RUN" = "true" ]; then stage=bump; fi
+          since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run deploy-prod.yml --ref main -f stage="$stage" -f checked_sha="$SHA"
+          name="Deploy $stage $SHA"
+          for _ in $(seq 1 30); do
+            run=$(gh run list --workflow deploy-prod.yml --event workflow_dispatch --created ">=$since" --json databaseId,displayTitle \
+              --jq "[.[] | select(.displayTitle == \"$name\")][0].databaseId // empty")
+            if [ -n "$run" ]; then break; fi
+            sleep 5
+          done
+          if [ -z "$run" ]; then echo "The deploy run never appeared."; exit 1; fi
+          echo "Following $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run"
+          gh run watch "$run" --interval 15 --exit-status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.check.outputs.sha }}
+          DRY_RUN: ${{ inputs.dry_run }}
+
+      - name: Delete the landed bump branches
+        if: inputs.dry_run != true
+        run: |
+          landed="${BRANCH#bump/}"
+          prefix="bump/v"
+          if [ "$KIND" = "cli" ]; then prefix="${BRANCH%-*}-"; landed="${BRANCH##*-}"; fi
+          git ls-remote --heads origin "${prefix}*" | sed 's#.*refs/heads/##' | while read -r branch; do
+            version="${branch#"$prefix"}"
+            if [ "$KIND" = "t3" ]; then version="${branch#bump/}"; fi
+            lowest=$(printf '%s\n%s\n' "$version" "$landed" | sort -V | head -1)
+            if [ "$lowest" = "$version" ]; then
+              echo "Deleting $branch"
+              git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --delete "$branch" || true
+            fi
+          done
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KIND: ${{ inputs.kind }}
+          BRANCH: ${{ inputs.branch }}
+
+      # D18: what landed through an Update gate gets the Full gate on main afterwards; a failure opens an issue.
+      - name: Dispatch the verify run
+        if: inputs.dry_run != true
+        run: gh workflow run bump.yml --ref main -f force=true -f dry_run=true -f gate=full -f verify="${VERIFY:-$BRANCH}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFY: ${{ inputs.verify }}
+          BRANCH: ${{ inputs.branch }}
