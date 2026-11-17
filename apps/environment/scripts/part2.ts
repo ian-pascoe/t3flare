@@ -8,15 +8,17 @@
 //                                                           an Environment restart (or, with --session, a Session restart)
 //                                                           while that command runs: its processes go
 //   node scripts/stage.ts run step2a2 part2 survivor         a background process of a completed call survives a later Stop
-//   node scripts/stage.ts run step2a2 part2 limit [--fixture cooldown] [--reset-s 120] [--no-resume]
-//                                                           a turn the proxy answers with a usage limit (the Session's fault
+//   node scripts/stage.ts run step2a2 part2 limit [--fixture anthropicUsageLimit] [--reset-s 120] [--no-resume]
+//                                                           a turn answered with a usage limit (the Session's fault
 //                                                           route): "Usage limit reached" with the reset, the requests it
 //                                                           made, the idle Environment woken at the reset, the resumed turn
 //   node scripts/stage.ts run step2a2 part2 stopped          with the Container stopped, a kill does not start it
 //   node scripts/stage.ts run step2a2 part2 overload         an overload (529): pi-durable retries it, then a provider error
-//   node scripts/stage.ts run step2a2 part2 key [--live]     a turn the proxy refuses (the fault route's 401, or with --live the
-//                                                           proxy's own, on a stage deployed with a refused key): the key error
-//                                                           after 1 request, no pause
+//                                                           (with --live only since the hard cut, SPI-1176: no overload
+//                                                           fault is left, the Model proxy's went with its fixtures)
+//   node scripts/stage.ts run step2a2 part2 key [--live]     a turn whose endpoint refuses its key (the fault route's 401, or
+//                                                           with --live the endpoint's own, with a refused key saved): the
+//                                                           key error after 1 request, no pause
 //   … [--out file.json]
 //
 // The fixture project is kept in `.alchemy/stages/<host>.part2.json` (gitignored) between runs.
@@ -305,12 +307,12 @@ switch (scenario) {
   case "limit":
   case "key":
   case "overload": {
-    const fixtureName = scenario === "key" ? "invalidKey" : scenario === "overload" ? "overloaded" : option("fixture", "cooldown");
+    const fixtureName = scenario === "key" ? "anthropicKeyRefused" : scenario === "overload" ? "overloaded" : option("fixture", "anthropicUsageLimit");
     const resume = scenario === "limit" && !flag("no-resume");
     if (resume) await updateSettings(cookie, { autoResumeLimitedThreads: true });
     const threadId = await threadOn(`${scenario} ${fixtureName} ${stamp}`);
     const resetAt = Date.now() + Number(option("reset-s", scenario === "key" ? "60" : "120")) * 1000;
-    // --live: no fault, the proxy's own answer (a stage deployed with a refused key).
+    // --live: no fault, the endpoint's own answer (an endpoint saved with a refused key).
     if (!flag("live")) report.fault = (await admin("POST", `/_t3flare/agents/proxy-fault?thread=${threadId}`, { fixture: fixtureName, resetAt })).json;
     await sendMessage(cookie, threadId, "Reply with the single word: pong", MODEL);
     const failed = await waitFor(cookie, threadId, (p) => SETTLED.has(runsOf(p)[0]?.status ?? ""), 180_000);

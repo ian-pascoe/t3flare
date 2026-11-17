@@ -68,7 +68,7 @@ const assistantText = (projection: any, after: number) =>
     .join("\n");
 
 const cookie = await pair();
-// A new Environment has the provider off (onboarding turns it on), as scripts/models.ts does.
+// A new Environment has the provider off (onboarding turns it on).
 await wsCall(cookie, "server.updateSettings", {
   patch: {},
   providerInstanceMutation: { operation: "upsert", instanceId: "piDurable", instance: { driver: "piDurable", enabled: true } },

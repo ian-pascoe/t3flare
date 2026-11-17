@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off globalTimers:off nodeBuiltinImport:off
 // SPI-1061 (plan §8, D16, D21): the stage stand-in for the owner's laptop. A stock `t3` from npm at an exact version, in
 // a Docker container on this machine (never as the owner's user, never against his home), with t3's Pi provider on the
-// model proxy, reachable from the cloud over the stage's named Cloudflare Tunnel (`T3FLARE_STANDIN=1` on deploy; its
+// stage's Model endpoint (`laptopAgent.ts`; the model proxy until the hard cut, SPI-1176), reachable from the cloud over the stage's named Cloudflare Tunnel (`T3FLARE_STANDIN=1` on deploy; its
 // token in `.alchemy/stages/<stage>.standin.json`, read here and handed to the container's environment, never printed).
 // The harness reaches the same t3 at a loopback port, so it can watch while the connector is stopped. From step 3's
 // `lib/laptop.ts`.
@@ -11,10 +11,12 @@ import * as path from "node:path";
 
 import { standinFile } from "../../stage-files.ts";
 import { clientAt, sleep } from "./client.ts";
+import { LAPTOP_KEY_VAR, laptopModels } from "./laptopAgent.ts";
 
 export const STANDIN_T3_VERSION = "0.1.10-nightly.20261112.4606";
 export const STANDIN_PI_VERSION = "1.5.2";
-export const STANDIN_MODEL = { instanceId: "pi", model: "anthropic/claude-haiku-5-5" };
+/** The stand-in's model: its Pi provider's, the stage's Model endpoint's first model (`laptopAgent.ts`). */
+export const standinModel = () => ({ instanceId: "pi", model: laptopModels().model });
 
 const docker = (args: ReadonlyArray<string>, options: { readonly env?: Record<string, string>; readonly input?: string; readonly allowFailure?: boolean; readonly timeoutMs?: number } = {}) => {
   const result = spawnSync("docker", args, {
@@ -75,18 +77,16 @@ export class Standin {
 
   /** Starts a fresh container (any earlier one of this stage is removed), its t3 and its connector. */
   async start(): Promise<{ readonly environmentId: string; readonly label: string }> {
-    if (!process.env.MODEL_PROXY_URL || !process.env.MODEL_PROXY_API_KEY) throw new Error("the stand-in's agent needs MODEL_PROXY_URL and MODEL_PROXY_API_KEY (stage.ts run)");
+    const laptop = laptopModels();
     if (docker(["image", "inspect", this.image], { allowFailure: true }).status !== 0) this.build();
     docker(["rm", "-f", this.name], { allowFailure: true });
     // Values by name only (`-e NAME`), so no secret is on a command line.
     docker(
-      ["run", "-d", "--name", this.name, "--hostname", "standin-laptop", "--memory", "2g", "-p", `127.0.0.1:${this.local.port}:3774`, "-e", "MODEL_PROXY_API_KEY", "-e", "TUNNEL_TOKEN", this.image],
-      { env: { TUNNEL_TOKEN: this.#tunnel.token } },
+      ["run", "-d", "--name", this.name, "--hostname", "standin-laptop", "--memory", "2g", "-p", `127.0.0.1:${this.local.port}:3774`, "-e", LAPTOP_KEY_VAR, "-e", "TUNNEL_TOKEN", this.image],
+      { env: { TUNNEL_TOKEN: this.#tunnel.token, [LAPTOP_KEY_VAR]: laptop.key } },
     );
-    // t3's Pi provider on the model proxy: the key is named, never written (`$MODEL_PROXY_API_KEY`).
-    docker(["exec", "-i", this.name, "sh", "-c", "mkdir -p /data/pi-agent && cat > /data/pi-agent/models.json"], {
-      input: JSON.stringify({ providers: { anthropic: { baseUrl: process.env.MODEL_PROXY_URL, apiKey: "$MODEL_PROXY_API_KEY" } } }),
-    });
+    // t3's Pi provider on the stage's Model endpoint: the key is named, never written (`laptopModels`).
+    docker(["exec", "-i", this.name, "sh", "-c", "mkdir -p /data/pi-agent && cat > /data/pi-agent/models.json"], { input: laptop.modelsJson });
     const started = Date.now();
     while (Date.now() - started < 180_000) {
       const descriptor = await this.descriptor().catch(() => undefined);

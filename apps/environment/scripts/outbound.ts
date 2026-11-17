@@ -26,7 +26,7 @@ import { MODEL, pendingOf, projection, replyOf, say, settled, t3Calls, until } f
 import { writeEvidence } from "./lib/evidence.ts";
 import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
 import { findSession } from "./lib/peerAcceptance.ts";
-import { Standin, STANDIN_MODEL } from "./lib/standin.ts";
+import { Standin, standinModel } from "./lib/standin.ts";
 import { tailing } from "./lib/tail.ts";
 
 const arg = (name: string, fallback: string) => {
@@ -175,7 +175,7 @@ const delegateArgs = (task: string, extra: Record<string, unknown> = {}) =>
   JSON.stringify({
     task,
     title: `outbound ${stamp}`,
-    target: { environmentId: sId, projectId: state.standinProjectId, providerInstanceId: STANDIN_MODEL.instanceId, model: STANDIN_MODEL.model },
+    target: { environmentId: sId, projectId: state.standinProjectId, providerInstanceId: standinModel().instanceId, model: standinModel().model },
     mode: "async",
     ...extra,
   });
@@ -237,7 +237,7 @@ if (phase === "link") {
     projectId: state.standinProjectId,
     title: `wait piece ${stamp}`,
     message: "Run the bash command `echo waited` and reply with its output.",
-    modelSelection: STANDIN_MODEL,
+    modelSelection: standinModel(),
     clientRequestId: `wait-${stamp}`,
   });
   const waitThread = launched.json?.threadId as string | undefined;

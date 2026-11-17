@@ -1,6 +1,6 @@
 // @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
-// SPI-1175's evidence on its stage, deployed with `stage.ts deploy p1175 --no-model-proxy` and passed by `acceptance`:
-// what stage.ts set up through the panel's API, and that the stage has no Model proxy.
+// SPI-1175's evidence on its stage, deployed with `stage.ts deploy p1175` (with `--no-model-proxy` before the hard cut,
+// SPI-1176) and passed by `acceptance`: what stage.ts set up through the panel's API, and that the stage has no Model proxy.
 //
 //   node scripts/stage.ts run p1175 p1175 [--out ../../docs/steps/spi-1175/p1175.json]
 //
@@ -8,8 +8,8 @@
 //    by the service token, with no key.
 // 2. The text-generation setting names the endpoint's small model with no pick by anyone, and a thread's title is
 //    generated on it.
-// 3. The stage has no Model proxy: text generation on the proxy's model (`anthropic/…`) answers that the Model proxy is not
-//    configured. (Picking it is the owner's pick: run this last; the stage is destroyed after.)
+// 3. The stage has no Model proxy: text generation on the retired proxy's model (`anthropic/…`) runs on the default model
+//    (SPI-1176's fallback; before it, it answered that the Model proxy is not configured). Run this last.
 // No key is printed: every answer kept is scanned for the keys first.
 import * as fs from "node:fs";
 
@@ -23,9 +23,9 @@ const option = (name: string) => {
   return index === -1 ? undefined : process.argv[index + 1];
 };
 const out = option("out");
-const spec = modelEndpointSpec(process.env, { derive: true });
+const spec = modelEndpointSpec(process.env);
 if (!spec.ok) throw new Error(spec.reason);
-const secrets = [...secretsOf(spec.spec), process.env.MODEL_PROXY_API_KEY].filter((value): value is string => value !== undefined && value.length >= MIN_SECRET_LENGTH);
+const secrets = secretsOf(spec.spec).filter((value) => value.length >= MIN_SECRET_LENGTH);
 const failures: Array<string> = [];
 const report: Record<string, unknown> = { at: new Date().toISOString(), endpointFrom: spec.source };
 const check = (name: string, ok: boolean, detail?: unknown) => {
@@ -68,11 +68,11 @@ const title = await regenerateTitle(cookie, threadId);
 report.title = clean(title);
 check("a thread's title is generated on the endpoint's model", title.outcome === "renamed" && typeof title.title === "string" && title.title !== "New thread", title);
 
-// 3. No Model proxy: its model's text generation says so.
+// 3. No Model proxy: its model's text generation runs on the default model (SPI-1176).
 await updateSettings(cookie, { textGenerationModelSelection: { instanceId: "piDurable", model: "anthropic/claude-haiku-5-5" } });
 const proxyTitle = await regenerateTitle(cookie, threadId);
 report.proxyModel = clean(proxyTitle);
-check("the stage has no Model proxy", proxyTitle.outcome === "failed" && /model proxy is not configured/i.test(proxyTitle.message ?? ""), proxyTitle);
+check("the retired proxy's model falls back to the default model", proxyTitle.outcome === "renamed", proxyTitle);
 
 report.failures = failures;
 report.ok = failures.length === 0;

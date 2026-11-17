@@ -10,13 +10,9 @@ name: Deploy prod
 #   secrets.CLOUDFLARE_API_TOKEN   the account token `t3flare-ci-prod`
 #   vars.CLOUDFLARE_ACCOUNT_ID     the account the stages deploy to
 #   vars.T3FLARE_DOMAIN            prod's custom domain (unset on `bump`, which stays on workers.dev)
-#   vars.MODEL_PROXY_URL, secrets.MODEL_PROXY_API_KEY, secrets.T3FLARE_GITHUB_APP_ID, secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY
-#   secrets.COMMISSARY_CONTAINER_API_KEY   the CLI agents' own proxy key (step 4a, ADR-0016 A′)
+#   secrets.T3FLARE_GITHUB_APP_ID, secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY
 #   secrets.T3FLARE_MODEL_ENDPOINT   the Model endpoint stage.ts sets up through the panel's API after the deploy
 #     (SPI-1175): added when prod has no endpoint of its id, never changed once there. Unset: skipped, and the log says so.
-#   optional (parity G8, t3's Usage page and limit meters; unset: none): vars.COMMISSARY_MANAGEMENT_URL,
-#     vars.COMMISSARY_MANAGEMENT_ORG, vars.COMMISSARY_ACCESS_CLIENT_ID, secrets.COMMISSARY_MANAGEMENT_KEY,
-#     secrets.COMMISSARY_ACCESS_CLIENT_SECRET (docs/model-proxy.md, "Usage and limits")
 #   secrets.T3_BOOTSTRAP_TOKEN, secrets.T3FLARE_ADMIN_TOKEN   prod's own tokens, the same as the laptop's
 #     (apps/environment/.alchemy/stages/prod.env.json); stage.ts refuses to make new ones for prod in CI.
 # The Access service token's credentials come from alchemy's state on every deploy, so nothing else is stored.
@@ -59,7 +55,6 @@ jobs:
       T3FLARE_DOMAIN: ${{ vars.T3FLARE_DOMAIN }}
       # The Workspace sweep's real purge (SPI-974): `1` on prod once the owner turned it on.
       T3FLARE_SWEEP_PURGE: ${{ vars.T3FLARE_SWEEP_PURGE }}
-      MODEL_PROXY_URL: ${{ vars.MODEL_PROXY_URL }}
       NPM_CONFIG_WORKSPACE_DIR: ${{ github.workspace }}
     steps:
       # The submodule is fetched by hand, not by the action (see bump.yml).
@@ -86,16 +81,8 @@ jobs:
         run: node scripts/stage.ts deploy "$STAGE" --web
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          MODEL_PROXY_API_KEY: ${{ secrets.MODEL_PROXY_API_KEY }}
-          COMMISSARY_CONTAINER_API_KEY: ${{ secrets.COMMISSARY_CONTAINER_API_KEY }}
           # The Model endpoint (SPI-1175); unset until `ci:setup` sets it, and then skipped.
           T3FLARE_MODEL_ENDPOINT: ${{ secrets.T3FLARE_MODEL_ENDPOINT }}
-          # Optional (parity G8): Commissary's management API, for t3's Usage page and limit meters.
-          COMMISSARY_MANAGEMENT_URL: ${{ vars.COMMISSARY_MANAGEMENT_URL }}
-          COMMISSARY_MANAGEMENT_ORG: ${{ vars.COMMISSARY_MANAGEMENT_ORG }}
-          COMMISSARY_ACCESS_CLIENT_ID: ${{ vars.COMMISSARY_ACCESS_CLIENT_ID }}
-          COMMISSARY_MANAGEMENT_KEY: ${{ secrets.COMMISSARY_MANAGEMENT_KEY }}
-          COMMISSARY_ACCESS_CLIENT_SECRET: ${{ secrets.COMMISSARY_ACCESS_CLIENT_SECRET }}
           T3FLARE_GITHUB_APP_ID: ${{ secrets.T3FLARE_GITHUB_APP_ID }}
           T3FLARE_GITHUB_APP_PRIVATE_KEY: ${{ secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY }}
           # Unset on `bump`, whose tokens the job makes fresh.
@@ -108,8 +95,6 @@ jobs:
         # The same secrets as Deploy.
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          MODEL_PROXY_API_KEY: ${{ secrets.MODEL_PROXY_API_KEY }}
-          COMMISSARY_CONTAINER_API_KEY: ${{ secrets.COMMISSARY_CONTAINER_API_KEY }}
           T3FLARE_GITHUB_APP_ID: ${{ secrets.T3FLARE_GITHUB_APP_ID }}
           T3FLARE_GITHUB_APP_PRIVATE_KEY: ${{ secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY }}
           # Unset on `bump`, whose tokens the job makes fresh.

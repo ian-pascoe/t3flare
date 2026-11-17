@@ -109,7 +109,7 @@ if (wants("c")) {
 
 if (wants("d")) {
   const threadId = await thread("m2 d limit");
-  const fault = (await admin("POST", `/_t3flare/agents/proxy-fault?thread=${threadId}`, { fixture: "cooldown", resetAt: Date.now() + 120_000 })).json;
+  const fault = (await admin("POST", `/_t3flare/agents/proxy-fault?thread=${threadId}`, { fixture: "anthropicUsageLimit", resetAt: Date.now() + 120_000 })).json;
   await say(cookie, threadId, "Reply with the single word: pong");
   const done = await until(cookie, threadId, settled);
   const entries = await publishes(threadId);

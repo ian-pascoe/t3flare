@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off globalConsole:off globalFetch:off
-// Step 4a's acceptance (`acceptance.ts --codex` / `--pi`): on a fresh clone of the fixture, the key route refused with no
+// Step 4a's acceptance (`acceptance.ts --codex` / `--pi`): on a fresh clone of the fixture, the retired key route giving nothing with no
 // CLI alive; a CLI turn at approval-required that edits a file and runs `bash test.sh`, each asked and approved; the
 // Container stopped; a second turn that resumes the same native thread (the protocol trace, no handoff); the leak check
 // clean. The Workspace is removed afterwards.
@@ -61,7 +61,8 @@ export const cliAcceptance = async (cookie: string, cli: "codex" | "pi"): Promis
   await admin("POST", `/_t3flare/agents/workspace-stop?id=${workspace}`);
   const keyRoute = (await admin("POST", `/_t3flare/agents/workspace-call?id=${workspace}`, { exec: { script: "curl -s -o /dev/null -w '%{http_code}' http://computer.internal/t3flare/model-key?cli=x", timeoutMs: 180_000 } })).json?.result?.stdout;
   report.keyRouteWithoutCli = keyRoute;
-  check("the key route refuses with no CLI process", keyRoute === "403", keyRoute);
+  // SPI-1176: the Model proxy's key route is gone; computer's proxy answers its path as any unknown one.
+  check("the retired key route gives nothing", keyRoute !== "200", keyRoute);
   await admin("POST", `/_t3flare/agents/workspace-stop?id=${workspace}`);
   await admin("POST", `/_t3flare/agents/workspace-remove?id=${workspace}`);
   return { ok: failures.length === 0, failures, ...report };

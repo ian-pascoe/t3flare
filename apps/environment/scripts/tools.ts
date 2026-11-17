@@ -900,7 +900,7 @@ sed -n 's/^== \(GET\|POST\) \(.*\) \([0-9][0-9][0-9]\)$/\1 \2 \3/p' "$OUT" > /tm
 `;
 
 /** Environment bindings that are configuration, not credentials: in the Container or logs by design. */
-const NOT_SECRET = /^(MODEL_PROXY_URL|ALCHEMY_WORKER_NAME|ALCHEMY_CLOUDFLARE_ACCOUNT_ID|T3FLARE_ACCESS_AUD|T3FLARE_HARNESS_ACCESS_AUD|T3FLARE_HOST|T3FLARE_ACCESS_SERVICE_CLIENT_ID|T3FLARE_ACCESS_TEAM_DOMAIN|T3FLARE_HARNESS_HOST|T3FLARE_OWNER_EMAIL)$/;
+const NOT_SECRET = /^(ALCHEMY_WORKER_NAME|ALCHEMY_CLOUDFLARE_ACCOUNT_ID|T3FLARE_ACCESS_AUD|T3FLARE_HARNESS_ACCESS_AUD|T3FLARE_HOST|T3FLARE_ACCESS_SERVICE_CLIENT_ID|T3FLARE_ACCESS_TEAM_DOMAIN|T3FLARE_HARNESS_HOST|T3FLARE_OWNER_EMAIL)$/;
 
 const keyExfil = async () => {
   await enableCli(cookie, "codex", "codex");
@@ -952,7 +952,7 @@ const keyExfil = async () => {
       !["GET", "POST"].some((method) => codeOf(method, "/t3flare/model-key", "stolen") === "200"),
   });
   const leak = (await admin("POST", "/_t3flare/check/peer-leak", { workspace, threads: [threads.durableThread], text })).json as any;
-  const wanted = ["MODEL_PROXY_API_KEY", "mcp-header:fixture", "mcp-oauth-access:fixoauth", "mcp-oauth-access:executor"];
+  const wanted = ["mcp-header:fixture", "mcp-oauth-access:fixoauth", "mcp-oauth-access:executor"];
   cases.push({
     name: "the leak check: no MCP credential (tools key, header values, OAuth tokens and client secrets) nor any other Environment secret in the Container (hunt outputs included), the Session's state and pushes, or the Workers Logs",
     checked: leak?.checked,

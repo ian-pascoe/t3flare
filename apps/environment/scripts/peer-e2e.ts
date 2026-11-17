@@ -25,7 +25,7 @@ import { pendingOf, projection as cloudProjection } from "./lib/cloudThread.ts";
 import { writeEvidence } from "./lib/evidence.ts";
 import { ensureCloudFixtureProject, FIXTURE } from "./lib/fixtureProject.ts";
 import { Laptop } from "./lib/laptop.ts";
-import { LAPTOP_MODEL, laptopPiEnvironment, piInstanceMutation } from "./lib/laptopAgent.ts";
+import { laptopModel, laptopPiEnvironment, piInstanceMutation } from "./lib/laptopAgent.ts";
 import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
 
 const arg = (name: string, fallback: string) => {
@@ -103,7 +103,7 @@ try {
     threadId: laptopThread,
     projectId: laptopProject,
     title: `e2e ${variant} ${stamp}`,
-    modelSelection: LAPTOP_MODEL,
+    modelSelection: laptopModel(),
     runtimeMode: "full-access",
     interactionMode: "default",
     branch: null,
@@ -120,7 +120,7 @@ try {
       `The task, verbatim: ${JSON.stringify(task)}`,
       "Do not do the task yourself. After delegating, end your turn. When the task's result arrives, reply with the result verbatim.",
     ].join("\n"),
-    LAPTOP_MODEL as never,
+    laptopModel() as never,
   );
   log("laptop thread", laptopThread);
 
@@ -191,7 +191,7 @@ try {
     events.push({ approved: (await approveCloud())?.kind ?? null });
     await untilCloud((q) => itemsOf(q).some((item: any) => item.type === "command_execution" && item.status === "running"), 120_000);
     await sleep(3000);
-    await lp.sendMessage(laptopCookie, laptopThread, "Cancel the delegated task now with task_cancel, then reply CANCELLED.", LAPTOP_MODEL as never);
+    await lp.sendMessage(laptopCookie, laptopThread, "Cancel the delegated task now with task_cancel, then reply CANCELLED.", laptopModel() as never);
     events.push("asked the laptop agent to task_cancel");
   } else if (variant === "cloud-restart") {
     events.push({ approved: (await approveCloud())?.kind ?? null });

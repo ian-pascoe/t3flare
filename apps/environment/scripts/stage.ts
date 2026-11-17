@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off nodeBuiltinImport:off
 // Deploys, tests and destroys a stage of the environment Worker, with secrets made for that stage alone.
 //
-//   node scripts/stage.ts deploy <stage> [--web] [--no-model-proxy]
+//   node scripts/stage.ts deploy <stage> [--web]
 //                                                      build (and the web client with --web or when missing), alchemy deploy,
 //                                                      then the stage's Model endpoint through the panel's API (SPI-1175)
 //   node scripts/stage.ts run <stage> <script> [args]  run scripts/<script>.ts against the stage, with its secrets
@@ -51,12 +51,12 @@ const stageSecrets = (): Record<string, string> => {
   if (fs.existsSync(secretsFile)) {
     const kept = JSON.parse(fs.readFileSync(secretsFile, "utf8")) as Record<string, string>;
     // The tools step's fixture MCP server's bearer (test stages): made once, kept with the stage's tokens, destroyed with
-    // them. The owner pastes it into Commissary's panel for the `fixture` toolkit, from this file.
+    // them. The owner pastes it into the fixture MCP server's settings for the `fixture` toolkit, from this file.
     if (stage !== "prod" && kept.T3FLARE_FIXTURE_BEARER === undefined) {
       kept.T3FLARE_FIXTURE_BEARER = token();
       fs.writeFileSync(secretsFile, JSON.stringify(kept), { mode: 0o600 });
     }
-    // Parity batch 2's probe Worker's key (test stages): the stand-in Commissary's credentials and the log's bearer.
+    // Parity batch 2's probe Worker's key (test stages): its stand-ins' credentials and the log's bearer.
     if (stage !== "prod" && kept.T3FLARE_PROBE_KEY === undefined) {
       kept.T3FLARE_PROBE_KEY = token();
       fs.writeFileSync(secretsFile, JSON.stringify(kept), { mode: 0o600 });
@@ -75,8 +75,8 @@ const stageSecrets = (): Record<string, string> => {
 };
 
 /**
- * The deploy-wide secrets (step 2a): the GitHub App, the CLI agents' key, the Model proxy and Commissary's management API
- * (lib/deployPlan.ts lists them), and `extra`, from the environment (CI) or else ~/.config/t3flare/dev.env (0600,
+ * The deploy-wide secrets (step 2a): the GitHub App (lib/deployPlan.ts lists them), and `extra`, from the environment
+ * (CI) or else ~/.config/t3flare/dev.env (0600,
  * outside the repo), which bash reads as it is written (multi-line values included). Shell variables win. Never printed.
  */
 const deploySecrets = (extra: ReadonlyArray<string> = []): Record<string, string> => {
@@ -158,9 +158,8 @@ switch (command) {
       console.error("t3flare: t3code/node_modules/.pnpm exists (a pnpm command ran inside t3code/); remove t3code/node_modules and run `pnpm install`");
       process.exit(2);
     }
-    // SPI-1175: what is bound and set up, decided before anything is built (lib/deployPlan.ts): the Model proxy is optional
-    // on a throwaway stage (`--no-model-proxy` drops it, blanked so a shell's own cannot be bound) and kept on prod; the
-    // stage's Model endpoint comes from T3FLARE_MODEL_ENDPOINT, else (a laptop) Commissary's, else (CI) a logged skip.
+    // SPI-1175: what is bound and set up, decided before anything is built (lib/deployPlan.ts): the stage's Model endpoint
+    // comes from T3FLARE_MODEL_ENDPOINT, else a logged skip (the stage then starts in the setup state, SPI-1176).
     const plan = deployPlan({ stage, args: rest, read: deploySecrets([MODEL_ENDPOINT_VAR]), env: process.env });
     if (!plan.ok) {
       console.error(`t3flare: ${plan.error}`);

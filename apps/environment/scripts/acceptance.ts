@@ -5,9 +5,9 @@
 //   T3FLARE_ACCESS_CLIENT_ID=… T3FLARE_ACCESS_CLIENT_SECRET=… node scripts/acceptance.ts [--threads 12] [--runs 4] [--out file.json]
 //
 // 1. The admin guard: refused without the admin token, admitted with Access (service token) plus the token.
-// 1b. The Model endpoint (SPI-1175): set up through the Harness panel's API from T3FLARE_MODEL_ENDPOINT (or, off CI, the
-//     Model proxy's settings: Commissary); the text-generation setting then names its default, and the real turn runs on
-//     its small model. Without a setting (CI before `ci:setup`), skipped and said so, and the real turn uses the proxy.
+// 1b. The Model endpoint (SPI-1175): set up through the Harness panel's API from T3FLARE_MODEL_ENDPOINT; the
+//     text-generation setting then names its default, and the real turn runs on its small model. Without a setting,
+//     skipped and said so: the stage has no model (SPI-1176), so the real turn and the CLI turns fail.
 // 2. Auth: the descriptor reports `remote-reachable`; the root `/.well-known/oauth-authorization-server` and
 //    `oauth-protected-resource` documents are t3's, not Access's (ADR-0036); the bootstrap token is refused until pairing
 //    is armed, pairs while armed (what the web client's /pair#token=… does), and is refused again once disarmed.
@@ -22,7 +22,7 @@
 //    and the sweep's dry run (`lib/terminalWorktree.ts`).
 // 8. With `--peer` (step 3): a Peer link from the harness, the forwarded launch and the link fence (`lib/peerAcceptance.ts`).
 // 8b. With `--codex` and/or `--pi` (step 4a): a CLI agent's turn with approvals, resumed after its Container stopped,
-//     the leak check and the key route (`lib/cliAcceptance.ts`).
+//     and the leak check (`lib/cliAcceptance.ts`).
 // 9. With `--claude` and/or `--opencode` (step 4b): a turn with an approved edit and command, a plan turn that edits
 //    nothing, and the leak check, on Claude Code or OpenCode in a Workspace's Container (`lib/acpAcceptance.ts`).
 import { WsRpcGroup, WS_METHODS, ORCHESTRATION_V2_WS_METHODS } from "@t3tools/contracts";
@@ -330,7 +330,7 @@ check("t3 boots twice in one isolate", reboot.json?.bothBootsServed === true && 
 // 6. A real turn (step 2a): clone the fixture, edit and `bash test.sh` with approvals, the checkpoint; `--push` adds a PR.
 if (process.argv.includes("--real-turn")) {
   const { realTurn } = await import("./lib/realTurn.ts");
-  // On the Model endpoint's small model when there is one (T3FLARE_REAL_TURN_MODEL wins), else the proxy's.
+  // On the Model endpoint's small model (T3FLARE_REAL_TURN_MODEL wins), else the default model (SPI-1176's fallback).
   const model = process.env.T3FLARE_REAL_TURN_MODEL ?? endpointModel;
   const real = await realTurn(cookie, { push: process.argv.includes("--push"), ...(model === undefined ? {} : { model }) });
   report.realTurn = real;

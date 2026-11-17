@@ -262,7 +262,7 @@ switch (scenario) {
       check(`${cli}: the profile's names are there`, ["HOME", "LANG", "T3FLARE_EXEC"].every((name) => names.includes(name)), names);
       // Names only: Claude's managed env pins its provider and auth variables to "" (claude-agent-acp applies the managed
       // env to its own process), so those names are present, empty.
-      const keyish = names.filter((name) => /API_KEY$|AUTH_TOKEN|OAUTH|GITHUB_TOKEN|GH_TOKEN|MODEL_PROXY|COMMISSARY|BOOTSTRAP|ADMIN_TOKEN/.test(name) && !CLAUDE_PINNED_EMPTY.includes(name));
+      const keyish = names.filter((name) => /API_KEY$|AUTH_TOKEN|OAUTH|GITHUB_TOKEN|GH_TOKEN|MODEL_HANDLE|BOOTSTRAP|ADMIN_TOKEN/.test(name) && !CLAUDE_PINNED_EMPTY.includes(name));
       check(`${cli}: no key or token by name (beyond the managed env's empty pins)`, keyish.length === 0, keyish);
       check(`${cli}: the leak scan finds nothing`, (scan?.do ?? []).length === 0 && (scan?.container?.hits ?? []).length === 0, scan);
       rows[cli] = { processes: processes.map((process) => ({ command: process.command, envNames: process.envNames, canaryHits: process.canaryHits })), names, scan };

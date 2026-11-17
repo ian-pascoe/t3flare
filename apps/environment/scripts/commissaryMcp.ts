@@ -1,8 +1,9 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
 // SPI-1160's stage evidence: Commissary's MCP endpoint added by hand as an ordinary direct server, signed in with an
 // `x-api-key` header, through the Harness panel's admin API; then a Durable agent and a Codex agent each run a write
-// (with its card) and a read through it. The key is the stage's Model proxy key, which `stage.ts run` passes in from
-// ~/.config/t3flare/dev.env: it goes into the add request and nowhere else, and no evidence file is written that holds it.
+// (with its card) and a read through it. Commissary's client API host and an API key with its `sandbox` toolkit come from
+// the shell (`T3FLARE_MCP_API_URL`, `T3FLARE_MCP_KEY`, exported inline; until the hard cut, SPI-1176, the Model proxy's
+// settings): the key goes into the add request and nowhere else, and no evidence file is written that holds it.
 //
 //   node scripts/stage.ts run p1160 commissaryMcp add       add (or re-add) the server, test it   (add.json)
 //   node scripts/stage.ts run p1160 commissaryMcp durable   a Durable agent's write and read      (durable.json)
@@ -18,15 +19,15 @@ import { admin, dispatch, itemsOf, pair, projectionOf, runsOf, SETTLED, sendMess
 
 const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/spi-1160");
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
-const KEY = process.env.MODEL_PROXY_API_KEY ?? "";
-const API = (process.env.MODEL_PROXY_URL ?? "").replace(/\/+$/, "");
+const KEY = process.env.T3FLARE_MCP_KEY ?? "";
+const API = (process.env.T3FLARE_MCP_API_URL ?? "").replace(/\/+$/, "");
 const URL_ = `${API}/mcp?toolkits=sandbox`;
 const SERVER = "commissary";
-const MODEL = { instanceId: "piDurable", model: process.env.T3FLARE_TOOLS_MODEL ?? "anthropic/claude-sonnet-5-5", options: [{ id: "thinking", value: "low" }] };
+const MODEL = { instanceId: "piDurable", model: process.env.T3FLARE_TOOLS_MODEL ?? "default", options: [{ id: "thinking", value: "low" }] };
 const accessHeaders = { "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID ?? "", "cf-access-client-secret": process.env.T3FLARE_ACCESS_CLIENT_SECRET ?? "" };
 
 if (KEY === "" || API === "" || HARNESS === "") {
-  console.error("commissaryMcp: run through `node scripts/stage.ts run <stage> commissaryMcp …` (MODEL_PROXY_URL, MODEL_PROXY_API_KEY, the stage's URL)");
+  console.error("commissaryMcp: run through `node scripts/stage.ts run <stage> commissaryMcp …` (T3FLARE_MCP_API_URL and T3FLARE_MCP_KEY exported, the stage's URL)");
   process.exit(2);
 }
 

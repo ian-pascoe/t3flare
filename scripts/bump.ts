@@ -10,8 +10,8 @@
 //  3. Regenerate the workspace and the lock from t3's pnpm-workspace.yaml and pnpm-lock.yaml (scripts/relock.ts), and
 //     check that t3's importers install exactly what t3's lock installs, with a single `effect` (ADR-0030).
 //  4. `pnpm run check`, the whole of it: every Patch applies (`git apply --check`), typecheck, lint, tests.
-//  5. `test:docker` (step 4a): the pinned Codex and pi in Docker, launched by our profiles and guard against the new
-//     t3, on the model proxy.
+//  5. `test:docker` (step 4a): the pinned CLIs in Docker, launched by our profiles against the new t3, on a stand-in
+//     model relay (the real-model turns are the acceptance test's, on the stage's Model endpoint).
 //  6. Build the Worker and the web client, deploy the `bump` stage, and run the acceptance test against it
 //     (scripts/acceptance.ts: pairing, a /ws client, turn-item fixtures and t3's heavy queries, and since step 2a
 //     `--real-turn`: a Durable agent turn on a fresh clone of the fixture, both Workers and the Container image;

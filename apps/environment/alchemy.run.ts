@@ -44,7 +44,6 @@ import { MCP_WORKER_COMPATIBILITY } from "../mcp-worker/src/engine/compatibility
 import { COMPATIBILITY } from "./build.ts";
 import { credentialsFile, standinFile } from "./stage-files.ts";
 import { ownerEndpointOn, SETTINGS_MCP_PATH, SETTINGS_OAUTH_GRANT, SETTINGS_OAUTH_REDIRECT_URIS, settingsMcpUrl } from "./src/settings/endpointLayout.ts";
-import { principalOfApiKey } from "./src/usage/commissary.ts";
 
 const here = import.meta.dirname;
 
@@ -53,15 +52,6 @@ const ACCESS_TEAM_DOMAIN = "spirit-led-software.cloudflareaccess.com";
 const OWNER_EMAIL = "ian.g.pascoe@gmail.com";
 /** The account's workers.dev subdomain: the Worker's host has to be known to name the Access destination. */
 const WORKERS_DEV_SUBDOMAIN = "ian-g-pascoe";
-
-/** A plain-text binding of `name` when it is set (and not empty), else none. */
-const optionalVar = (name: string) =>
-  Config.String(name).pipe(
-    Config.withDefault(""),
-    Effect.map((value): Record<string, string> => (value === "" ? {} : { [name]: value })),
-  );
-/** A secret binding of `name` when it is set in the deploy's environment, else none. */
-const optionalSecret = (name: string) => (process.env[name] ? { [name]: Config.Redacted(name) } : {});
 
 /**
  * The routes of t3's server (t3code, pinned) that take a credential from a caller who has no session yet, and so are
@@ -195,15 +185,9 @@ export default Alchemy.Stack(
       } as never)
       : undefined;
 
-    // The model proxy (ADR-0012) and the GitHub App (ADR-0013), from ~/.config/t3flare/dev.env or CI's environment.
-    // SPI-1175: optional until the hard cut (SPI-1176); a stage without it reaches models through its Model endpoints only,
-    // and both Workers then have neither setting. Empty counts as unset (stage.ts passes both empty for a stage without the
-    // proxy, so a shell's own cannot be bound). With the URL, the key is required.
-    const modelProxyUrl = yield* Config.String("MODEL_PROXY_URL").pipe(Config.withDefault(""));
-    const modelProxy = modelProxyUrl === "" ? {} : { MODEL_PROXY_URL: modelProxyUrl, MODEL_PROXY_API_KEY: Config.Redacted("MODEL_PROXY_API_KEY") };
-    // Step 4a (ADR-0016, A′): the CLI agents' own proxy key, answered by the Workspace DO's key route only while a CLI
-    // process lives there. Never the Workers' MODEL_PROXY_API_KEY; bound to the agents Worker alone.
-    const containerModelKey = Config.Redacted("COMMISSARY_CONTAINER_API_KEY");
+    // Models are the owner's Model endpoints (ADR-0034), set in the Harness panel; no Worker holds a model setting (the
+    // Model proxy's MODEL_PROXY_* and COMMISSARY_* went at the hard cut, SPI-1176). The GitHub App (ADR-0013) comes from
+    // ~/.config/t3flare/dev.env or CI's environment.
     // SPI-1162: the stage's credentials key, under which the Environment seals the Model endpoints' API keys. 256 random
     // bits made once per stage on its first deploy after this, kept in the stage's alchemy state (Cloudflare's, so CI and
     // the laptop share it), and gone with the stage: prod gets its own at its next deploy, with nothing for the owner to
@@ -255,8 +239,8 @@ export default Alchemy.Stack(
     }
 
     // Parity batch 2: a test stage's probe Worker (scripts/pbatch2/probe.ts), made when the stage asks (`T3FLARE_PROBE=1`),
-    // never for prod: a stand-in for Commissary's management API and an OTLP receiver. The stage's Environment is pointed
-    // at its management stand-in in place of Commissary's (below); the harness points t3's OTLP settings at it.
+    // never for prod: an OTLP receiver (and, until the hard cut, SPI-1176, a stand-in for Commissary's management API).
+    // The harness points t3's OTLP settings at it.
     const probe = stage !== "prod" && (yield* Config.String("T3FLARE_PROBE").pipe(Config.withDefault(""))) === "1";
     if (probe) {
       yield* Cloudflare.Worker("Probe", {
@@ -270,24 +254,6 @@ export default Alchemy.Stack(
         },
       } as never);
     }
-    // Parity G8: Commissary's management API for t3's Usage page and limit meters, the Environment Worker's alone and
-    // optional (unset: no meters, no usage, as before). The principal of the Containers' key is not secret: its key id.
-    const containerPrincipal = principalOfApiKey(yield* Config.String("COMMISSARY_CONTAINER_API_KEY").pipe(Config.withDefault("")));
-    const commissaryManagement = probe
-      ? {
-          COMMISSARY_MANAGEMENT_URL: `https://${probeName}.${WORKERS_DEV_SUBDOMAIN}.workers.dev`,
-          COMMISSARY_MANAGEMENT_KEY: Config.Redacted("T3FLARE_PROBE_KEY"),
-          COMMISSARY_ACCESS_CLIENT_ID: "probe-client.access",
-          COMMISSARY_ACCESS_CLIENT_SECRET: Config.Redacted("T3FLARE_PROBE_KEY"),
-        }
-      : {
-          ...(yield* optionalVar("COMMISSARY_MANAGEMENT_URL")),
-          ...(yield* optionalVar("COMMISSARY_MANAGEMENT_ORG")),
-          ...(yield* optionalVar("COMMISSARY_ACCESS_CLIENT_ID")),
-          ...optionalSecret("COMMISSARY_MANAGEMENT_KEY"),
-          ...optionalSecret("COMMISSARY_ACCESS_CLIENT_SECRET"),
-        };
-
     const agents = yield* Cloudflare.Worker("Agents", {
       name: agentsName,
       main: path.join(here, "../agents/dist/worker/worker.js"),
@@ -305,9 +271,7 @@ export default Alchemy.Stack(
               CODEMODE_SANDBOX: Cloudflare.DurableObject("CodemodeSandbox", { className: "CodemodeSandbox", scriptName: codemodeName }),
             }),
         LOADER: Cloudflare.WorkerLoader(),
-        ...modelProxy,
-        COMMISSARY_CONTAINER_API_KEY: containerModelKey,
-        // The model proxy fault route (step 2a part 2) answers on test stages only.
+        // The model fault route (step 2a part 2) answers on test stages only.
         ...(stage === "prod" ? {} : { T3FLARE_FAULTS: "1" }),
         ...(turnDeadlineMs === "" ? {} : { T3FLARE_TURN_DEADLINE_MS: turnDeadlineMs }),
         ...(terminalIdleMs === "" ? {} : { T3FLARE_TERMINAL_IDLE_MS: terminalIdleMs }),
@@ -359,9 +323,6 @@ export default Alchemy.Stack(
             }),
         T3FLARE_GITHUB_APP_ID: Config.String("T3FLARE_GITHUB_APP_ID"),
         T3FLARE_GITHUB_APP_PRIVATE_KEY: Config.Redacted("T3FLARE_GITHUB_APP_PRIVATE_KEY"),
-        ...modelProxy,
-        ...commissaryManagement,
-        ...(containerPrincipal === undefined ? {} : { COMMISSARY_USAGE_PRINCIPALS: containerPrincipal }),
         ...(idleAfterMs === "" ? {} : { T3FLARE_IDLE_AFTER_MS: idleAfterMs }),
         // Step 2b (review F3): the Workspace sweep purges on test stages; prod's reports what it would do until the owner
         // sets T3FLARE_SWEEP_PURGE=1 for it (the `prod` environment's variable, passed by deploy-prod.yml; on 2026-11-12, SPI-974).

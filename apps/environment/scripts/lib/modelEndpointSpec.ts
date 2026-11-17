@@ -8,9 +8,9 @@
 // Without `models` the endpoint's own list is read, keeping the ids `match` (a regular expression) matches when given.
 // The panel validates the rest as it does the owner's form.
 //
-// Until the hard cut (SPI-1176), a laptop without it derives a Commissary endpoint from the Model proxy's settings: the
-// proxy's URL and key, its Claude models. CI derives nothing (`derive: false`): it has the secret or skips the setup.
-// `infra/github.ts` (`ci:setup`) derives the secret the same way. No dependency: both read this file.
+// Without it there is nothing to set up: a deploy skips the setup and says so (a stage then starts in the setup state,
+// its providers needing an endpoint). Until the hard cut (SPI-1176) a laptop derived a Commissary endpoint from the Model
+// proxy's settings. `infra/github.ts` (`ci:setup`) reads the same setting. No dependency: both read this file.
 //
 // No message here repeats the value: it holds a key. In CI each of its secrets is masked by value (`maskCommands`, run by
 // `mask-endpoint.ts` as the workflows' first step), because GitHub masks only the whole JSON string.
@@ -37,23 +37,12 @@ export interface ModelEndpointSpec {
 }
 
 export type ModelEndpointSpecResult =
-  | { readonly ok: true; readonly spec: ModelEndpointSpec; readonly source: typeof MODEL_ENDPOINT_VAR | "MODEL_PROXY_URL" }
+  | { readonly ok: true; readonly spec: ModelEndpointSpec; readonly source: typeof MODEL_ENDPOINT_VAR }
   /** `invalid`: the setting is there but unusable (a failure); otherwise there is nothing to set up (a skip). */
   | { readonly ok: false; readonly invalid: boolean; readonly reason: string };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const isText = (value: unknown): value is string => typeof value === "string" && value.trim() !== "";
-
-/** The Commissary endpoint the Model proxy's settings describe (SPI-1162's evidence endpoint): its Claude models. */
-export const commissaryEndpoint = (url: string, apiKey: string): ModelEndpointSpec => ({
-  id: "commissary",
-  label: "Commissary",
-  api: "anthropic-messages",
-  baseUrl: url.replace(/\/+$/, ""),
-  apiKey,
-  headers: {},
-  match: "^claude-",
-});
 
 const invalid = (why: string): ModelEndpointSpecResult => ({ ok: false, invalid: true, reason: `${MODEL_ENDPOINT_VAR} ${why}` });
 
@@ -100,23 +89,15 @@ const parse = (text: string): ModelEndpointSpecResult => {
 /** The value of `T3FLARE_MODEL_ENDPOINT` that describes `spec` (what `ci:setup` stores as the secret). */
 export const modelEndpointSecret = (spec: ModelEndpointSpec): string => JSON.stringify(spec);
 
-/**
- * The endpoint to set up from `env`: `T3FLARE_MODEL_ENDPOINT` when set; else, with `derive`, Commissary from the Model
- * proxy's settings; else nothing, with the reason.
- */
-export const modelEndpointSpec = (env: Readonly<Record<string, string | undefined>>, options: { readonly derive: boolean }): ModelEndpointSpecResult => {
+/** The endpoint to set up from `env`: `T3FLARE_MODEL_ENDPOINT` when set, else nothing, with the reason. */
+export const modelEndpointSpec = (env: Readonly<Record<string, string | undefined>>): ModelEndpointSpecResult => {
   const given = env[MODEL_ENDPOINT_VAR];
   if (given !== undefined && given.trim() !== "") return parse(given);
-  if (!options.derive) return { ok: false, invalid: false, reason: `${MODEL_ENDPOINT_VAR} is not set` };
-  const url = env.MODEL_PROXY_URL;
-  const key = env.MODEL_PROXY_API_KEY;
-  if (isText(url) && isText(key)) return { ok: true, source: "MODEL_PROXY_URL", spec: commissaryEndpoint(url, key) };
-  return { ok: false, invalid: false, reason: `neither ${MODEL_ENDPOINT_VAR} nor MODEL_PROXY_URL and MODEL_PROXY_API_KEY are set` };
+  return { ok: false, invalid: false, reason: `${MODEL_ENDPOINT_VAR} is not set` };
 };
 
-/** The stages' rule (stage.ts and acceptance.ts): CI derives nothing, a laptop derives Commissary's from the proxy. */
-export const stageEndpointSpec = (env: Readonly<Record<string, string | undefined>>): ModelEndpointSpecResult =>
-  modelEndpointSpec(env, { derive: env.GITHUB_ACTIONS !== "true" });
+/** The stages' rule (stage.ts and acceptance.ts), the same on a laptop and in CI since the hard cut (SPI-1176). */
+export const stageEndpointSpec = (env: Readonly<Record<string, string | undefined>>): ModelEndpointSpecResult => modelEndpointSpec(env);
 
 /** Shorter values are not masked or scrubbed: no credential is that short, and masking one would garble every log line. */
 export const MIN_SECRET_LENGTH = 4;

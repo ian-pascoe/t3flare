@@ -11,7 +11,7 @@ import * as path from "node:path";
 import { itemsOf, runsOf, SETTLED, uuid, waitFor } from "./lib/client.ts";
 import { writeEvidence } from "./lib/evidence.ts";
 import { Laptop } from "./lib/laptop.ts";
-import { LAPTOP_MODEL, laptopPiEnvironment, piInstanceMutation } from "./lib/laptopAgent.ts";
+import { laptopModel, laptopPiEnvironment, piInstanceMutation } from "./lib/laptopAgent.ts";
 
 const at = process.argv.indexOf("--version");
 const version = at < 0 ? "0.1.9-nightly.20261111.4515" : process.argv[at + 1]!;
@@ -34,7 +34,7 @@ try {
     threadId,
     projectId,
     title: "r6",
-    modelSelection: LAPTOP_MODEL,
+    modelSelection: laptopModel(),
     runtimeMode: "full-access",
     interactionMode: "default",
     branch: null,
@@ -42,7 +42,7 @@ try {
     createdBy: "user",
     creationSource: "web",
   });
-  await laptop.client.sendMessage(cookie, threadId, "Call the T3 Code tool orchestrator_capabilities with no arguments, then reply with the word DONE and the number of providers it listed.", LAPTOP_MODEL as never);
+  await laptop.client.sendMessage(cookie, threadId, "Call the T3 Code tool orchestrator_capabilities with no arguments, then reply with the word DONE and the number of providers it listed.", laptopModel() as never);
   const { projection, ms } = await waitFor(cookie, threadId, (p) => runsOf(p).length > 0 && runsOf(p).every((run) => SETTLED.has(run.status)), 240_000, laptop.client);
   const items = itemsOf(projection);
   const tools = items.filter((item: any) => /tool|mcp/.test(String(item.type))).map((item: any) => ({ type: item.type, name: item.toolName ?? item.name ?? item.server ?? null, status: item.status }));
