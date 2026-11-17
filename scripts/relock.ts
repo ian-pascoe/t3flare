@@ -1,6 +1,8 @@
 // Regenerates the workspace and the lock from the pinned t3code (ADR-0030), the one way to change either:
 //
-//   node scripts/relock.ts        (pnpm run relock)
+//   node scripts/relock.ts              (pnpm run relock): keep t3flare's own resolutions, move what t3 moved
+//   node scripts/relock.ts --refresh    (pnpm run relock -- --refresh): re-resolve t3flare's own dependencies too, the one
+//                                       way to refresh them (ADR-0030's in-app updates refinement); a bump never does
 //
 //  1. gen-workspace.ts writes pnpm-workspace.yaml (t3's patches limited to what the current lock installs);
 //  2. seed-lock.ts seeds pnpm-lock.yaml from t3's lock;
@@ -25,6 +27,7 @@ const run = (command: string, args: Array<string>) => {
     process.exit(1);
   }
 };
+const refresh = process.argv.includes("--refresh");
 const workspaceFile = path.join(root, "pnpm-workspace.yaml");
 const read = () => (fs.existsSync(workspaceFile) ? fs.readFileSync(workspaceFile, "utf8") : "");
 
@@ -36,7 +39,7 @@ for (let round = 1; ; round++) {
     console.error("relock: pnpm-workspace.yaml still changes after two installs");
     process.exit(1);
   }
-  run(process.execPath, ["scripts/seed-lock.ts"]);
+  run(process.execPath, ["scripts/seed-lock.ts", ...(refresh ? ["--refresh"] : [])]);
   run("pnpm", ["install", "--no-frozen-lockfile", "--fix-lockfile"]);
 }
 run(process.execPath, ["scripts/verify-lock.ts"]);

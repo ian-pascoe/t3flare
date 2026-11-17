@@ -2,7 +2,8 @@
 // Run after gen-workspace.ts and before `pnpm install --no-frozen-lockfile`, which keeps every seeded resolution,
 // resolves our own packages, and prunes what nothing uses.
 //
-//   node scripts/seed-lock.ts
+//   node scripts/seed-lock.ts [--refresh]    --refresh: carry none of t3flare's own resolutions over (step 4), so pnpm
+//                                            resolves them again (relock.ts --refresh)
 //
 //  1. Take both documents of t3code/pnpm-lock.yaml: pnpm's env document (its own version, which ours follows, see
 //     gen-workspace.ts) as is, and the main one as below.
@@ -51,7 +52,7 @@ const patchedDependencies = Object.fromEntries(
 // t3 installs is left out (kept, ours would win pnpm's deduplication and move t3's packages, see 4.): pnpm resolves
 // that dependency again against the seeded t3 graph.
 const currentFile = path.join(root, "pnpm-lock.yaml");
-const current = fs.existsSync(currentFile) ? readLock(currentFile).main : undefined;
+const current = fs.existsSync(currentFile) && !process.argv.includes("--refresh") ? readLock(currentFile).main : undefined;
 const t3Names = new Set([...installed].map((key) => key.replace(/^(@?[^@]+)@.*$/, "$1")));
 const nameOf = (key: string) => key.replace(/^(@?[^@]+)@.*$/, "$1");
 if (current !== undefined) {

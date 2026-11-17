@@ -24,7 +24,7 @@ const failures: Array<string> = [];
 const PEER_DRIFT: ReadonlyArray<{ readonly t3: ReadonlyArray<string>; readonly ours: RegExp; readonly why: string }> = [
   {
     t3: ["@anthropic-ai/sdk@0.93.0"],
-    ours: /^(@anthropic-ai\/sdk@0\.129\.0|standardwebhooks@1\.\d+\.\d+|@stablelib\/base64@1\.0\.1|fast-sha256@1\.3\.0)$/,
+    ours: /^(@anthropic-ai\/sdk@0\.129\.0|standardwebhooks@1\.1\.1|@stablelib\/base64@1\.0\.1|fast-sha256@1\.3\.0)$/,
     why: "the peer of @anthropic-ai/claude-agent-sdk (a stub in the Worker); pi-ai pins 0.129.0",
   },
   {
