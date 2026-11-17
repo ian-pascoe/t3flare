@@ -18,7 +18,7 @@ import { CLIS } from "@t3flare/sandbox-image/clis";
 import { expect, it } from "vitest";
 
 import { CODEX_ENVIRONMENT_SKILLS, type Launch } from "../../src/agents/cliProfiles.ts";
-import { drive, IMAGE, launchOf, openCodeServedSkills, piLaunchOf, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
+import { drive, IMAGE, launchOf, openCodeServedSkills, piLaunchOf, removeMounted, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
 import { type Loaded, skillMd } from "./skillsProbe.ts";
 
 const here = import.meta.dirname;
@@ -160,7 +160,7 @@ it("each CLI reads the Environment skill set through its link, keeps its own win
     harness.stop();
     for (const workspace of workspaces) {
       spawnSync("docker", ["run", "--rm", "-v", `${workspace}:/workspace`, IMAGE, "rm", "-rf", "/workspace/repo", "/workspace/.t3flare", "/workspace/.agents"], { encoding: "utf8" });
-      fs.rmSync(workspace, { recursive: true, force: true });
+      removeMounted(workspace);
     }
     fs.rmSync(environmentSet, { recursive: true, force: true });
   }

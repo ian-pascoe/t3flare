@@ -4,6 +4,7 @@
 // DO launches it (`profileLaunch` → `processCommand`) on a probe Model endpoint through the relay, and the JSON-RPC
 // drivers.
 import { spawnSync } from "node:child_process";
+import * as fs from "node:fs";
 import * as path from "node:path";
 
 import type { EndpointModel } from "@t3flare/models/endpoints";
@@ -25,6 +26,20 @@ export const docker = (args: ReadonlyArray<string>, options: { quiet?: boolean }
   const result = spawnSync("docker", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   if (result.status !== 0 && options.quiet !== true) throw new Error(`docker ${args.slice(0, 3).join(" ")} failed: ${(result.stderr ?? "").slice(-1500)}`);
   return result;
+};
+
+/**
+ * Removes a directory a container wrote into through a bind mount. On a Linux host the container's files keep its uid
+ * (root, or the image's user), which the host user may not delete; Docker Desktop maps them to the host user. What the
+ * host cannot remove is removed from a container, so a cleanup never replaces a test's own result.
+ */
+export const removeMounted = (dir: string, image: string = IMAGE) => {
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch {
+    docker(["run", "--rm", "--user", "0", "--entrypoint", "sh", "-v", `${dir}:/gone`, image, "-c", "find /gone -mindepth 1 -delete"], { quiet: true });
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 };
 
 /** The probe endpoint's one model (no model is called). */

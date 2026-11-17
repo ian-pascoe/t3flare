@@ -16,7 +16,7 @@ import * as path from "node:path";
 import { expect, it } from "vitest";
 
 import { profileLaunch } from "../../src/agents/cliProfiles.ts";
-import { docker, drive, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
+import { docker, drive, removeMounted, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
 
 const here = import.meta.dirname;
 
@@ -90,6 +90,6 @@ it("Claude Code reaches the model relay with its handle, which no Claude process
     expect(report.helperBytes, text).toBe("65");
   } finally {
     harness.stop();
-    fs.rmSync(workspace, { recursive: true, force: true });
+    removeMounted(workspace);
   }
 });

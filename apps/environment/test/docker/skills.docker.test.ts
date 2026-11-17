@@ -18,7 +18,7 @@ import { CLIS } from "@t3flare/sandbox-image/clis";
 import { type Launch } from "../../src/agents/cliProfiles.ts";
 import { expect, it } from "vitest";
 
-import { type Cli, drive, IMAGE, launchOf, openCodeServedSkills, piLaunchOf, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
+import { drive, IMAGE, launchOf, openCodeServedSkills, piLaunchOf, removeMounted, runCommand, startHarness, T3_PATH, type Cli } from "./cliHarness.ts";
 import { commandMd, type Loaded, PROBED, repoFixture, repoView, skillMd } from "./skillsProbe.ts";
 
 const here = import.meta.dirname;
@@ -148,7 +148,7 @@ it("each CLI's skill and command roots (SPI-1151 M0) are CLI_ROOTS' table", asyn
   } finally {
     harness.stop();
     spawnSync("docker", ["run", "--rm", "-v", `${workspace}:/workspace`, IMAGE, "rm", "-rf", "/workspace/repo", "/workspace/.t3flare"], { encoding: "utf8" });
-    fs.rmSync(workspace, { recursive: true, force: true });
+    removeMounted(workspace);
   }
   const full = { ...report, loaded };
   if (out !== undefined) fs.writeFileSync(out, `${JSON.stringify(full, null, 1)}\n`);

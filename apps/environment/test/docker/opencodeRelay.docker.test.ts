@@ -25,7 +25,7 @@ import { expect, it } from "vitest";
 import { OPENCODE_HANDLE_HOLDERS } from "../../src/agents/acpProfiles.ts";
 import { profileLaunch } from "../../src/agents/cliProfiles.ts";
 import { opencodeRelayOf } from "../../src/provider/cli/opencodeEndpoints.ts";
-import { docker, drive, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
+import { docker, drive, removeMounted, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
 
 const here = import.meta.dirname;
 
@@ -156,6 +156,6 @@ it("OpenCode reaches each endpoint's provider at the model relay with its handle
     expect(holders, text).toEqual([...OPENCODE_HANDLE_HOLDERS]);
   } finally {
     harness.stop();
-    fs.rmSync(workspace, { recursive: true, force: true });
+    removeMounted(workspace);
   }
 });

@@ -28,7 +28,7 @@ import { expect, it } from "vitest";
 import { PI_T3_MCP_EXTENSION_SOURCE } from "../../../../t3code/packages/provider-pi/src/server/mcpExtensionSource.ts";
 import { PI_HANDLE_HOLDERS, profileLaunch } from "../../src/agents/cliProfiles.ts";
 import { piLineFromPi, piRelayOf } from "../../src/provider/cli/piEndpoints.ts";
-import { docker, drive, EXTENSION, IMAGE, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
+import { docker, drive, EXTENSION, IMAGE, removeMounted, runCommand, startHarness, T3_PATH } from "./cliHarness.ts";
 
 const here = import.meta.dirname;
 
@@ -237,7 +237,7 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
     expect(resumed.errors ?? [], text).toEqual([]);
   } finally {
     harness.stop();
-    fs.rmSync(workspace, { recursive: true, force: true });
+    removeMounted(workspace);
   }
 });
 

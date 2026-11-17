@@ -174,7 +174,8 @@ const ok =
   }) &&
   (flag("no-deploy") ||
   step("the CLI agents in Docker (test:docker: the pinned Codex and pi, launched as the Workspace launches them)", () => {
-    const result = sh("pnpm", ["run", "test:docker"], environment, { quiet: true });
+    // In the log whole: the report keeps only the last 4000 characters, which a few failures overrun.
+    const result = sh("pnpm", ["run", "test:docker"], environment);
     return { ok: result.ok, detail: result.output.slice(-4000) };
   }) &&
   step(`deploy the ${stage} stage (build, web client)`, () => {
