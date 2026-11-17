@@ -120,7 +120,8 @@ const all = await tailing([`t3flare-agents-${stage}`, `t3flare-environment-${sta
     opencode: /OpenCode has no Model endpoint to run on/,
   };
   for (const cli of ["codex", "pi", "claude", "opencode"] as const) {
-    const turn = cli === "codex" || cli === "pi" ? await cliTurn(cookie, { cli, workspace: setupWorkspace, mode: "approval-required", plan: false, prompt: "Reply with the word ok." }) : await acpTurn(cookie, { cli, workspace: setupWorkspace, mode: "approval-required", plan: false, prompt: "Reply with the word ok." });
+    // One Workspace per CLI: the two turn helpers keep their own project lists, so they never share a Workspace.
+    const turn = cli === "codex" || cli === "pi" ? await cliTurn(cookie, { cli, workspace: `${setupWorkspace}-${cli}`, mode: "approval-required", plan: false, prompt: "Reply with the word ok." }) : await acpTurn(cookie, { cli, workspace: `${setupWorkspace}-${cli}`, mode: "approval-required", plan: false, prompt: "Reply with the word ok." });
     const text = JSON.stringify({ runs: turn.runs, items: turn.items });
     refusals[cli] = clean({ runs: turn.runs.map((run) => run.status), said: NEEDS[cli]!.exec(text)?.[0] ?? null, failure: turn.runs.at(-1)?.failure ?? null });
     check(`a ${cli} spawn with no endpoint for its API is refused, saying which it needs`, turn.runs.at(-1)?.status === "failed" && NEEDS[cli]!.test(text), refusals[cli]);
