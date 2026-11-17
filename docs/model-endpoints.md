@@ -20,6 +20,12 @@ agent names the API it needs), and a CLI agent's thread is refused at its start,
      URL). Give it an id (lowercase, immutable once saved: it is the first half of every model's slug,
      `<endpointId>/<modelId>`), a label, the key, optional headers, and its models: **Read the list** from the endpoint,
      or type ids. The key is sealed at rest and never shown again (ADR-0034 §4).
+   - **Before you save, edit the Models field**: keep only models the endpoint answers, one id a line, **the model you
+     want as the default first**. The first model of the first endpoint is the default for every new thread and every
+     old selection ([below](#models-t3flare-picks-for-you)). Read model list fills the field with everything the
+     endpoint lists, which can include models its server no longer answers: Commissary's list starts with dated ones
+     (`claude-3-5-haiku-20241022`, `claude-3-7-sonnet-20250219`) that it answers with 503. For an endpoint already
+     saved, **Edit** it and fix the Models field the same way.
    - **A subscription sign-in**: ChatGPT (plan usage), Claude (a Pro or Max plan, Claude Code's sign-in) or GitHub
      Copilot. Start the sign-in, complete it in your browser, paste what the vendor shows when asked. The Environment
      keeps and refreshes the tokens ([ADR-0018](adr/0018-the-environment-do-is-the-credential-broker-and-each-environment-signs-in-itself.md)).
@@ -48,10 +54,12 @@ count.
 ### Models t3flare picks for you
 
 - **The default model** of a new thread is the first model of the first endpoint that lists one (each CLI: of the first
-  endpoint it runs on).
-- **A selection from before the hard cut** (the Model proxy's `anthropic/<id>`, a bare model id such as Codex's
-  `gpt-6-luna` or Claude Code's `claude-opus-5-5`, or `default`) runs on that default model, for every agent; nothing is
-  refused for it. A slug of an endpoint you removed is not one: its turn fails saying the endpoint is gone.
+  endpoint it runs on). It is whatever you put first in the Models field: nothing checks that the endpoint answers it,
+  so put a working model there (the setup step).
+- **An old selection** (the Model proxy's `anthropic/<id>`, a bare model id such as Codex's `gpt-6-luna` or Claude
+  Code's `claude-opus-5-5`, or `default`) runs on that default model, for every agent, even where an endpoint lists a
+  model of the same id: no endpoint answers for an old selection by accident (ADR-0034 §3). Nothing is refused for it. A
+  slug of an endpoint you removed is not one: its turn fails saying the endpoint is gone.
 - **Text generation** (thread titles, commit messages, PR text) runs on the model t3's text-generation setting names.
   While you have picked none, the setting names the default: a small model (haiku, mini, nano, flash, lite, small,
   tiny) of the first endpoint that has one, its cheapest by known price, else the default model. It follows your
@@ -81,7 +89,10 @@ Nothing is read from a vendor's or Commissary's management API.
 - **Its models**: add it as an **Anthropic Messages** endpoint at its client API host (the API host if you set
   `COMMISSARY_API_DOMAIN`, else the app host; never behind Access), with a Commissary API key (`cms_…`). For Codex, add
   it a second time as an **OpenAI Responses** endpoint at `<host>/v1` with the same key: Codex speaks only Responses.
-  Read each one's list: an endpoint at Commissary reads Commissary's alias for a non-Claude model back to its real id.
+  Read each one's list (an endpoint at Commissary reads Commissary's alias for a non-Claude model back to its real id),
+  then **narrow it before saving**: drop the dated models Commissary lists first and no longer answers, and put the
+  model you want as the default first, e.g. `claude-sonnet-<version>`, `claude-haiku-<version>` on the Anthropic
+  Messages endpoint.
 - **Its MCP tools**: Commissary's MCP endpoint is not built in (SPI-1160; ADR-0028's SPI-1160 refinement). Add it in the
   Harness panel's **MCP servers** as a direct server:
   1. **A key.** Create a Commissary API key with a tool scope of the toolkits t3flare should see. Use a key of its own,
@@ -117,14 +128,15 @@ One endpoint speaks one API, and each CLI agent needs its own (Claude Code: Anth
 Responses; OpenCode and pi: either). For every agent, as the nightly bump runs them, give a list with one of each:
 
 ```sh
-T3FLARE_MODEL_ENDPOINT='[{"id":"anth","api":"anthropic-messages","baseUrl":"https://<host>","apiKey":"<key>","match":"^claude-"},{"id":"resp","api":"openai-responses","baseUrl":"https://<host>/v1","apiKey":"<key>","models":["<model id>"]}]'
+T3FLARE_MODEL_ENDPOINT='[{"id":"anth","api":"anthropic-messages","baseUrl":"https://<host>","apiKey":"<key>","models":["claude-sonnet-<version>","claude-haiku-<version>"]},{"id":"resp","api":"openai-responses","baseUrl":"https://<host>/v1","apiKey":"<key>","models":["claude-sonnet-<version>"]}]'
 ```
 
 The acceptance test fails by name on a CLI it is asked to run (`--codex` …) that no endpoint serves.
 
 - `id`, `baseUrl` and `apiKey` are required; `label` defaults to the id, `api` to `anthropic-messages`, `headers` to none.
-- Without `models`, the endpoint's own list is read through the panel, keeping the ids the regular expression `match`
-  matches, when given.
+- `models` is saved in its order, the first the default model. Without it, the endpoint's own list is read through the
+  panel, keeping the ids the regular expression `match` matches, when given, in the endpoint's order: name `models`
+  for an endpoint whose list starts with models it does not answer.
 - The panel validates the rest as it does the owner's form: an https URL at a public host, an id that is not reserved
   (`anthropic`, kept for the Model proxy's old selections, and `default`).
 

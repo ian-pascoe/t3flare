@@ -15,31 +15,46 @@ prod's Harness panel, **no agent can run a turn**. Do the steps below right afte
    Commissary for both, written out (placeholders, not real values):
 
    ```sh
-   T3FLARE_MODEL_ENDPOINT='[{"id":"commissary","label":"Commissary","api":"anthropic-messages","baseUrl":"https://<Commissary API host>","apiKey":"cms_<key>","match":"^claude-"},{"id":"commissary-oai","label":"Commissary (Responses)","api":"openai-responses","baseUrl":"https://<Commissary API host>/v1","apiKey":"cms_<key>","models":["<model id>"]}]'
+   T3FLARE_MODEL_ENDPOINT='[{"id":"commissary","label":"Commissary","api":"anthropic-messages","baseUrl":"https://<Commissary API host>","apiKey":"cms_<key>","models":["claude-sonnet-<version>","claude-haiku-<version>"]},{"id":"commissary-oai","label":"Commissary (Responses)","api":"openai-responses","baseUrl":"https://<Commissary API host>/v1","apiKey":"cms_<key>","models":["claude-sonnet-<version>"]}]'
    ```
 
-   The first one's small model runs the bump's real turn and is the one prod gets first. With only one endpoint the bump
-   fails, naming the CLI with no endpoint for its API.
+   Name `models` explicitly, the working model you want as the default first: each endpoint is saved with exactly
+   these, in this order, and the first model of the first endpoint is the default for every new thread and every old
+   selection. Do not use `"match":"^claude-"`: Commissary's own list starts with dated models it answers with 503
+   (`claude-3-5-haiku-20241022`, `claude-3-7-sonnet-20250219`), and a match keeps them first. The first endpoint's small
+   model runs the bump's real turn. With only one endpoint the bump fails, naming the CLI with no endpoint for its API.
 2. **Do not run `pnpm --filter @t3flare/infra run ci:setup` before the merge.** After it (step 4 below), it removes the
    proxy's GitHub variables and secrets it once set, and sets `T3FLARE_MODEL_ENDPOINT` from `dev.env` (without it in
    `dev.env`, it would also remove the `T3FLARE_MODEL_ENDPOINT` secret an earlier run derived).
 
 ## Right after the deploy
 
-1. **Add your Model endpoints** in prod's Harness panel (`https://t3.ianpascoe.dev/_t3flare/harness` → Model endpoints →
-   Add endpoint). If prod already has the `commissary` endpoint (SPI-1175's deploy adds it when the `prod` environment
-   has the `T3FLARE_MODEL_ENDPOINT` secret), check it lists the models you use. For each way you reach models:
-   - **Commissary for Claude Code, OpenCode, pi and Pi Durable**: an Anthropic Messages endpoint at Commissary's API host
-     with a Commissary API key (`cms_…`), **Read the list**.
-   - **Commissary for Codex**: Codex speaks only OpenAI Responses, so add Commissary a second time: id e.g. `commissary-oai`,
-     API **OpenAI Responses**, base URL `<Commissary API host>/v1`, the same key, **Read the list**. Without an OpenAI
-     Responses endpoint (or a ChatGPT sign-in), Codex stays in the setup state.
-   - **Any other key** (Anthropic API, OpenAI API, OpenRouter, a custom OpenAI-compatible gateway): its preset or Custom.
-   - **Subscription sign-ins** you want t3flare itself to hold (ChatGPT plan usage, a Claude Pro or Max plan, GitHub
-     Copilot): Add a sign-in, complete it in the browser. Claude's and Copilot's terms-of-service risk is yours.
-2. **Check the setup state is gone**: in t3's Settings → Providers, Pi Durable, Codex, Claude Code, OpenCode and Pi are
-   no longer "Needs attention", and each picker lists the endpoints' models. Text generation's setting names the
-   endpoints' small model unless you picked one.
+1. **Set up the Model endpoints** in prod's Harness panel (`https://t3.ianpascoe.dev/_t3flare/harness` → Model
+   endpoints). The first model of the first endpoint becomes the default for every new thread and every old selection
+   (each CLI: of the first endpoint it runs on), so every endpoint's Models field must hold only models it answers,
+   the one you want as the default first. In this order:
+   1. **Commissary for Pi Durable, Claude Code, OpenCode and pi** (the first endpoint): if prod already has the
+      `commissary` endpoint (SPI-1175's deploy adds it when the `prod` environment has the `T3FLARE_MODEL_ENDPOINT`
+      secret), **Edit** it; else **Add endpoint**: id `commissary`, API **Anthropic Messages**, base URL
+      `https://<Commissary API host>`, a Commissary API key (`cms_…`). Click **Read model list**, then edit the Models
+      field before saving: delete the dated models at the top that Commissary no longer answers
+      (`claude-3-5-haiku-20241022`, `claude-3-7-sonnet-20250219`, `claude-opus-4-1-20250805`, any other with a date or
+      one you do not use), and put the model you want as the default on the first line (e.g. `claude-sonnet-<version>`,
+      then `claude-haiku-<version>` for the small model). Save.
+   2. **Commissary for Codex**: Codex speaks only OpenAI Responses, so **Add endpoint** again: id `commissary-oai`, API
+      **OpenAI Responses**, base URL `https://<Commissary API host>/v1`, the same key; Models: the one or few you want
+      Codex on, the default first (e.g. `claude-sonnet-<version>`). Without an OpenAI Responses endpoint (or a ChatGPT
+      sign-in), Codex stays in the setup state.
+   3. **Any other key** (Anthropic API, OpenAI API, OpenRouter, a custom OpenAI-compatible gateway): its preset or
+      Custom, its Models field narrowed the same way. Add it after Commissary unless it should hold the default.
+   4. **Subscription sign-ins** you want t3flare itself to hold (ChatGPT plan usage, a Claude Pro or Max plan, GitHub
+      Copilot): Add a sign-in, complete it in the browser, then **Edit models** to narrow its list the same way.
+      Claude's and Copilot's terms-of-service risk is yours.
+2. **Check every agent runs**: in t3's Settings → Providers, Pi Durable, Codex, Claude Code, OpenCode and Pi are no
+   longer "Needs attention", and each picker's first model is the one you put first. Start one new thread per agent on
+   its default model and send "Reply with the word ready."; each answers. Text generation's setting names the
+   endpoints' small model unless you picked one. A thread that fails "overloaded (HTTP 503)" on its first turn is on a
+   model Commissary does not answer: Edit the endpoint and take that model out.
 3. **Commissary's MCP tools, if you want them**: Harness panel → MCP servers → Add server: name `commissary`, URL
    `https://<Commissary API host>/mcp` (narrow it with `?toolkits=…`), sign-in Header `x-api-key` with a Commissary key
    of its own, scoped to the toolkits t3flare should see; Test. Since SPI-1160 prod has none until you add it.
@@ -87,20 +102,13 @@ prod's Harness panel, **no agent can run a turn**. Do the steps below right afte
 
 ## What carries over
 
-Checked on a stage upgraded from `origin/main` (with the Model proxy) to this branch, one thread per agent kind
-([`spi-1176/upgrade.json`](spi-1176/upgrade.json)):
+Checked on a stage upgraded from `origin/main` (with the Model proxy) to this branch, the endpoints set up as above,
+one thread per agent kind ([`spi-1176/upgrade.json`](spi-1176/upgrade.json)):
 
-- **Threads from before the cut keep working** once an endpoint is there. A model selection from before the cut
-  (`anthropic/<id>`, Codex's and Claude Code's bare ids) runs on the endpoint that lists a model of that id
-  (`anthropic/claude-haiku-5-5` on `commissary/claude-haiku-5-5`), else on the default model, the first endpoint's
-  first model. Pi Durable, Codex, Claude Code, OpenCode and pi threads each answered their next turn, Codex's on the
-  same native thread (an earlier draft of this note said a Codex thread could not move; it did).
-- **Check what your endpoints list.** Commissary's list holds dated models it no longer serves, first in its order
-  (`claude-3-5-haiku-20241022`, `claude-3-7-sonnet-20250219`, `claude-opus-4-1-20250805`; it answers 503 or 400 for
-  them). The default model is the first endpoint's first model, so with Commissary's full list an old selection that
-  no endpoint names, and any thread on `default`, runs on a dead model. Narrow the endpoint to the models it serves
-  (`match`, or edit its list in the panel), or put an endpoint whose first model works first. Claude Code's `sonnet`
-  and `opus` aliases pick the first model of their family pi-ai knows, so they skip those dated ids.
+- **Threads from before the cut keep working.** A model selection from before the cut (`anthropic/<id>`, Codex's and
+  Claude Code's bare ids) runs on the default model, the first endpoint's first model (each CLI: of its endpoints),
+  even where an endpoint lists a model of the same id. Pick another in the thread to change it. Pi Durable, Codex,
+  Claude Code, OpenCode and pi threads each answered their next turn; Codex's on the same native thread.
 - **Bindings**: the deploy unbinds `MODEL_PROXY_URL`, `MODEL_PROXY_API_KEY` and `COMMISSARY_CONTAINER_API_KEY` from
   both Workers and every `COMMISSARY_*` from the Environment's (the stage's deploy log: `unbind` for each of the ten).
 - The Harness settings: a Guardian, Advisor or web-search model setting from before the cut (`claude-haiku-5-5`) reads

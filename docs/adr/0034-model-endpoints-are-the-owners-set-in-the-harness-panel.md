@@ -112,8 +112,11 @@ speak of "until the hard cut", this holds instead:
 3. **Old selections fall back** (item 6's "until SPI-1176's fallback"): a model selection from before the cut (the
    proxy's `anthropic/<id>`, a bare id, `default`) runs on the default model, the first model of the first endpoint that
    lists one (each CLI's: of its endpoints), for Pi Durable and every CLI; text generation's falls back to text
-   generation's default. A slug of an endpoint that is gone still fails, saying so. `anthropic` stays a reserved
-   endpoint id, so no endpoint answers for an old selection by accident.
+   generation's default. That holds where an endpoint lists a model of the old selection's id: it still runs on the
+   default. A slug of an endpoint that is gone still fails, saying so. `anthropic` stays a reserved endpoint id, so no
+   endpoint answers for an old selection by accident. The default is whatever the owner lists first, unchecked: an
+   endpoint whose list names models its server no longer answers (Commissary's starts with dated ones) is narrowed at
+   the setup step, the working model first (`docs/model-endpoints.md`).
 4. **Text generation's default** (item 5): a small model of the first endpoint that has one, else the default model; with
    no endpoint, it says to set one up. The Guardian, prompt suggestions and `web_search` (on an Anthropic Messages
    endpoint with an API key or no auth) use the same small model unless the owner names another endpoint's model; the
