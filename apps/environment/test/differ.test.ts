@@ -125,6 +125,10 @@ describe("differ", () => {
         message: "No Model endpoint is set up: add one in the Harness panel (/_t3flare/harness), under Model endpoints.",
       });
     }
+    // pi-durable's settlement without a detail: the setup state decides (no endpoint lists a model).
+    const bare = { submissionId: "1", runId: "r", attemptId: "a", status: "failed" as const, reason: "no_model", startedAt: 0 };
+    expect(failureOf(bare, now, () => true).message).toBe("No Model endpoint is set up: add one in the Harness panel (/_t3flare/harness), under Model endpoints.");
+    expect(failureOf(bare, now, () => false).message).toBe("The selected model is not available: its Model endpoint was removed or no longer lists it. Pick another model.");
   });
 
   it("shows a Model endpoint's credential failure as the Session recorded it, typed, never the error's text (SPI-1164)", () => {

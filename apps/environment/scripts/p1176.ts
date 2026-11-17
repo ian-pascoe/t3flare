@@ -122,8 +122,10 @@ const all = await tailing([`t3flare-agents-${stage}`, `t3flare-environment-${sta
   for (const cli of ["codex", "pi", "claude", "opencode"] as const) {
     // One Workspace per CLI: the two turn helpers keep their own project lists, so they never share a Workspace.
     const turn = cli === "codex" || cli === "pi" ? await cliTurn(cookie, { cli, workspace: `${setupWorkspace}-${cli}`, mode: "approval-required", plan: false, prompt: "Reply with the word ok." }) : await acpTurn(cookie, { cli, workspace: `${setupWorkspace}-${cli}`, mode: "approval-required", plan: false, prompt: "Reply with the word ok." });
-    const text = JSON.stringify({ runs: turn.runs, items: turn.items });
-    refusals[cli] = clean({ runs: turn.runs.map((run) => run.status), said: NEEDS[cli]!.exec(text)?.[0] ?? null, failure: turn.runs.at(-1)?.failure ?? null });
+    // The error items' failure text as t3 keeps it (the helpers' item summaries cut it short).
+    const errors = itemsOf(projectionOf(await threadWindow(cookie, turn.threadId))).filter((item: any) => item.type === "error").map((item: any) => ({ title: item.title ?? null, message: String(item.failure?.message ?? "") }));
+    const text = JSON.stringify({ runs: turn.runs, errors });
+    refusals[cli] = clean({ runs: turn.runs.map((run) => run.status), said: NEEDS[cli]!.exec(text)?.[0] ?? null, errors });
     check(`a ${cli} spawn with no endpoint for its API is refused, saying which it needs`, turn.runs.at(-1)?.status === "failed" && NEEDS[cli]!.test(text), refusals[cli]);
   }
   report.setupSpawns = refusals;
@@ -179,18 +181,22 @@ const all = await tailing([`t3flare-agents-${stage}`, `t3flare-environment-${sta
   report.oldDurable = clean({ model: oldDurable.model, ok: oldDurable.ok, failures: oldDurable.failures, turn: oldDurable.turn ?? null });
   check("a Pi Durable turn on anthropic/claude-haiku-5-5 (a proxy-era selection) runs on the default model", oldDurable.ok, report.oldDurable);
   const old: Record<string, unknown> = {};
+  const scanned: Record<string, any> = {};
   for (const cli of ["codex", "pi", "claude", "opencode"]) {
     // No model given: each helper's own proxy-era default (`gpt-6-luna`, `anthropic/claude-haiku-5-5`, `anthropic/claude-sonnet-5-5`).
     const turn = await turnOf(cli, { workspace: workspaces[cli]!, prompt: "Run `cat src/greeting.txt` with your shell tool, then reply with the single word done." });
     old[cli] = clean({ model: turn.model, runs: turn.runs.slice(-1), items: turn.items, text: turn.text });
     check(`a ${cli} thread on its proxy-era model (${turn.model}) runs on the default model`, turn.runs.at(-1)?.status === "completed" && /done/i.test(turn.text), old[cli]);
+    // 5. The leak scan, right after the CLI's last turn, its processes alive (a Container idle for minutes may sleep:
+    // its scan then answers no Container; once more).
+    let scan = await leak(workspaces[cli]!);
+    if (scan?.container == null) scan = await leak(workspaces[cli]!);
+    scanned[cli] = scan;
   }
   report.oldSelections = old;
 
-  // 5. The leak scans, each CLI's processes alive.
   const scans: Record<string, unknown> = {};
-  for (const [cli, workspace] of Object.entries(workspaces)) {
-    const scan = await leak(workspace);
+  for (const [cli, scan] of Object.entries(scanned)) {
     scans[cli] = clean({ do: scan?.do ?? null, hits: scan?.container?.hits ?? null, files: scan?.container?.files ?? null, notScanned: scan?.notScanned ?? null, lookedFor: scan?.lookedFor ?? null });
     check(`the leak scan in ${cli}'s Container finds no key and scanned every one`, (scan?.do ?? []).length === 0 && (scan?.container?.hits ?? []).length === 0 && (scan?.container?.files ?? 0) > 0 && Array.isArray(scan?.notScanned) && scan.notScanned.length === 0 && (scan?.lookedFor ?? []).includes("endpoint:comm"), scan);
   }

@@ -26,6 +26,10 @@ import {
   type OrchestrationV2RuntimeRequest,
   type OrchestrationV2TurnItem,
   type ProviderApprovalDecision,
+  type ProviderDriverKind,
+  type ProviderInstanceId,
+  type ProviderSessionId,
+  ProviderSetupError,
   type ProviderThreadId,
   type ProviderTurnId,
   type RunId,
@@ -151,6 +155,36 @@ const answerOf = (decision: ProviderApprovalDecision): CliAnswer =>
       ? { approved: true, decision: "accept" }
       : { approved: false, reason: decision, decision: decision === "decline" ? "decline" : "cancel" };
 
+/**
+ * A spawn the Environment refused (`cliProcess.ts` `refused`: a `PermissionDenied` spawn error, `t3flare: <why>`) anywhere
+ * in an error's cause chain: its reason, our own text (SPI-1176: no Model endpoint serves the CLI). Else undefined.
+ */
+export const spawnRefusalOf = (error: unknown): string | undefined => {
+  const seen = new Set<unknown>();
+  let node = error;
+  for (let depth = 0; depth < 16 && typeof node === "object" && node !== null && !seen.has(node); depth++) {
+    seen.add(node);
+    const reason = (node as { reason?: { _tag?: unknown; module?: unknown; method?: unknown; description?: unknown } }).reason;
+    if ((node as { _tag?: unknown })._tag === "PlatformError" && reason?._tag === "PermissionDenied" && reason.module === "ChildProcess" && reason.method === "spawn" && typeof reason.description === "string" && reason.description.startsWith("t3flare: ")) {
+      return reason.description.slice("t3flare: ".length);
+    }
+    node = (node as { cause?: unknown }).cause;
+  }
+  return undefined;
+};
+
+/**
+ * An open that failed on a refused spawn, as t3 shows it: t3's open error carries a `ProviderSetupError` with the
+ * refusal, a cause t3's failure text reads through (`knownProviderFailureMessage`), not "Failed to open ... session"
+ * (U85). Any other failure as it was.
+ */
+export const withSpawnRefusal = (instanceId: ProviderInstanceId, driver: ProviderDriverKind, providerSessionId: ProviderSessionId) => (error: ProviderAdapter.ProviderAdapterV2Error): ProviderAdapter.ProviderAdapterV2Error => {
+  const refusal = spawnRefusalOf(error);
+  if (refusal === undefined) return error;
+  const detail = /[.!?]$/.test(refusal) ? refusal : `${refusal}.`;
+  return new ProviderAdapter.ProviderAdapterOpenSessionError({ driver, providerSessionId, cause: new ProviderSetupError({ instanceId, operation: "open-session", detail, cause: error }) });
+};
+
 /** t3's adapter, as the Cloud Environment runs it. */
 export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Service"], options: WrapOptions): ProviderAdapter.ProviderAdapterV2["Service"] => {
   const { sessions } = options;
@@ -181,7 +215,7 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
         session.runtimeMode = input.runtimePolicy.runtimeMode;
         session.interactionMode = input.runtimePolicy.interactionMode;
         session.model = input.modelSelection.model;
-        const runtime = yield* adapter.openSession(input).pipe(Effect.provideService(CliSpawn, session));
+        const runtime = yield* adapter.openSession(input).pipe(Effect.provideService(CliSpawn, session), Effect.mapError(withSpawnRefusal(adapter.instanceId, adapter.driver, input.providerSessionId)));
         yield* Effect.addFinalizer(() => Effect.sync(() => sessions.delete(input.providerSessionId)));
         // G11: `mcpApps` passes through (Codex's App rendering, MCP apps through the relay); upload feedback stays off.
         const { uploadFeedback: _feedback, ...rest } = runtime;
