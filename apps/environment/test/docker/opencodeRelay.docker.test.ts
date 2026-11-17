@@ -4,15 +4,15 @@
 // `computer.internal`'s model relay (keyhost.mjs; no model is called). The real launcher and key plugin:
 // - each endpoint is its own provider at the relay's per-endpoint path, by API: Anthropic Messages at `…/v1/messages`
 //   with the handle in `x-api-key`, OpenAI Chat Completions at `…/chat/completions` and Responses at `…/responses` with
-//   it as a Bearer; the model's own id in the body; the key helper never asked;
+//   it as a Bearer; the model's own id in the body;
 // - one session switches between the three endpoints' models, each turn running OpenCode's shell tool;
-// - the session offers the endpoints' models (and a model the repository adds to one of their providers), no proxy's;
+// - the session offers the endpoints' models (and a model the repository adds to one of their providers) only;
 // - a hostile repository configuration cannot send the handle anywhere but the relay: a model-level `baseURL` or
 //   `package` on an endpoint's model (pinned by the system configuration), a model it adds with
 //   `{env:T3FLARE_MODEL_HANDLE}` as its key, a variant with its own `baseURL` (the handle goes only into a request at
 //   the relay, `relay.js` `putHandle`);
 // - a shell command OpenCode runs, a repository's MCP server and a repository's plugin have `T3FLARE_EXEC` and no
-//   handle (OpenCode starts without it) and no nonce;
+//   handle (OpenCode starts without it);
 // - only the launch chain's setsid holds the handle, not OpenCode, nor the launcher's watcher or snapshot loop.
 import { spawnSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -123,7 +123,7 @@ it("OpenCode reaches each endpoint's provider at the model relay with its handle
     const mcpEnv = read("mcp-env.txt");
     const pluginEnv = read("plugin-env.txt");
     const holders = read("holders.txt").split("\n").map((line) => line.trim()).filter((line) => line !== "");
-    const report = { models: result.models, stopReason: result.stopReason, turns: result.turns, errors: result.errors, toolCalls: result.toolCalls, stderr: String(result.stderr ?? "").slice(-1500), relayed, elsewhere, configOptions: result.configOptions, keyAsked, holders, ps: read("ps.txt"), shellEnvWritten: shellEnv !== "", mcpEnvWritten: mcpEnv !== "", pluginEnvWritten: pluginEnv !== "", pluginNonce: pluginEnv.includes("T3FLARE_MODEL_KEY_NONCE"), watchLog: read("watch.log").slice(-600) };
+    const report = { models: result.models, stopReason: result.stopReason, turns: result.turns, errors: result.errors, toolCalls: result.toolCalls, stderr: String(result.stderr ?? "").slice(-1500), relayed, elsewhere, configOptions: result.configOptions, holders, ps: read("ps.txt"), shellEnvWritten: shellEnv !== "", mcpEnvWritten: mcpEnv !== "", pluginEnvWritten: pluginEnv !== "", watchLog: read("watch.log").slice(-600) };
     const text = JSON.stringify(report);
     expect(text.includes(handle), "the handle reached the report").toBe(false);
     // The endpoints' models by OpenCode's provider ids, and the one the repository added; no proxy model, no Google's.
@@ -147,15 +147,11 @@ it("OpenCode reaches each endpoint's provider at the model relay with its handle
     // The repository's own variant and model reached their own URLs (the stand-in's 404), without the handle.
     expect(elsewhere.map((entry) => entry.path).sort((a, b) => a.localeCompare(b)), text).toEqual(["/evil/new/v1/messages", "/evil/variant/responses"]);
     expect(elsewhere.every((entry) => !entry.apiKeyIsHandle && !entry.bearerIsHandle), text).toBe(true);
-    // The handle needs no key helper.
-    // The shell, the repository's MCP server and its plugin: the marker, no handle, no nonce.
+    // The shell, the repository's MCP server and its plugin: the marker, no handle.
     for (const [name, env] of [["shell", shellEnv], ["MCP server", mcpEnv], ["plugin", pluginEnv]] as const) {
       expect(env.includes("T3FLARE_EXEC"), `${name}: ${text}`).toBe(true);
       expect(env.includes("T3FLARE_MODEL_HANDLE"), `${name}: ${text}`).toBe(false);
     }
-    expect(shellEnv.includes("T3FLARE_MODEL_KEY_NONCE"), text).toBe(false);
-    expect(mcpEnv.includes("T3FLARE_MODEL_KEY_NONCE"), text).toBe(false);
-    expect(pluginEnv.includes("T3FLARE_MODEL_KEY_NONCE"), text).toBe(false);
     // The holders: only the launch chain's setsid, not OpenCode, nor the launcher's loops.
     expect(holders, text).toEqual([...OPENCODE_HANDLE_HOLDERS]);
   } finally {

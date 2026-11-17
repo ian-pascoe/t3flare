@@ -5,7 +5,7 @@
 // - each endpoint is its own pi provider at the relay's per-endpoint path, by API, with pi-ai's own path and key
 //   header: Anthropic Messages at `…/v1/messages` (`x-api-key`), OpenAI Chat Completions at `…/chat/completions` and
 //   Responses at `…/responses` (a Bearer), Google Generative AI at `…/models/<model>:streamGenerateContent`
-//   (`x-goog-api-key`), Mistral at `…/v1/chat/completions` (a Bearer); the model's own id; the key helper never asked;
+//   (`x-goog-api-key`), Mistral at `…/v1/chat/completions` (a Bearer); the model's own id;
 // - one session switches between the five endpoints' models, each turn running pi's bash tool; a stale proxy model
 //   (`anthropic/…`) is refused by pi without a request;
 // - a hostile repository `.pi/` (settings naming an extension and a package, an extension that would move an endpoint's
@@ -195,8 +195,7 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
     // The hostile repository loaded nothing; nothing went anywhere but the relay.
     expect(report.repoExtensionLoaded, text).toBe(false);
     expect(elsewhere, text).toEqual([]);
-    // The handle needs no key helper.
-    // pi's bash: the marker, no handle, no nonce.
+    // pi's bash: the marker, no handle.
     expect(shellEnv.includes("T3FLARE_EXEC"), text).toBe(true);
     expect(shellEnv.includes("T3FLARE_MODEL_HANDLE"), text).toBe(false);
     // pi's environment keeps the owner's no_proxy entries and adds the relay's host; nothing went through the proxy.

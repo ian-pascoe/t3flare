@@ -4,8 +4,8 @@
 // - with KEYHOST_MODEL_HANDLE (SPI-1168), a stand-in model relay and endpoint under /t3flare/model/: Anthropic Messages,
 //   and OpenAI Chat Completions and Responses (SPI-1169), Google Generative AI and Mistral's chat (SPI-1170, pi's
 //   APIs). KEYHOST_MODEL_HANDLE may name several handles (comma-separated): a process each (SPI-1170's resume).
-// Every event is one JSON line on stdout, never a handle. (The Model proxy's key route went at the hard cut, SPI-1176:
-// a request to it is logged as any other path, `http`, and answered 404, as computer's proxy answers it.)
+// Every event is one JSON line on stdout, never a handle. (A request to `/t3flare/model-key` is logged as any other
+// path, `http`, and answered 404, as computer's proxy answers it.)
 import dgram from "node:dgram";
 import http from "node:http";
 import net from "node:net";
