@@ -1536,7 +1536,8 @@ its web client's meter logic, which nothing of ours restates.
     `noteLimitReading`, `acceptedLimitReading`); the readers in agents' `session/models.ts` (`limitWatch`, on each
     endpoint's fetch, beside SPI-1173's `answering`), `workspace/modelRelay.ts` and `endpointText.ts`; the sender
     `limitsSender` (`environment.ts`); the Environment's `usage/limits.ts` (`limitStore`, table
-    `t3flare_limit_windows`; `forget` on an endpoint's removal, `endpoints/api.ts`'s `removed`), `usage/limitMeters.ts`
+    `t3flare_limit_windows`; `limitWiring`, the Environment DO's `recordLimits` and `forget` on an endpoint's removal,
+    `endpoints/api.ts`'s `removed`), `usage/limitMeters.ts`
     (`limitSnapshots`) and `usage/limitSources.ts` (`endpointMeterSources`, `withSources`), wired in
     `t3/composition.ts`.
   - **ChatGPT's Codex headers**: `x-codex-{primary,secondary}-used-percent` (a percentage), `-window-minutes`,
