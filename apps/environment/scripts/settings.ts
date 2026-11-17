@@ -22,7 +22,7 @@
 //   node scripts/stage.ts run psmcp settings changes          the Open changes list (ids, states), for a person
 //
 // Commissary is no built-in server since SPI-1160: `setup` and `m2` use the Direct server named `commissary` the owner
-// added, as `node scripts/stage.ts run <stage> commissaryMcp add` adds it (docs/model-proxy.md); without one they say so.
+// added, as `node scripts/stage.ts run <stage> commissaryMcp add` adds it (docs/model-endpoints.md); without one they say so.
 import * as fs from "node:fs";
 import * as path from "node:path";
 

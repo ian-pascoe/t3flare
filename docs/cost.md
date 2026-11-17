@@ -52,8 +52,8 @@ What moves the total:
 - **`GET /_t3flare/agents/workspaces` → `terminals.pushes`**: terminal output batches each Workspace DO pushed since it
   started.
 
-- **`process-started`, `process-exited`, `model-key`, `container-stop-cli`** (agents Worker logs, step 4a): CLI
-  agent processes and the key helper's grants. A CLI process holds its Container while its thread is in a turn and
+- **`process-started`, `process-exited`, `container-stop-cli`** (agents Worker logs, step 4a): CLI
+  agent processes (the key helper's `model-key` grants went at the hard cut, SPI-1176). A CLI process holds its Container while its thread is in a turn and
   for 11 minutes after (t3 releases the session at 10, Patch 0003), so an idle CLI session costs at most about
   11 Container-minutes beyond its last turn (about $0.006). The Environment's own idle reset (60 s without a client)
   ends idle CLI processes earlier, at the Workspace's 90 s lapse; a full budget reclaims Containers whose CLI sessions
