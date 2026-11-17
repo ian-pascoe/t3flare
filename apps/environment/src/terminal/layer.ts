@@ -13,8 +13,11 @@
 // - `registerTerminalProcesses` and `unregisterTerminal` name each shell's thread and terminal for our port discovery
 //   (G11, `preview/portDiscovery.ts`), which attributes a listener by its shell's key: the inspector reports the shell's
 //   own (synthetic) pid for that, and nothing else reads it;
+// - t3's shell lookup (`SpawnExecutableResolution`, since v0.1.11-nightly.20261117.4825) checks this process's disk, where
+//   no shell exists: a shell the Container has (`SHELLS`) resolves to itself, any other to none, so t3 tries its next;
 // - no `resolveProviderInstanceEnvironment` (a provider instance's env can carry credentials, ADR-0016; review F10).
 import * as PtyAdapter from "@t3tools/shared/PtyAdapter";
+import { SpawnExecutableResolution } from "@t3tools/shared/shell";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as ServerConfig from "t3/src/config.ts";
@@ -23,7 +26,7 @@ import * as TerminalManager from "t3/src/terminal/Manager.ts";
 
 import { locate } from "../agents/workspaceClient.ts";
 import { setCurrentTerminals } from "./current.ts";
-import { TerminalProcesses } from "./ptyAdapter.ts";
+import { SHELLS, TerminalProcesses } from "./ptyAdapter.ts";
 
 /** The shell's base env: t3 adds its own runtime keys (`T3CODE_*`, `NO_COLOR`, …) on top. */
 export const TERMINAL_BASE_ENV: Readonly<Record<string, string>> = {
@@ -72,12 +75,17 @@ export const terminalManagerOptions = (processes: TerminalProcesses, logsDir: st
   unregisterTerminal: (input: { readonly threadId: string; readonly terminalId: string }) => Effect.sync(() => processes.unregisterOwner(input)),
 });
 
+/** A shell as the Container resolves it: one of `SHELLS` is itself (the PTY adapter runs it there), any other none. */
+export const containerShell = (command: string): string | undefined => (SHELLS.has(command) ? command : undefined);
+
 export const layer = Layer.effect(
   TerminalManager.TerminalManager,
   Effect.gen(function* () {
     const { terminalLogsDir } = yield* ServerConfig.ServerConfig;
     const processes = makeTerminalProcesses();
     setCurrentTerminals(processes);
-    return yield* TerminalManager.makeWithOptions(terminalManagerOptions(processes, terminalLogsDir));
+    return yield* TerminalManager.makeWithOptions(terminalManagerOptions(processes, terminalLogsDir)).pipe(
+      Effect.provideService(SpawnExecutableResolution, containerShell),
+    );
   }),
 ).pipe(Layer.provide(ProcessRunner.layer));

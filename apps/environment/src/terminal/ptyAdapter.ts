@@ -81,7 +81,7 @@ export class RefusedProcess {
   }
 }
 
-const SHELLS = new Set(["bash", "sh", "/bin/bash", "/bin/sh", "/usr/bin/bash", "/usr/bin/sh"]);
+export const SHELLS: ReadonlySet<string> = new Set(["bash", "sh", "/bin/bash", "/bin/sh", "/usr/bin/bash", "/usr/bin/sh"]);
 
 /** Env keys a terminal may receive. */
 export const allowedEnvKey = (key: string): boolean =>

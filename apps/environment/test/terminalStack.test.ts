@@ -28,7 +28,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { terminalRc } from "../../sandbox-image/src/terminal.ts";
 import { type ShellProcess, TerminalHost } from "../../agents/src/workspace/terminalHost.ts";
 import { TerminalProcesses } from "../src/terminal/ptyAdapter.ts";
-import { terminalManagerOptions } from "../src/terminal/layer.ts";
+import { containerShell, terminalManagerOptions } from "../src/terminal/layer.ts";
+import { SpawnExecutableResolution } from "@t3tools/shared/shell";
 
 const BASH = ["/opt/homebrew/bin/bash", "/usr/bin/bash", "/bin/bash"].find((candidate) => {
   if (!fs.existsSync(candidate)) return false;
@@ -109,7 +110,7 @@ beforeAll(async () => {
     Layer.succeed(HostProcess.Architecture, "x64"),
     Layer.succeed(HostProcess.HomeDirectory, dir),
   );
-  const terminals = Layer.effect(TerminalManager.TerminalManager, TerminalManager.makeWithOptions(terminalManagerOptions(processes, path.join(dir, "logs")))).pipe(
+  const terminals = Layer.effect(TerminalManager.TerminalManager, TerminalManager.makeWithOptions(terminalManagerOptions(processes, path.join(dir, "logs"))).pipe(Effect.provideService(SpawnExecutableResolution, containerShell))).pipe(
     Layer.provide(ProcessRunner.layer),
   );
   const fakes = Layer.mergeAll(
@@ -174,6 +175,15 @@ const attachAndRead = (threadId: string, cwd: string, ms = 3000) =>
       return { shown, types };
     }),
   );
+
+describe("the shell t3 resolves (layer.ts's SpawnExecutableResolution, as in the Environment)", () => {
+  it("is a shell the Container has, as named, never looked up on this process's disk; any other is none", () => {
+    expect(containerShell("/bin/bash")).toBe("/bin/bash");
+    expect(containerShell("bash")).toBe("bash");
+    expect(containerShell("/bin/zsh")).toBeUndefined();
+    expect(containerShell("/opt/homebrew/bin/fish")).toBeUndefined();
+  });
+});
 
 describe("a terminal whose cwd is in no Workspace (t3's No project)", () => {
   it("shows why in the terminal at once and ends, instead of a blank terminal", async () => {
