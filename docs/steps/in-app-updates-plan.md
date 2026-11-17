@@ -67,7 +67,9 @@ Settled with the owner on 2026-11-17 after a four-round design interview. The fa
 
   The **Full gate** is today's suite.
 - **Land:** a separate reusable **land** workflow, used by both kinds of update. It runs on a fresh runner with
-  `contents: write`, `actions: write` and `issues: write`. It checks:
+  `contents: write`, `actions: write` and `statuses: read`. As built (review cycles 1–3, ADR-0037 §4–7) it takes the
+  pin (`t3:<tag>` or `cli:<cli>:<version>`) and the proven commit (`sha`), not a branch: the branch name is made from the
+  pin, and it lands only that commit, while the branch points at it and its `t3flare/proven` proof counts. It checks:
   - The branch is one commit on `origin/main`. `git merge-base --is-ancestor origin/main <branch>` plus a commit count.
   - The diff touches only the files this kind of update may change. A t3 bump may touch `t3code` and `PINNED_FILES`
     (`scripts/bump.ts:102`); a CLI bump has its own list (D22).
@@ -106,8 +108,10 @@ Settled with the owner on 2026-11-17 after a four-round design interview. The fa
 
 ### D7 State and reporting
 
-- **Record:** one per target (`t3`, and one per CLI) in DO storage: `{id, target, from, dispatchedAt, run}`. It expires to
-  failed after 45 minutes.
+- **Record:** one per target (`t3`, and one per CLI) in DO storage: `{id, target, from, dispatchedAt, run, startedAt}`.
+  As built (reviews A2, A10, cycle 3) it expires to failed 100 minutes after the DO first sees its run out of the queue
+  (not 45 from the dispatch: a run waits its turn in the `bump` group, and the land waits out deploy-prod's 45 minutes);
+  3 hours queued, or 15 minutes with no run listed, has failed too.
 - **Presses:**
   - The same target pressed again re-attaches to the same `updateId`.
   - A different target while one is in flight is refused with `ServerSelfUpdateError`.
@@ -160,8 +164,10 @@ Settled with the owner on 2026-11-17 after a four-round design interview. The fa
 - An acceptance assertion that the descriptor's `serverVersion`, the web `APP_VERSION` and the tag all agree. The prod
   smoke check also asserts `serverVersion` equals the tag.
 - A test that a client blocked by a protocol mismatch can still call the update RPC (`outdatedHostUpdate.ts:103-181`).
-- One trial run of each workflow, `land` + `dry_run` and `cli-bump` + `dry_run`, on the `bump` stage. It confirms the
-  timings, including the image build.
+- One trial run of each workflow, `land` + `dry_run` and `cli-bump` + `dry_run`. As built, a dry run lands and deploys
+  nothing: `cli-bump.yml` with `dry_run` proves the pin on the `bump` stage (the timings, including the image build)
+  and runs the publish job's land check; `land.yml` with `dry_run` (`-f pin=… [-f sha=…]`) runs its binding to the
+  proof and its land check only, since deploy-prod refuses a commit that is not main's (review cycle 3).
 
 ### D17 Docs
 
@@ -226,8 +232,9 @@ Settled with the owner on 2026-11-17 after a four-round design interview. The fa
 
 ### D22 CLI bump workflow
 
-- **Workflow:** `cli-bump.yml` takes inputs `cli` (`pi` | `codex` | `claude`), `update_id` and `dry_run`. It runs
-  `scripts/cli-bump.ts`.
+- **Workflow:** `cli-bump.yml` takes inputs `cli` (`pi` | `codex` | `claude`), `update_id`, `dry_run`, and (as built,
+  review F2) `running`, the CLI's pin prod runs, which the DO sends so a run can deploy main when main already holds
+  the newest pin. It runs `scripts/cli-bump.ts`.
 - **What the script edits:**
   - **Codex:** the Dockerfile `CODEX_VERSION` and `CODEX_SHA256`. CI downloads the musl release tarball and hashes it.
   - **pi CLI:** the `apps/sandbox-image/image/cli/` npm lock (`@earendil-works/pi-coding-agent`).

@@ -19,7 +19,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import { clisField } from "../apps/environment/scripts/lib/cliPins.ts";
-import { landMode, planT3, readBumpReport } from "../apps/environment/scripts/lib/land.ts";
+import { landBindingRefusal, landMode, planT3, readBumpReport } from "../apps/environment/scripts/lib/land.ts";
 import { branchOf, COMMIT, landedBranches, newestNightly, NIGHTLY_TAG, parsePin, type Pin, pinOf, pinText } from "../apps/environment/src/updates/pins.ts";
 import { branchTipOf, bumpBranches, git, nightlyTagsOf, optionOf, provenGateOf, setProven, thisRunUrl } from "./lib/updatesGit.ts";
 
@@ -144,14 +144,13 @@ switch (command) {
       break;
     }
     // Review B1: land exactly the commit a trusted job proved, and only while the branch still points at it.
-    const sha = option("sha") ?? "";
-    if (!COMMIT.test(sha)) fail(`landing ${branch} needs the proven commit, not ${JSON.stringify(sha)}`);
+    const sha = option("sha") || undefined;
     const tip = branchTipOf(branch);
-    if (tip !== sha) fail(`${branch} is at ${String(tip)}, not the proven ${sha}`);
+    const proof = sha !== undefined && COMMIT.test(sha) && tip === sha ? await provenGateOf(sha) : undefined;
+    const refusal = landBindingRefusal({ branch, sha, tip, proof: proof ?? (sha !== undefined && tip === sha ? undefined : { gate: undefined, reason: "" }) });
+    if (refusal !== undefined) fail(refusal);
     if (!git(["fetch", "--quiet", "origin", `+refs/heads/${branch}:refs/remotes/origin/${branch}`], root).ok) fail(`could not fetch ${branch}`);
-    const proof = await provenGateOf(sha);
-    if (proof.gate === undefined) fail(proof.reason);
-    output({ mode, branch, sha, verify });
+    output({ mode, branch, sha: sha!, verify });
     break;
   }
   case "landed-branches": {

@@ -335,3 +335,20 @@ export const readBumpReport = (
   // deploys main, whatever `to` says).
   return { changed, to: report.to, gate: "update", callLand: changed || (expect.running !== undefined && expect.running !== report.to) };
 };
+
+/**
+ * Why land.yml may not land `sha` from `branch` (review B1), or undefined: it lands only the exact commit a trusted job
+ * proved, while the branch still points at it, and only when its proof counts (`proof`: the gate, or why not).
+ */
+export const landBindingRefusal = (input: {
+  readonly branch: string;
+  readonly sha: string | undefined;
+  readonly tip: string | undefined;
+  readonly proof: { readonly gate: "update" | "full" } | { readonly gate: undefined; readonly reason: string } | undefined;
+}): string | undefined => {
+  if (input.sha === undefined || !/^[0-9a-f]{40}$/.test(input.sha)) return `landing ${input.branch} needs the proven commit, not ${JSON.stringify(input.sha ?? "")}`;
+  if (input.tip !== input.sha) return `${input.branch} is at ${input.tip ?? "nothing"}, not the proven ${input.sha}`;
+  if (input.proof === undefined) return `${input.sha}'s proof was not read`;
+  if (input.proof.gate === undefined) return input.proof.reason;
+  return undefined;
+};

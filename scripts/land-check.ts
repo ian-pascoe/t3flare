@@ -12,12 +12,11 @@
 //       (`applyCliPin`: the tarballs downloaded and hashed, the npm lock resolved with `--package-lock-only
 //       --ignore-scripts`, which runs no package code) is byte for byte the proposed one.
 //     - t3 bump: package.json moves only packageManager and engines.node; in a worktree of the candidate with t3code at
-//       the tag (data: nothing of it runs), `gen-workspace.ts --check` regenerates pnpm-workspace.yaml, package.json's two
-//       fields and mise.toml from t3code and requires them equal; `verify-lock.ts` checks the lock's t3 closures, one
-//       effect, the patches and the vendored links; and every package entry in the lock is one main's lock or t3's lock
-//       at the tag holds as it is, or a plain npm registry entry whose integrity the registry confirms (`lockProvenance`).
-//       The lock is not regenerated: `pnpm install` resolves our own packages against the registry, which is neither
-//       deterministic nor free of dependency code.
+//       the tag (data: nothing of it runs), `gen-workspace.ts --check` regenerates pnpm-workspace.yaml, package.json's
+//       two fields and mise.toml from t3code and requires them equal; `verify-lock.ts` holds t3's graph in the lock to
+//       t3's own lock; `t3LockRefusal` holds everything outside that graph to main's or t3's lock (importers, snapshots,
+//       packages, the header); and `lockProvenance` has the npm registry confirm any entry of t3's graph neither lock
+//       holds. The lock is not regenerated: the land runs hours after the proof, and the registry moves.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";

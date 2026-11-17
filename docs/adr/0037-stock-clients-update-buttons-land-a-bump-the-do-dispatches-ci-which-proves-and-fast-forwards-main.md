@@ -34,7 +34,10 @@ CI, never by updating the Environment in place:
    contents and nothing else. It saves no dependency cache: `setup-vp` (`cache: true`) saves the pnpm store in its post
    step under `vite-plus-<os>-<arch>-pnpm-<hash of the lock>` whenever the job passed and missed that key, with restore
    keys down to `vite-plus-<os>-<arch>-`, and `deploy-prod.yml` restores that cache with prod's secrets in the job; the
-   bump jobs therefore set the setup action's `cache: "false"` (review B4). It hands its one commit to the next job as
+   bump jobs therefore set the setup action's `cache: "false"` (review B4). `deploy-prod.yml` itself builds only main's
+   code: a `checked_sha` that is not main's tip is refused on every stage, and only a prod deploy uses the store cache
+   (a `bump` stage deploy neither restores nor saves it), so no job writes a main-scoped cache from code that is not on
+   main (review cycle 3). It hands its one commit to the next job as
    an artifact: a git bundle and its report. The trusted jobs (`plan`, `publish`, `verify-issue`, `land.yml`) run on
    fresh runners with plain Node and main's own scripts (`scripts/updates-ci.ts`, `scripts/land-check.ts`), install
    nothing but `yaml` at main's locked version for a t3 bump, and read the report as untrusted input: every field
@@ -58,9 +61,12 @@ CI, never by updating the Environment in place:
      and the workspace's (overrides with `catalog:` resolved, patches with their files' hashes), pnpm's own document is
      t3's, and outside what t3 moved it is main's. What t3 moved, derived from the t3 side only: its own importers' graph,
      the names its catalog, overrides and patches changed, and the names whose versions changed inside its graph.
-     t3flare's importers keep main's entries except a dependency of a moved name (a `catalog:` specifier may follow the
-     catalog) or a peer suffix; a snapshot outside that graph is main's, or a variant of one of main's that differs only
-     in a moved dependency or a peer suffix; a package outside it is main's. Inside it, every package entry is one main's
+     t3flare's importers keep main's entries (and their other fields) except a peer suffix, or a dependency of a moved
+     name now at a version of the same package that t3's graph or main's or t3's lock already holds (a `catalog:`
+     specifier may follow the catalog). Nothing such an entry reaches is taken on trust (review cycle 3): every snapshot
+     outside t3's graph is main's, or a variant of a snapshot of the same package and version in main's or t3's lock
+     that differs only in a peer suffix, or in a moved dependency still naming the same package; every package outside
+     it is main's or t3's exactly. Inside it, every package entry is one main's
      or t3's lock holds exactly, or a plain registry entry (`resolution: {integrity}` alone) whose integrity the npm
      registry confirms for that name@version. The lock is not regenerated here: `pnpm install` resolves against the
      live registry and is not reproducible later (the fast path lands hours after the proof). For the bump job's lock
@@ -77,7 +83,9 @@ CI, never by updating the Environment in place:
    `bump.yml` on main. Nothing a workflow can read tells the two apart. What bounds it: the land check runs on every
    land regardless of the proof, so such a commit is still only the exact pin (a CLI pin made again byte for byte; a t3
    bump whose workspace, manifest and lock outside t3's graph are main's or t3's), merely one that skipped the gate's
-   tests on the `bump` stage. The proof is the record that the gate ran, not the guard on what lands.
+   tests on the `bump` stage. The proof is the record that the gate ran, not the guard on what lands. And such a
+   Workspace is already owner-equivalent: a workflow it pushes can name the `bump` environment and read its secrets (the
+   Cloudflare token, the GitHub App's key), so opting a Workspace in to changing CI is trusting it with them.
 7. **Land** (`land.yml`, reusable by both kinds) lands exactly the commit `plan` (an Update's fast path) or `publish`
    proved: it refuses unless the pin's branch still points at that commit and the commit's proof counts (review B1),
    then runs the land check, fast-forwards `main` with `GITHUB_TOKEN`, dispatches `deploy-prod.yml` with
@@ -90,8 +98,8 @@ CI, never by updating the Environment in place:
    dispatches the **verify run**: the Full gate on main, which opens an issue when it does not pass for any reason. No
    automatic revert: migrations only go forward; recovery is Safe mode and a revert by the owner. A **dry run**
    (`dry_run`) of either workflow plans, bumps and runs the publish job's land check, and pushes, marks, proposes,
-   lands, deploys and deletes nothing (review B3); `land.yml`'s own dry run, by hand, checks and deploys to the `bump`
-   stage.
+   lands, deploys and deletes nothing (review B3); `land.yml`'s own dry run, by hand, runs its binding to the proof and
+   its land check, and then nothing: no push, no deploy, no branch deleted (review cycle 3).
 8. **Pre-proving.** The nightly bump runs hourly, exits before setup when the newest nightly is pinned or proposed, and
    proposes a new one through the Full gate as a pull request (scheduled runs never land; a newer proposal closes the
    older ones). An Update to a tag already proven on top of main skips the bump and only lands.
@@ -99,7 +107,7 @@ CI, never by updating the Environment in place:
    none is cancelled for a newer one. Every run checks out the tip of `main` when it starts.
 10. **State and outcome.** The Environment DO keeps one record per target (`t3`, one per CLI) in its storage, and finds
    the run by its `run-name` (`Update <id>`, `CLI update <id>`). The same target pressed again joins the run in flight;
-   another is refused. A record has failed 60 minutes after the DO first saw its run out of the queue (a run waiting its
+   another is refused. A record has failed 100 minutes after the DO first saw its run out of the queue (a run waiting its
    turn in the `bump` group is not counted until then; 3 hours queued, or 15 minutes unlisted, has failed). A fiber in t3's runtime follows the run while the
    DO is awake (no alarm), and settles lazily at boot and at the next press. Success is the new build booting:
    `prepareTrial` of our `ServiceLauncherClient` reports the update committed when the stored target is the stamped

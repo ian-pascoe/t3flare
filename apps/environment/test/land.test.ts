@@ -3,7 +3,7 @@
 // `bump.yml` run does.
 import { describe, expect, it } from "vitest";
 
-import { landMode, landRefusal, lockProvenance, planT3, readBumpReport, t3LockRefusal, t3ManifestRefusal, type LandFacts, type T3LockInput } from "../scripts/lib/land.ts";
+import { landBindingRefusal, landMode, landRefusal, lockProvenance, planT3, readBumpReport, t3LockRefusal, t3ManifestRefusal, type LandFacts, type T3LockInput } from "../scripts/lib/land.ts";
 
 const SHA = "cd9c39fe3c25ad71657cc0b8631b6de76775261e";
 const TAG = "v0.1.11-nightly.20261117.4825";
@@ -222,5 +222,23 @@ describe("a t3 bump's lock against main's (B2)", () => {
     const changed = input(base);
     expect(t3LockRefusal({ ...changed, afterWorkspace: { ...changed.afterWorkspace, overrides: { a: "9.9.9" } } })).toMatch(/overrides are not the workspace's/);
     expect(t3LockRefusal({ ...changed, patchHashes: { "x@1.0.0": "abc" } })).toMatch(/patchedDependencies/);
+  });
+});
+
+describe("land.yml's binding to the proven commit (B1)", () => {
+  const sha = "a".repeat(40);
+  const branch = "bump/cli-codex-0.169.0";
+
+  it("lands the proven commit its branch still points at", () => {
+    expect(landBindingRefusal({ branch, sha, tip: sha, proof: { gate: "update" } })).toBeUndefined();
+  });
+
+  it("refuses without the commit, a moved or deleted branch, or a proof that does not count", () => {
+    expect(landBindingRefusal({ branch, sha: undefined, tip: sha, proof: { gate: "full" } })).toMatch(/needs the proven commit/);
+    expect(landBindingRefusal({ branch, sha: "main", tip: sha, proof: { gate: "full" } })).toMatch(/needs the proven commit/);
+    expect(landBindingRefusal({ branch, sha, tip: "b".repeat(40), proof: { gate: "full" } })).toMatch(/is at b+, not the proven/);
+    expect(landBindingRefusal({ branch, sha, tip: undefined, proof: { gate: "full" } })).toMatch(/is at nothing/);
+    expect(landBindingRefusal({ branch, sha, tip: sha, proof: { gate: undefined, reason: "its run is on agent/x, not main" } })).toBe("its run is on agent/x, not main");
+    expect(landBindingRefusal({ branch, sha, tip: sha, proof: undefined })).toMatch(/proof was not read/);
   });
 });
