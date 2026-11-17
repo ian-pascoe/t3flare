@@ -9,8 +9,10 @@ name: Deploy prod
 #
 # The land workflow (land.yml, ADR-0037) dispatches this with `checked_sha`, the commit it just fast-forwarded main to: a
 # push made with GITHUB_TOKEN starts no workflow, so this dispatch is what deploys a landed Update. The job deploys
-# exactly that commit, and on prod only while it is still main's tip. The run's name carries the stage and the commit,
-# which is how land.yml finds it.
+# exactly that commit, and only while it is main's tip, on any stage: this workflow never builds code that is not on
+# main (review cycle 3). The run's name carries the stage and the commit, which is how land.yml finds it.
+# The pnpm store cache (restored, and saved after a pass, under the lock's key) is used on prod only, where the code is
+# main's; a `bump` stage deploy neither restores nor saves it (ADR-0037 §4).
 #
 # Needs, made by `pnpm --filter @t3flare/infra run ci:setup` (infra/github.ts) on the GitHub environment `prod` (main only):
 #   secrets.CLOUDFLARE_API_TOKEN   the account token `t3flare-ci-prod`
@@ -43,7 +45,7 @@ on:
         options: [prod, bump]
         default: prod
       checked_sha:
-        description: "The commit to deploy (land.yml: the proven pin it landed); on prod it must be main's tip"
+        description: "The commit to deploy (land.yml: the proven pin it landed); it must be main's tip"
         required: false
 
 permissions:
@@ -75,9 +77,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # A landed commit deploys to prod only while main is still it (stage.ts also refuses anything but main).
+      # A landed commit deploys only while main is still it, on any stage (stage.ts also refuses prod off main).
       - name: The checked commit is main
-        if: inputs.checked_sha && env.STAGE == 'prod'
+        if: inputs.checked_sha
         run: |
           main=$(git rev-parse origin/main)
           if [ "$main" != "$CHECKED_SHA" ]; then echo "main is $main, not the checked $CHECKED_SHA"; exit 1; fi
@@ -91,8 +93,10 @@ jobs:
         id: version
         run: echo "server=$(git -C t3code describe --tags --exact-match HEAD | sed 's/^v//')" >> "$GITHUB_OUTPUT"
 
-      # Node, pnpm and Vite+ at package.json's versions, then a frozen install (ADR-0030).
+      # Node, pnpm and Vite+ at package.json's versions, then a frozen install (ADR-0030). The store cache on prod only.
       - uses: ./.github/actions/setup
+        with:
+          cache: ${{ (inputs.stage || 'prod') == 'prod' && 'true' || 'false' }}
 
       # SPI-1175: GitHub masks only the whole secret, so its key and header values are masked each on its own, before any
       # step that could print one. The commands go to the runner's log only, never a file.

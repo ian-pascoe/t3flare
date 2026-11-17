@@ -1,7 +1,7 @@
 // @effect-diagnostics extendsNativeError:off
 // In-app Updates' state (ADR-0037; in-app updates plan D7, D9, D19): one record per target in the Environment DO's
 // storage (`t3`, and one per CLI), so a press survives the DO's resets. A press dispatches the target's workflow, and
-// the record follows the run that dispatch made until it ends, or for 60 minutes from its start (UPDATE_EXPIRY_MS), after which it reads as failed. The
+// the record follows the run that dispatch made until it ends, or for 100 minutes from its start (UPDATE_EXPIRY_MS), after which it reads as failed. The
 // same target pressed again re-attaches to the record in flight; a different one is refused while it runs.
 //
 // Promise-based and free of t3: the Effect layers (`selfUpdate.ts`) and the process router (`cliUpdate.ts`) drive it.
@@ -9,12 +9,13 @@ import type { ActionsClient } from "./actions.ts";
 import type { UpdatableCli } from "./pins.ts";
 
 /**
- * How long a record may stay in flight (review A2). Measured from its run's start, not its dispatch: a run waits its
- * turn in the `bump` concurrency group behind other bumps (`queue: max`) for as long as they take. 60 minutes covers the
- * run's own timeouts (the bump job's 20, publish's 15 and the land's 35 are ceilings; a run that hits them has failed
- * already), and orders after t3's 32-minute client wait and the 35-minute replay of a failed outcome (U92).
+ * How long a record may stay in flight (review A2). Measured from when the DO first sees its run out of the queue, not
+ * its dispatch: a run waits its turn in the `bump` concurrency group behind other bumps (`queue: max`) for as long as
+ * they take. 100 minutes covers the run's own timeouts (the bump job's 20, publish's 15 and the land's 60, which waits
+ * out deploy-prod's 45; a run that hits them has failed already), and orders after t3's 32-minute client wait and the
+ * 35-minute replay of a failed outcome (U92).
  */
-export const UPDATE_EXPIRY_MS = 60 * 60_000;
+export const UPDATE_EXPIRY_MS = 100 * 60_000;
 /** A run still waiting its turn this long after the dispatch has failed. */
 export const QUEUED_CEILING_MS = 3 * 60 * 60_000;
 /** A dispatch whose run GitHub never lists within this has failed. */
