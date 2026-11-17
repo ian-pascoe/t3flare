@@ -8,6 +8,7 @@
     "build:web": "pnpm --filter @t3tools/web run build",
     "check": "vp run --log grouped --concurrency-limit 16 check:all",
     "bump": "node scripts/bump.ts",
+    "cli-bump": "node scripts/cli-bump.ts",
     "test:docker": "pnpm --filter @t3flare/environment run test:docker",
     "prepare": "if [ -z \"$CI\" ]; then effect-tsgo patch --typescript; fi && ./scripts/link-tsrs-lint.sh"
   },

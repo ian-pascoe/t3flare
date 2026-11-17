@@ -1,6 +1,7 @@
 // `pnpm run bump`: move t3code to its newest nightly tag and prove it on a deployed stage (ADR-0017).
 //
 //   pnpm run bump [--tag <tag>] [--skip-if-current] [--commit] [--destroy] [--report <file>]
+//                 [--gate full|update]   which gate proves the pin (ADR-0037; default full)
 //                 [--stage <stage>]      deploy and test this throwaway stage instead of `bump`
 //                 [--no-deploy]          stop after the check: no Docker, deploy or acceptance (no secrets needed)
 //                 [--fail-at <step>]     fail the step whose name starts so, to prove the rollback
@@ -20,6 +21,13 @@
 //     `--peer` (step 3): a Peer link from the harness, a forwarded launch, the link fence F1–F12; `--codex --pi`
 //     (step 4a): a Codex and a Pi turn with approvals, resumed after their Containers stopped), then a stock t3
 //     from npm at its newest nightly as the laptop: it links to the stage and forwards a launch (version skew, review C6).
+//
+// The Update gate (`--gate update`, in-app updates plan D4; about 5 minutes): what a stock client's Update waits on. It
+// keeps steps 3, 4 and 6 with the acceptance test's core (pairing, /ws, the SQL adapter, the heavy queries, the boot
+// twice in one isolate, migrations on the stage's database) and `--real-turn`'s one Durable agent turn, and drops
+// test:docker, the CLI turns, terminal and worktree, the Peer link and its fence, and the stock npm nightly's link. The
+// Full gate (the default) is all of it; a landed Update gets the Full gate afterwards as its verify run (D18).
+//
 //  7. Report. On any failure the submodule and PINNED_FILES go back to the last good pin and a frozen install
 //     restores node_modules, so the pin is unchanged (the report's `rollback` says whether that worked); on success
 //     they stay (and are committed with --commit).
@@ -39,6 +47,17 @@ const option = (name: string) => (args.includes(`--${name}`) ? args[args.indexOf
 const reportFile = option("report") ?? path.join(root, "bump-report.json");
 const stage = option("stage") ?? "bump";
 const failAt = option("fail-at");
+const gate = option("gate") ?? "full";
+if (gate !== "full" && gate !== "update") {
+  console.error(`bump: --gate is full or update, not ${gate}`);
+  process.exit(2);
+}
+const fullGate = gate === "full";
+/** The acceptance test's arguments for the gate: the Update gate keeps the core and one Durable agent turn. */
+const ACCEPTANCE_ARGS = {
+  full: ["--threads", "12", "--runs", "4", "--real-turn", "--terminal", "--worktree", "--peer", "--codex", "--pi", "--claude", "--opencode"],
+  update: ["--threads", "12", "--runs", "4", "--real-turn"],
+} as const;
 // Every pnpm command belongs to this workspace, never t3code's (AGENTS.md; review M3).
 process.env.NPM_CONFIG_WORKSPACE_DIR = root;
 
@@ -112,6 +131,7 @@ step("find the newest nightly tag", () => {
 const finish = (ok: boolean, note?: string) => {
   const report = {
     ok,
+    gate,
     from,
     to: to ?? null,
     changed: to !== undefined && to !== from,
@@ -178,11 +198,11 @@ const ok =
     return { ok: result.ok, detail: result.output };
   }) &&
   (flag("no-deploy") ||
-  step("the CLI agents in Docker (test:docker: the pinned Codex and pi, launched as the Workspace launches them)", () => {
+  (!fullGate || step("the CLI agents in Docker (test:docker: the pinned Codex and pi, launched as the Workspace launches them)", () => {
     // In the log whole, and a long tail in the report.
     const result = sh("pnpm", ["run", "test:docker"], environment);
     return { ok: result.ok, detail: result.output };
-  }, LONG_DETAIL_CHARS) &&
+  }, LONG_DETAIL_CHARS)) &&
   step(`deploy the ${stage} stage (build, web client)`, () => {
     const result = sh(process.execPath, ["scripts/stage.ts", "deploy", stage, "--web"], environment);
     return { ok: result.ok, detail: result.output };
@@ -200,21 +220,21 @@ const ok =
     }
     return { ok: false, detail: output };
   }) &&
-  step(`acceptance test against the ${stage} stage`, () => {
+  step(`acceptance test against the ${stage} stage (${gate} gate)`, () => {
     const out = path.join(environment, "dist/bump-acceptance.json");
     fs.rmSync(out, { force: true });
-    const result = sh(process.execPath, ["scripts/stage.ts", "run", stage, "acceptance", "--threads", "12", "--runs", "4", "--real-turn", "--terminal", "--worktree", "--peer", "--codex", "--pi", "--claude", "--opencode", "--out", out], environment, { quiet: true });
+    const result = sh(process.execPath, ["scripts/stage.ts", "run", stage, "acceptance", ...ACCEPTANCE_ARGS[gate], "--out", out], environment, { quiet: true });
     // A failed start answers every route with one line; the boot record says why.
     const health = result.ok ? "" : `\n${sh(process.execPath, ["scripts/stage.ts", "run", stage, "health", "bootRecord,safeMode,runtime"], environment, { quiet: true }).output}`;
     return { ok: result.ok, detail: `${fs.existsSync(out) ? fs.readFileSync(out, "utf8") : result.output}${health}` };
   }, LONG_DETAIL_CHARS) &&
-  step(`a stock t3 nightly from npm links to the ${stage} stage and forwards a launch`, () => {
+  (!fullGate || step(`a stock t3 nightly from npm links to the ${stage} stage and forwards a launch`, () => {
     // stdout alone, outside the workspace (npm warns about workspaces on stderr there).
     const nightly = (spawnSync("npm", ["view", "t3", "dist-tags.nightly"], { cwd: os.tmpdir(), encoding: "utf8" }).stdout ?? "").trim();
     if (nightly === "") return { ok: false, detail: "npm has no nightly t3" };
     const result = sh(process.execPath, ["scripts/stage.ts", "run", stage, "peer-laptop", "--version", nightly, "--skip-repo", "--out", path.join(environment, "dist/bump-peer-laptop.json")], environment, { quiet: true });
     return { ok: result.ok, detail: `t3@${nightly}\n${result.output.slice(-3000)}` };
-  }));
+  })));
 
 if (!ok) {
   rollback();
@@ -228,7 +248,7 @@ if (flag("destroy") && !flag("no-deploy")) {
 if (flag("commit") && to !== from) {
   step("commit the new pin", () => {
     const add = sh("git", ["add", "t3code", ...PINNED_FILES], root);
-    const commit = sh("git", ["commit", "--quiet", "-m", `chore: bump t3code to ${to}`], root);
+    const commit = sh("git", ["commit", "--quiet", "-m", `chore: bump t3code to ${to}`, "-m", `Proven by the ${gate} gate.`], root);
     return { ok: add.ok && commit.ok, detail: commit.output };
   });
 }
