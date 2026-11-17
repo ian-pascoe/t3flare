@@ -11,8 +11,8 @@ name: Deploy prod
 #   vars.CLOUDFLARE_ACCOUNT_ID     the account the stages deploy to
 #   vars.T3FLARE_DOMAIN            prod's custom domain (unset on `bump`, which stays on workers.dev)
 #   secrets.T3FLARE_GITHUB_APP_ID, secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY
-#   secrets.T3FLARE_MODEL_ENDPOINT   the Model endpoint stage.ts sets up through the panel's API after the deploy
-#     (SPI-1175): added when prod has no endpoint of its id, never changed once there. Unset: skipped, and the log says so.
+#   secrets.T3FLARE_MODEL_ENDPOINT   the Model endpoints stage.ts sets up through the panel's API after the deploy
+#     (SPI-1175; one, or a list): each added when prod has no endpoint of its id, never changed once there. Unset: skipped, and the log says so.
 #   secrets.T3_BOOTSTRAP_TOKEN, secrets.T3FLARE_ADMIN_TOKEN   prod's own tokens, the same as the laptop's
 #     (apps/environment/.alchemy/stages/prod.env.json); stage.ts refuses to make new ones for prod in CI.
 # The Access service token's credentials come from alchemy's state on every deploy, so nothing else is stored.

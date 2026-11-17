@@ -15,13 +15,14 @@
  *
  *   GITHUB_REPOSITORY  owner/name (default: ian-pascoe/t3flare)
  *   T3FLARE_GITHUB_APP_ID, T3FLARE_GITHUB_APP_PRIVATE_KEY   (required)
- *   T3FLARE_MODEL_ENDPOINT  the Model endpoint CI's stages set up through the panel's API (SPI-1175; the format is in
- *                      apps/environment/scripts/lib/modelEndpointSpec.ts). Set as the secret T3FLARE_MODEL_ENDPOINT on
- *                      `bump` and `prod`. Unset, neither gets it (and a run removes one an earlier run set): CI's stages
- *                      then have no model, and the bump's real turn fails.
+ *   T3FLARE_MODEL_ENDPOINT  the Model endpoints CI's stages set up through the panel's API (SPI-1175; the format is in
+ *                      apps/environment/scripts/lib/modelEndpointSpec.ts): one, or a list with one per API. The bump's
+ *                      acceptance needs Anthropic Messages (Claude Code) and OpenAI Responses (Codex). Set as the secret
+ *                      T3FLARE_MODEL_ENDPOINT on `bump` and `prod`. Unset, neither gets it (and a run removes one an
+ *                      earlier run set): CI's stages then have no model, and the bump's real turn fails.
  *
- * The Model proxy's settings (MODEL_PROXY_URL, MODEL_PROXY_API_KEY, COMMISSARY_CONTAINER_API_KEY) are no longer read or
- * set (the hard cut, SPI-1176): a run after it removes the ones earlier runs set (`docs/steps/spi-1176-owner-setup.md`).
+ * MODEL_PROXY_URL, MODEL_PROXY_API_KEY and COMMISSARY_CONTAINER_API_KEY are not read: a run removes them where an
+ * earlier run set them (`docs/steps/spi-1176-owner-setup.md`).
  *   T3FLARE_PROD_ENV_FILE  prod's bootstrap and admin tokens, the laptop's (default:
  *                      ../apps/environment/.alchemy/stages/prod.env.json; set it when running from a worktree)
  *
@@ -128,11 +129,11 @@ export default Alchemy.Stack(
       value: accountId,
     });
 
-    // SPI-1175: the Model endpoint both workflows' stages set up through the panel's API, one JSON secret holding its key:
-    // dev.env's T3FLARE_MODEL_ENDPOINT. Never printed.
+    // SPI-1175: the Model endpoints both workflows' stages set up through the panel's API, one JSON secret holding their
+    // keys: dev.env's T3FLARE_MODEL_ENDPOINT (an endpoint, or a list of them). Never printed.
     const endpoint = modelEndpointSpec(process.env);
     if (!endpoint.ok && endpoint.invalid) return yield* Effect.die(new Error(endpoint.reason));
-    const endpointSecret = endpoint.ok ? Redacted.make(modelEndpointSecret(endpoint.spec)) : undefined;
+    const endpointSecret = endpoint.ok ? Redacted.make(modelEndpointSecret(endpoint.specs)) : undefined;
     if (endpointSecret === undefined) yield* Effect.logWarning(`ci:setup: no ${MODEL_ENDPOINT_VAR} secret: ${endpoint.ok ? "" : endpoint.reason}`);
     else yield* GitHub.Secret("BumpModelEndpoint", { ...repo, environment: bump, name: MODEL_ENDPOINT_VAR, value: endpointSecret });
 

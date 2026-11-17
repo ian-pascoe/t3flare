@@ -8,6 +8,7 @@ import { type AdminCall, ensureModelEndpoint } from "../scripts/lib/modelEndpoin
 import { ENDPOINT_APIS, type EndpointApi } from "@t3flare/models/endpoints";
 
 import {
+  cliCoverage,
   keptReportJson,
   maskCommands,
   modelEndpointSecret,
@@ -80,6 +81,17 @@ const stagePanel = (options: { readonly listed?: ReadonlyArray<string> | string;
 
 const noWait = { waitMs: 60_000, sleep: async () => {} };
 
+describe("cliCoverage: every CLI the acceptance test runs has an endpoint for its API", () => {
+  it("names each CLI no endpoint serves, with what it needs; nothing when every one is served", () => {
+    const anth = [{ api: "anthropic-messages" as const }];
+    expect(cliCoverage(["codex", "pi", "claude", "opencode"], anth)).toEqual([{ cli: "codex", needs: "an endpoint speaking openai-responses in T3FLARE_MODEL_ENDPOINT" }]);
+    expect(cliCoverage(["codex", "pi", "claude", "opencode"], [{ api: "openai-responses" }]).map((entry) => entry.cli)).toEqual(["claude"]);
+    expect(cliCoverage(["codex", "pi", "claude", "opencode"], [...anth, { api: "openai-responses" }])).toEqual([]);
+    expect(cliCoverage(["pi", "codex"], []).map((entry) => entry.cli)).toEqual(["pi", "codex"]);
+    expect(cliCoverage([], [])).toEqual([]);
+  });
+});
+
 describe("modelEndpointSpec", () => {
   it("reads T3FLARE_MODEL_ENDPOINT, with defaults for what it leaves out", () => {
     const value = JSON.stringify({ id: "openai", api: "openai-responses", baseUrl: "https://api.openai.com/v1", apiKey: KEY, models: ["gpt-5-mini"] });
@@ -88,13 +100,33 @@ describe("modelEndpointSpec", () => {
       ok: true,
       source: "T3FLARE_MODEL_ENDPOINT",
       spec: { id: "openai", label: "openai", api: "openai-responses", baseUrl: "https://api.openai.com/v1", apiKey: KEY, headers: {}, models: ["gpt-5-mini"] },
+      specs: [{ id: "openai", label: "openai", api: "openai-responses", baseUrl: "https://api.openai.com/v1", apiKey: KEY, headers: {}, models: ["gpt-5-mini"] }],
     });
+  });
+
+  it("reads a list, one endpoint per API, the first being the stage's own; ids unique", () => {
+    const anth = { id: "anth", baseUrl: "https://llm.example.com", apiKey: KEY };
+    const resp = { id: "resp", api: "openai-responses", baseUrl: "https://llm.example.com/v1", apiKey: `${KEY}-2` };
+    const found = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: JSON.stringify([anth, resp]) });
+    if (!found.ok) throw new Error(found.reason);
+    expect(found.specs.map((spec) => [spec.id, spec.api])).toEqual([["anth", "anthropic-messages"], ["resp", "openai-responses"]]);
+    expect(found.spec).toEqual(found.specs[0]);
+    // Both keys are masked and scrubbed, not only the first's.
+    expect(maskCommands({ T3FLARE_MODEL_ENDPOINT: JSON.stringify([anth, resp]) })).toEqual([`::add-mask::${KEY}`, `::add-mask::${KEY}-2`]);
+    expect(keptReportJson({ a: `${KEY}-2` }, { T3FLARE_MODEL_ENDPOINT: JSON.stringify([anth, resp]) })).not.toContain(KEY);
+    // ci:setup writes it back as a list.
+    expect(modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: modelEndpointSecret(found.specs) })).toEqual(found);
+    expect(modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: JSON.stringify([anth, anth]) })).toMatchObject({ ok: false, invalid: true, reason: 'T3FLARE_MODEL_ENDPOINT has the id "anth" twice' });
+    expect(modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: "[]" })).toMatchObject({ ok: false, invalid: true, reason: "T3FLARE_MODEL_ENDPOINT is an empty list" });
+    expect(modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: JSON.stringify([anth, { id: "y" }]) })).toMatchObject({ ok: false, invalid: true, reason: "T3FLARE_MODEL_ENDPOINT[1] has no baseUrl" });
   });
 
   it("reads back the secret ci:setup writes", () => {
     const given = modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: JSON.stringify({ id: "commissary", baseUrl: "https://llm.example.com", apiKey: KEY, match: "^claude-" }) });
     if (!given.ok) throw new Error(given.reason);
-    expect(modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: modelEndpointSecret(given.spec) })).toEqual({ ok: true, source: "T3FLARE_MODEL_ENDPOINT", spec: given.spec });
+    expect(modelEndpointSpec({ T3FLARE_MODEL_ENDPOINT: modelEndpointSecret([given.spec]) })).toEqual({ ok: true, source: "T3FLARE_MODEL_ENDPOINT", spec: given.spec, specs: [given.spec] });
+    // One endpoint is stored as one object, as the owner writes it.
+    expect(JSON.parse(modelEndpointSecret([given.spec]))).toMatchObject({ id: "commissary" });
   });
 
   it("derives nothing from the retired Model proxy's settings (SPI-1176): a missing T3FLARE_MODEL_ENDPOINT is a skip, not an error", () => {
@@ -120,7 +152,7 @@ describe("modelEndpointSpec", () => {
       expect(found.ok, value).toBe(false);
       if (!found.ok) {
         expect(found.invalid).toBe(true);
-        expect(found.reason).toMatch(/^T3FLARE_MODEL_ENDPOINT /);
+        expect(found.reason).toMatch(/^T3FLARE_MODEL_ENDPOINT(\[\d+\])? /);
         expect(found.reason).not.toContain(KEY);
         expect(found.reason).not.toContain("a.example");
       }

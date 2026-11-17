@@ -5,9 +5,10 @@
 //   T3FLARE_ACCESS_CLIENT_ID=… T3FLARE_ACCESS_CLIENT_SECRET=… node scripts/acceptance.ts [--threads 12] [--runs 4] [--out file.json]
 //
 // 1. The admin guard: refused without the admin token, admitted with Access (service token) plus the token.
-// 1b. The Model endpoint (SPI-1175): set up through the Harness panel's API from T3FLARE_MODEL_ENDPOINT; the
-//     text-generation setting then names its default, and the real turn runs on its small model. Without a setting,
-//     skipped and said so: the stage has no model (SPI-1176), so the real turn and the CLI turns fail.
+// 1b. The Model endpoints (SPI-1175): set up through the Harness panel's API from T3FLARE_MODEL_ENDPOINT (one, or one per
+//     API); the text-generation setting then names their default, and the real turn runs on the first one's small
+//     model. Without a setting, skipped and said so: the stage has no model, so the real turn fails. A CLI asked for
+//     (`--codex` …) with no endpoint for its API fails by name before it runs (`cliCoverage`).
 // 2. Auth: the descriptor reports `remote-reachable`; the root `/.well-known/oauth-authorization-server` and
 //    `oauth-protected-resource` documents are t3's, not Access's (ADR-0036); the bootstrap token is refused until pairing
 //    is armed, pairs while armed (what the web client's /pair#token=… does), and is refused again once disarmed.
@@ -37,7 +38,7 @@ import * as fs from "node:fs";
 import { defaultTextModel } from "@t3flare/models/endpoints";
 
 import { adminClient, ensureModelEndpoint } from "./lib/modelEndpoint.ts";
-import { keptReportJson, stageEndpointSpec } from "./lib/modelEndpointSpec.ts";
+import { cliCoverage, keptReportJson, stageEndpointSpec } from "./lib/modelEndpointSpec.ts";
 
 const arg = (name: string, fallback: string) => {
   const index = process.argv.indexOf(`--${name}`);
@@ -117,13 +118,24 @@ const adminCall = adminClient({
 const endpointSpec = stageEndpointSpec(process.env);
 let endpointModel: string | undefined;
 if (endpointSpec.ok) {
-  const result = await ensureModelEndpoint(adminCall, endpointSpec.spec, { overwrite: true, waitMs: 120_000 });
-  report.modelEndpoint = { source: endpointSpec.source, ...result };
-  if (check("Model endpoint set up through the panel's API", result.ok, result) && result.ok) endpointModel = result.turnModel;
+  // Each endpoint given (one per API the CLI agents need); the first one's small model runs the real turn.
+  const results: Array<unknown> = [];
+  for (const spec of endpointSpec.specs) {
+    const result = await ensureModelEndpoint(adminCall, spec, { overwrite: true, waitMs: 120_000 });
+    results.push(result);
+    if (check(`Model endpoint "${spec.id}" set up through the panel's API`, result.ok, result) && result.ok) endpointModel ??= result.turnModel;
+  }
+  report.modelEndpoint = { source: endpointSpec.source, endpoints: results };
 } else {
   report.modelEndpoint = { skipped: endpointSpec.reason };
   check("the Model endpoint's setting is usable", !endpointSpec.invalid, endpointSpec.reason);
 }
+// A CLI agent asked for with no endpoint for its API would be refused at spawn: fail on it here, by name, and run only
+// the covered ones.
+const askedClis = (["codex", "pi", "claude", "opencode"] as const).filter((cli) => process.argv.includes(`--${cli}`));
+const uncovered = cliCoverage(askedClis, endpointSpec.ok ? endpointSpec.specs : []);
+for (const { cli, needs } of uncovered) check(`${cli}: the stage has a Model endpoint for it`, false, `${cli} needs ${needs}`);
+const runsCli = (cli: string) => askedClis.includes(cli as never) && !uncovered.some((entry) => entry.cli === cli);
 
 // 2. Auth.
 const descriptor = (await (await fetch(new URL("/.well-known/t3/environment", base))).json()) as Record<string, any>;
@@ -347,7 +359,7 @@ if (process.argv.includes("--terminal") || process.argv.includes("--worktree")) 
 
 // 8b. CLI agents (step 4a): a Codex and/or a Pi turn in a Workspace's Container, resumed after the Container stopped.
 for (const cli of ["codex", "pi"] as const) {
-  if (!process.argv.includes(`--${cli}`)) continue;
+  if (!runsCli(cli)) continue;
   const { cliAcceptance } = await import("./lib/cliAcceptance.ts");
   const result = await cliAcceptance(cookie, cli);
   report[cli] = result;
@@ -368,7 +380,7 @@ if (peer) {
 
 // 9. Claude Code and OpenCode over ACP (step 4b).
 for (const cli of ["claude", "opencode"] as const) {
-  if (!process.argv.includes(`--${cli}`)) continue;
+  if (!runsCli(cli)) continue;
   const { acpAcceptance } = await import("./lib/acpAcceptance.ts");
   const result = await acpAcceptance(cookie, cli);
   report[cli] = result;

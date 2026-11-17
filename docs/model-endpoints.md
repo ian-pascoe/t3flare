@@ -101,17 +101,26 @@ Nothing is read from a vendor's or Commissary's management API.
   - **Classes** come from each tool's read-only hint; fix a wrong one in Commissary, or for t3flare alone in the panel.
   - **Limits**: calls end after 240 s (Commissary's upstream cap); progress and upstream elicitation are not passed on.
 
-## The stages' Model endpoint
+## The stages' Model endpoints
 
-SPI-1175. After each deploy, `stage.ts` saves one Model endpoint through the Harness panel's own API
+SPI-1175. After each deploy, `stage.ts` saves the stage's Model endpoints through the Harness panel's own API
 (`/_t3flare/harness/api/endpoints`, with the stage's Access service token and admin token), and the acceptance test does
-the same before its turns; its real turn then runs on that endpoint's small model. The endpoint is one setting,
-`T3FLARE_MODEL_ENDPOINT`, a JSON object holding its key
+the same before its turns; its real turn then runs on the first endpoint's small model. They are one setting,
+`T3FLARE_MODEL_ENDPOINT`, a JSON object holding an endpoint and its key, or a list of them
 ([`apps/environment/scripts/lib/modelEndpointSpec.ts`](../apps/environment/scripts/lib/modelEndpointSpec.ts)):
 
 ```sh
 T3FLARE_MODEL_ENDPOINT='{"id":"openai","label":"OpenAI","api":"openai-responses","baseUrl":"https://api.openai.com/v1","apiKey":"sk-…","models":["gpt-5-mini"]}'
 ```
+
+One endpoint speaks one API, and each CLI agent needs its own (Claude Code: Anthropic Messages; Codex: OpenAI
+Responses; OpenCode and pi: either). For every agent, as the nightly bump runs them, give a list with one of each:
+
+```sh
+T3FLARE_MODEL_ENDPOINT='[{"id":"anth","api":"anthropic-messages","baseUrl":"https://<host>","apiKey":"<key>","match":"^claude-"},{"id":"resp","api":"openai-responses","baseUrl":"https://<host>/v1","apiKey":"<key>","models":["<model id>"]}]'
+```
+
+The acceptance test fails by name on a CLI it is asked to run (`--codex` …) that no endpoint serves.
 
 - `id`, `baseUrl` and `apiKey` are required; `label` defaults to the id, `api` to `anthropic-messages`, `headers` to none.
 - Without `models`, the endpoint's own list is read through the panel, keeping the ids the regular expression `match`
@@ -122,13 +131,12 @@ T3FLARE_MODEL_ENDPOINT='{"id":"openai","label":"OpenAI","api":"openai-responses"
 Where it comes from:
 
 - **A laptop:** `T3FLARE_MODEL_ENDPOINT` in the environment or `~/.config/t3flare/dev.env`. Without it, a stage deploys
-  in the setup state and says so. (Until the hard cut a laptop derived Commissary's endpoint from `MODEL_PROXY_URL` and
-  `MODEL_PROXY_API_KEY`; nothing reads those now.)
+  in the setup state and says so.
 - **CI:** the GitHub secret `T3FLARE_MODEL_ENDPOINT` on the `bump` and `prod` environments, set by
   `pnpm --filter @t3flare/infra run ci:setup` from `dev.env`. Run `ci:setup` again after changing the endpoint or
   rotating its key. Without the secret, a deploy and the acceptance test skip the endpoint and say so, and the bump's
   real turn fails: the stage has no model.
-- **prod** gets the endpoint only when it has none of that id: what the owner changes in the panel stays. A removed one
+- **prod** gets each endpoint only when it has none of that id: what the owner changes in the panel stays. A removed one
   comes back at the next deploy while the secret is set; delete the secret to stop that.
 
 A setting that is set but unusable fails the deploy before the Workers are built. In CI, the workflows' first step after
@@ -145,5 +153,5 @@ the setup (`apps/environment/scripts/mask-endpoint.ts`) masks its key and each h
 | "The Model endpoint "<id>" refused its API key …" | The key is wrong, revoked or out of scope: enter it again in the panel |
 | "… is not signed in to <vendor> …" | The sign-in was signed out or its renewal refused: sign in again in the panel |
 | "Usage limit reached" naming an endpoint | That endpoint's limit; the thread resumes at the reset, or pick another endpoint's model |
-| An old Codex thread fails "this Codex thread runs on another Model endpoint than …" | Codex cannot move a thread between providers, the retired proxy's included: start a new thread |
+| An old Codex thread fails "this Codex thread runs on another Model endpoint than …" | Codex cannot move a live thread between Model endpoints: start a new thread |
 | `web_search` says no Anthropic Messages endpoint can search | Add one with an API key (or set the search model to one) |

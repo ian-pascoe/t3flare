@@ -93,7 +93,7 @@ const deploySecrets = (extra: ReadonlyArray<string> = []): Record<string, string
 };
 
 /**
- * SPI-1175: the stage's Model endpoint after a good deploy, through the panel's API with the stage's service token and
+ * SPI-1175: the stage's Model endpoints after a good deploy, through the panel's API with the stage's service token and
  * admin token (lib/modelEndpoint.ts). prod keeps an endpoint already there as the owner left it; a test stage saves it
  * again. Text generation follows the endpoints' default unless the owner picked. The exit status.
  */
@@ -104,12 +104,14 @@ const setUpEndpoint = async (endpoint: ModelEndpointSpecResult): Promise<number>
   }
   const access = JSON.parse(fs.readFileSync(credentialsFile(stage), "utf8")) as { url: string; clientId: string; clientSecret: string };
   const admin = adminClient({ url: access.url, adminToken: stageSecrets().T3FLARE_ADMIN_TOKEN!, clientId: access.clientId, clientSecret: access.clientSecret });
-  const result = await ensureModelEndpoint(admin, endpoint.spec, { overwrite: stage !== "prod", waitMs: 5 * 60_000 });
-  if (!result.ok) {
-    console.error(`t3flare: deployed, but the Model endpoint was not set up: ${result.error}`);
-    return 1;
+  for (const spec of endpoint.specs) {
+    const result = await ensureModelEndpoint(admin, spec, { overwrite: stage !== "prod", waitMs: 5 * 60_000 });
+    if (!result.ok) {
+      console.error(`t3flare: deployed, but the Model endpoint "${spec.id}" was not set up: ${result.error}`);
+      return 1;
+    }
+    console.log(`t3flare: Model endpoint "${result.id}" ${result.outcome} (from ${endpoint.source}, ${result.models} models; its small model ${result.turnModel})`);
   }
-  console.log(`t3flare: Model endpoint "${result.id}" ${result.outcome} (from ${endpoint.source}, ${result.models} models; its small model ${result.turnModel})`);
   return 0;
 };
 
@@ -158,8 +160,8 @@ switch (command) {
       console.error("t3flare: t3code/node_modules/.pnpm exists (a pnpm command ran inside t3code/); remove t3code/node_modules and run `pnpm install`");
       process.exit(2);
     }
-    // SPI-1175: what is bound and set up, decided before anything is built (lib/deployPlan.ts): the stage's Model endpoint
-    // comes from T3FLARE_MODEL_ENDPOINT, else a logged skip (the stage then starts in the setup state, SPI-1176).
+    // SPI-1175: what is bound and set up, decided before anything is built (lib/deployPlan.ts): the stage's Model endpoints
+    // come from T3FLARE_MODEL_ENDPOINT, else a logged skip (the stage then starts in the setup state).
     const plan = deployPlan({ stage, args: rest, read: deploySecrets([MODEL_ENDPOINT_VAR]), env: process.env });
     if (!plan.ok) {
       console.error(`t3flare: ${plan.error}`);

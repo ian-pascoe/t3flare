@@ -6,9 +6,11 @@ name: Nightly bump
 # Needs, made by `pnpm --filter @t3flare/infra run ci:setup` (infra/github.ts):
 #   secrets.CLOUDFLARE_API_TOKEN   the account token `t3flare-ci-bump`
 #   vars.CLOUDFLARE_ACCOUNT_ID     the account the stages deploy to
-#   secrets.T3FLARE_MODEL_ENDPOINT   the Model endpoint stage.ts and the acceptance test set up through the panel's API,
-#     whose small model runs the real turn (SPI-1175). Unset: skipped, said so in the log and the report, and the stage
-#     has no model, so the real turn fails (there is no Model proxy since SPI-1176).
+#   secrets.T3FLARE_MODEL_ENDPOINT   the Model endpoints stage.ts and the acceptance test set up through the panel's API
+#     (SPI-1175): a list with one per API, an Anthropic Messages one first (its small model runs the real turn; Claude
+#     Code, OpenCode and pi run on it) and an OpenAI Responses one (Codex). A CLI with no endpoint for its API fails the
+#     acceptance test by name. Unset: skipped, said so in the log and the report, and the stage has no model, so the
+#     real turn fails.
 # and by `pnpm --filter @t3flare/infra run github-app:setup`: secrets.T3FLARE_GITHUB_APP_ID, secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY.
 # and the repository setting that lets Actions create pull requests (infra/allow-actions-prs.ts).
 # The stage's own bootstrap and admin tokens are made fresh by the job; nothing else is stored.
