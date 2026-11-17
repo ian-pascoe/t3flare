@@ -17,11 +17,13 @@ describe("resolveHarness", () => {
   });
 
   it("has the web tools on with web_search off (a search costs a model request), and the search model switchable (SPI-1054)", () => {
-    expect(resolveHarness(EMPTY_HARNESS).extensions.web).toEqual({ enabled: true, settings: { search: false, searchModel: "claude-haiku-5-5" } });
+    expect(resolveHarness(EMPTY_HARNESS).extensions.web).toEqual({ enabled: true, settings: { search: false, searchModel: "default" } });
     const on = applyChange(EMPTY_HARNESS, { extension: "web", settings: { search: true, searchModel: "claude-sonnet-5-5" } });
     if (!on.ok) throw new Error(on.error);
     expect(resolveHarness(on.harness).extensions.web).toEqual({ enabled: true, settings: { search: true, searchModel: "claude-sonnet-5-5" } });
-    expect(applyChange(EMPTY_HARNESS, { extension: "web", settings: { searchModel: "gpt-9" } })).toMatchObject({ ok: false });
+    // Since SPI-1176 the setting is text, resolved against the Model endpoints at use: any slug is taken, an overlong one is not.
+    expect(applyChange(EMPTY_HARNESS, { extension: "web", settings: { searchModel: "openai/gpt-9" } })).toMatchObject({ ok: true });
+    expect(applyChange(EMPTY_HARNESS, { extension: "web", settings: { searchModel: "x".repeat(301) } })).toMatchObject({ ok: false });
   });
 
   it("has Terminals on with bash's background jobs and a 120x40 viewport (SPI-1057): nothing starts a container until used", () => {
@@ -29,8 +31,8 @@ describe("resolveHarness", () => {
     expect(applyChange(EMPTY_HARNESS, { extension: "termctrl", settings: { cols: 10 } })).toMatchObject({ ok: false });
   });
 
-  it("has the Guardian off (each review is a model request), with Haiku, no thinking, and text rules (SPI-1058)", () => {
-    expect(resolveHarness(EMPTY_HARNESS).extensions.guardian).toEqual({ enabled: false, settings: { model: "claude-haiku-5-5", thinkingLevel: "off", tools: "", commands: "", policy: "" } });
+  it("has the Guardian off (each review is a model request), with the endpoints' small model (default), no thinking, and text rules (SPI-1058)", () => {
+    expect(resolveHarness(EMPTY_HARNESS).extensions.guardian).toEqual({ enabled: false, settings: { model: "default", thinkingLevel: "off", tools: "", commands: "", policy: "" } });
     const on = applyChange(EMPTY_HARNESS, { extension: "guardian", enabled: true, settings: { tools: "bash=review", policy: "Never touch prod." } });
     if (!on.ok) throw new Error(on.error);
     expect(resolveHarness(on.harness).extensions.guardian).toMatchObject({ enabled: true, settings: { tools: "bash=review", policy: "Never touch prod." } });
@@ -47,7 +49,7 @@ describe("resolveHarness", () => {
   it("gives an extension's defaults to a Session whose resolved view predates the entry", () => {
     const { web: _web, ...older } = resolveHarness(EMPTY_HARNESS).extensions;
     const taken = { ...resolveHarness(EMPTY_HARNESS), extensions: older };
-    expect(extensionOf(taken, "web")).toEqual({ enabled: true, settings: { search: false, searchModel: "claude-haiku-5-5" } });
+    expect(extensionOf(taken, "web")).toEqual({ enabled: true, settings: { search: false, searchModel: "default" } });
     expect(extensionOf(taken, "nope")).toEqual({ enabled: false, settings: {} });
   });
 

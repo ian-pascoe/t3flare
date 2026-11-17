@@ -123,7 +123,7 @@ describe("tierOf: extensions", () => {
   it("a change that moves nothing is unchanged; several parts are asked when any is", () => {
     expect(tier({ entity: "extension", stored: EMPTY_HARNESS, change: { extension: "codemode", enabled: true, settings: { inlineBudget: 2_000 } } })).toBe("unchanged");
     expect(tier({ entity: "extension", stored: EMPTY_HARNESS, change: { extension: "termctrl", settings: { cols: 200, backgroundBash: false } } })).toBe("free");
-    expect(tierOf({ entity: "extension", stored: EMPTY_HARNESS, change: { extension: "web", settings: { search: true, searchModel: "claude-haiku-5-5" } } })).toEqual({
+    expect(tierOf({ entity: "extension", stored: EMPTY_HARNESS, change: { extension: "web", settings: { search: true, searchModel: "default" } } })).toEqual({
       tier: "asked",
       reasons: ["web.search: false to true (turned up)"],
     });

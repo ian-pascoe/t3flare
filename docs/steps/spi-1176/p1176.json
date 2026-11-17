@@ -1,0 +1,1089 @@
+{
+  "at": "2026-11-17T01:44:26.575Z",
+  "stage": "p1176",
+  "head": "8a15fd59b93b4934f5d17b402bf309b1e9d7a565",
+  "clean": false,
+  "removedEndpoints": [
+    "comm",
+    "resp"
+  ],
+  "setupState": {
+    "piDurable": {
+      "status": "warning",
+      "message": "No Model endpoint is set up: add one in the Harness panel (/_t3flare/harness), under Model endpoints.",
+      "models": []
+    },
+    "codex": {
+      "status": "warning",
+      "message": "Codex has no Model endpoint to run on: it needs one that speaks OpenAI Responses and that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints.",
+      "models": []
+    },
+    "claudeAgent": {
+      "status": "warning",
+      "message": "Claude Code has no Model endpoint to run on: it needs one that speaks Anthropic Messages and that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints.",
+      "models": []
+    },
+    "opencode": {
+      "status": "warning",
+      "message": "OpenCode has no Model endpoint to run on: it needs one that speaks Anthropic Messages, OpenAI Responses or OpenAI-compatible Completions and that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints.",
+      "models": []
+    },
+    "pi": {
+      "status": "warning",
+      "message": "Pi has no Model endpoint to run on: it needs one that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints.",
+      "models": []
+    }
+  },
+  "setupDurableTurn": {
+    "runs": [
+      "failed"
+    ],
+    "failures": [
+      {
+        "code": "no_model",
+        "message": "No Model endpoint is set up: add one in the Harness panel (/_t3flare/harness), under Model endpoints."
+      }
+    ]
+  },
+  "setupSpawns": {
+    "codex": {
+      "runs": [
+        "failed"
+      ],
+      "said": "Codex has no Model endpoint to run on: it needs one that speaks OpenAI Responses",
+      "errors": [
+        {
+          "title": "Provider session failed to open",
+          "message": "Codex has no Model endpoint to run on: it needs one that speaks OpenAI Responses and that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints."
+        }
+      ]
+    },
+    "pi": {
+      "runs": [
+        "failed"
+      ],
+      "said": "Pi has no Model endpoint to run on: it needs one that lists a model",
+      "errors": [
+        {
+          "title": "Provider session failed to open",
+          "message": "Pi has no Model endpoint to run on: it needs one that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints."
+        }
+      ]
+    },
+    "claude": {
+      "runs": [
+        "failed"
+      ],
+      "said": "Claude Code has no Model endpoint to run on: it needs one that speaks Anthropic Messages",
+      "errors": [
+        {
+          "title": "Provider session failed to open",
+          "message": "Claude Code has no Model endpoint to run on: it needs one that speaks Anthropic Messages and that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints."
+        }
+      ]
+    },
+    "opencode": {
+      "runs": [
+        "failed"
+      ],
+      "said": "OpenCode has no Model endpoint to run on",
+      "errors": [
+        {
+          "title": "Provider session failed to open",
+          "message": "OpenCode has no Model endpoint to run on: it needs one that speaks Anthropic Messages, OpenAI Responses or OpenAI-compatible Completions and that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints."
+        }
+      ]
+    }
+  },
+  "saves": {
+    "comm": 200,
+    "resp": 200
+  },
+  "afterSetup": {
+    "piDurable": {
+      "status": "ready",
+      "message": null,
+      "models": [
+        "comm/claude-haiku-5-5",
+        "resp/claude-haiku-5-5"
+      ]
+    },
+    "codex": {
+      "status": "ready",
+      "message": null,
+      "models": [
+        "resp/claude-haiku-5-5"
+      ]
+    },
+    "claudeAgent": {
+      "status": "ready",
+      "message": "Runs Claude Code in the Workspace's Container on the Anthropic Messages Model endpoints; the binary, home, launch arguments and custom models settings are not used.",
+      "models": [
+        "comm/claude-haiku-5-5"
+      ]
+    },
+    "opencode": {
+      "status": "ready",
+      "message": "Runs OpenCode in the Workspace's Container on the Anthropic Messages, OpenAI Responses and OpenAI-compatible Model endpoints; the binary, server URL, password and custom models settings are not used.",
+      "models": [
+        "comm/claude-haiku-5-5",
+        "resp/claude-haiku-5-5"
+      ]
+    },
+    "pi": {
+      "status": "ready",
+      "message": null,
+      "models": [
+        "comm/claude-haiku-5-5",
+        "resp/claude-haiku-5-5"
+      ]
+    }
+  },
+  "textGeneration": {
+    "instanceId": "piDurable",
+    "model": "comm/claude-haiku-5-5"
+  },
+  "durableTurn": {
+    "ok": true,
+    "failures": [],
+    "fixture": "ian-pascoe/t3flare-fixture",
+    "model": "comm/claude-haiku-5-5",
+    "clone": {
+      "destination": "/w/acceptance-mwk178f8",
+      "ms": 7737,
+      "cwd": "/w/acceptance-mwk178f8",
+      "error": null
+    },
+    "turn": {
+      "threadId": "644762bf-6644-4920-9d2b-e0a6c3741cd9",
+      "runs": [
+        "completed"
+      ],
+      "approvals": [
+        {
+          "kind": "file-change",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "edit": {
+        "fileName": "src/greeting.txt",
+        "status": "completed"
+      },
+      "bash": {
+        "input": "cd /w/acceptance-mwk178f8 && bash test.sh",
+        "status": "completed",
+        "exitCode": 0
+      },
+      "checkpointFiles": [
+        {
+          "path": "src/greeting.txt",
+          "kind": "modified",
+          "additions": 1,
+          "deletions": 0
+        }
+      ],
+      "ms": 33685
+    },
+    "checkpointOps": [
+      "has:do",
+      "capture:do",
+      "has:do",
+      "capture:do",
+      "has:do",
+      "diff:container",
+      "authored:do"
+    ],
+    "commit": {
+      "events": [
+        "action_started",
+        "phase_started",
+        "hook_output",
+        "hook_output",
+        "action_finished"
+      ],
+      "failure": null,
+      "result": {
+        "status": "created",
+        "commitSha": "b2dac6631390bcca94256ad6de245910d3b30233",
+        "subject": "acceptance: t3's commit action"
+      },
+      "head": {
+        "sha": "b2dac6631390bcca94256ad6de245910d3b30233",
+        "subject": "acceptance: t3's commit action",
+        "files": [
+          "src/greeting.txt"
+        ]
+      },
+      "ms": 11677
+    },
+    "ms": 47360
+  },
+  "turns": {
+    "codex": {
+      "model": "resp/claude-haiku-5-5",
+      "runs": [
+        {
+          "id": "run:thread:d7494d9d-b687-49a9-ad51-afe34abc7b28:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "reasoning",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "/bin/bash -c 'cat -A src/greeting.txt; echo \"---\"; ls -la src test.sh 2>&1'",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "file_change",
+          "status": "completed",
+          "fileName": "/w/p1176-codex-mwk14ouo/src/greeting.txt",
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "/bin/bash -c 'cat -A src/greeting.txt; echo \"--- test ---\"; bash test.sh; echo \"exit=$?\"'",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        }
+      ],
+      "text": "I'll check the current contents of `src/greeting.txt` first.The file has one line ending in a newline, so I'll append the new line after it.Yes, `bash test.sh` passed: it printed \"all checks passed\" after I appended `Hello through the relay.` as the last line of `src/greeting.txt`.",
+      "requests": [
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1e730-1285-7122-908c-f0613ced897a:native-request:toolu_017E63ucVpZAQJAfZL3WhhGP:87e763d1-7dbf-46a3-9cf9-ef7281f862d8",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1e730-1285-7122-908c-f0613ced897a:native-request:toolu_01VdfuTB1bz5nWiKaS7jpQ3E:24b240a4-fce6-4ae4-adae-1032c7641f0e",
+          "kind": "file-change",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "id": "runtime-request:provider:codex:provider-turn:provider-turn%3Aprovider%3Acodex%3Anative-turn%3A01a1e730-1285-7122-908c-f0613ced897a:native-request:toolu_013m7gnLNC8f3vXQsTU7msxa:15df5d18-7d59-4429-bc82-4690c663d4d6",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "edited": "1"
+    },
+    "claude": {
+      "model": "comm/claude-haiku-5-5",
+      "runs": [
+        {
+          "id": "run:thread:a572ccde-1848-458f-a76a-f662c0e4a84b:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "dynamic_tool",
+          "status": "completed",
+          "title": "Read /w/p1176-claude-mwk14ouo/src/greeting.txt",
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "title": "Terminal",
+          "fileName": null,
+          "input": "Terminal"
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "title": "Tool",
+          "fileName": null,
+          "input": "od -c /w/p1176-claude-mwk14ouo/src/greeting.txt"
+        },
+        {
+          "type": "file_change",
+          "status": "completed",
+          "title": "Edit src/greeting.txt",
+          "fileName": "/w/p1176-claude-mwk14ouo/src/greeting.txt",
+          "input": null
+        },
+        {
+          "type": "dynamic_tool",
+          "status": "completed",
+          "title": "Action required",
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "title": "Terminal",
+          "fileName": null,
+          "input": "Terminal"
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "title": "bash test.sh",
+          "fileName": null,
+          "input": "bash test.sh"
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        }
+      ],
+      "text": "Yes, `bash test.sh` passed: it printed \"all checks passed\" after I added `Hello from the CLI.` as the new last line of [src/greeting.txt](/w/p1176-claude-mwk14ouo/src/greeting.txt).",
+      "requests": [
+        {
+          "id": "runtime-request:provider:claudeAgent:provider-turn:provider-turn%3Aprovider%3AclaudeAgent%3Anative-turn%3Aprovider-instance%253AclaudeAgent%253A569f980b-1a70-41ca-8435-4d5ccede4a05%253Aturn%253A1:native-request:toolu_016ADB2kAP3py1SL3HBtJYo6:a66044c7-e971-4878-95aa-05777fbf3d3d",
+          "kind": "file-change",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        },
+        {
+          "id": "runtime-request:provider:claudeAgent:provider-turn:provider-turn%3Aprovider%3AclaudeAgent%3Anative-turn%3Aprovider-instance%253AclaudeAgent%253A569f980b-1a70-41ca-8435-4d5ccede4a05%253Aturn%253A1:native-request:toolu_01GqFTBvLfty3xYukB13MyWX:ee92995b-f6bb-4b9a-b014-9eac55aca5a8",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        }
+      ],
+      "edited": "1"
+    },
+    "opencode": {
+      "model": "comm/claude-haiku-5-5",
+      "runs": [
+        {
+          "id": "run:thread:509b55c3-b2f0-43be-87ef-32b18a5757ec:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "dynamic_tool",
+          "status": "completed",
+          "title": "Read /w/p1176-opencode-mwk14ouo/src/greeting.txt",
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "file_change",
+          "status": "completed",
+          "title": "Tool",
+          "fileName": "/w/p1176-opencode-mwk14ouo/src/greeting.txt",
+          "input": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "title": "Tool",
+          "fileName": null,
+          "input": "bash test.sh"
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        }
+      ],
+      "text": "The test passed: `bash test.sh` printed \"all checks passed\" after I added `Hello from the CLI.` as the new last line of [greeting.txt](/w/p1176-opencode-mwk14ouo/src/greeting.txt).",
+      "requests": [
+        {
+          "id": "runtime-request:provider:opencode:provider-turn:provider-turn%3Aprovider%3Aopencode%3Anative-turn%3Aprovider-instance%253Aopencode%253Ases_e18cecb8dffef6fqFlo648tNOL%253Aturn%253A1:native-request:toolu_01ReB9WGBknzVv9A6rPrunE1:12ebad77-a9e5-437b-82d5-a0a1b9c26ae3",
+          "kind": "file-change",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        },
+        {
+          "id": "runtime-request:provider:opencode:provider-turn:provider-turn%3Aprovider%3Aopencode%3Anative-turn%3Aprovider-instance%253Aopencode%253Ases_e18cecb8dffef6fqFlo648tNOL%253Aturn%253A1:native-request:toolu_01V7erLYX69sVXgGN6f4n5bK:489013ab-ee11-4cc1-8dae-c72be54037a4",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": "accept",
+          "options": []
+        }
+      ],
+      "edited": "1"
+    },
+    "pi": {
+      "model": "comm/claude-haiku-5-5",
+      "runs": [
+        {
+          "id": "run:thread:60dded7f-0d6f-4f07-bc18-b9e418a22c26:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "reasoning",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "dynamic_tool",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "file_change",
+          "status": "completed",
+          "fileName": "src/greeting.txt",
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "bash test.sh",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        }
+      ],
+      "text": "The test passed: `bash test.sh` printed \"all checks passed\" after I added `Hello from the CLI.` as the new last line of `src/greeting.txt`.",
+      "requests": [
+        {
+          "id": "runtime-request:provider:pi:provider-turn:provider-turn%3Aprovider%3Api%3Anative-turn%3Aprovider-thread%253Aprovider%253Api%253Anative-thread%253Apending%25253Arun%25253Athread%25253A60dded7f-0d6f-4f07-bc18-b9e418a22c26%25253Aordinal%25253A1%253Aattempt%253Arun-attempt%253Arun%253Arun%25253Athread%25253A60dded7f-0d6f-4f07-bc18-b9e418a22c26%25253Aordinal%25253A1%253Aattempt%253A1:native-request:8b0a44c1-dcf7-4e43-89eb-ec7372d3c41f:3b713fee-57fa-4acf-bae1-73f845266b13",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": null
+        },
+        {
+          "id": "runtime-request:provider:pi:provider-turn:provider-turn%3Aprovider%3Api%3Anative-turn%3Aprovider-thread%253Aprovider%253Api%253Anative-thread%253Apending%25253Arun%25253Athread%25253A60dded7f-0d6f-4f07-bc18-b9e418a22c26%25253Aordinal%25253A1%253Aattempt%253Arun-attempt%253Arun%253Arun%25253Athread%25253A60dded7f-0d6f-4f07-bc18-b9e418a22c26%25253Aordinal%25253A1%253Aattempt%253A1:native-request:39658f4e-f030-497b-b8e3-9ac31543d76d:8b733799-4850-4682-90f8-a3502bed4c3c",
+          "kind": "command",
+          "requestKind": null,
+          "status": "resolved",
+          "decision": null
+        }
+      ],
+      "edited": "1"
+    }
+  },
+  "oldDurable": {
+    "model": "anthropic/claude-haiku-5-5",
+    "ok": true,
+    "failures": [],
+    "turn": {
+      "threadId": "6121e41a-c62c-419f-b4b6-fe6bf4f0e706",
+      "runs": [
+        "completed"
+      ],
+      "approvals": [
+        {
+          "kind": "file-change",
+          "status": "resolved",
+          "decision": "accept"
+        },
+        {
+          "kind": "command",
+          "status": "resolved",
+          "decision": "accept"
+        }
+      ],
+      "edit": {
+        "fileName": "/w/acceptance-mwk1bdgj/src/greeting.txt",
+        "status": "completed"
+      },
+      "bash": {
+        "input": "cd /w/acceptance-mwk1bdgj && bash test.sh",
+        "status": "completed",
+        "exitCode": 0
+      },
+      "checkpointFiles": [
+        {
+          "path": "src/greeting.txt",
+          "kind": "modified",
+          "additions": 1,
+          "deletions": 0
+        }
+      ],
+      "ms": 29054
+    }
+  },
+  "oldSelections": {
+    "codex": {
+      "model": "gpt-6-luna",
+      "runs": [
+        {
+          "id": "run:thread:57bb754e-98ee-4e7f-a303-ba93ecfa1f77:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "/bin/bash -c 'cat src/greeting.txt'",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        }
+      ],
+      "text": "done"
+    },
+    "pi": {
+      "model": "anthropic/claude-haiku-5-5",
+      "runs": [
+        {
+          "id": "run:thread:c6c3fef2-1329-4be5-ac11-22568d1368a9:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "fileName": null,
+          "input": "cat src/greeting.txt",
+          "exitCode": 0
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "fileName": null,
+          "input": null,
+          "exitCode": null
+        }
+      ],
+      "text": "done"
+    },
+    "claude": {
+      "model": "anthropic/claude-sonnet-5-5",
+      "runs": [
+        {
+          "id": "run:thread:4541f8af-c789-4a82-8e76-4555c28f10ad:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "title": "Terminal",
+          "fileName": null,
+          "input": "Terminal"
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "title": "Tool",
+          "fileName": null,
+          "input": "cat src/greeting.txt"
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        }
+      ],
+      "text": "done"
+    },
+    "opencode": {
+      "model": "anthropic/claude-sonnet-5-5",
+      "runs": [
+        {
+          "id": "run:thread:b1e04fae-62de-47a0-9691-12ecdd3684bd:ordinal:1",
+          "status": "completed",
+          "failure": null
+        }
+      ],
+      "items": [
+        {
+          "type": "user_message",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "command_execution",
+          "status": "completed",
+          "title": "Tool",
+          "fileName": null,
+          "input": "cat src/greeting.txt"
+        },
+        {
+          "type": "approval_request",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "assistant_message",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        },
+        {
+          "type": "checkpoint",
+          "status": "completed",
+          "title": null,
+          "fileName": null,
+          "input": null
+        }
+      ],
+      "text": "done"
+    }
+  },
+  "leak": {
+    "codex": {
+      "do": [],
+      "hits": [],
+      "files": 675,
+      "notScanned": [],
+      "lookedFor": [
+        "endpoint:comm",
+        "endpoint:resp"
+      ]
+    },
+    "pi": {
+      "do": [],
+      "hits": [],
+      "files": 615,
+      "notScanned": [],
+      "lookedFor": [
+        "endpoint:comm",
+        "endpoint:resp"
+      ]
+    },
+    "claude": {
+      "do": [],
+      "hits": [],
+      "files": 610,
+      "notScanned": [],
+      "lookedFor": [
+        "endpoint:comm",
+        "endpoint:resp"
+      ]
+    },
+    "opencode": {
+      "do": [],
+      "hits": [],
+      "files": 609,
+      "notScanned": [],
+      "lookedFor": [
+        "endpoint:comm",
+        "endpoint:resp"
+      ]
+    }
+  },
+  "retired": {
+    "route": "404",
+    "nonces": "0"
+  },
+  "relayLog": {
+    "entries": 25,
+    "byCli": {
+      "codex": [
+        "resp 200"
+      ],
+      "claude": [
+        "comm 200"
+      ],
+      "opencode": [
+        "comm 200"
+      ],
+      "pi": [
+        "comm 200"
+      ]
+    }
+  },
+  "checks": [
+    {
+      "name": "piDurable needs setup with no endpoint: warning, no model, pointing to the Harness panel",
+      "ok": true
+    },
+    {
+      "name": "codex needs setup with no endpoint: warning, no model, pointing to the Harness panel",
+      "ok": true
+    },
+    {
+      "name": "claudeAgent needs setup with no endpoint: warning, no model, pointing to the Harness panel",
+      "ok": true
+    },
+    {
+      "name": "opencode needs setup with no endpoint: warning, no model, pointing to the Harness panel",
+      "ok": true
+    },
+    {
+      "name": "pi needs setup with no endpoint: warning, no model, pointing to the Harness panel",
+      "ok": true
+    },
+    {
+      "name": "a Pi Durable turn with no endpoint fails, saying to set one up in the Harness panel",
+      "ok": true
+    },
+    {
+      "name": "a codex spawn with no endpoint for its API is refused, saying which it needs",
+      "ok": true
+    },
+    {
+      "name": "a pi spawn with no endpoint for its API is refused, saying which it needs",
+      "ok": true
+    },
+    {
+      "name": "a claude spawn with no endpoint for its API is refused, saying which it needs",
+      "ok": true
+    },
+    {
+      "name": "a opencode spawn with no endpoint for its API is refused, saying which it needs",
+      "ok": true
+    },
+    {
+      "name": "two API-key endpoints saved through the panel's API",
+      "ok": true
+    },
+    {
+      "name": "piDurable is ready once an endpoint for it is set up",
+      "ok": true
+    },
+    {
+      "name": "codex is ready once an endpoint for it is set up",
+      "ok": true
+    },
+    {
+      "name": "claudeAgent is ready once an endpoint for it is set up",
+      "ok": true
+    },
+    {
+      "name": "opencode is ready once an endpoint for it is set up",
+      "ok": true
+    },
+    {
+      "name": "pi is ready once an endpoint for it is set up",
+      "ok": true
+    },
+    {
+      "name": "Codex lists only the Responses endpoint's model, the others the Anthropic one's",
+      "ok": true
+    },
+    {
+      "name": "text generation's setting names the endpoints' small model",
+      "ok": true
+    },
+    {
+      "name": "a Pi Durable turn with tools on the endpoint: the edit and the test run approved, the checkpoint and t3's commit",
+      "ok": true
+    },
+    {
+      "name": "a codex turn with tools on resp/claude-haiku-5-5 through the relay: the file edited, the test run",
+      "ok": true
+    },
+    {
+      "name": "a claude turn with tools on comm/claude-haiku-5-5 through the relay: the file edited, the test run",
+      "ok": true
+    },
+    {
+      "name": "a opencode turn with tools on comm/claude-haiku-5-5 through the relay: the file edited, the test run",
+      "ok": true
+    },
+    {
+      "name": "a pi turn with tools on comm/claude-haiku-5-5 through the relay: the file edited, the test run",
+      "ok": true
+    },
+    {
+      "name": "a Pi Durable turn on anthropic/claude-haiku-5-5 (a proxy-era selection) runs on the default model",
+      "ok": true
+    },
+    {
+      "name": "a codex thread on its proxy-era model (gpt-6-luna) runs on the default model",
+      "ok": true
+    },
+    {
+      "name": "a pi thread on its proxy-era model (anthropic/claude-haiku-5-5) runs on the default model",
+      "ok": true
+    },
+    {
+      "name": "a claude thread on its proxy-era model (anthropic/claude-sonnet-5-5) runs on the default model",
+      "ok": true
+    },
+    {
+      "name": "a opencode thread on its proxy-era model (anthropic/claude-sonnet-5-5) runs on the default model",
+      "ok": true
+    },
+    {
+      "name": "the leak scan in codex's Container finds no key and scanned every one",
+      "ok": true
+    },
+    {
+      "name": "the leak scan in pi's Container finds no key and scanned every one",
+      "ok": true
+    },
+    {
+      "name": "the leak scan in claude's Container finds no key and scanned every one",
+      "ok": true
+    },
+    {
+      "name": "the leak scan in opencode's Container finds no key and scanned every one",
+      "ok": true
+    },
+    {
+      "name": "the retired key route gives nothing, and no process holds a nonce",
+      "ok": true
+    },
+    {
+      "name": "no key and no handle in either Worker's log",
+      "ok": true
+    },
+    {
+      "name": "no log names a Model proxy key route grant",
+      "ok": true
+    }
+  ],
+  "failures": [],
+  "ok": true
+}
