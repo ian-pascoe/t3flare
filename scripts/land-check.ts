@@ -19,12 +19,13 @@
 //       The lock is not regenerated: `pnpm install` resolves our own packages against the registry, which is neither
 //       deterministic nor free of dependency code.
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
 import { applyCliPin, CLI_PIN_FILES, cliPinRefusal, type PinFiles } from "../apps/environment/scripts/lib/cliPins.ts";
-import { landRefusal, lockProvenance, t3ManifestRefusal } from "../apps/environment/scripts/lib/land.ts";
+import { landRefusal, lockProvenance, t3LockRefusal, t3ManifestRefusal } from "../apps/environment/scripts/lib/land.ts";
 import { COMMIT, pinOf, type Pin } from "../apps/environment/src/updates/pins.ts";
 import { tagCommitOf } from "./lib/updatesGit.ts";
 
@@ -109,13 +110,20 @@ if (pin.kind === "cli") {
       if (result.status !== 0) refuse(`${script} failed on the candidate: ${`${result.stdout}${result.stderr}`.slice(-2000)}`);
     }
     const { readLock } = await import("./lock.ts");
+    const { parse } = await import("yaml");
     const mainLockFile = path.join(tree, "main-pnpm-lock.yaml");
     fs.writeFileSync(mainLockFile, show(base, "pnpm-lock.yaml"));
-    const provenance = lockProvenance(
-      readLock(path.join(tree, "pnpm-lock.yaml")).documents,
-      readLock(mainLockFile).documents,
-      readLock(path.join(tree, "t3code/pnpm-lock.yaml")).documents,
+    const [afterLock, mainLock, t3Lock] = [readLock(path.join(tree, "pnpm-lock.yaml")), readLock(mainLockFile), readLock(path.join(tree, "t3code/pnpm-lock.yaml"))];
+    const afterWorkspace = parse(fs.readFileSync(path.join(tree, "pnpm-workspace.yaml"), "utf8")) as Record<string, any>;
+    const patchHashes = Object.fromEntries(
+      Object.entries<string>(afterWorkspace.patchedDependencies ?? {})
+        .map(([key, file]) => [key, createHash("sha256").update(fs.readFileSync(path.join(tree, file))).digest("hex")] as const)
+        .sort(([x], [y]) => x.localeCompare(y)),
     );
+    // Review B2: outside t3's graph, the lock is main's.
+    const diff = t3LockRefusal({ after: afterLock, main: mainLock, t3: t3Lock, mainWorkspace: parse(show(base, "pnpm-workspace.yaml")) as Record<string, any>, afterWorkspace, patchHashes });
+    if (diff !== undefined) refuse(diff);
+    const provenance = lockProvenance(afterLock.documents, mainLock.documents, t3Lock.documents);
     if (provenance.refused.length > 0) refuse(`the lock holds entries neither main's nor t3's lock vouches for, outside the npm registry: ${provenance.refused.slice(0, 10).join(", ")}`);
     for (const entry of provenance.registry) {
       const response = await fetch(`https://registry.npmjs.org/${entry.name.replace("/", "%2F")}/${entry.version}`, { headers: { accept: "application/json" } });

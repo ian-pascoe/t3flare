@@ -36,6 +36,6 @@ for (let round = 1; ; round++) {
     process.exit(1);
   }
   run(process.execPath, ["scripts/seed-lock.ts"]);
-  run("pnpm", ["install", "--no-frozen-lockfile"]);
+  run("pnpm", ["install", "--no-frozen-lockfile", "--fix-lockfile"]);
 }
 run(process.execPath, ["scripts/verify-lock.ts"]);

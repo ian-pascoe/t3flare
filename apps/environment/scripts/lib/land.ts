@@ -2,6 +2,7 @@
 // updates plan D4; review F2, F3). The facts come from git and GitHub (`scripts/land-check.ts`, `scripts/updates-ci.ts`);
 // the files themselves were written by a job that ran upstream code, so nothing here trusts their content: each rule
 // checks it. Dependency-free.
+import { bareKey, closure, DEPENDENCY_FIELDS, importerKey, type Json, nameOfKey, reachableFrom } from "../../../../scripts/lockGraph.ts";
 import { compareVersions, CLI_PIN_FILES, EXACT_VERSION, NIGHTLY_TAG, type Pin, T3_PIN_FILES } from "../../src/updates/pins.ts";
 
 export const LAND_ALLOWLIST = { t3: T3_PIN_FILES, cli: CLI_PIN_FILES } as const;
@@ -102,6 +103,112 @@ export const lockProvenance = (after: LockDocuments, main: LockDocuments, t3: Lo
     }
   }
   return { refused, registry };
+};
+
+const T3_IMPORTER = "t3code/";
+const sameJson = (a: unknown, b: unknown) => stable(a) === stable(b);
+
+/** The package names a workspace's catalog, overrides and patches move between `before` and `after` (both t3-derived). */
+export const workspaceMovedNames = (before: Json, after: Json): Set<string> => {
+  const names = new Set<string>();
+  for (const field of ["catalog", "overrides", "patchedDependencies"]) {
+    const [a, b] = [before[field] ?? {}, after[field] ?? {}] as [Json, Json];
+    for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      if (sameJson(a[key], b[key])) continue;
+      // `a@1.2>b`: both a and b move.
+      for (const segment of key.split(">")) names.add(/^(@?[^@]+)/.exec(segment)?.[1] ?? segment);
+    }
+  }
+  return names;
+};
+
+export interface T3LockInput {
+  /** The candidate's lock, main's, and t3's own at the tag: each the main document and every document. */
+  readonly after: { readonly main: Json; readonly documents: ReadonlyArray<Json> };
+  readonly main: { readonly main: Json; readonly documents: ReadonlyArray<Json> };
+  readonly t3: { readonly main: Json; readonly documents: ReadonlyArray<Json> };
+  /** pnpm-workspace.yaml on main, and the candidate's (which `gen-workspace.ts --check` made from t3 at the tag). */
+  readonly mainWorkspace: Json;
+  readonly afterWorkspace: Json;
+  /** sha256 of each patch file the candidate's workspace names, by its key, computed by the trusted job. */
+  readonly patchHashes: Readonly<Record<string, string>>;
+}
+
+/**
+ * The t3 bump's lock against main's (review B2): it may differ only where t3 moved. Allowed to change, all derived from
+ * the t3 side: t3's own importers and everything they install (`verify-lock.ts` holds that closure to t3's own lock),
+ * the names t3's catalog, overrides and patches moved, and the names whose versions moved inside t3's closure. Outside
+ * that, t3flare's importers and every snapshot and package are main's: an entry may differ only in a dependency whose
+ * name moved, or in a peer suffix. The header is t3's (settings, catalogs) and the workspace's (overrides, patches with
+ * their files' hashes); pnpm's own document is t3's. Returns why not, or undefined.
+ */
+export const t3LockRefusal = (input: T3LockInput): string | undefined => {
+  const { after, main, t3 } = input;
+  const [lock, base] = [after.main, main.main];
+  for (const field of ["lockfileVersion", "settings", "catalogs", "packageExtensionsChecksum"]) {
+    if (!sameJson(lock[field], t3.main[field])) return `the lock's ${field} is not t3's`;
+  }
+  if (!sameJson(lock.overrides ?? {}, input.afterWorkspace.overrides ?? {})) return "the lock's overrides are not the workspace's";
+  if (!sameJson(lock.patchedDependencies ?? {}, input.patchHashes)) return "the lock's patchedDependencies are not the workspace's patches";
+  const env = (documents: ReadonlyArray<Json>, mainDocument: Json) => documents.filter((document) => document !== mainDocument);
+  if (!sameJson(env(after.documents, lock), env(t3.documents, t3.main))) return "pnpm's own document is not t3's";
+
+  const t3Importers = (doc: Json) => Object.keys(doc.importers ?? {}).filter((dir) => dir.startsWith(T3_IMPORTER));
+  const ours = (doc: Json) => Object.keys(doc.importers ?? {}).filter((dir) => !dir.startsWith(T3_IMPORTER)).sort();
+  const inT3 = closure(lock, t3Importers(lock));
+  const versionsOf = (keys: Iterable<string>) => new Set([...keys].map(bareKey));
+  const [beforeT3, afterT3] = [versionsOf(closure(base, t3Importers(base))), versionsOf(inT3)];
+  const moved = workspaceMovedNames(input.mainWorkspace, input.afterWorkspace);
+  for (const key of [...beforeT3].filter((key) => !afterT3.has(key)).concat([...afterT3].filter((key) => !beforeT3.has(key)))) moved.add(nameOfKey(key));
+
+  // t3flare's importers: main's, but for dependencies whose name t3 moved.
+  if (!sameJson(ours(lock), ours(base))) return "t3flare's importers are not main's";
+  const changedRoots: Array<string> = [];
+  for (const dir of ours(lock)) {
+    for (const field of DEPENDENCY_FIELDS) {
+      const [now, was] = [(lock.importers[dir][field] ?? {}) as Json, (base.importers[dir][field] ?? {}) as Json];
+      if (!sameJson(Object.keys(now).sort(), Object.keys(was).sort())) return `${dir}'s ${field} are not main's`;
+      for (const name of Object.keys(now)) {
+        if (sameJson(now[name], was[name])) continue;
+        if (!moved.has(name)) return `${dir} repoints ${name}, which t3 did not move`;
+        if (now[name].specifier !== was[name].specifier && !String(was[name].specifier).startsWith("catalog:")) return `${dir} changes ${name}'s specifier`;
+        const key = importerKey(name, String(now[name].version));
+        if (key !== undefined) changedRoots.push(key);
+      }
+    }
+  }
+
+  // Snapshots: t3's closure and what the moved importer entries reach may change; any other is main's, or a variant of
+  // one of main's whose dependencies differ only in a moved name or a peer suffix.
+  const free = reachableFrom(lock, [...inT3, ...changedRoots]);
+  const differsOnlyWhereMoved = (now: Json, was: Json) => {
+    const { dependencies: d1, optionalDependencies: o1, ...rest1 } = now;
+    const { dependencies: d2, optionalDependencies: o2, ...rest2 } = was;
+    if (!sameJson(rest1, rest2)) return false;
+    for (const [a, b] of [[d1 ?? {}, d2 ?? {}], [o1 ?? {}, o2 ?? {}]] as Array<[Json, Json]>) {
+      if (!sameJson(Object.keys(a).sort(), Object.keys(b).sort())) return false;
+      for (const name of Object.keys(a)) {
+        if (a[name] === b[name] || moved.has(name)) continue;
+        if (bareKey(`${name}@${a[name]}`) !== bareKey(`${name}@${b[name]}`)) return false;
+      }
+    }
+    return true;
+  };
+  const variants = new Map<string, Array<string>>();
+  for (const key of Object.keys(base.snapshots ?? {})) variants.set(bareKey(key), [...(variants.get(bareKey(key)) ?? []), key]);
+  for (const [key, entry] of Object.entries<Json>(lock.snapshots ?? {})) {
+    if (free.has(key) || sameJson(entry, base.snapshots?.[key])) continue;
+    const candidates = variants.get(bareKey(key)) ?? [];
+    if (candidates.length === 0) return `the lock adds ${bareKey(key)} outside t3's graph`;
+    if (!candidates.some((variant) => differsOnlyWhereMoved(entry, base.snapshots[variant]))) return `the lock changes ${key} outside t3's graph`;
+  }
+  // Packages: those t3's graph or the moved entries reach go to `lockProvenance`; any other is main's.
+  const freeVersions = versionsOf(free);
+  for (const [key, entry] of Object.entries(lock.packages ?? {})) {
+    if (freeVersions.has(key) || sameJson(entry, base.packages?.[key])) continue;
+    return `the lock changes the package ${key} outside t3's graph`;
+  }
+  return undefined;
 };
 
 /** A proposed t3 branch as the plan sees it: its proof (A1) and whether it sits on main. */
