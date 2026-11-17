@@ -1,0 +1,514 @@
+{
+ "what": "SPI-1176 review item 11: an upgrade on stage p1176. origin/main (c2299eb, with the Model proxy) deployed fresh; a thread per agent kind; this branch deployed over it; an OpenAI Responses endpoint added (the owner's step for Codex); each thread resumed with one more turn. Keys scrubbed.",
+ "bindings": {
+  "origin/main deploy": [
+   "Agents/COMMISSARY_CONTAINER_API_KEY create",
+   "Agents/COMMISSARY_CONTAINER_API_KEY noop",
+   "Agents/MODEL_PROXY_API_KEY create",
+   "Agents/MODEL_PROXY_API_KEY noop",
+   "Agents/MODEL_PROXY_URL create",
+   "Agents/MODEL_PROXY_URL noop",
+   "Environment/COMMISSARY_ACCESS_CLIENT_ID create",
+   "Environment/COMMISSARY_ACCESS_CLIENT_ID noop",
+   "Environment/COMMISSARY_ACCESS_CLIENT_SECRET create",
+   "Environment/COMMISSARY_ACCESS_CLIENT_SECRET noop",
+   "Environment/COMMISSARY_MANAGEMENT_KEY create",
+   "Environment/COMMISSARY_MANAGEMENT_KEY noop",
+   "Environment/COMMISSARY_MANAGEMENT_URL create",
+   "Environment/COMMISSARY_MANAGEMENT_URL noop",
+   "Environment/COMMISSARY_USAGE_PRINCIPALS create",
+   "Environment/COMMISSARY_USAGE_PRINCIPALS noop",
+   "Environment/MODEL_PROXY_API_KEY create",
+   "Environment/MODEL_PROXY_API_KEY noop",
+   "Environment/MODEL_PROXY_URL create",
+   "Environment/MODEL_PROXY_URL noop"
+  ],
+  "branch deploy over it": [
+   "Agents/COMMISSARY_CONTAINER_API_KEY unbind",
+   "Agents/MODEL_PROXY_API_KEY unbind",
+   "Agents/MODEL_PROXY_URL unbind",
+   "Environment/COMMISSARY_ACCESS_CLIENT_ID unbind",
+   "Environment/COMMISSARY_ACCESS_CLIENT_SECRET unbind",
+   "Environment/COMMISSARY_MANAGEMENT_KEY unbind",
+   "Environment/COMMISSARY_MANAGEMENT_URL unbind",
+   "Environment/COMMISSARY_USAGE_PRINCIPALS unbind",
+   "Environment/MODEL_PROXY_API_KEY unbind",
+   "Environment/MODEL_PROXY_URL unbind"
+  ]
+ },
+ "beforeTheCut": {
+  "providers": {
+   "codex": {
+    "status": "ready",
+    "message": null,
+    "models": 119,
+    "first": [
+     "beam-free",
+     "big-pickle",
+     "claude-3-5-haiku-20241022"
+    ]
+   },
+   "claudeAgent": {
+    "status": "ready",
+    "message": "Runs Claude Code in the Workspace's Container on the Anthropic Messages Model endpoints (else the model proxy); the binary, home, launch arguments and custom models settings are not used.",
+    "models": 23,
+    "first": [
+     "commissary/claude-3-5-haiku-20241022",
+     "commissary/claude-3-7-sonnet-20250219",
+     "commissary/claude-fable-5"
+    ]
+   },
+   "opencode": {
+    "status": "ready",
+    "message": "Runs OpenCode in the Workspace's Container on the Anthropic Messages, OpenAI Responses and OpenAI-compatible Model endpoints (else the model proxy); the binary, server URL, password and custom models settings are not used.",
+    "models": 23,
+    "first": [
+     "commissary/claude-3-5-haiku-20241022",
+     "commissary/claude-3-7-sonnet-20250219",
+     "commissary/claude-fable-5"
+    ]
+   },
+   "pi": {
+    "status": "ready",
+    "message": null,
+    "models": 23,
+    "first": [
+     "commissary/claude-3-5-haiku-20241022",
+     "commissary/claude-3-7-sonnet-20250219",
+     "commissary/claude-fable-5"
+    ]
+   },
+   "piDurable": {
+    "status": "ready",
+    "message": null,
+    "models": 142,
+    "first": [
+     "anthropic/qwen3.5-plus",
+     "anthropic/qwen3.6-plus",
+     "anthropic/qwen3.7-plus"
+    ]
+   }
+  },
+  "endpoints": [
+   {
+    "id": "commissary",
+    "api": "anthropic-messages",
+    "models": 23
+   }
+  ],
+  "threads": {
+   "durable": {
+    "model": "anthropic/claude-haiku-5-5",
+    "runs": [
+     {
+      "status": "completed"
+     }
+    ],
+    "text": "ready",
+    "errors": []
+   },
+   "codex": {
+    "model": "gpt-6-luna",
+    "runs": [
+     "completed"
+    ],
+    "text": "ready",
+    "errors": []
+   },
+   "pi": {
+    "model": "anthropic/claude-haiku-5-5",
+    "runs": [
+     "failed"
+    ],
+    "text": "",
+    "errors": [
+     "The provider could not start this turn. Retry the turn; if it keeps failing, check the provider setup and server logs."
+    ]
+   },
+   "claude": {
+    "model": "anthropic/claude-sonnet-5-5",
+    "runs": [
+     "failed"
+    ],
+    "text": "",
+    "errors": [
+     "The agent did not accept the model \"anthropic/claude-sonnet-5-5\". Choose another model for this provider, then retry."
+    ]
+   },
+   "opencode": {
+    "model": "anthropic/claude-sonnet-5-5",
+    "runs": [
+     "failed"
+    ],
+    "text": "",
+    "errors": [
+     "The agent did not accept the model \"anthropic/claude-sonnet-5-5\". Choose another model for this provider, then retry."
+    ]
+   },
+   "pi@endpoint": {
+    "model": "commissary/claude-haiku-5-5",
+    "runs": [
+     "completed"
+    ],
+    "text": "ready",
+    "errors": []
+   },
+   "claude@endpoint": {
+    "model": "commissary/claude-haiku-5-5",
+    "runs": [
+     "completed"
+    ],
+    "text": "ready",
+    "errors": []
+   },
+   "opencode@endpoint": {
+    "model": "commissary/claude-haiku-5-5",
+    "runs": [
+     "completed"
+    ],
+    "text": "ready",
+    "errors": []
+   }
+  }
+ },
+ "afterTheCut": {
+  "endpointsBefore": [
+   {
+    "id": "commissary",
+    "api": "anthropic-messages",
+    "models": 23
+   }
+  ],
+  "providersBeforeSetup": {
+   "codex": {
+    "status": "warning",
+    "message": "Codex has no Model endpoint to run on: it needs one that speaks OpenAI Responses and that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints.",
+    "models": 0,
+    "first": []
+   },
+   "claudeAgent": {
+    "status": "ready",
+    "message": "Runs Claude Code in the Workspace's Container on the Anthropic Messages Model endpoints; the binary, home, launch arguments and custom models settings are not used.",
+    "models": 23,
+    "first": [
+     "commissary/claude-3-5-haiku-20241022",
+     "commissary/claude-3-7-sonnet-20250219",
+     "commissary/claude-fable-5"
+    ]
+   },
+   "opencode": {
+    "status": "ready",
+    "message": "Runs OpenCode in the Workspace's Container on the Anthropic Messages, OpenAI Responses and OpenAI-compatible Model endpoints; the binary, server URL, password and custom models settings are not used.",
+    "models": 23,
+    "first": [
+     "commissary/claude-3-5-haiku-20241022",
+     "commissary/claude-3-7-sonnet-20250219",
+     "commissary/claude-fable-5"
+    ]
+   },
+   "pi": {
+    "status": "ready",
+    "message": null,
+    "models": 23,
+    "first": [
+     "commissary/claude-3-5-haiku-20241022",
+     "commissary/claude-3-7-sonnet-20250219",
+     "commissary/claude-fable-5"
+    ]
+   },
+   "piDurable": {
+    "status": "ready",
+    "message": null,
+    "models": 23,
+    "first": [
+     "commissary/claude-3-5-haiku-20241022",
+     "commissary/claude-3-7-sonnet-20250219",
+     "commissary/claude-fable-5"
+    ]
+   }
+  },
+  "savedResponsesEndpoint": 200,
+  "providers": {
+   "codex": {
+    "status": "ready",
+    "message": null,
+    "models": 1,
+    "first": [
+     "commissary-oai/claude-haiku-5-5"
+    ]
+   },
+   "claudeAgent": {
+    "status": "ready",
+    "message": "Runs Claude Code in the Workspace's Container on the Anthropic Messages Model endpoints; the binary, home, launch arguments and custom models settings are not used.",
+    "models": 23,
+    "first": [
+     "commissary/claude-3-5-haiku-20241022",
+     "commissary/claude-3-7-sonnet-20250219",
+     "commissary/claude-fable-5"
+    ]
+   },
+   "opencode": {
+    "status": "ready",
+    "message": "Runs OpenCode in the Workspace's Container on the Anthropic Messages, OpenAI Responses and OpenAI-compatible Model endpoints; the binary, server URL, password and custom models settings are not used.",
+    "models": 24,
+    "first": [
+     "commissary/claude-3-5-haiku-20241022",
+     "commissary/claude-3-7-sonnet-20250219",
+     "commissary/claude-fable-5"
+    ]
+   },
+   "pi": {
+    "status": "ready",
+    "message": null,
+    "models": 24,
+    "first": [
+     "commissary/claude-3-5-haiku-20241022",
+     "commissary/claude-3-7-sonnet-20250219",
+     "commissary/claude-fable-5"
+    ]
+   },
+   "piDurable": {
+    "status": "ready",
+    "message": null,
+    "models": 24,
+    "first": [
+     "commissary/claude-3-5-haiku-20241022",
+     "commissary/claude-3-7-sonnet-20250219",
+     "commissary/claude-fable-5"
+    ]
+   }
+  }
+ },
+ "resume1_at_8a15fd5_plus_round1_wip": {
+  "durable": {
+   "model": "anthropic/claude-haiku-5-5",
+   "runs": [
+    {
+     "status": "completed"
+    },
+    {
+     "status": "failed"
+    }
+   ],
+   "text": "",
+   "errors": [
+    "The model provider returned HTTP 400."
+   ]
+  },
+  "codex": {
+   "model": "gpt-6-luna",
+   "runs": [
+    "completed",
+    "completed"
+   ],
+   "text": "ready",
+   "errors": []
+  },
+  "pi": {
+   "model": "anthropic/claude-haiku-5-5",
+   "runs": [
+    "failed",
+    "failed"
+   ],
+   "text": "",
+   "errors": [
+    "The provider could not start this turn. Retry the turn; if it keeps failing, check the provider setup and server logs.",
+    "The Model endpoint \"commissary\" is overloaded (HTTP 503)."
+   ]
+  },
+  "claude": {
+   "model": "anthropic/claude-sonnet-5-5",
+   "runs": [
+    "failed",
+    "failed"
+   ],
+   "text": "",
+   "errors": [
+    "The agent did not accept the model \"anthropic/claude-sonnet-5-5\". Choose another model for this provider, then retry.",
+    "Failed to open claudeAgent provider session provider-session:provider-instance:claudeAgent:thread:07e08a8b-6906-471b-acd5-bc4b7c63e2f6:4d20081b-d03c-4234-bd0e-fb482c566884."
+   ]
+  },
+  "opencode": {
+   "model": "anthropic/claude-sonnet-5-5",
+   "runs": [
+    "failed",
+    "running"
+   ],
+   "text": "",
+   "errors": [
+    "The agent did not accept the model \"anthropic/claude-sonnet-5-5\". Choose another model for this provider, then retry."
+   ]
+  },
+  "pi@endpoint": {
+   "model": "commissary/claude-haiku-5-5",
+   "runs": [
+    "completed",
+    "completed"
+   ],
+   "text": "ready",
+   "errors": []
+  },
+  "claude@endpoint": {
+   "model": "commissary/claude-haiku-5-5",
+   "runs": [
+    "completed",
+    "failed"
+   ],
+   "text": "",
+   "errors": [
+    "Provider turn failed."
+   ]
+  },
+  "opencode@endpoint": {
+   "model": "commissary/claude-haiku-5-5",
+   "runs": [
+    "completed",
+    "completed"
+   ],
+   "text": "ready",
+   "errors": []
+  }
+ },
+ "resume2_with_retiredSelectionSlug": {
+  "durable": {
+   "model": "anthropic/claude-haiku-5-5",
+   "runs": [
+    {
+     "status": "completed"
+    },
+    {
+     "status": "failed"
+    },
+    {
+     "status": "completed"
+    }
+   ],
+   "text": "ready",
+   "errors": []
+  },
+  "codex": {
+   "model": "gpt-6-luna",
+   "runs": [
+    "completed",
+    "completed",
+    "completed"
+   ],
+   "text": "ready",
+   "errors": []
+  },
+  "pi": {
+   "model": "anthropic/claude-haiku-5-5",
+   "runs": [
+    "failed",
+    "failed",
+    "completed"
+   ],
+   "text": "The word I replied with was:\n\n**ready**",
+   "errors": [
+    "The provider could not start this turn. Retry the turn; if it keeps failing, check the provider setup and server logs.",
+    "The Model endpoint \"commissary\" is overloaded (HTTP 503)."
+   ]
+  },
+  "claude": {
+   "model": "anthropic/claude-sonnet-5-5",
+   "runs": [
+    "failed",
+    "failed",
+    "failed"
+   ],
+   "text": "",
+   "errors": [
+    "Failed to open claudeAgent provider session provider-session:provider-instance:claudeAgent:thread:07e08a8b-6906-471b-acd5-bc4b7c63e2f6:4d20081b-d03c-4234-bd0e-fb482c566884.",
+    "the Container cannot start: Container budget (3) reached: raise it at /_t3flare/harness#environment."
+   ]
+  },
+  "opencode": {
+   "model": "anthropic/claude-sonnet-5-5",
+   "runs": [
+    "failed",
+    "cancelled",
+    "cancelled",
+    "cancelled",
+    "completed",
+    "completed"
+   ],
+   "text": "None",
+   "errors": [
+    "The agent did not accept the model \"anthropic/claude-sonnet-5-5\". Choose another model for this provider, then retry."
+   ]
+  },
+  "pi@endpoint": {
+   "model": "commissary/claude-haiku-5-5",
+   "runs": [
+    "completed",
+    "completed",
+    "completed"
+   ],
+   "text": "ready",
+   "errors": []
+  },
+  "claude@endpoint": {
+   "model": "commissary/claude-haiku-5-5",
+   "runs": [
+    "completed",
+    "failed",
+    "failed",
+    "failed"
+   ],
+   "text": "",
+   "errors": [
+    "The Model endpoint \"commissary\" is overloaded (HTTP 503).",
+    "The Model endpoint \"commissary\" is overloaded (HTTP 503)."
+   ]
+  },
+  "opencode@endpoint": {
+   "model": "commissary/claude-haiku-5-5",
+   "runs": [
+    "completed",
+    "completed",
+    "completed"
+   ],
+   "text": "ready",
+   "errors": []
+  },
+  "claude (new thread)": {
+   "model": "commissary/claude-haiku-5-5",
+   "runs": [
+    "completed"
+   ],
+   "text": "ready",
+   "errors": []
+  }
+ },
+ "resume3_claude_with_known_family_alias": {
+  "claude": {
+   "model": "anthropic/claude-sonnet-5-5",
+   "runs": [
+    "failed",
+    "failed",
+    "failed",
+    "completed"
+   ],
+   "text": "I haven't replied with any word. Each earlier run failed with a provider error (rejected model name, session open failure, container budget reached), so none produced an answer. The first request asked for \"ready\", but that reply was never sent.",
+   "errors": [
+    "Failed to open claudeAgent provider session provider-session:provider-instance:claudeAgent:thread:07e08a8b-6906-471b-acd5-bc4b7c63e2f6:4d20081b-d03c-4234-bd0e-fb482c566884.",
+    "the Container cannot start: Container budget (3) reached: raise it at /_t3flare/harness#environment."
+   ]
+  },
+  "claude@endpoint": {
+   "model": "commissary/claude-haiku-5-5",
+   "runs": [
+    "completed",
+    "failed",
+    "failed",
+    "failed",
+    "completed"
+   ],
+   "text": "again",
+   "errors": [
+    "The Model endpoint \"commissary\" is overloaded (HTTP 503).",
+    "The Model endpoint \"commissary\" is overloaded (HTTP 503)."
+   ]
+  }
+ }
+}
