@@ -2,7 +2,7 @@
 // updates plan D4; review F2, F3). The facts come from git and GitHub (`scripts/land-check.ts`, `scripts/updates-ci.ts`);
 // the files themselves were written by a job that ran upstream code, so nothing here trusts their content: each rule
 // checks it. Dependency-free.
-import { bareKey, closure, DEPENDENCY_FIELDS, importerKey, type Json, nameOfKey, reachableFrom } from "../../../../scripts/lockGraph.ts";
+import { bareKey, closure, DEPENDENCY_FIELDS, importerKey, type Json, nameOfKey } from "../../../../scripts/lockGraph.ts";
 import { compareVersions, CLI_PIN_FILES, EXACT_VERSION, NIGHTLY_TAG, type Pin, T3_PIN_FILES } from "../../src/updates/pins.ts";
 
 export const LAND_ALLOWLIST = { t3: T3_PIN_FILES, cli: CLI_PIN_FILES } as const;
@@ -77,10 +77,10 @@ export interface LockProvenance {
 }
 
 /**
- * The t3 bump's pnpm lock (F3). A package entry main's lock or t3's lock at the tag holds exactly is vouched for. pnpm
- * resolves t3flare's own packages against the registry, so a bump can bring new versions neither holds (the first trial:
- * `@smithy/core@3.41.0`); those must be plain registry entries (`resolution: {integrity}` and nothing else), and
- * `land-check.ts` asks the npm registry that each name@version has that integrity. Anything else is refused.
+ * The package entries of t3's graph in a t3 bump's lock (F3), after `t3LockRefusal` has held everything outside that
+ * graph to main's or t3's lock. An entry main's lock or t3's lock at the tag holds exactly is vouched for; any other must
+ * be a plain registry entry (`resolution: {integrity}` and nothing else), which `land-check.ts` asks the npm registry to
+ * confirm for that name@version. Anything else is refused.
  */
 export const lockProvenance = (after: LockDocuments, main: LockDocuments, t3: LockDocuments): LockProvenance => {
   const vouched = new Map<string, Set<string>>();
@@ -138,9 +138,11 @@ export interface T3LockInput {
  * The t3 bump's lock against main's (review B2): it may differ only where t3 moved. Allowed to change, all derived from
  * the t3 side: t3's own importers and everything they install (`verify-lock.ts` holds that closure to t3's own lock),
  * the names t3's catalog, overrides and patches moved, and the names whose versions moved inside t3's closure. Outside
- * that, t3flare's importers and every snapshot and package are main's: an entry may differ only in a dependency whose
- * name moved, or in a peer suffix. The header is t3's (settings, catalogs) and the workspace's (overrides, patches with
- * their files' hashes); pnpm's own document is t3's. Returns why not, or undefined.
+ * t3's graph, t3flare's importers and every snapshot and package are main's or t3's own: an importer entry may move only
+ * for a moved name, to a version of the same package t3's graph or a lock holds; a snapshot may differ from one of the
+ * same package and version only in a peer suffix or a moved dependency naming the same package. The header is t3's
+ * (settings, catalogs) and the workspace's (overrides, patches with their files' hashes); pnpm's own document is t3's.
+ * Returns why not, or undefined.
  */
 export const t3LockRefusal = (input: T3LockInput): string | undefined => {
   const { after, main, t3 } = input;
@@ -176,29 +178,39 @@ export const t3LockRefusal = (input: T3LockInput): string | undefined => {
   const moved = workspaceMovedNames(input.mainWorkspace, input.afterWorkspace);
   for (const key of [...beforeT3].filter((key) => !afterT3.has(key)).concat([...afterT3].filter((key) => !beforeT3.has(key)))) moved.add(nameOfKey(key));
 
-  // t3flare's importers: main's, but for dependencies whose name t3 moved.
+  // What a lock holds (a snapshot or package key), on main or in t3's own lock at the tag: what a repointed entry may name.
+  const known = (key: string) =>
+    base.snapshots?.[key] !== undefined || base.packages?.[bareKey(key)] !== undefined || t3.main.snapshots?.[key] !== undefined || t3.main.packages?.[bareKey(key)] !== undefined || afterT3.has(bareKey(key));
+  /** The package a dependency value names: `1.2.3(peer)` names `name` itself, an alias `other@1.2.3` names `other`. */
+  const targetName = (name: string, value: string) => nameOfKey(importerKey(name, value) ?? `${name}@`);
+
+  // t3flare's importers: main's, but for a dependency whose name t3 moved, now at a version t3's graph or a lock holds,
+  // of the same package; or a peer suffix. Their other fields (`dependenciesMeta`, …) are main's.
   if (!sameJson(ours(lock), ours(base))) return "t3flare's importers are not main's";
-  const changedRoots: Array<string> = [];
   for (const dir of ours(lock)) {
+    const strip = (importer: Json) => Object.fromEntries(Object.entries(importer ?? {}).filter(([field]) => !(DEPENDENCY_FIELDS as ReadonlyArray<string>).includes(field)));
+    if (!sameJson(strip(lock.importers[dir]), strip(base.importers[dir]))) return `${dir}'s fields besides its dependencies are not main's`;
     for (const field of DEPENDENCY_FIELDS) {
       const [now, was] = [(lock.importers[dir][field] ?? {}) as Json, (base.importers[dir][field] ?? {}) as Json];
       if (!sameJson(Object.keys(now).sort(), Object.keys(was).sort())) return `${dir}'s ${field} are not main's`;
       for (const name of Object.keys(now)) {
         if (sameJson(now[name], was[name])) continue;
+        const [version, previous] = [String(now[name].version), String(was[name].version)];
         // A peer suffix only (the same package at the same version, its peers moved): its snapshot is checked below.
-        const peerOnly = now[name].specifier === was[name].specifier && bareKey(`${name}@${String(now[name].version)}`) === bareKey(`${name}@${String(was[name].version)}`);
-        if (peerOnly) continue;
+        if (now[name].specifier === was[name].specifier && bareKey(`${name}@${version}`) === bareKey(`${name}@${previous}`)) continue;
         if (!moved.has(name)) return `${dir} repoints ${name}, which t3 did not move`;
         if (now[name].specifier !== was[name].specifier && !String(was[name].specifier).startsWith("catalog:")) return `${dir} changes ${name}'s specifier`;
-        const key = importerKey(name, String(now[name].version));
-        if (key !== undefined) changedRoots.push(key);
+        if (targetName(name, version) !== targetName(name, previous)) return `${dir} points ${name} at another package`;
+        const key = importerKey(name, version);
+        if (key !== undefined && !known(key)) return `${dir} points ${name} at ${bareKey(key)}, which neither t3's graph nor a lock holds`;
       }
     }
   }
 
-  // Snapshots: t3's closure and what the moved importer entries reach may change; any other is main's, or a variant of
-  // one of main's whose dependencies differ only in a moved name or a peer suffix.
-  const free = reachableFrom(lock, [...inT3, ...changedRoots]);
+  // Snapshots: t3's own graph is held to t3's lock by verify-lock.ts. Every other one is main's, or a variant of a
+  // snapshot of the same package and version in main's or t3's lock whose dependencies differ only in a peer suffix, or
+  // in a name t3 moved, still naming the same package (review B2: nothing a moved entry reaches is taken on trust).
+  const free = inT3;
   const differsOnlyWhereMoved = (now: Json, was: Json) => {
     const { dependencies: d1, optionalDependencies: o1, ...rest1 } = now;
     const { dependencies: d2, optionalDependencies: o2, ...rest2 } = was;
@@ -206,24 +218,28 @@ export const t3LockRefusal = (input: T3LockInput): string | undefined => {
     for (const [a, b] of [[d1 ?? {}, d2 ?? {}], [o1 ?? {}, o2 ?? {}]] as Array<[Json, Json]>) {
       if (!sameJson(Object.keys(a).sort(), Object.keys(b).sort())) return false;
       for (const name of Object.keys(a)) {
-        if (a[name] === b[name] || moved.has(name)) continue;
+        if (a[name] === b[name]) continue;
+        if (targetName(name, String(a[name])) !== targetName(name, String(b[name]))) return false;
+        if (moved.has(name)) continue;
         if (bareKey(`${name}@${a[name]}`) !== bareKey(`${name}@${b[name]}`)) return false;
       }
     }
     return true;
   };
-  const variants = new Map<string, Array<string>>();
-  for (const key of Object.keys(base.snapshots ?? {})) variants.set(bareKey(key), [...(variants.get(bareKey(key)) ?? []), key]);
+  const variants = new Map<string, Array<Json>>();
+  for (const snapshots of [base.snapshots ?? {}, t3.main.snapshots ?? {}] as Array<Json>) {
+    for (const [key, entry] of Object.entries<Json>(snapshots)) variants.set(bareKey(key), [...(variants.get(bareKey(key)) ?? []), entry]);
+  }
   for (const [key, entry] of Object.entries<Json>(lock.snapshots ?? {})) {
     if (free.has(key) || sameJson(entry, base.snapshots?.[key])) continue;
     const candidates = variants.get(bareKey(key)) ?? [];
     if (candidates.length === 0) return `the lock adds ${bareKey(key)} outside t3's graph`;
-    if (!candidates.some((variant) => differsOnlyWhereMoved(entry, base.snapshots[variant]))) return `the lock changes ${key} outside t3's graph`;
+    if (!candidates.some((variant) => differsOnlyWhereMoved(entry, variant))) return `the lock changes ${key} outside t3's graph`;
   }
-  // Packages: those t3's graph or the moved entries reach go to `lockProvenance`; any other is main's.
+  // Packages: t3's graph's go to `lockProvenance`; any other is main's or t3's, exactly.
   const freeVersions = versionsOf(free);
   for (const [key, entry] of Object.entries(lock.packages ?? {})) {
-    if (freeVersions.has(key) || sameJson(entry, base.packages?.[key])) continue;
+    if (freeVersions.has(key) || sameJson(entry, base.packages?.[key]) || sameJson(entry, t3.main.packages?.[key])) continue;
     return `the lock changes the package ${key} outside t3's graph`;
   }
   return undefined;

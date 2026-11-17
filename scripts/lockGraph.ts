@@ -51,25 +51,6 @@ export const depPatchKey = (file: string) => file.slice(0, -".patch".length).rep
 /** A package key's name: `@scope/name@1.2.3(peer@4)` → `@scope/name`. */
 export const nameOfKey = (key: string) => /^(@?[^@]+)@/.exec(key)?.[1] ?? key;
 
-/** The snapshot keys reachable from `roots` (snapshot keys), roots included. */
-export const reachableFrom = (lock: Json, roots: Iterable<string>): Set<string> => {
-  const reachable = new Set<string>();
-  const stack = [...roots];
-  while (stack.length > 0) {
-    const key = stack.pop()!;
-    if (reachable.has(key)) continue;
-    reachable.add(key);
-    const snapshot = lock.snapshots?.[key] as Json | undefined;
-    for (const deps of [snapshot?.dependencies, snapshot?.optionalDependencies]) {
-      for (const [name, version] of Object.entries<string>(deps ?? {})) {
-        if (version.startsWith("link:")) continue;
-        stack.push(/^\d/.test(version) ? `${name}@${version}` : version);
-      }
-    }
-  }
-  return reachable;
-};
-
 /** An importer dependency's snapshot key (`version` as the importer records it), or undefined for a link. */
 export const importerKey = (name: string, version: string): string | undefined =>
   version.startsWith("link:") ? undefined : /^\d/.test(version) ? `${name}@${version}` : version;

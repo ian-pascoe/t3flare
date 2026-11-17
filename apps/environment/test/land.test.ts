@@ -137,11 +137,12 @@ describe("what a bump.yml run does", () => {
 
 describe("a t3 bump's lock against main's (B2)", () => {
   const entry = (integrity: string) => ({ resolution: { integrity } });
-  const header = { lockfileVersion: "9.0", settings: { autoInstallPeers: true }, catalogs: { default: { react: { specifier: "19.0.0", version: "19.0.0" } } }, packageExtensionsChecksum: "x" };
+  const header = { lockfileVersion: "9.0", settings: { autoInstallPeers: true }, packageExtensionsChecksum: "x" };
   const env = { lockfileVersion: "9.0", importers: { ".": { packageManagerDependencies: { pnpm: { specifier: "12.14.0", version: "12.14.0" } } } } };
-  type Graph = { a: string; rolldown: string; react: string; extraSnapshots?: Record<string, unknown>; bDeps?: Record<string, string> };
+  type Graph = { readonly a: string; readonly rolldown: string; readonly react: string };
+  /** A lock where t3's importer installs `a`, and t3flare's installs `rolldown` (→ `b`) and `react` through the catalog. */
   const lockOf = (graph: Graph) => {
-    const main = {
+    const main: Record<string, any> = {
       ...header,
       catalogs: { default: { react: { specifier: graph.react, version: graph.react } } },
       overrides: { a: graph.a },
@@ -151,37 +152,73 @@ describe("a t3 bump's lock against main's (B2)", () => {
         "apps/environment": { dependencies: { rolldown: { specifier: "^1.2.0", version: graph.rolldown }, react: { specifier: "catalog:", version: graph.react } } },
       },
       packages: { [`a@${graph.a}`]: entry("sha512-A"), [`rolldown@${graph.rolldown}`]: entry("sha512-R"), "b@1.0.0": entry("sha512-B"), [`react@${graph.react}`]: entry("sha512-C") },
-      snapshots: { [`a@${graph.a}`]: {}, [`rolldown@${graph.rolldown}`]: { dependencies: graph.bDeps ?? { b: "1.0.0" } }, "b@1.0.0": {}, [`react@${graph.react}`]: {}, ...graph.extraSnapshots },
+      snapshots: { [`a@${graph.a}`]: {}, [`rolldown@${graph.rolldown}`]: { dependencies: { b: "1.0.0" } }, "b@1.0.0": {}, [`react@${graph.react}`]: {} },
     };
     return { main, documents: [env, main] };
   };
   const workspace = (graph: Graph) => ({ catalog: { react: graph.react }, overrides: { a: graph.a }, patchedDependencies: {} });
   const base: Graph = { a: "1.0.0", rolldown: "1.2.13", react: "19.0.0" };
-  const t3At = (graph: Graph) => {
-    const lock = lockOf(graph);
-    return { main: { ...lock.main, importers: { "apps/x": lock.main.importers["t3code/apps/x"] } }, documents: [env, lock.main] };
+  /** The candidate made from `graph`, then changed by `tamper`; t3's own lock is the untampered graph. */
+  const input = (graph: Graph, tamper: (lock: Record<string, any>) => void = () => {}): T3LockInput => {
+    const clean = lockOf(graph).main;
+    const t3Main = { ...clean, importers: { "apps/x": clean.importers["t3code/apps/x"] } };
+    const after = lockOf(graph);
+    tamper(after.main);
+    return { after, main: lockOf(base), t3: { main: t3Main, documents: [env, t3Main] }, mainWorkspace: workspace(base), afterWorkspace: workspace(graph), patchHashes: {} };
   };
-  const input = (after: Graph): T3LockInput => {
-    const t3 = t3At(after);
-    t3.documents = [env, t3.main];
-    return { after: lockOf(after), main: lockOf(base), t3, mainWorkspace: workspace(base), afterWorkspace: workspace(after), patchHashes: {} };
-  };
+  const moved: Graph = { ...base, react: "19.1.0" };
 
   it("passes what t3 moved: its own graph, and an importer of ours that follows t3's catalog", () => {
     expect(t3LockRefusal(input({ ...base, a: "1.1.0" }))).toBeUndefined();
-    expect(t3LockRefusal(input({ ...base, react: "19.1.0" }))).toBeUndefined();
+    expect(t3LockRefusal(input(moved))).toBeUndefined();
   });
 
   it("refuses a candidate that repoints a t3flare importer", () => {
     expect(t3LockRefusal(input({ ...base, rolldown: "1.2.12" }))).toMatch(/apps\/environment repoints rolldown, which t3 did not move/);
   });
 
-  it("refuses a candidate that adds a snapshot for an unrelated package, or changes one outside t3's graph", () => {
-    expect(t3LockRefusal(input({ ...base, extraSnapshots: { "is-odd@3.0.1": {} } }))).toMatch(/adds is-odd@3\.0\.1 outside t3's graph/);
-    expect(t3LockRefusal(input({ ...base, bDeps: { b: "1.0.0", evil: "6.6.6" } }))).toMatch(/changes rolldown@1\.2\.13 outside t3's graph/);
+  it("refuses a moved dependency whose snapshot brings a package (the cycle-3 probe: react@19.1.0 → evil@6.6.6)", () => {
+    const evil = (lock: Record<string, any>) => {
+      lock.snapshots["react@19.1.0"] = { dependencies: { evil: "6.6.6" } };
+      lock.snapshots["evil@6.6.6"] = {};
+      lock.packages["evil@6.6.6"] = entry("sha512-E");
+    };
+    expect(t3LockRefusal(input(moved, evil))).toMatch(/changes react@19\.1\.0 outside t3's graph/);
   });
 
-  it("refuses a header that is not t3's or the workspace's", () => {
+  it("refuses a moved dependency aliased to another package (the probe's alias: evil-pkg@6.6.6)", () => {
+    const alias = (lock: Record<string, any>) => {
+      lock.importers["apps/environment"].dependencies.react = { specifier: "catalog:", version: "evil-pkg@6.6.6" };
+      lock.snapshots["evil-pkg@6.6.6"] = {};
+      lock.packages["evil-pkg@6.6.6"] = entry("sha512-E");
+    };
+    expect(t3LockRefusal(input(moved, alias))).toMatch(/points react at another package/);
+    // A version of the same package that neither t3's graph nor a lock holds.
+    const unknown = (lock: Record<string, any>) => {
+      lock.importers["apps/environment"].dependencies.react = { specifier: "catalog:", version: "19.2.0" };
+      lock.snapshots["react@19.2.0"] = {};
+    };
+    expect(t3LockRefusal(input(moved, unknown))).toMatch(/points react at react@19\.2\.0, which neither/);
+  });
+
+  it("accepts a peer-suffix variant of one of main's snapshots, and refuses one that changes anything else", () => {
+    const peer = (deps: Record<string, string>) => (lock: Record<string, any>) => {
+      lock.importers["apps/environment"].dependencies.rolldown = { specifier: "^1.2.0", version: "1.2.13(typescript@7.0.2)" };
+      delete lock.snapshots["rolldown@1.2.13"];
+      lock.snapshots["rolldown@1.2.13(typescript@7.0.2)"] = { dependencies: deps };
+    };
+    expect(t3LockRefusal(input(base, peer({ b: "1.0.0" })))).toBeUndefined();
+    expect(t3LockRefusal(input(base, peer({ b: "1.0.0", evil: "6.6.6" })))).toMatch(/changes rolldown@1\.2\.13\(typescript@7\.0\.2\) outside/);
+    expect(t3LockRefusal(input(base, peer({ b: "1.0.1" })))).toMatch(/changes rolldown@1\.2\.13\(typescript@7\.0\.2\) outside/);
+  });
+
+  it("refuses a candidate that adds a snapshot for an unrelated package, or changes one outside t3's graph", () => {
+    expect(t3LockRefusal(input(base, (lock) => void (lock.snapshots["is-odd@3.0.1"] = {})))).toMatch(/adds is-odd@3\.0\.1 outside t3's graph/);
+    expect(t3LockRefusal(input(base, (lock) => void (lock.snapshots["rolldown@1.2.13"] = { dependencies: { b: "1.0.0", evil: "6.6.6" } })))).toMatch(/changes rolldown@1\.2\.13 outside t3's graph/);
+  });
+
+  it("refuses an importer whose other fields moved, and a header that is not t3's or the workspace's", () => {
+    expect(t3LockRefusal(input(base, (lock) => void (lock.importers["apps/environment"].dependenciesMeta = { rolldown: { injected: true } })))).toMatch(/fields besides its dependencies/);
     const changed = input(base);
     expect(t3LockRefusal({ ...changed, afterWorkspace: { ...changed.afterWorkspace, overrides: { a: "9.9.9" } } })).toMatch(/overrides are not the workspace's/);
     expect(t3LockRefusal({ ...changed, patchHashes: { "x@1.0.0": "abc" } })).toMatch(/patchedDependencies/);
