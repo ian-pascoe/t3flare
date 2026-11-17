@@ -74,7 +74,7 @@ const mapStore = (): UpdateStore => {
 const fakeRuns = (conclusion: string) => {
   const dispatched: Array<Readonly<Record<string, string>>> = [];
   let polls = 0;
-  const run = (): WorkflowRun => ({ id: 5, url: "https://github.com/o/r/actions/runs/5", status: polls > 1 ? "completed" : "in_progress", conclusion: polls > 1 ? conclusion : null, startedAt: 0 });
+  const run = (): WorkflowRun => ({ id: 5, url: "https://github.com/o/r/actions/runs/5", status: polls > 1 ? "completed" : "in_progress", conclusion: polls > 1 ? conclusion : null, started: true });
   const client: ActionsClient = {
     dispatch: async (_workflow, inputs) => void dispatched.push(inputs),
     findRun: async (workflow, runName) => (workflow === "cli-bump.yml" && runName === `CLI update ${dispatched.at(-1)?.update_id}` ? run() : undefined),

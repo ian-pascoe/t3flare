@@ -42,7 +42,7 @@ export interface UpdateRecord {
   readonly runName: string;
   readonly dispatchedAt: number;
   readonly run: { readonly id: number; readonly url: string } | null;
-  /** When its run left the queue; null while it waits (or before it is found). */
+  /** When the DO first saw its run out of the queue (review A10); null while it waits (or before it is found). */
   readonly startedAt?: number | null;
   /** Null while in flight. */
   readonly outcome: UpdateOutcome | null;
@@ -109,7 +109,7 @@ export const updates = (deps: {
     }
     if (current.run !== null) {
       const run = await actions.getRun(current.run.id);
-      if ((current.startedAt ?? null) === null && run.startedAt !== null) current = save({ ...current, startedAt: run.startedAt });
+      if ((current.startedAt ?? null) === null && run.started) current = save({ ...current, startedAt: deps.now() });
       if (run.status === "completed") {
         if (run.conclusion === "success") return settleWith(current, "succeeded", `${current.label}: ${run.url}`);
         const step = await actions.failedStep(run.id).catch(() => undefined);

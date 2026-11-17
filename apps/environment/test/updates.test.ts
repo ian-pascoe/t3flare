@@ -49,11 +49,11 @@ const fakeActions = () => {
     start: (name: string, startedAt: number | null = 0) => {
       const id = nextRun++;
       const last = dispatched.at(-1)!;
-      runs.set(id, { id, url: `https://github.com/o/r/actions/runs/${id}`, status: startedAt === null ? "pending" : "in_progress", conclusion: null, startedAt, name, workflow: last.workflow });
+      runs.set(id, { id, url: `https://github.com/o/r/actions/runs/${id}`, status: startedAt === null ? "pending" : "in_progress", conclusion: null, started: startedAt !== null, name, workflow: last.workflow });
       return id;
     },
     /** The run leaves the queue at `at`. */
-    begin: (id: number, at: number) => runs.set(id, { ...runs.get(id)!, status: "in_progress", startedAt: at }),
+    begin: (id: number) => runs.set(id, { ...runs.get(id)!, status: "in_progress", started: true }),
     end: (id: number, conclusion: string) => runs.set(id, { ...runs.get(id)!, status: "completed", conclusion }),
   };
 };
@@ -137,13 +137,13 @@ describe("the update records", () => {
     expect(await subject.press(serverPress(NEXT))).toMatchObject({ attached: false, record: { id: "id-2" } });
   });
 
-  it("does not expire a run waiting its turn in the bump group; measures from when it starts (review A2)", async () => {
+  it("does not expire a run waiting its turn in the bump group; measures from when the DO first sees it started (review A2, A10)", async () => {
     const { actions, subject, advance, now } = setup();
     await subject.press(serverPress(NEXT));
     const run = actions.start("Update id-1", null);
     advance(UPDATE_EXPIRY_MS * 2);
     expect((await subject.settle("t3"))?.outcome).toBeNull();
-    actions.begin(run, now());
+    actions.begin(run);
     expect((await subject.settle("t3"))?.startedAt).toBe(now());
     advance(UPDATE_EXPIRY_MS - 1);
     expect((await subject.settle("t3"))?.outcome).toBeNull();
@@ -243,8 +243,8 @@ describe("GitHub Actions through a fake dispatch and runs endpoint", () => {
       if (pathname.endsWith("/runs")) {
         return Response.json({
           workflow_runs: [
-            { id: 7, html_url: "https://github.com/ian-pascoe/t3flare/actions/runs/7", status: "queued", conclusion: null, name: "Nightly bump", display_title: "Update other", run_started_at: "2026-11-17T12:00:01Z" },
-            { id: 8, html_url: "https://github.com/ian-pascoe/t3flare/actions/runs/8", status: "in_progress", conclusion: null, name: "Nightly bump", display_title: "Update u1", run_started_at: "2026-11-17T12:00:05Z" },
+            { id: 7, html_url: "https://github.com/ian-pascoe/t3flare/actions/runs/7", status: "queued", conclusion: null, name: "Nightly bump", display_title: "Update other" },
+            { id: 8, html_url: "https://github.com/ian-pascoe/t3flare/actions/runs/8", status: "in_progress", conclusion: null, name: "Nightly bump", display_title: "Update u1" },
           ],
         });
       }
@@ -269,7 +269,7 @@ describe("GitHub Actions through a fake dispatch and runs endpoint", () => {
   it("finds the run by its run-name among the dispatches since, and names its failed step", async () => {
     const { requests, client } = fakeGitHub();
     const run = await client.findRun("bump.yml", "Update u1", Date.UTC(2026, 10, 17, 12, 0, 0, 500));
-    expect(run).toEqual({ id: 8, url: "https://github.com/ian-pascoe/t3flare/actions/runs/8", status: "in_progress", conclusion: null, startedAt: Date.UTC(2026, 10, 17, 12, 0, 5) });
+    expect(run).toEqual({ id: 8, url: "https://github.com/ian-pascoe/t3flare/actions/runs/8", status: "in_progress", conclusion: null, started: true });
     expect(decodeURIComponent(requests[0]!.url)).toContain("event=workflow_dispatch");
     expect(decodeURIComponent(requests[0]!.url)).toContain("created=>=2026-11-17T12:00:00Z");
     expect(await client.getRun(8)).toMatchObject({ status: "completed", conclusion: "failure" });
