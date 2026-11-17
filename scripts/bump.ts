@@ -50,8 +50,10 @@ interface Step {
 }
 
 const steps: Array<Step> = [];
+/** The tail of a failed step's output the report keeps. */
+const DETAIL_CHARS = 4000;
 /** test:docker's and the acceptance test's failures each carry a long record; 4000 characters held barely one. */
-const DOCKER_DETAIL_CHARS = 24_000;
+const LONG_DETAIL_CHARS = 24_000;
 
 const sh = (command: string, commandArgs: Array<string>, cwd: string, options: { quiet?: boolean; env?: Record<string, string> } = {}) => {
   const result = spawnSync(command, commandArgs, {
@@ -65,7 +67,7 @@ const sh = (command: string, commandArgs: Array<string>, cwd: string, options: {
   return { ok: result.status === 0, output };
 };
 
-const step = (name: string, run: () => { ok: boolean; detail?: string }): boolean => {
+const step = (name: string, run: () => { ok: boolean; detail?: string }, detailChars = DETAIL_CHARS): boolean => {
   const started = performance.now();
   console.log(`\n== ${name}`);
   let result: { ok: boolean; detail?: string };
@@ -76,7 +78,7 @@ const step = (name: string, run: () => { ok: boolean; detail?: string }): boolea
   }
   if (failAt !== undefined && name.startsWith(failAt)) result = { ok: false, detail: `forced to fail by --fail-at ${failAt}` };
   const seconds = Math.round((performance.now() - started) / 100) / 10;
-  steps.push({ name, ok: result.ok, seconds, ...(result.detail === undefined ? {} : { detail: result.detail.slice(name.startsWith("the CLI agents in Docker") || name.startsWith("acceptance test") ? -DOCKER_DETAIL_CHARS : -4000) }) });
+  steps.push({ name, ok: result.ok, seconds, ...(result.detail === undefined ? {} : { detail: result.detail.slice(-detailChars) }) });
   console.log(`== ${name}: ${result.ok ? "ok" : "FAILED"} (${seconds} s)`);
   return result.ok;
 };
@@ -173,20 +175,20 @@ const ok =
   // The whole check, as prod's deploy runs it (D9; closes U27): the patches apply, typecheck, lint, tests.
   step("check (pnpm run check: patches, typecheck, lint, test)", () => {
     const result = sh("pnpm", ["run", "check"], root);
-    return { ok: result.ok, detail: result.output.slice(-4000) };
+    return { ok: result.ok, detail: result.output };
   }) &&
   (flag("no-deploy") ||
   step("the CLI agents in Docker (test:docker: the pinned Codex and pi, launched as the Workspace launches them)", () => {
-    // In the log whole: the report keeps only the last 4000 characters, which a few failures overrun.
+    // In the log whole, and a long tail in the report.
     const result = sh("pnpm", ["run", "test:docker"], environment);
-    return { ok: result.ok, detail: result.output.slice(-DOCKER_DETAIL_CHARS) };
-  }) &&
+    return { ok: result.ok, detail: result.output };
+  }, LONG_DETAIL_CHARS) &&
   step(`deploy the ${stage} stage (build, web client)`, () => {
     const result = sh(process.execPath, ["scripts/stage.ts", "deploy", stage, "--web"], environment);
     return { ok: result.ok, detail: result.output };
   }) &&
   // A new build on CI's own stage starts fresh: boots the last build failed (safe mode after three, which only the owner
-  // or this turns off, ADR-0010) say nothing about this one.
+  // or this turns off; GLOSSARY: Safe mode) say nothing about this one.
   step(`the ${stage} stage starts its new build fresh (safe mode off)`, () => {
     // Just after a deploy the admin routes can refuse for a moment (a 404, as the panel's endpoint save also met): retried.
     let output = "";
@@ -205,7 +207,7 @@ const ok =
     // A failed start answers every route with one line; the boot record says why.
     const health = result.ok ? "" : `\n${sh(process.execPath, ["scripts/stage.ts", "run", stage, "health", "bootRecord,safeMode,runtime"], environment, { quiet: true }).output}`;
     return { ok: result.ok, detail: `${fs.existsSync(out) ? fs.readFileSync(out, "utf8") : result.output}${health}` };
-  }) &&
+  }, LONG_DETAIL_CHARS) &&
   step(`a stock t3 nightly from npm links to the ${stage} stage and forwards a launch`, () => {
     // stdout alone, outside the workspace (npm warns about workspaces on stderr there).
     const nightly = (spawnSync("npm", ["view", "t3", "dist-tags.nightly"], { cwd: os.tmpdir(), encoding: "utf8" }).stdout ?? "").trim();

@@ -44,13 +44,16 @@ const cloudProject = await ensureCloudFixtureProject(cookie);
 out.cloudProject = cloudProject;
 // The forwarded launch's model: one the stage's Durable agent advertises. Since v0.1.11-nightly.20261117.4825 t3's
 // `t3_thread_launch` refuses a model its provider does not list (`model_unavailable`), and the stage's models are its
-// Model endpoints' (e.g. `commissary/claude-haiku-5-5`), so a fixed id is refused. A small one, when listed.
-const advertised: Array<string> = await wsCall(cookie, "server.refreshProviders", { instanceId: "piDurable" })
-  .then((reply: any) => (reply?.providers ?? []).find((provider: any) => provider.instanceId === "piDurable")?.models ?? [])
-  .then((models: Array<any>) => models.map((model) => String(model.slug)))
-  .catch(() => []);
-const launchModel = advertised.find((slug) => /haiku/.test(slug)) ?? advertised[0] ?? "anthropic/claude-haiku-5-5";
-out.launchModel = { model: launchModel, advertised: advertised.slice(0, 20) };
+// Model endpoints' (e.g. `commissary/claude-haiku-5-5`), so a fixed id is refused. A small one, when listed. Reads
+// t3's `server.refreshProviders` reply (`providers[].models[].slug`): U30 in docs/upstream-fragility.md.
+const advertised: { readonly slugs: Array<string>; readonly error?: string } = await wsCall(cookie, "server.refreshProviders", { instanceId: "piDurable" })
+  .then((reply: any) => ({
+    slugs: ((reply?.providers ?? []).find((provider: any) => provider.instanceId === "piDurable")?.models ?? []).map((model: any) => String(model.slug)),
+  }))
+  .catch((error: unknown) => ({ slugs: [], error: String(error).slice(0, 400) }));
+const launchModel = advertised.slugs.find((slug) => /haiku/.test(slug)) ?? advertised.slugs[0];
+out.launchModel = { model: launchModel ?? null, advertised: advertised.slugs.slice(0, 20), error: advertised.error ?? null };
+check("the stage's Durable agent advertises a model for the forwarded launch", launchModel !== undefined, out.launchModel);
 
 // The laptop.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3flare-laptop-"));
@@ -115,7 +118,7 @@ try {
       projectId: cloudProject.projectId,
       title: `step3 forwarded ${version}`,
       message: "Reply with exactly the word PONG and nothing else. Use no tools.",
-      modelSelection: { instanceId: "piDurable", model: launchModel },
+      modelSelection: { instanceId: "piDurable", model: launchModel ?? "none advertised" },
       clientRequestId: `forwarded-${Date.now()}`,
     });
     out.launch = { isError: launched.isError, sample: launched.text.slice(0, 800) };

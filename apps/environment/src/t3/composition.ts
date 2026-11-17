@@ -813,9 +813,10 @@ export const make = (options: CompositionOptions) => {
   );
 
   // t3flare: t3's AgentScope without its ProviderProcesses layer, which on Linux reads `/proc/sys/kernel/random/boot_id`
-  // (workerd has none: t3 would not boot), records the server's CLI processes in the State directory and kills a crashed
-  // server's leftovers. No CLI runs in this process (each runs in its Workspace's Container), so the reference keeps its
-  // own default: no records, no other owner.
+  // (workerd has none: t3 would not boot) and records the server's CLI processes in the State directory. No CLI runs in
+  // this process (each runs in its Workspace's Container), so the reference keeps its own default: no records, no other
+  // owner. `make` still looks for `systemd-run` and `systemctl` to stop a crashed server's leftovers; workerd has neither,
+  // so it does nothing.
   const layerAgentScope = Layer.effect(AgentScope, AgentScopeLive.make).pipe(
     Layer.provide(ProcessRunner.layer),
     Layer.provideMerge(Layer.succeed(ProviderProcesses.ProviderProcesses, { hasOtherLiveOwner: false })),
