@@ -292,7 +292,7 @@ const worktreeAdd = async (cwd: string, command: Extract<WorktreeCommand, { verb
     // there is restored (its work kept); a removal still under way is finished first; a failed attempt starts again.
     if (existing.state === "tombstoned") {
       const { restoreWorkspace } = await import("./deletion.ts");
-      restoreWorkspace(id);
+      await restoreWorkspace(id);
       return { exitCode: 0, stdout: "", stderr: `Preparing worktree (restoring '${command.path}')\n`, route: "worktree", detail: "tombstone restored" };
     }
     if (existing.state === "deleting") {

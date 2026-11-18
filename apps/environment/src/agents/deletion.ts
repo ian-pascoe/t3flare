@@ -122,11 +122,15 @@ export const purgeWorkspace = async (id: string, deletedThreads: ReadonlyArray<{
   }
 };
 
-/** A tombstone back to `ready` (admin `workspace-restore`; `git worktree add` at its path, review F5). */
-export const restoreWorkspace = (id: string): WorkspaceRecord | undefined => {
+/**
+ * A tombstone back to `ready` (admin `workspace-restore`; `git worktree add` at its path, review F5): its Container may
+ * start again first, so a failed reopen leaves it a tombstone rather than a `ready` Workspace that cannot run.
+ */
+export const restoreWorkspace = async (id: string): Promise<WorkspaceRecord | undefined> => {
   const services = environmentServices();
   const record = services.workspaces.get(id);
   if (record?.state !== "tombstoned") return undefined;
+  await workspaceRpc(id).reopenContainer();
   services.workspaces.setState(id, "ready", { deletedAt: null, purgeAfter: null, lastError: null });
   services.workspaces.setUnreferencedSince(id, null);
   return services.workspaces.get(id);
@@ -159,10 +163,18 @@ export const removeWorktree = async (projectCwd: string, path: string, force: bo
   const dir = id.split("/")[2] ?? id;
   const tombstone = async (why: string, purgeAfter: number | null): Promise<RemoveAnswer> => {
     services.workspaces.setState(id, "tombstoned", { deletedAt: Date.now(), purgeAfter, lastError: why });
-    // The work is kept; the Container and its budget slot are not.
-    await workspaceRpc(id).stopContainer().catch(() => undefined);
-    console.log(JSON.stringify({ t3flare: "workspace-tombstoned", id, why, purgeAfter }));
-    return { exitCode: 0, stderr: "", detail: JSON.stringify({ outcome: "tombstoned", why, purgeAfter }) };
+    // The work is kept; the Container and its budget slot are not. Closed, not just stopped: a start under way (the
+    // thread's first turn, its terminal) would otherwise bring it back with a lease (the nightly's `leased: true`).
+    // A close that fails still leaves the Workspace closed: its alarm stops the Container rather than renew it.
+    const closed = await workspaceRpc(id)
+      .closeContainer()
+      .then(
+        () => null,
+        (error: unknown) => String(error).slice(0, 300),
+      );
+    if (closed !== null) services.workspaces.setLastError(id, `${why}; the Container did not stop: ${closed}`);
+    console.log(JSON.stringify({ t3flare: "workspace-tombstoned", id, why, purgeAfter, ...(closed === null ? {} : { stopError: closed }) }));
+    return { exitCode: 0, stderr: "", detail: JSON.stringify({ outcome: "tombstoned", why, purgeAfter, ...(closed === null ? {} : { stopError: closed }) }) };
   };
   let tips: { readonly ok: boolean; readonly tips: ReadonlyArray<string>; readonly error?: string };
   let out: Awaited<ReturnType<ReturnType<typeof workspaceRpc>["carryOut"]>>;
