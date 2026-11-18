@@ -24,7 +24,7 @@ import { type AuthMcpClientAccess, mcpClientScopes } from "@t3tools/contracts";
 import { admin, base, createProjectAndThread, dispatch, itemsOf, pair, runsOf, sleep, updateSettings, uuid, wsCall } from "./lib/client.ts";
 import { MODEL, pendingOf, projection, replyOf, say, settled, t3Calls, until } from "./lib/cloudThread.ts";
 import { writeEvidence } from "./lib/evidence.ts";
-import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
+import { HELD_WAIT_FLOOR_MS, McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
 import { findSession } from "./lib/peerAcceptance.ts";
 import { Standin, standinModel } from "./lib/standin.ts";
 import { tailing } from "./lib/tail.ts";
@@ -243,7 +243,7 @@ if (phase === "link") {
   const waitThread = launched.json?.threadId as string | undefined;
   check("G1: a forwarded launch starts a thread on the stand-in", !launched.isError && waitThread !== undefined, launched.text.slice(0, 300));
   if (waitThread !== undefined) {
-    // Its bash asks there (the link is Supervised), so the run waits; a 50 s wait then holds and times out as a wait.
+    // Its bash asks there (the link is Supervised), so the run waits; a 50 s wait then holds (to t3's 45 s cap) and times out as a wait.
     const at = Date.now();
     let asked = 0;
     while (Date.now() - at < 180_000 && asked === 0) {
@@ -254,7 +254,7 @@ if (phase === "link") {
     const waitAt = Date.now();
     const held = await mcp.call("t3_thread_wait", { environmentId: sId, threadId: waitThread, timeoutMs: 50_000 });
     out.waitPiece = { ms: Date.now() - waitAt, timedOut: held.json?.timedOut ?? null, isError: held.isError, text: held.isError ? held.text.slice(0, 300) : undefined };
-    check("G1: a 50 s wait piece survives the Route and times out as a wait", held.json?.timedOut === true && Date.now() - waitAt >= 45_000, out.waitPiece);
+    check("G1: a 50 s wait piece survives the Route and times out as a wait", held.json?.timedOut === true && Date.now() - waitAt >= HELD_WAIT_FLOOR_MS, out.waitPiece);
     await approveOnStandin(waitThread);
     const done = await mcp.call("t3_thread_wait", { environmentId: sId, threadId: waitThread, timeoutMs: 50_000 });
     const read = await mcp.call("t3_thread_read", { environmentId: sId, threadId: waitThread });

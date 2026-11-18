@@ -32,7 +32,10 @@ import { isDeniedT3Tool } from "@t3flare/harness-registry";
 
 /** Tools that wait on t3 for up to `timeoutMs`: sent in pieces of at most WAIT_PIECE_MS. */
 const WAIT_TOOLS: ReadonlySet<string> = new Set(["t3_thread_wait", "t3_background_wait"]);
-/** `PeerForwarding.FORWARDED_WAIT_CHUNK_MS`'s length, from the wait's start. */
+/**
+ * `PeerForwarding.FORWARDED_WAIT_CHUNK_MS`'s length, from the wait's start. t3 itself holds a wait at most 45 s
+ * (`OrchestratorMcpService.MAX_WAIT_TIMEOUT_MS`), so a piece holds 45 s and times out; the next piece follows.
+ */
 export const WAIT_PIECE_MS = 50_000;
 /** A wait the model gave no `timeoutMs` for lasts this long at most, in pieces. */
 const DEFAULT_WAIT_MS = 10 * 60_000;

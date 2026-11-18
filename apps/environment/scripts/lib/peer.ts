@@ -15,6 +15,12 @@ export const MCP_PROTOCOL_VERSION = "2025-06-18";
 export const WAIT_CHUNK_MS = 50_000;
 /** `OrchestratorMcpService.MAX_WAIT_TIMEOUT_MS`: t3 holds any `t3_thread_wait` at most this long. */
 export const T3_WAIT_CAP_MS = 45_000;
+/**
+ * The least a wait asked for longer than the cap must hold to count as held: 1 s under the cap. Measured, it lands
+ * within about 0.1 s either side of 45 s (44 971-45 082 ms over the 2026-11-17/18 bump runs); a wait that returns
+ * early returns far sooner.
+ */
+export const HELD_WAIT_FLOOR_MS = T3_WAIT_CAP_MS - 1000;
 
 export type LinkAccess = "read-only" | "approval-required" | "auto-accept-edits" | "auto" | "full-access";
 

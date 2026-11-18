@@ -7,7 +7,7 @@
 //   - a link with a plain pairing code; the cap a code's scopes put on the access a link may take (review C5);
 //   - a forwarded `t3_thread_launch` on the Durable agent, followed in 50 s waits, its last reply read back;
 //   - F5: a link at auto-accept-edits caps a full-access caller: the cloud thread's `bash` waits for approval, and a
-//     50 s wait on it times out as a wait (workerd holds it);
+//     50 s wait asked on it holds to t3's 45 s cap and times out as a wait (workerd holds it);
 //   - F7: `t3_pending_request respond` through the link cannot answer the child's approval; the owner's answer can;
 //   - F6: `T3-Mode-Limit: approval-required/plan` runs the thread in plan: `write` is refused, `bash` asks;
 //   - F1, F2: an auto-accept-edits link may not change the owner's threads, projects, settings or schedules;
@@ -18,7 +18,7 @@
 // F11 (the bootstrap token at `/oauth/mcp/decision`) runs in `acceptance.ts` around the Pairing window.
 import { base, dispatch, mutateProject, projectionOf, runsOf, SETTLED, sleep, threadWindow, updateSettings, uuid, wsCall, wsFirst } from "./client.ts";
 import { ensureCloudFixtureProject } from "./fixtureProject.ts";
-import { decide, McpClient, mintPairingCode, registerPeerClient, signIn, T3_WAIT_CAP_MS, type ToolAnswer, WAIT_CHUNK_MS } from "./peer.ts";
+import { decide, HELD_WAIT_FLOOR_MS, McpClient, mintPairingCode, registerPeerClient, signIn, type ToolAnswer, WAIT_CHUNK_MS } from "./peer.ts";
 
 /**
  * The launches' model: the stage's Model endpoint's, when the caller names it. Since v0.1.11-nightly.20261117.4825 t3's
@@ -144,7 +144,7 @@ export const peerAcceptance = async (cookie: string, options: { readonly only?: 
     }
   }
 
-  // F5 and F7: the link's cap holds in the Session; a 50 s wait holds; the link cannot approve, the owner can.
+  // F5 and F7: the link's cap holds in the Session; a wait holds to t3's cap; the link cannot approve, the owner can.
   if (wants("F5")) {
     const launched = await launch("f5", `Run the bash command \`echo f5-${stamp}\` and reply with its output.`);
     const threadId = threadOf(launched);
@@ -157,10 +157,8 @@ export const peerAcceptance = async (cookie: string, options: { readonly only?: 
         const started = Date.now();
         const held = await mcp.call("t3_thread_wait", { threadId, timeoutMs: WAIT_CHUNK_MS });
         report.waitHold = { ms: Date.now() - started, timedOut: held.json?.timedOut ?? null, status: held.json?.status ?? null };
-        // t3 caps a wait at 45 s (`OrchestratorMcpService`'s `MAX_WAIT_TIMEOUT_MS`), so the 50 s asked for holds 45 s;
-        // measured here it lands within about 0.1 s either side (44 971–45 082 ms over the 2026-11-17/18 bump runs),
-        // so the floor allows 1 s under the cap. What it guards is a wait that returns early, not the cap's exact edge.
-        check("a 50 s wait on a waiting run holds in workerd and times out as a wait", held.json?.timedOut === true && Date.now() - started >= T3_WAIT_CAP_MS - 1000, report.waitHold);
+        // Asked for 50 s, held to t3's 45 s cap (`T3_WAIT_CAP_MS`); the floor allows its jitter (`HELD_WAIT_FLOOR_MS`).
+        check("a 50 s wait asked on a waiting run holds in workerd (to t3's 45 s cap) and times out as a wait", held.json?.timedOut === true && Date.now() - started >= HELD_WAIT_FLOOR_MS, report.waitHold);
         // F7: the link cannot answer an approval; the owner's answer through the cloud client runs the call.
         const respond = await mcp.call("t3_pending_request", { action: "respond", threadId, requestId: request.id, answers: { decision: "accept" } });
         const afterLink = await cloud(threadId!);
