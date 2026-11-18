@@ -1591,8 +1591,11 @@ its web client's meter logic, which nothing of ours restates.
   - **No Copilot meter**: no documented header carries Copilot's plan quota.
   - t3: `UsageLimitSources` (`apps/server/src/usage/UsageLimitSources.ts`: `current`, `streamChanges` seeded with the
     current list, `refresh`, `consumeResetCredit`); `UsageLimitSourceSnapshot` (`contracts/src/providerUsageLimits.ts`,
-    kind `cliproxy` only); the web client's `collectLimitAccounts`, `collectLimitPools`, `collectLimitNotices` and
-    `collectProviderUsageLimits` (`packages/shared/src/usageLimits.ts`): an account with no email is named by its id, a
+    kind `cliproxy` only); the web client's `collectLimitAccounts`, `collectLimitPools` and
+    `collectProviderUsageLimits` (`packages/shared/src/usageLimits.ts`), and `collectLimitNotices`
+    (`packages/shared/src/usageLimitsCopy.ts` since `v0.1.11-nightly.20261118.4864`, which translates its text; before
+    that in `usageLimits.ts`, and `limitMeters.test.ts` takes it from whichever has it until the pin is past that tag,
+    then imports it from `usageLimitsCopy` directly): an account with no email is named by its id, a
     source's `error` becomes a notice beside the meters (our staleness text: "Last read 3 hours ago …"), Codex windows
     pool by kind. The composer's `/usage-limits` report labels every source account "CLI Proxy" (`sourceLabel`, fixed
     for t3's only source kind `cliproxy`), ours included: it reads "<endpoint label> · <endpoint id>" beside that.
@@ -1611,7 +1614,7 @@ its web client's meter logic, which nothing of ours restates.
   each subscription, then the Usage page.
 - **Blast radius**: a missing, frozen or wrong meter; the turn itself is unaffected.
 - **Fix**: compare the vendor's client again (Codex's `rate_limits.rs`, Claude Code's `strings`), update
-  `limits.ts` and its pins; for t3, diff `usageLimits.ts` and `UsageLimitSources.ts` between tags.
+  `limits.ts` and its pins; for t3, diff `usageLimits.ts`, `usageLimitsCopy.ts` and `UsageLimitSources.ts` between tags.
 
 ### U85. The setup state and the fallback of old selections (SPI-1176)
 

@@ -3,7 +3,8 @@
 // answer in the Environment DO's SQLite, and shown as one t3 limit source per endpoint, through t3's own contract and
 // the meter logic its Usage page and composer use.
 import { UsageLimitSourceSnapshot } from "@t3tools/contracts";
-import { collectLimitAccounts, collectLimitNotices, collectLimitPools, collectProviderUsageLimits } from "@t3tools/shared/usageLimits";
+import * as UsageLimits from "@t3tools/shared/usageLimits";
+import { collectLimitAccounts, collectLimitPools, collectProviderUsageLimits } from "@t3tools/shared/usageLimits";
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import { acceptedLimitReading, limitReadingOf, limitWindowsOf, type LimitReading, noteLimitReading } from "@t3flare/models/limits";
 import * as Duration from "effect/Duration";
@@ -20,6 +21,19 @@ import { endpointMeterSources, withSources } from "../src/usage/limitSources.ts"
 import { agoText, LIMIT_SOURCE_PREFIX, limitSnapshots, STALE_AFTER_MS } from "../src/usage/limitMeters.ts";
 import { limitStore, limitWiring } from "../src/usage/limits.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
+
+/**
+ * t3's composer notices. Since `v0.1.11-nightly.20261118.4864` (t3's translation of the whole app) the function is in
+ * `@t3tools/shared/usageLimitsCopy`, with a translator argument that defaults to its English text. Before that it was
+ * in `usageLimits`. It is taken from whichever module has it, so this file passes on the pin and on the nightly the bump
+ * moves to. Once the pin is past that tag, import it from `usageLimitsCopy` directly (docs/upstream-fragility.md, U84). The specifier is a variable so
+ * typecheck does not resolve a module the older pin lacks.
+ */
+type CollectLimitNotices = (presentations: never) => ReadonlyArray<string>;
+const LIMITS_COPY_MODULE = "@t3tools/shared/usageLimitsCopy";
+const collectLimitNotices: CollectLimitNotices =
+  ((UsageLimits as Record<string, unknown>).collectLimitNotices as CollectLimitNotices | undefined) ??
+  ((await import(/* @vite-ignore */ LIMITS_COPY_MODULE)) as { readonly collectLimitNotices: CollectLimitNotices }).collectLimitNotices;
 
 const NOW = Date.parse("2026-11-16T12:00:00Z");
 const S = (ms: number) => String(Math.floor(ms / 1000));
