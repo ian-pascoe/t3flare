@@ -69,14 +69,32 @@ export const terminalWorktree = async (cookie: string, options: { readonly termi
     check("setup script done in the worktree", stages.includes("setup-script:done"), report.worktree);
     const path: string | null = setup?.worktreePath ?? null;
     if (path !== null) {
+      const wid = path.replace(/^\/w\//, "");
+      const removeStarted = Date.now();
       const removed = await wsCall(cookie, "vcs.removeWorktree", { cwd: `/w/${id}`, path, force: true }).then(
         () => "removed",
         (error: unknown) => String(error).slice(0, 300),
       );
-      const workspaces = (((await admin("GET", "/_t3flare/agents/workspaces")).json?.workspaces ?? []) as Array<{ id: string; state: string }>).map((ws) => ws.id);
-      const leases = (((await admin("GET", "/_t3flare/agents/budget")).json?.leases ?? []) as Array<{ workspace: string | null }>).map((lease) => lease.workspace);
-      const wid = path.replace(/^\/w\//, "");
-      report.removal = { removed, inRegistry: workspaces.includes(wid), leased: leases.includes(wid) };
+      const removeEnded = Date.now();
+      const registry = ((await admin("GET", "/_t3flare/agents/workspaces")).json?.workspaces ?? []) as Array<{ id: string; state: string }>;
+      const leaseList = ((await admin("GET", "/_t3flare/agents/budget")).json?.leases ?? []) as Array<{ workspace: string | null; until?: number }>;
+      const leases = leaseList.map((lease) => lease.workspace);
+      const entry = registry.find((ws) => ws.id === wid);
+      const lease = leaseList.find((l) => l.workspace === wid);
+      // A lease still held after the removal: when it was taken (until − LEASE_MS, 10 minutes) against the removal's
+      // window, and what the router ran in the worktree meanwhile, tell a release that never ran from a later restart.
+      const trace = (((await admin("GET", "/_t3flare/agents/router-trace")).json?.entries ?? []) as Array<{ at: number; cwd: string | null; command: string; argv: unknown; route: string }>)
+        .filter((e) => e.cwd !== null && e.cwd.startsWith(path) && e.at >= removeStarted - 30_000)
+        .map((e) => ({ dt: e.at - removeStarted, command: e.command, argv: e.argv, route: e.route }));
+      report.removal = {
+        removed,
+        inRegistry: registry.some((ws) => ws.id === wid),
+        leased: leases.includes(wid),
+        removeMs: removeEnded - removeStarted,
+        entry: entry ?? null,
+        leaseTakenDt: lease?.until === undefined ? null : lease.until - 10 * 60_000 - removeStarted,
+        trace,
+      };
       // setup.txt is untracked: a forced removal of a dirty worktree is a tombstone, gone from t3 and the budget.
       check("worktree removed and out of the budget", removed === "removed" && !leases.includes(wid), report.removal);
     }
