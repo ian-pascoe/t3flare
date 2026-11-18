@@ -79,7 +79,7 @@ Settled with the owner on 2026-11-17 after a four-round design interview. The fa
   - fast-forwards `main` with `GITHUB_TOKEN`; that push does not start `on: push` workflows
   - dispatches `deploy-prod.yml` with `checked_sha`
   - watches that run; its conclusion is the Update's outcome
-  - *Superseded 2026-11-17 (ADR-0037 §7): ruleset `main` refuses a `GITHUB_TOKEN` push, so it pushes with a `prod`
+  - *Superseded 2026-11-17 (ADR-0037 §7): ruleset `main` refuses a `GITHUB_TOKEN` push, so it pushes with a `land`-environment
     deploy key, whose push starts `deploy-prod.yml`; it follows that push run, dispatching only when deploy-only.*
   - deletes landed `bump/*` branches at or below the landed version
   - dispatches a **verify** run (D18)

@@ -90,8 +90,9 @@ CI, never by updating the Environment in place:
    proved: it refuses unless the pin's branch still points at that commit and the commit's proof counts (review B1),
    then runs the land check (job `check`, no environment), fast-forwards `main` with the deploy key
    `T3FLARE_LAND_DEPLOY_KEY` (job `land`, which runs only main's code), and follows the `deploy-prod.yml` push run that
-   push starts: its conclusion is the Update's. The key is a secret of the `prod` environment, whose branch policy
-   admits `main` alone, so no branch, by-hand dispatch from another ref or opted-in Workspace's workflow reaches it.
+   push starts: its conclusion is the Update's. The key is the one secret of the `land` environment (none of prod's:
+   the job can't reach prod's Cloudflare token or the App key, and deploy-prod's install never shares an environment
+   with the key), whose branch policy admits `main` alone, so no branch, by-hand dispatch from another ref or opted-in Workspace's workflow reaches it.
    Ruleset `main` requires pull requests: deploy keys and admins skip it always; the cloudpid and t3flare Apps only when
    merging a pull request (set before this, for their PR merges). GitHub Actions can't be a bypass actor on a personal
    account's repo, and the t3flare App also mints agents' Container tokens, so it gets no direct-push skip. The key can
@@ -149,8 +150,8 @@ CI, never by updating the Environment in place:
   turns are not warned or refused: the restart costs a re-prompt (ADR-0004). A running Container keeps its old CLI until
   it restarts.
 - A t3 bump that raises a CLI's minimum fails `check` with "bump the CLI in clis.ts": press that CLI's update first.
-- The deploy key `land.yml: fast-forward main (ADR-0037)` (write access), its private half as the `prod` secret
-  `T3FLARE_LAND_DEPLOY_KEY`, and the `DeployKey` bypass on ruleset `main` were set by hand (2026-11-17). Rotate by
+- The deploy key `land.yml: fast-forward main (ADR-0037)` (write access), its private half as the `land` environment's
+  secret `T3FLARE_LAND_DEPLOY_KEY` (environment `land`: branch policy `main`), and the `DeployKey` bypass on ruleset `main` were set by hand (2026-11-17). Rotate by
   replacing both halves.
 - The owner accepts the App's new `actions: write` on its installation, which must include `ian-pascoe/t3flare`, and
   deletes the Actions caches the bump jobs saved before this (`gh cache delete --all`): until now they saved the pnpm

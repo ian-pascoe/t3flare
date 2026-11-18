@@ -16,7 +16,8 @@ name: CLI bump
 # runs (the Environment DO sends it): when main already holds the newest pin and prod does not run it, the run only
 # deploys main (review F2). `dry_run` runs the path through the check and pushes, marks and lands nothing (review B3).
 #
-# Needs the `bump` environment's secrets, as bump.yml (see there), in the bump job only; prod's never reach it.
+# Needs the `bump` environment's secrets, as bump.yml (see there), in the bump job only; prod's never reach it
+# (land.yml's job enters only the `land` environment, whose one secret is its deploy key).
 
 run-name: ${{ inputs.update_id && format('CLI update {0}', inputs.update_id) || format('CLI bump {0}', inputs.cli) }}
 

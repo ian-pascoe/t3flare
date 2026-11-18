@@ -33,7 +33,8 @@ name: Nightly bump
 # `github-app:setup` secrets.T3FLARE_GITHUB_APP_ID and secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY; and the repository setting
 # that lets Actions create pull requests (infra/allow-actions-prs.ts). The stage's own tokens are made fresh by the job.
 # The secrets reach only the Bump step, and the Model endpoint the masking step before it (node on mask-endpoint.ts
-# alone). Prod's secrets never reach this workflow: land.yml deploys prod by dispatching deploy-prod.yml.
+# alone). Prod's secrets never reach this workflow: the land job (land.yml) enters only the `land` environment, whose one
+# secret is the deploy key it pushes `main` with; that push starts deploy-prod.yml, which holds prod's.
 
 run-name: ${{ inputs.verify && format('Verify {0}', inputs.verify) || inputs.update_id && format('Update {0}', inputs.update_id) || 'Nightly bump' }}
 
