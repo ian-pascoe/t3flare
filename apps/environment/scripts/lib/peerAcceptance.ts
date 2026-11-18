@@ -18,7 +18,7 @@
 // F11 (the bootstrap token at `/oauth/mcp/decision`) runs in `acceptance.ts` around the Pairing window.
 import { base, dispatch, mutateProject, projectionOf, runsOf, SETTLED, sleep, threadWindow, updateSettings, uuid, wsCall, wsFirst } from "./client.ts";
 import { ensureCloudFixtureProject } from "./fixtureProject.ts";
-import { decide, McpClient, mintPairingCode, registerPeerClient, signIn, type ToolAnswer, WAIT_CHUNK_MS } from "./peer.ts";
+import { decide, McpClient, mintPairingCode, registerPeerClient, signIn, T3_WAIT_CAP_MS, type ToolAnswer, WAIT_CHUNK_MS } from "./peer.ts";
 
 /**
  * The launches' model: the stage's Model endpoint's, when the caller names it. Since v0.1.11-nightly.20261117.4825 t3's
@@ -157,7 +157,10 @@ export const peerAcceptance = async (cookie: string, options: { readonly only?: 
         const started = Date.now();
         const held = await mcp.call("t3_thread_wait", { threadId, timeoutMs: WAIT_CHUNK_MS });
         report.waitHold = { ms: Date.now() - started, timedOut: held.json?.timedOut ?? null, status: held.json?.status ?? null };
-        check("a 50 s wait on a waiting run holds in workerd and times out as a wait", held.json?.timedOut === true && Date.now() - started >= 45_000, report.waitHold);
+        // t3 caps a wait at 45 s (`OrchestratorMcpService`'s `MAX_WAIT_TIMEOUT_MS`), so the 50 s asked for holds 45 s;
+        // measured here it lands within about 0.1 s either side (44 971–45 082 ms over the 2026-11-17/18 bump runs),
+        // so the floor allows 1 s under the cap. What it guards is a wait that returns early, not the cap's exact edge.
+        check("a 50 s wait on a waiting run holds in workerd and times out as a wait", held.json?.timedOut === true && Date.now() - started >= T3_WAIT_CAP_MS - 1000, report.waitHold);
         // F7: the link cannot answer an approval; the owner's answer through the cloud client runs the call.
         const respond = await mcp.call("t3_pending_request", { action: "respond", threadId, requestId: request.id, answers: { decision: "accept" } });
         const afterLink = await cloud(threadId!);

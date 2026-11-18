@@ -13,6 +13,8 @@ export const PEER_LINK_REDIRECT_URI = "http://127.0.0.1/t3code-peer-link";
 export const MCP_PROTOCOL_VERSION = "2025-06-18";
 /** `PeerForwarding.FORWARDED_WAIT_CHUNK_MS`: the peer sends nothing while it waits, so no wait outlives this. */
 export const WAIT_CHUNK_MS = 50_000;
+/** `OrchestratorMcpService.MAX_WAIT_TIMEOUT_MS`: t3 holds any `t3_thread_wait` at most this long. */
+export const T3_WAIT_CAP_MS = 45_000;
 
 export type LinkAccess = "read-only" | "approval-required" | "auto-accept-edits" | "auto" | "full-access";
 
