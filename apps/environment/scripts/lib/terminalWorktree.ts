@@ -3,7 +3,8 @@
 // terminal echoes through t3's terminal RPCs; a worktree thread of a project with a setup script provisions and runs
 // it; the worktree is removed through t3's `vcs.removeWorktree` and frees its Workspace; the sweep's dry run reads t3's
 // projection columns (it fails closed if a bump renamed them).
-import { admin, DEFAULT_MODEL, mutateProject, sleep, updateSettings, uuid, wsCall, wsFirst } from "./client.ts";
+import { admin, DEFAULT_MODEL, mutateProject, runsOf, sleep, updateSettings, uuid, wsCall, wsFirst } from "./client.ts";
+import { settled, until } from "./cloudThread.ts";
 import { attachTerminal } from "./terminal.ts";
 
 /** One entry of the admin route `GET /_t3flare/agents/router-trace` (`TraceEntry`), as far as the removal reads it. */
@@ -78,6 +79,13 @@ export const terminalWorktree = async (cookie: string, options: { readonly termi
     check("setup script done in the worktree", stages.includes("setup-script:done"), report.worktree);
     const path: string | null = setup?.worktreePath ?? null;
     if (path !== null) {
+      // The thread's first turn settles before the removal. t3 restores a thread's missing worktree before a send
+      // (`restoreMissingWorktree`), and since v0.1.11-nightly.20261117.4851 that restore succeeds here. A removal that
+      // beats the pending turn is undone: t3 re-adds the worktree, our router restores its tombstone (review F5), and
+      // the restored worktree takes a lease. That is the nightly's `leased: true`, and it is no leak.
+      const turn = await until(cookie, threadId, settled, 4 * 60_000);
+      report.turnBeforeRemoval = runsOf(turn).map((run: { status: string }) => run.status);
+      check("the worktree thread's turn settled before the removal", settled(turn), report.turnBeforeRemoval);
       const workspaceId = path.replace(/^\/w\//, "");
       const removeStarted = Date.now();
       const removed = await wsCall(cookie, "vcs.removeWorktree", { cwd: `/w/${id}`, path, force: true }).then(
@@ -93,7 +101,8 @@ export const terminalWorktree = async (cookie: string, options: { readonly termi
       // on the DO's clock) against the removal's window, and what the router ran in the worktree meanwhile, tell a
       // release that never ran from a later restart. Sessions' own starts are not in the router trace.
       const trace = (((await admin("GET", "/_t3flare/agents/router-trace")).json?.entries ?? []) as Array<RouterTraceEntry>)
-        .filter((entry) => entry.cwd !== null && entry.cwd.startsWith(path) && entry.at >= removeStarted - 30_000)
+        // In the worktree, or naming it from the project (a `git worktree add` that restores it).
+        .filter((entry) => ((entry.cwd !== null && entry.cwd.startsWith(path)) || JSON.stringify(entry.argv).includes(path)) && entry.at >= removeStarted - 30_000)
         .map((entry) => ({ msFromRemoval: entry.at - removeStarted, command: entry.command, argv: entry.argv, route: entry.route }));
       report.removal = {
         removed,
