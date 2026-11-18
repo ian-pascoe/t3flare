@@ -28,6 +28,9 @@
  *
  * Run ci:setup again after rotating any of those (prod's tokens, the GitHub App's key, the endpoint's key).
  *
+ * Not managed here (set by hand, ADR-0037 §7; SPI-1266): the environment `land` (main only), whose one secret is
+ * T3FLARE_LAND_DEPLOY_KEY, the repo's deploy key that land.yml pushes `main` with, and the ruleset bypass for it.
+ *
  * Rotate the token: `pnpm --filter @t3flare/infra run ci:destroy`, then `ci:setup` again. The `bump` environment is retained on
  * destroy, so anything set on it by hand survives.
  */
