@@ -26,7 +26,7 @@ import { nodeSqlStorage } from "./nodeSqlStorage.ts";
  * t3's composer notices. Since `v0.1.11-nightly.20261118.4864` (t3's translation of the whole app) the function is in
  * `@t3tools/shared/usageLimitsCopy`, with a translator argument that defaults to its English text. Before that it was
  * in `usageLimits`. It is taken from whichever module has it, so this file passes on the pin and on the nightly the bump
- * moves to. Once the pin is past that tag, import it from `usageLimitsCopy` directly. The specifier is a variable so
+ * moves to. Once the pin is past that tag, import it from `usageLimitsCopy` directly (docs/upstream-fragility.md, U84). The specifier is a variable so
  * typecheck does not resolve a module the older pin lacks.
  */
 type CollectLimitNotices = (presentations: never) => ReadonlyArray<string>;
