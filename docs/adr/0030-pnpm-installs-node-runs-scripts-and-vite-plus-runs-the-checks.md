@@ -59,3 +59,12 @@ carried over (step 4 above, measured in M0), and `verify-lock.ts` still fails on
 `v0.1.11-nightly.20261117.4851`: verify-lock passed, and the lock's diff was t3's (`@legendapp/list` 3.7.3, its patch
 dropped, the peer variants that follow).
 
+## Refinement (official tsrs support, 2026-11-17): oxlint finds tsrs-lint by itself
+
+Since oxlint 1.94.0 and tsrs 0.25.0 ([official support](https://oxc.rs/blog/2026-11-17-faster-type-aware-linting-with-tsrs)),
+oxlint `--type-aware` finds tsrs's `tsrs-lint` by itself and prefers it to the `oxlint-tsgolint` that vite-plus brings
+(checked: with the variable unset and no link, oxlint 1.94.0 spawned `tsrs-lint headless`). So the two workarounds above
+are gone: the lint scripts no longer set `OXLINT_TSGOLINT_PATH`, and `prepare` no longer runs `scripts/link-tsrs-lint.sh`,
+which is deleted. An inherited `OXLINT_TSGOLINT_PATH` still overrides oxlint's choice, and the scripts no longer guard
+against it: unset a stale one (AGENTS.md). An editor bundling an oxlint older than 1.94.0 no longer gets tsrs-lint
+through the link.
