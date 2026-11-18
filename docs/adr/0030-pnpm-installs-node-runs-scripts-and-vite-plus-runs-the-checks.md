@@ -17,9 +17,8 @@ Under Bun, every nightly bump re-translated t3code's pnpm settings into Bun's. C
 - **Node runs our scripts** (`node x.ts`, type stripping), at t3's `engines.node`. alchemy then runs under Node with its Oxc loader. `erasableSyntaxOnly` keeps every file strippable.
 - **Vite+ runs the check.** `pnpm run check` is `vp run check:all` (root `vite.config.ts`): the same tasks `scripts/check.ts` ran, plus `check:workspace`, run at once and uncached. The bump job runs the whole check (closes U27).
 - **tsrs's `tsrs-lint` is oxlint's type-aware backend** (2026-11-13; it replaced the interim `@maschwenk/tsrslint`).
-  - Every lint script sets `OXLINT_TSGOLINT_PATH` to the root `node_modules/.bin/tsrs-lint` itself. An inherited value, such as a stale path from another repo's mise `[env]`, otherwise overrides any link, and oxlint fails or lints on another backend.
-  - `vp run` passes its tasks the caller's environment; a `process.env` assignment in `vite.config.ts` does not reach them. So the variable is set in the scripts, not the config.
-  - `prepare` runs `scripts/link-tsrs-lint.sh`, which links `node_modules/.bin/tsgolint` to `tsrs-lint`. A bare `oxlint --type-aware` and editors then use tsrs-lint when the variable is unset.
+  - Since oxlint 1.94.0 and tsrs 0.25.0 (2026-11-17, [official support](https://oxc.rs/blog/2026-11-17-faster-type-aware-linting-with-tsrs)), oxlint finds `tsrs-lint` by itself and prefers it to the `oxlint-tsgolint` that vite-plus brings. The lint scripts no longer set `OXLINT_TSGOLINT_PATH`, and `prepare` no longer links `node_modules/.bin/tsgolint` to `tsrs-lint` (`scripts/link-tsrs-lint.sh` is gone).
+  - An inherited `OXLINT_TSGOLINT_PATH`, such as a stale path from another repo's mise `[env]`, still overrides that choice. Unset it.
 - **CI** uses `voidzero-dev/setup-vp` (`.github/actions/setup`). The pnpm store is cached on the lock. Secrets reach only the steps that deploy.
 
 **Nested workspace.** A pnpm or `vp` command whose working directory is inside `t3code/` finds t3's `pnpm-workspace.yaml` and installs t3code as its own workspace. Guards:

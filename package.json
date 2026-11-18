@@ -10,14 +10,14 @@
     "bump": "node scripts/bump.ts",
     "cli-bump": "node scripts/cli-bump.ts",
     "test:docker": "pnpm --filter @t3flare/environment run test:docker",
-    "prepare": "if [ -z \"$CI\" ]; then effect-tsgo patch --typescript; fi && ./scripts/link-tsrs-lint.sh"
+    "prepare": "if [ -z \"$CI\" ]; then effect-tsgo patch --typescript; fi"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261104.1",
     "@effect/tsgo": "0.67.1",
     "@types/node": "catalog:",
-    "oxlint": "1.91.0",
-    "tsrs": "0.24.0-ts7.1.0-beta",
+    "oxlint": "1.94.0",
+    "tsrs": "0.25.0-ts7.1.0-beta",
     "typescript": "^7.0.2",
     "vite-plus": "catalog:",
     "yaml": "catalog:"
