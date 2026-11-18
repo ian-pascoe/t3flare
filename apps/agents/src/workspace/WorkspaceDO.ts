@@ -1954,8 +1954,9 @@ export class WorkspaceDO extends ContainerHost {
     // A closed Workspace's Container running anyway (a path that bypassed the gate): stopped, not renewed.
     if (this.#gate.closed()) {
       console.warn(JSON.stringify({ t3flare: "container-closed-running", workspace: this.#workspaceId() ?? null }));
-      // A failed stop tries again on the next alarm rather than leave the Container running unwatched.
-      await this.stopContainer().catch(async () => await this.#scheduleAlarm());
+      // A failed stop tries again in 30 s rather than leave the Container running unwatched (not every second, as the
+      // idle schedule would for a Workspace past its idle time).
+      await this.stopContainer().catch(async () => await this.ctx.storage.setAlarm(Date.now() + 30_000));
       return;
     }
     await this.#terminals.expire().catch(() => undefined);

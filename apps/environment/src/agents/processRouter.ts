@@ -292,11 +292,11 @@ const worktreeAdd = async (cwd: string, command: Extract<WorktreeCommand, { verb
     // there is restored (its work kept); a removal still under way is finished first; a failed attempt starts again.
     if (existing.state === "tombstoned") {
       const { restoreWorkspace } = await import("./deletion.ts");
-      const reopened = await restoreWorkspace(id).then(
+      const restoreError = await restoreWorkspace(id).then(
         () => undefined,
         (error: unknown) => String(error).slice(0, 300),
       );
-      if (reopened !== undefined) return fail(`fatal: t3flare: '${command.path}' could not be restored: ${reopened}`);
+      if (restoreError !== undefined) return fail(`fatal: t3flare: '${command.path}' could not be restored: ${restoreError}`);
       return { exitCode: 0, stdout: "", stderr: `Preparing worktree (restoring '${command.path}')\n`, route: "worktree", detail: "tombstone restored" };
     }
     if (existing.state === "deleting") {
