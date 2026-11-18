@@ -88,13 +88,18 @@ CI, never by updating the Environment in place:
    Cloudflare token, the GitHub App's key), so opting a Workspace in to changing CI is trusting it with them.
 7. **Land** (`land.yml`, reusable by both kinds) lands exactly the commit `plan` (an Update's fast path) or `publish`
    proved: it refuses unless the pin's branch still points at that commit and the commit's proof counts (review B1),
-   then runs the land check, fast-forwards `main` with the deploy key `T3FLARE_LAND_DEPLOY_KEY`, and follows the
-   `deploy-prod.yml` push run that push starts: its conclusion is the Update's. The key is a secret of the `prod`
-   environment (deployable from `main` only) and reaches only the push step. Ruleset `main` requires pull requests and
-   lets deploy keys and admins skip it: GitHub Actions can't be a bypass actor on a personal account's repo, and the
-   t3flare App also mints agents' Container tokens, so letting it skip would let a Workspace on this repo push `main`.
-   The ruleset's skip also covers its other rules (no force push), so the push itself is a plain fast-forward; the repo
-   holds no other deploy key, and adding one is trusting it with `main`. It is
+   then runs the land check (job `check`, no environment), fast-forwards `main` with the deploy key
+   `T3FLARE_LAND_DEPLOY_KEY` (job `land`, which runs only main's code), and follows the `deploy-prod.yml` push run that
+   push starts: its conclusion is the Update's. The key is a secret of the `prod` environment, whose branch policy
+   admits `main` alone, so no branch, by-hand dispatch from another ref or opted-in Workspace's workflow reaches it.
+   Ruleset `main` requires pull requests: deploy keys and admins skip it always; the cloudpid and t3flare Apps only when
+   merging a pull request (set before this, for their PR merges). GitHub Actions can't be a bypass actor on a personal
+   account's repo, and the t3flare App also mints agents' Container tokens, so it gets no direct-push skip. The key can
+   push any ref, workflow files included, and the skip covers the ruleset's other rules (force push, deletion): the
+   push is a plain fast-forward, git's own refusal is its guard, and the land check's file allowlist is what keeps
+   workflows out of a landed commit. The repo holds no other deploy key; adding one is trusting it with `main`. The
+   ruleset needs no approval, so a Container token on this repo (contents and pull requests write) could likely open and
+   merge its own pull request; that predates this and is SPI-1262's. It is
    idempotent: when main already holds the pin (or a newer one), it pushes nothing and dispatches `deploy-prod.yml`
    with `checked_sha` for main's tip (as it does when no push run is listed within 3 minutes), so a press
    after a land whose deploy failed recovers, with or without its branch. The server Update's plan lands (deploy-only) a

@@ -5,10 +5,12 @@ name: Land
 # branches at or below the landed version and dispatch the verify run (bump.yml through the Full gate, D18).
 #
 # The push uses the deploy key T3FLARE_LAND_DEPLOY_KEY, a secret of the `prod` environment (deployable from `main`
-# only), because ruleset `main` requires pull requests and only deploy keys and admins may skip it: GitHub Actions can't
-# be a bypass actor on a personal account's repo, and the t3flare App also mints agents' Container tokens, so it must not
-# skip it. A deploy-key push, unlike a GITHUB_TOKEN one, starts deploy-prod.yml. The key reaches only the push step, after
-# the proof binding and the land check, and is a plain fast-forward (no force). ADR-0037 §7.
+# only), because ruleset `main` requires pull requests: deploy keys and admins skip it always, and the two Apps only when
+# merging a pull request. GitHub Actions can't be a bypass actor on a personal account's repo, and the t3flare App also
+# mints agents' Container tokens, so it gets no direct-push skip. A deploy-key push, unlike a GITHUB_TOKEN one, starts
+# deploy-prod.yml. Two jobs: `check` (no environment, so no key on its runner) binds to the proof and runs the land check
+# on the candidate; `land` (environment `prod`) runs only main's code and pushes the checked commit as a plain
+# fast-forward (no force; the ruleset skip would allow one, so git's own refusal is the guard). ADR-0037 §7.
 #
 # Bound to the proof (review B1): it lands `sha` only while the pin's branch still points at it, and only when `sha`
 # carries a `t3flare/proven` status set by GitHub Actions that names a run of bump.yml or cli-bump.yml on main
@@ -19,8 +21,9 @@ name: Land
 #
 # Called by bump.yml and cli-bump.yml on a fresh runner that ran no upstream code and holds no stage secrets, with the
 # pin as one validated string (`t3:<tag>`, `cli:<cli>:<version>`). They never call it on a dry run. By hand, `dry_run`
-# tries the job's checks only: the binding to the proof and the land check, then nothing (no push, no deploy, no branch
-# deleted). It never deploys a commit that is not main's: deploy-prod refuses one (review cycle 3).
+# runs the `check` job only: the binding to the proof and the land check, then nothing (no push, no deploy, no branch
+# deleted, no `prod` deployment record). It never deploys a commit that is not main's: deploy-prod refuses one (review
+# cycle 3). A real run's `land` job passes the `prod` environment's branch policy only from `main`.
 
 on:
   workflow_call:
@@ -44,21 +47,21 @@ on:
 permissions: {}
 
 jobs:
-  land:
+  check:
     runs-on: ubuntu-latest
     # By hand it waits in the `bump` group like any bump; called, it runs in its caller's run.
     concurrency:
       group: ${{ github.event_name == 'workflow_dispatch' && github.workflow == 'Land' && 'bump' || format('land-{0}', github.run_id) }}
       cancel-in-progress: false
-    # Long enough to wait out deploy-prod's own 45 minutes and a queue in its group; with the bump job's 20 and publish's
-    # 15 and plan's 5 this stays within an Update's 110 minutes from its start (ADR-0037, U92).
-    timeout-minutes: 60
-    # For T3FLARE_LAND_DEPLOY_KEY only; its branch policy admits `main` alone.
-    environment: prod
+    timeout-minutes: 5
     permissions:
-      contents: write
-      actions: write
+      contents: read
+      actions: read
       statuses: read
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      sha: ${{ steps.plan.outputs.sha }}
+      verify: ${{ steps.plan.outputs.verify }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -88,26 +91,53 @@ jobs:
           PIN: ${{ inputs.pin }}
           SHA: ${{ steps.plan.outputs.sha }}
 
+  land:
+    needs: check
+    if: inputs.dry_run != true
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.event_name == 'workflow_dispatch' && github.workflow == 'Land' && 'bump' || format('land-{0}', github.run_id) }}
+      cancel-in-progress: false
+    # Long enough to wait out deploy-prod's own 45 minutes and a queue in its group; with the bump job's 20, publish's
+    # 15, plan's 5 and check's 5 this stays within an Update's 110 minutes from its start (ADR-0037, U92).
+    timeout-minutes: 60
+    # For T3FLARE_LAND_DEPLOY_KEY; its branch policy admits `main` alone. Nothing from the candidate runs in this job.
+    environment: prod
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      # Every branch, so the checked commit is here to push; nothing from it runs.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+
       # A fast-forward only: a push that is not one is refused, and nothing is forced. The deploy key (see the header)
       # lives in a 0600 file under the runner's temp directory for this step alone; GitHub's host keys come from its API.
       - name: Fast-forward main
-        if: steps.plan.outputs.mode == 'land' && inputs.dry_run != true
+        if: needs.check.outputs.mode == 'land'
         run: |
+          if [ -z "$LAND_DEPLOY_KEY" ]; then echo "T3FLARE_LAND_DEPLOY_KEY is not readable (the prod environment's secret)."; exit 1; fi
           dir=$(mktemp -d "$RUNNER_TEMP/land-key.XXXXXX")
           trap 'rm -rf "$dir"' EXIT
           (umask 077 && printf '%s\n' "$LAND_DEPLOY_KEY" > "$dir/key")
           gh api meta --jq '.ssh_keys[] | "github.com " + .' > "$dir/known_hosts"
-          GIT_SSH_COMMAND="ssh -i $dir/key -o IdentitiesOnly=yes -o IdentityAgent=none -o UserKnownHostsFile=$dir/known_hosts -o StrictHostKeyChecking=yes" \
+          GIT_SSH_COMMAND="ssh -F /dev/null -i $dir/key -o IdentitiesOnly=yes -o IdentityAgent=none -o UserKnownHostsFile=$dir/known_hosts -o StrictHostKeyChecking=yes" \
             git push "git@github.com:${GITHUB_REPOSITORY}.git" "$SHA:refs/heads/main"
         env:
           GH_TOKEN: ${{ github.token }}
           LAND_DEPLOY_KEY: ${{ secrets.T3FLARE_LAND_DEPLOY_KEY }}
-          SHA: ${{ steps.plan.outputs.sha }}
+          SHA: ${{ needs.check.outputs.sha }}
 
       # A landed commit: follow the push run the deploy key's push started. Deploy-only (main already held the pin), or
       # no push run listed in time: dispatch one for main's tip and follow that.
       - name: Deploy
-        if: inputs.dry_run != true
         run: |
           run=""
           if [ "$MODE" = land ]; then
@@ -134,12 +164,11 @@ jobs:
           gh run watch "$run" --interval 15 --exit-status
         env:
           GH_TOKEN: ${{ github.token }}
-          MODE: ${{ steps.plan.outputs.mode }}
-          SHA: ${{ steps.plan.outputs.sha }}
+          MODE: ${{ needs.check.outputs.mode }}
+          SHA: ${{ needs.check.outputs.sha }}
 
       # Names from `pins.ts`'s parser only: this kind (and CLI), at or below the landed version.
       - name: Delete the landed bump branches
-        if: inputs.dry_run != true
         run: |
           node scripts/updates-ci.ts landed-branches --pin "$PIN" | while read -r branch; do
             echo "Deleting $branch"
@@ -151,8 +180,7 @@ jobs:
 
       # D18: what landed through an Update gate gets the Full gate on main afterwards; any non-pass opens an issue.
       - name: Dispatch the verify run
-        if: inputs.dry_run != true
         run: gh workflow run bump.yml --ref main -f force=true -f dry_run=true -f gate=full -f verify="$VERIFY"
         env:
           GH_TOKEN: ${{ github.token }}
-          VERIFY: ${{ steps.plan.outputs.verify }}
+          VERIFY: ${{ needs.check.outputs.verify }}

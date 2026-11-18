@@ -13,8 +13,8 @@ The job is `pnpm run bump` (`scripts/bump.ts`), run nightly by `.github/workflow
 
 - **Land mode.** `bump.yml` takes `land`, `gate` and `update_id`. A stock client's server Update dispatches it with
   `land: true` and the Update gate (`bump.ts --gate update`); a pass goes to a trusted job that checks it, pushes
-  `bump/<tag>` and marks it proven, and the reusable land workflow (`land.yml`) fast-forwards `main` to it and deploys
-  prod by dispatching `deploy-prod.yml` (ADR-0037 has the trust split and what the checks prove). Everything else stays a
+  `bump/<tag>` and marks it proven, and the reusable land workflow (`land.yml`) fast-forwards `main` to it with the `prod`
+  environment's deploy key `T3FLARE_LAND_DEPLOY_KEY`, whose push deploys prod (ADR-0037 has the trust split and what the checks prove). Everything else stays a
   pull request for the owner to merge. The run is named by `run-name` (`Nightly bump`, `Update <id>`, `Verify <what>`),
   checks out the tip of `main` when it starts, and queues in the `bump` group with `queue: max`.
 - **Hourly, with pre-proving.** The schedule is hourly. A trusted first job skips the run when the newest nightly is

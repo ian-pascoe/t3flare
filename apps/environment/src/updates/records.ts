@@ -11,8 +11,8 @@ import type { UpdatableCli } from "./pins.ts";
 /**
  * How long a record may stay in flight (review A2). Measured from when the DO first sees its run out of the queue, not
  * its dispatch: a run waits its turn in the `bump` concurrency group behind other bumps (`queue: max`) for as long as
- * they take. 110 minutes covers the run's own timeouts (plan's 5, the bump job's 20, publish's 15 and the land's 60, which
- * waits out deploy-prod's 45: 100, plus a margin for runners picking up each job; a run that hits them has failed already), and orders after t3's 32-minute client wait and the
+ * they take. 110 minutes covers the run's own timeouts (plan's 5, the bump job's 20, publish's 15, land's check 5 and its push
+ * and follow 60, which waits out deploy-prod's 45: 105, plus a margin for runners picking up each job; a run that hits them has failed already), and orders after t3's 32-minute client wait and the
  * 35-minute replay of a failed outcome (U92).
  */
 export const UPDATE_EXPIRY_MS = 110 * 60_000;

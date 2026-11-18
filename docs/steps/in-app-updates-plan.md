@@ -79,6 +79,8 @@ Settled with the owner on 2026-11-17 after a four-round design interview. The fa
   - fast-forwards `main` with `GITHUB_TOKEN`; that push does not start `on: push` workflows
   - dispatches `deploy-prod.yml` with `checked_sha`
   - watches that run; its conclusion is the Update's outcome
+  - *Superseded 2026-11-17 (ADR-0037 §7): ruleset `main` refuses a `GITHUB_TOKEN` push, so it pushes with a `prod`
+    deploy key, whose push starts `deploy-prod.yml`; it follows that push run, dispatching only when deploy-only.*
   - deletes landed `bump/*` branches at or below the landed version
   - dispatches a **verify** run (D18)
 - **Fast path:** if `bump/<tag>` already exists and `origin/main` is its ancestor, the run skips the bump and only lands.
@@ -180,7 +182,7 @@ Settled with the owner on 2026-11-17 after a four-round design interview. The fa
 - **ADR-0024:** amend the "Provider install and update … never from a client" row.
 - **ADR-0015:** note CLI pins and CLI bumps.
 - **AGENTS.md:** note that a land push to `main` deploys through an explicit dispatch, because a `GITHUB_TOKEN` push
-  starts no workflow.
+  starts no workflow. *(Superseded 2026-11-17: the push uses a deploy key and starts deploy-prod itself; ADR-0037 §7.)*
 - **`docs/upstream-fragility.md`:** revise U7, and add entries for:
   - the stamp seams
   - the `respawn` literal

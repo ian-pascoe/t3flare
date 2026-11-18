@@ -372,7 +372,7 @@ _Avoid_: token service, auth server
 
 **Container token**:
 A GitHub installation token for one Workspace's one repo (code and pull requests write; `workflows` only when the Workspace is opted in), handed to git in its Container on the credential helper's request; never stored there. The agent's own git pushes with it (owner, 2026-11-12, back to stock).
-_Avoid_: repo token, deploy key
+_Avoid_: repo token, deploy key (the repo's one deploy key is `land.yml`'s, ADR-0037 §7)
 
 **Environment token**:
 The GitHub installation token t3's own PR features use, answered to `gh auth token`; it never reaches a Container or a Session.
