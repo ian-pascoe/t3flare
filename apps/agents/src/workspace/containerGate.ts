@@ -1,3 +1,4 @@
+// @effect-diagnostics globalTimers:off
 // Whether a Workspace's Container may start, and the starts under way (the nightly's step 2b `leased: true`).
 //
 // A removed worktree with uncommitted work is a tombstone: its files are kept, its Container and budget lease are not.
@@ -13,8 +14,11 @@ export interface GateStore {
   readonly setClosed: (closed: boolean) => void;
 }
 
-/** What a start on a closed gate throws; computer's start wraps it as it wraps a budget refusal. */
-export const CLOSED_MESSAGE = "t3flare: this Workspace was removed: its Container does not start";
+/** What a start on a closed gate throws, in the budget refusal's words, so `startRefusal` lifts it out of computer's wrapping. */
+export const CLOSED_MESSAGE = "t3flare: the Container cannot start: this Workspace was removed";
+
+/** How long `close` waits for starts under way: a start that never settles must not hang a removal or a purge. */
+export const CLOSE_WAIT_MS = 5 * 60_000;
 
 export class ContainerGate {
   readonly #store: GateStore;
@@ -49,10 +53,18 @@ export class ContainerGate {
     return started;
   }
 
-  /** Closes the gate and waits until no start is under way (each ends, started or refused). Stops nothing itself. */
-  async close(): Promise<void> {
+  /**
+   * Closes the gate and waits until no start is under way (each ends, started or refused), at most `waitMs`; answers
+   * whether they all ended. Stops nothing itself. No start joins once closed, so one wait covers them all.
+   */
+  async close(waitMs = CLOSE_WAIT_MS): Promise<boolean> {
     this.#store.setClosed(true);
-    while (this.#starts.size > 0) await Promise.all(this.#starts);
+    if (this.#starts.size === 0) return true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<false>((resolve) => (timer = setTimeout(() => resolve(false), waitMs)));
+    const ended = await Promise.race([Promise.all(this.#starts).then(() => true as const), deadline]);
+    clearTimeout(timer);
+    return ended;
   }
 
   reopen(): void {

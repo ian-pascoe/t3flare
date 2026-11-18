@@ -822,21 +822,18 @@ export class WorkspaceDO extends ContainerHost {
       await this.#scheduleAlarm();
     };
     // Each start, lease and all, goes through the gate: refused once the Workspace is closed, waited out by the close.
+    const gated =
+      <A>(op: (spec: ContainerLaunchSpec) => Promise<A>) =>
+      (spec: ContainerLaunchSpec): Promise<A> =>
+        this.#gate.start(async () => {
+          const fresh = !this.containerRunning();
+          const launch = await this.#launch();
+          await lease(fresh ? launch.budget : undefined);
+          return op({ ...spec, instance: launch.instance });
+        });
     return {
-      start: (spec: ContainerLaunchSpec) =>
-        this.#gate.start(async () => {
-          const fresh = !this.containerRunning();
-          const launch = await this.#launch();
-          await lease(fresh ? launch.budget : undefined);
-          return api.start({ ...spec, instance: launch.instance });
-        }),
-      restart: (spec: ContainerLaunchSpec) =>
-        this.#gate.start(async () => {
-          const fresh = !this.containerRunning();
-          const launch = await this.#launch();
-          await lease(fresh ? launch.budget : undefined);
-          return api.restart({ ...spec, instance: launch.instance });
-        }),
+      start: gated((spec) => api.start(spec)),
+      restart: gated((spec) => api.restart(spec)),
       interceptOutboundHttp: (host, workspace) => api.interceptOutboundHttp(host, workspace),
       interceptAllOutboundHttp: (workspace, token) => api.interceptAllOutboundHttp(workspace, token),
       fetchPort: (port, input, init) => api.fetchPort(port, input, init),
@@ -1554,10 +1551,12 @@ export class WorkspaceDO extends ContainerHost {
   /**
    * A tombstoned worktree (its files kept): refuses every later Container start, waits out a start under way, then
    * stops the Container and releases its lease. Throws when the Container is still running after all, so the caller
-   * never reports a removal whose Container holds the budget.
+   * can record a Container that still holds the budget instead of reporting it stopped.
    */
   async closeContainer(): Promise<{ readonly stopped: true }> {
-    await this.#gate.close();
+    // The last writes come in while a start may still adopt the Container: once closed, a pull that needs one is refused.
+    await this.#terminalSync.pullNow().catch(() => undefined);
+    if (!(await this.#gate.close())) console.warn(JSON.stringify({ t3flare: "container-close-start-pending", workspace: this.#workspaceId() ?? null }));
     try {
       await this.stopContainer();
     } catch (error) {
@@ -1570,9 +1569,8 @@ export class WorkspaceDO extends ContainerHost {
   }
 
   /** A tombstone restored (`git worktree add` at its path, the admin restore): its Container may start again. */
-  reopenContainer(): Promise<void> {
+  async reopenContainer(): Promise<void> {
     this.#gate.reopen();
-    return Promise.resolve();
   }
 
   /**
@@ -1956,7 +1954,8 @@ export class WorkspaceDO extends ContainerHost {
     // A closed Workspace's Container running anyway (a path that bypassed the gate): stopped, not renewed.
     if (this.#gate.closed()) {
       console.warn(JSON.stringify({ t3flare: "container-closed-running", workspace: this.#workspaceId() ?? null }));
-      await this.stopContainer();
+      // A failed stop tries again on the next alarm rather than leave the Container running unwatched.
+      await this.stopContainer().catch(async () => await this.#scheduleAlarm());
       return;
     }
     await this.#terminals.expire().catch(() => undefined);

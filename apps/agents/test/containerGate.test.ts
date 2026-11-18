@@ -99,7 +99,7 @@ describe("ContainerGate", () => {
     expect(gate.starting).toBe(0);
   });
 
-  it("waits for a start that began while it waited for another", async () => {
+  it("waits for every start under way, not just the first to end", async () => {
     const gate = new ContainerGate(store());
     const first = pendingStart();
     const second = pendingStart();
@@ -115,6 +115,17 @@ describe("ContainerGate", () => {
     await b;
     await closing;
     expect(closed).toBe(true);
+  });
+
+  it("gives up waiting at its deadline, closed all the same, so a start that never settles hangs nothing", async () => {
+    const gate = new ContainerGate(store());
+    void gate.start(() => new Promise<never>(() => undefined));
+    expect(await gate.close(10)).toBe(false);
+    await expect(gate.start(async () => undefined)).rejects.toThrow(CLOSED_MESSAGE);
+  });
+
+  it("refuses in the budget refusal's words, which computer's wrapping keeps", () => {
+    expect(CLOSED_MESSAGE).toMatch(/the Container cannot start: /);
   });
 
   it("starts again once reopened (a restored tombstone, a reprovisioned path)", async () => {
