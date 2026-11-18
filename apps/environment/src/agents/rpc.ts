@@ -91,6 +91,10 @@ export interface WorkspaceRpc {
     readonly launch: { readonly size: string; readonly instance: ContainerInstance; readonly idleMs: number; readonly budget?: number; readonly revision: number } | null;
   }>;
   stopContainer(): Promise<void>;
+  /** A tombstone: no later start, a start under way waited out, then stopped and released; throws if it still runs. */
+  closeContainer(): Promise<{ readonly stopped: true }>;
+  /** A tombstone restored: its Container may start again. */
+  reopenContainer(): Promise<void>;
   readText(path: string): Promise<string | null>;
   /**
    * SPI-1147: the Repo skills and Prompt templates of a thread in `cwd`, from the Workspace's own files; SPI-1151: with

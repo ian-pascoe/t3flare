@@ -89,6 +89,7 @@ import { workspacePrompts, workspaceSkills } from "./skills.ts";
 import { mountWithFallback, skillSetMount, skillSetStore } from "./skillSet.ts";
 import { keepPriorSkills } from "./skillSetWait.ts";
 import { awaitContainerCopy, type TakeAnswer, takeSkillSet } from "./skillSetTake.ts";
+import { ContainerGate } from "./containerGate.ts";
 import { TerminalHost } from "./terminalHost.ts";
 import { TerminalSync } from "./terminalSync.ts";
 import { carryInScript, carryOutScript, parseBundleAnswer, parseCarryOut, parseTips, worktreeBundleScript, worktreeCloneScript, worktreeFinishScript } from "./worktreeScripts.ts";
@@ -186,6 +187,8 @@ export const PROJECT_ROOT_VIEW = `${HARNESS_ROOT}/project-root`;
 const PROJECT_ROOT_MAX_FILES = 1000;
 const PROJECT_ROOT_MAX_BYTES = 20 * 1024 * 1024;
 const LEASED_KEY = "t3flare:container-leased";
+/** Set by `closeContainer()` (a tombstoned worktree): no Container start until provisioning or `reopenContainer()`. */
+const CONTAINER_CLOSED_KEY = "t3flare:container-closed";
 export { CREDENTIAL_HELPER, CREDENTIAL_PATH };
 const WORKSPACE_ID_KEY = "t3flare:workspace-id";
 /** A cached token is renewed this long before it expires. */
@@ -246,6 +249,11 @@ export class WorkspaceDO extends ContainerHost {
   #hostReady: Promise<void> | undefined;
   /** Commands running now: the Container is not stopped under them. */
   #running = 0;
+  /** Whether the Container may start, and the starts under way (`containerGate.ts`). */
+  readonly #gate = new ContainerGate({
+    closed: () => this.ctx.storage.kv.get<number>(CONTAINER_CLOSED_KEY) !== undefined,
+    setClosed: (closed) => (closed ? this.ctx.storage.kv.put(CONTAINER_CLOSED_KEY, Date.now()) : this.ctx.storage.kv.delete(CONTAINER_CLOSED_KEY)),
+  });
   /** This instance (review F11): the adapter learns from a new epoch that the old instance's terminals are gone. */
   readonly #epoch = crypto.randomUUID();
   readonly #terminals: TerminalHost;
@@ -813,19 +821,19 @@ export class WorkspaceDO extends ContainerHost {
       await this.#noteUse();
       await this.#scheduleAlarm();
     };
+    // Each start, lease and all, goes through the gate: refused once the Workspace is closed, waited out by the close.
+    const gated =
+      <A>(op: (spec: ContainerLaunchSpec) => Promise<A>) =>
+      (spec: ContainerLaunchSpec): Promise<A> =>
+        this.#gate.start(async () => {
+          const fresh = !this.containerRunning();
+          const launch = await this.#launch();
+          await lease(fresh ? launch.budget : undefined);
+          return op({ ...spec, instance: launch.instance });
+        });
     return {
-      start: async (spec: ContainerLaunchSpec) => {
-        const fresh = !this.containerRunning();
-        const launch = await this.#launch();
-        await lease(fresh ? launch.budget : undefined);
-        return api.start({ ...spec, instance: launch.instance });
-      },
-      restart: async (spec: ContainerLaunchSpec) => {
-        const fresh = !this.containerRunning();
-        const launch = await this.#launch();
-        await lease(fresh ? launch.budget : undefined);
-        return api.restart({ ...spec, instance: launch.instance });
-      },
+      start: gated((spec) => api.start(spec)),
+      restart: gated((spec) => api.restart(spec)),
       interceptOutboundHttp: (host, workspace) => api.interceptOutboundHttp(host, workspace),
       interceptAllOutboundHttp: (workspace, token) => api.interceptAllOutboundHttp(workspace, token),
       fetchPort: (port, input, init) => api.fetchPort(port, input, init),
@@ -1537,6 +1545,32 @@ export class WorkspaceDO extends ContainerHost {
   /** Provisioning makes the Workspace again (a worktree at a reused path, review F5). */
   #revive(): void {
     this.ctx.storage.kv.delete(DESTROYED_KEY);
+    this.#gate.reopen();
+  }
+
+  /**
+   * A tombstoned worktree (its files kept): refuses every later Container start, waits out a start under way, then
+   * stops the Container and releases its lease. Throws when the Container is still running after all, so the caller
+   * can record a Container that still holds the budget instead of reporting it stopped.
+   */
+  async closeContainer(): Promise<{ readonly stopped: true }> {
+    // The last writes come in while a start may still adopt the Container: once closed, a pull that needs one is refused.
+    await this.#terminalSync.pullNow().catch(() => undefined);
+    if (!(await this.#gate.close())) console.warn(JSON.stringify({ t3flare: "container-close-start-pending", workspace: this.#workspaceId() ?? null }));
+    try {
+      await this.stopContainer();
+    } catch (error) {
+      if (this.containerRunning()) throw error;
+      // The platform's stop failed after the Container was gone: the lease goes all the same.
+      await this.#release();
+    }
+    console.log(JSON.stringify({ t3flare: "container-closed", workspace: this.#workspaceId() ?? null }));
+    return { stopped: true };
+  }
+
+  /** A tombstone restored (`git worktree add` at its path, the admin restore): its Container may start again. */
+  async reopenContainer(): Promise<void> {
+    this.#gate.reopen();
   }
 
   /**
@@ -1545,6 +1579,8 @@ export class WorkspaceDO extends ContainerHost {
    * restarts the object so no in-memory computer state outlives the storage.
    */
   async destroy(): Promise<{ readonly destroyed: true }> {
+    // A start under way would take a lease after the release below; the storage wipe clears the mark again.
+    await this.#gate.close();
     this.#terminals.containerStopped();
     this.#agentHost.containerStopped();
     this.#agentTerminals.containerStopped();
@@ -1913,6 +1949,14 @@ export class WorkspaceDO extends ContainerHost {
     if (this.#isDestroyed()) return;
     if (!this.containerRunning()) {
       if ((await this.ctx.storage.get<boolean>(LEASED_KEY)) === true) await this.#release();
+      return;
+    }
+    // A closed Workspace's Container running anyway (a path that bypassed the gate): stopped, not renewed.
+    if (this.#gate.closed()) {
+      console.warn(JSON.stringify({ t3flare: "container-closed-running", workspace: this.#workspaceId() ?? null }));
+      // A failed stop tries again in 30 s rather than leave the Container running unwatched (not every second, as the
+      // idle schedule would for a Workspace past its idle time).
+      await this.stopContainer().catch(async () => await this.ctx.storage.setAlarm(Date.now() + 30_000));
       return;
     }
     await this.#terminals.expire().catch(() => undefined);

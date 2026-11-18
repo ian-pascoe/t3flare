@@ -507,7 +507,7 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
       }
       case "POST /_t3flare/agents/workspace-restore": {
         const { restoreWorkspace } = await import("../agents/deletion.ts");
-        const restored = restoreWorkspace(url.searchParams.get("id") ?? "");
+        const restored = await restoreWorkspace(url.searchParams.get("id") ?? "");
         return restored === undefined ? json({ error: "not a tombstone" }, 409) : json({ restored });
       }
       case "GET /_t3flare/agents/budget": {

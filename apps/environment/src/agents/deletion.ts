@@ -122,11 +122,15 @@ export const purgeWorkspace = async (id: string, deletedThreads: ReadonlyArray<{
   }
 };
 
-/** A tombstone back to `ready` (admin `workspace-restore`; `git worktree add` at its path, review F5). */
-export const restoreWorkspace = (id: string): WorkspaceRecord | undefined => {
+/**
+ * A tombstone back to `ready` (admin `workspace-restore`; `git worktree add` at its path, review F5): its Container may
+ * start again first, so a failed reopen leaves it a tombstone rather than a `ready` Workspace that cannot run.
+ */
+export const restoreWorkspace = async (id: string): Promise<WorkspaceRecord | undefined> => {
   const services = environmentServices();
   const record = services.workspaces.get(id);
   if (record?.state !== "tombstoned") return undefined;
+  await workspaceRpc(id).reopenContainer();
   services.workspaces.setState(id, "ready", { deletedAt: null, purgeAfter: null, lastError: null });
   services.workspaces.setUnreferencedSince(id, null);
   return services.workspaces.get(id);
@@ -157,12 +161,22 @@ export const removeWorktree = async (projectCwd: string, path: string, force: bo
   if (record === undefined || record.kind !== "worktree" || record.parent !== project.id) return notAWorktree(path);
   const id = record.id;
   const dir = id.split("/")[2] ?? id;
-  const tombstone = async (why: string, purgeAfter: number | null): Promise<RemoveAnswer> => {
+  const tombstone = async (why: string, purgeAfter: number | null, extra: Readonly<Record<string, unknown>> = {}): Promise<RemoveAnswer> => {
     services.workspaces.setState(id, "tombstoned", { deletedAt: Date.now(), purgeAfter, lastError: why });
-    // The work is kept; the Container and its budget slot are not.
-    await workspaceRpc(id).stopContainer().catch(() => undefined);
-    console.log(JSON.stringify({ t3flare: "workspace-tombstoned", id, why, purgeAfter }));
-    return { exitCode: 0, stderr: "", detail: JSON.stringify({ outcome: "tombstoned", why, purgeAfter }) };
+    // The work is kept; the Container and its budget slot are not. Closed, not just stopped: a start under way (the
+    // thread's first turn, its terminal) would otherwise bring it back with a lease (the nightly's `leased: true`).
+    // A close that fails still leaves the Workspace closed: its alarm stops the Container rather than renew it. The
+    // removal itself stands (t3's worktree is gone either way); the failure is on the row and in the answer's detail.
+    const stopError = await workspaceRpc(id)
+      .closeContainer()
+      .then(
+        () => undefined,
+        (error: unknown) => String(error).slice(0, 300),
+      );
+    if (stopError !== undefined) services.workspaces.setLastError(id, `${why}; the Container did not stop: ${stopError}`);
+    const outcome = { outcome: "tombstoned", why, purgeAfter, ...extra, ...(stopError === undefined ? {} : { stopError }) };
+    console.log(JSON.stringify({ t3flare: "workspace-tombstoned", id, ...outcome }));
+    return { exitCode: 0, stderr: "", detail: JSON.stringify(outcome) };
   };
   let tips: { readonly ok: boolean; readonly tips: ReadonlyArray<string>; readonly error?: string };
   let out: Awaited<ReturnType<ReturnType<typeof workspaceRpc>["carryOut"]>>;
@@ -186,7 +200,7 @@ export const removeWorktree = async (projectCwd: string, path: string, force: bo
     if (!home.ok) return await tombstone(`the worktree's refs could not be carried home: ${(home.error ?? "").slice(0, 300)}`, null);
     carried = home.lines;
   }
-  if (out.dirty) return { ...(await tombstone("uncommitted work (--force)", Date.now() + settings.graceMs)), detail: JSON.stringify({ outcome: "tombstoned", carried }) };
+  if (out.dirty) return await tombstone("uncommitted work (--force)", Date.now() + settings.graceMs, { carried });
   const references = referencesFrom(sql);
   const purged = await purgeWorkspace(id, references.deletedThreads.get(id) ?? []);
   return { exitCode: 0, stderr: "", detail: JSON.stringify({ outcome: purged.destroyed ? "purged" : "deleting", carried, sessions: purged.sessionsDestroyed.length, error: purged.error }) };
