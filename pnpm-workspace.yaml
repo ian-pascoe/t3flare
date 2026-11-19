@@ -213,6 +213,7 @@ overrides:
   workerd: 1.20261026.1
   "@cloudflare/workers-types@^5.20261104.1": 5.20261108.1
   "@effect/sql-d1": 4.1.1
+  guarded-fetch>undici: 7.30.2
   "@asamuzakjp/css-color@7.0.1>lru-cache": 11.5.3
   "@asamuzakjp/dom-selector@9.2.1>css-tree": 3.2.1
   "@asamuzakjp/dom-selector@9.2.1>lru-cache": 11.5.3
