@@ -28,6 +28,30 @@ describe("startRefusal", () => {
     (cycle as { cause?: unknown }).cause = cycle;
     expect(startRefusal(cycle)).toBeUndefined();
   });
+
+  it("reads the reason as the regex it replaces did: from the first prefix, at least one character, up to a quote", () => {
+    const reference = (text: string) => /the Container cannot start: (.+?)(?:"|$)/s.exec(text)?.[1];
+    const prefix = "the Container cannot start: ";
+    for (const text of [
+      prefix,
+      `${prefix}"`,
+      `${prefix}""x`,
+      `${prefix}a"b`,
+      `${prefix}a\nb`,
+      `${prefix}${prefix}x`,
+      `x ${prefix}a ${prefix}b"`,
+      `no refusal "here"`,
+      "",
+    ]) {
+      expect(startRefusal(text), text).toBe(reference(text));
+    }
+  });
+
+  it("reads a message of many prefixes in linear time", () => {
+    const started = performance.now();
+    expect(startRefusal("the Container cannot start: a".repeat(100_000))).toHaveLength(29 * 100_000 - 28);
+    expect(performance.now() - started).toBeLessThan(400);
+  });
 });
 
 describe("describeFailure", () => {
