@@ -1,6 +1,9 @@
 // Git and GitHub reads the trusted update jobs share (ADR-0037): `scripts/updates-ci.ts` and `scripts/land-check.ts`.
 // Plain Node: no dependency.
 import { spawnSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 
 import { COMMIT, NIGHTLY_TAG, type Gate, PROVEN_CONTEXT, proofRunRefusal, provenDescription, provenStatus } from "../../apps/environment/src/updates/pins.ts";
 
@@ -72,6 +75,37 @@ export const provenGateOf = async (sha: string): Promise<{ readonly gate: Gate }
   if (status.repository !== repository) return { gate: undefined, reason: `its proof names a run of ${status.repository}` };
   const refusal = proofRunRefusal((await api("GET", `/actions/runs/${status.runId}`)) as Parameters<typeof proofRunRefusal>[0], repository);
   return refusal === undefined ? { gate: status.gate } : { gate: undefined, reason: `its proof does not count: ${refusal}` };
+};
+
+/**
+ * The reports of the newest hourly bump jobs on main, newest first, at most `count` (a plan that skipped ran no bump job
+ * and is passed over; a run whose report cannot be read counts as undefined). Untrusted input: `bumpAttemptOf` reads it.
+ * The artifact is unpacked with the runner's `unzip`, one named file to stdout.
+ */
+export const recentBumpReports = async (count: number): Promise<Array<string | undefined>> => {
+  const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
+  const runs = ((await api("GET", "/actions/workflows/bump.yml/runs?event=schedule&branch=main&status=completed&per_page=30")) as {
+    workflow_runs?: Array<{ id: number }>;
+  }).workflow_runs ?? [];
+  const reports: Array<string | undefined> = [];
+  for (const run of runs) {
+    if (reports.length >= count) break;
+    const artifacts = ((await api("GET", `/actions/runs/${run.id}/artifacts?name=bump`)) as { artifacts?: Array<{ archive_download_url: string; expired: boolean }> }).artifacts ?? [];
+    const artifact = artifacts.find((a) => !a.expired);
+    if (artifact === undefined) continue;
+    const response = await fetch(artifact.archive_download_url, { headers: { authorization: `Bearer ${token}`, "user-agent": "t3flare-ci" } });
+    if (!response.ok) {
+      reports.push(undefined);
+      continue;
+    }
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bump-artifact-"));
+    const zip = path.join(dir, "bump.zip");
+    fs.writeFileSync(zip, Buffer.from(await response.arrayBuffer()));
+    const unzipped = spawnSync("unzip", ["-p", zip, "bump-report.json"], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+    fs.rmSync(dir, { recursive: true, force: true });
+    reports.push(unzipped.status === 0 ? unzipped.stdout : undefined);
+  }
+  return reports;
 };
 
 /** Records that `sha` passed `gate` (the trusted publish job only). */

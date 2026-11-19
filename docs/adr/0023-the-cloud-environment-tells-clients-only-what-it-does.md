@@ -43,3 +43,13 @@ Update dispatches CI. `respawn` and not `boot-service`, so the client takes no a
 reset during the update does not read as its failure. Still stripped: `serverSelfUpdateProgress`,
 `serverUpdateStaging`, `serverUpdateThreadContinuation`, `serverInstallation`, `npmReleaseLookup`, `desktopAppUpdate`,
 `desktopAppChannelSwitch`.
+
+## Refinement (2026-11-19): a new flag is stripped until classified
+
+A flag a nightly adds no longer fails typecheck and `test/capabilities.test.ts`. `cloudCapabilities` strips any flag
+`capabilities.ts` does not classify, so the clients hide the feature as they would for an older server. t3 added more
+than thirty flags in seven weeks, and a missing classification blocked the bump each time (two nightlies in a row on
+11-18). The bump lists each unclassified flag in its report, the pin's commit message and its pull request's body
+(`scripts/capabilities-unclassified.ts`), so it still gets classified, after the pin lands rather than before. A removed
+or misspelt key still fails typecheck. The cost: a new feature that works in the cloud stays hidden until classified, and
+a flag the clients need present for an old behaviour would be stripped too (none has been).

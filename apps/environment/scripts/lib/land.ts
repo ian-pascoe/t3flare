@@ -267,7 +267,51 @@ export interface T3PlanInput {
   readonly mainTag?: string | undefined;
   /** `bump/<tag>` of the tag the run is about, when it exists. */
   readonly branch?: ProposedBranch | undefined;
+  /** Hourly: the commit of main this run would test, and the newest earlier hourly attempts, newest first. */
+  readonly mainSha?: string | undefined;
+  readonly attempts?: ReadonlyArray<BumpAttempt | undefined> | undefined;
 }
+
+/** An earlier bump job's attempt, read from its report (untrusted; `bumpAttemptOf`). */
+export interface BumpAttempt {
+  /** The commit of t3flare it tested, and the tag it tried. */
+  readonly base: string;
+  readonly to: string;
+  /** The first step that failed, or undefined when none did. */
+  readonly failedStep: string | undefined;
+}
+
+/**
+ * The steps whose failure the same inputs reproduce: the same t3 tag on the same t3flare commit fails them again.
+ * The install (the registry) and every step after the check (Docker, Cloudflare, the stage, npm) can fail by chance.
+ */
+const DETERMINISTIC_STEPS = ["move t3code to ", "lock matches t3's", "check (pnpm run check"] as const;
+/** How many hourly attempts in a row must fail a deterministic step before the plan stops retrying: one retry covers a flaky unit test. */
+export const DETERMINISTIC_FAILURES_TO_STOP = 2;
+
+/** An attempt from a bump job's report, or undefined when the report is not one this can read. */
+export const bumpAttemptOf = (text: string): BumpAttempt | undefined => {
+  let report: Record<string, unknown>;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+    report = parsed as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+  if (typeof report.base !== "string" || !/^[0-9a-f]{40}$/.test(report.base)) return undefined;
+  if (typeof report.to !== "string" || !NIGHTLY_TAG.test(report.to)) return undefined;
+  if (!Array.isArray(report.steps)) return undefined;
+  const failed = (report.steps as Array<unknown>).find((s): s is { name: string } => s !== null && typeof s === "object" && (s as { ok?: unknown }).ok === false && typeof (s as { name?: unknown }).name === "string");
+  return { base: report.base, to: report.to, failedStep: failed?.name };
+};
+
+const failedDeterministically = (attempt: BumpAttempt | undefined, tag: string, mainSha: string): boolean =>
+  attempt !== undefined &&
+  attempt.to === tag &&
+  attempt.base === mainSha &&
+  attempt.failedStep !== undefined &&
+  DETERMINISTIC_STEPS.some((prefix) => attempt.failedStep!.startsWith(prefix));
 
 export type T3Plan = { readonly mode: "skip" | "bump" | "land"; readonly tag: string; readonly reason: string; readonly proven?: boolean };
 
@@ -287,6 +331,12 @@ export const planT3 = (input: T3PlanInput): T3Plan | string => {
     if (newest === undefined) return { mode: "skip", tag: "", reason: "no nightly tag" };
     if (atOrAbove(input.mainTag, newest)) return { mode: "skip", tag: newest, reason: `${newest} is already pinned` };
     if (input.branch?.gate === "full") return { mode: "skip", tag: newest, reason: `${newest} is already proposed through the Full gate` };
+    // The same tag on the same main failed the same way: another hour changes nothing. A commit on main, a newer
+    // nightly or a run by hand tries again.
+    const recent = (input.attempts ?? []).slice(0, DETERMINISTIC_FAILURES_TO_STOP);
+    if (input.mainSha !== undefined && recent.length === DETERMINISTIC_FAILURES_TO_STOP && recent.every((attempt) => failedDeterministically(attempt, newest, input.mainSha!))) {
+      return { mode: "skip", tag: newest, reason: `${newest} failed "${recent[0]!.failedStep}" on this main ${DETERMINISTIC_FAILURES_TO_STOP} times; a change to main, a newer nightly or a run by hand tries again` };
+    }
     return { mode: "bump", tag: newest, reason: input.branch?.gate === "update" ? `${newest} was proven by the Update gate only; the Full gate proposes it` : `${newest} is new` };
   }
   if (!input.land) return { mode: "bump", tag: input.tag ?? "", reason: "a bump by hand" };
@@ -338,6 +388,27 @@ export const readBumpReport = (
   // F2: a press while prod runs an older pin than main's newest lands nothing new, and only deploys (land.yml then
   // deploys main, whatever `to` says).
   return { changed, to: report.to, gate: "update", callLand: changed || (expect.running !== undefined && expect.running !== report.to) };
+};
+
+const CAPABILITY_KEY = /^[A-Za-z][A-Za-z0-9]{0,63}$/;
+
+/**
+ * What a t3 bump's pull request tells its reader beyond the pass (fragility U4, U18), from the untrusted report: the
+ * capability flags stripped until classified (only names shaped as flags; anything else is dropped), and whether the
+ * acceptance test passed only on its second attempt. Never part of a decision to publish or land.
+ */
+export const bumpReportNotes = (text: string): { readonly unclassified: ReadonlyArray<string>; readonly acceptanceRetried: boolean } => {
+  let report: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) report = parsed as Record<string, unknown>;
+  } catch {
+    // No notes.
+  }
+  const unclassified = Array.isArray(report.unclassifiedCapabilities)
+    ? report.unclassifiedCapabilities.filter((key): key is string => typeof key === "string" && CAPABILITY_KEY.test(key)).slice(0, 50)
+    : [];
+  return { unclassified, acceptanceRetried: report.acceptanceRetry !== undefined && report.acceptanceRetry !== null };
 };
 
 /**

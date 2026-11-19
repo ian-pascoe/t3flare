@@ -21,6 +21,8 @@
 //     `--peer` (step 3): a Peer link from the harness, a forwarded launch, the link fence F1–F12; `--codex --pi`
 //     (step 4a): a Codex and a Pi turn with approvals, resumed after their Containers stopped), then a stock t3
 //     from npm at its newest nightly as the laptop: it links to the stage and forwards a launch (version skew, review C6).
+//     On the Full gate a failed acceptance test runs once more; a pass on the second attempt still passes, and the report's
+//     `acceptanceRetry` keeps the first attempt's failures (a pass that may be luck: the PR says so, U18).
 //
 // The Update gate (`--gate update`, in-app updates plan D4; about 5 minutes): what a stock client's Update waits on. It
 // keeps steps 3, 4 and 6 with the acceptance test's core (pairing, /ws, the SQL adapter, the heavy queries, the boot
@@ -105,6 +107,12 @@ const step = (name: string, run: () => { ok: boolean; detail?: string }, detailC
 
 
 let lockLine: string | undefined;
+/** The descriptor flags the new pin has and `capabilities.ts` does not classify: stripped until classified (U4). */
+let unclassifiedCapabilities: Array<string> | undefined;
+/** The first acceptance attempt's result, when it failed and a second ran. */
+let acceptanceRetry: { readonly firstFailures: unknown; readonly firstDetail: string } | undefined;
+/** The commit of t3flare this run tested: the plan job skips an hourly retry of a failure nothing has changed since. */
+const base = sh("git", ["rev-parse", "HEAD"], root, { quiet: true }).output.trim();
 let rollbackResult: { ok: boolean; t3code: string; pinnedFiles: string; install: string } | undefined;
 const from = sh("git", ["describe", "--tags", "--exact-match", "HEAD"], t3, { quiet: true }).output.trim() || sh("git", ["rev-parse", "HEAD"], t3, { quiet: true }).output.trim();
 const fromCommit = sh("git", ["rev-parse", "HEAD"], t3, { quiet: true }).output.trim();
@@ -121,6 +129,7 @@ const finish = (ok: boolean, note?: string) => {
   const report = {
     ok,
     gate,
+    base,
     from,
     to: to ?? null,
     changed: to !== undefined && to !== from,
@@ -131,6 +140,8 @@ const finish = (ok: boolean, note?: string) => {
       ? JSON.parse(fs.readFileSync(path.join(environment, "dist/bump-acceptance.json"), "utf8"))
       : null,
     lock: lockLine ?? null,
+    unclassifiedCapabilities: unclassifiedCapabilities ?? null,
+    acceptanceRetry: acceptanceRetry ?? null,
     rollback: rollbackResult ?? null,
   };
   // SPI-1175: the report is an artifact; the Model endpoint's key and header values never reach it, even where a step's
@@ -186,6 +197,17 @@ const ok =
     const result = sh("pnpm", ["run", "check"], root);
     return { ok: result.ok, detail: result.output };
   }) &&
+  // Never fails the bump: a new flag is stripped until classified (U4). The report and the PR name each one.
+  step("capability flags not yet classified (stripped until they are)", () => {
+    const result = sh(process.execPath, ["scripts/capabilities-unclassified.ts"], environment, { quiet: true });
+    try {
+      const parsed: unknown = JSON.parse(result.output.trim().split("\n").at(-1) ?? "");
+      if (Array.isArray(parsed) && parsed.every((key) => typeof key === "string")) unclassifiedCapabilities = parsed;
+    } catch {
+      // Unread: the report says null, and the bump goes on.
+    }
+    return { ok: true, detail: unclassifiedCapabilities === undefined ? `unread: ${result.output.slice(-1000)}` : JSON.stringify(unclassifiedCapabilities) };
+  }) &&
   (flag("no-deploy") ||
   (!fullGate || step("the CLI agents in Docker (test:docker: the pinned Codex and pi, launched as the Workspace launches them)", () => {
     // In the log whole, and a long tail in the report.
@@ -211,8 +233,25 @@ const ok =
   }) &&
   step(`acceptance test against the ${stage} stage (${gate} gate)`, () => {
     const out = path.join(environment, "dist/bump-acceptance.json");
-    fs.rmSync(out, { force: true });
-    const result = sh(process.execPath, ["scripts/stage.ts", "run", stage, "acceptance", ...ACCEPTANCE_ARGS[gate], "--out", out], environment, { quiet: true });
+    const attempt = () => {
+      fs.rmSync(out, { force: true });
+      return sh(process.execPath, ["scripts/stage.ts", "run", stage, "acceptance", ...ACCEPTANCE_ARGS[gate], "--out", out], environment, { quiet: true });
+    };
+    let result = attempt();
+    // Once more, on the Full gate: most acceptance failures that were not t3's were races and timeouts that passed on the
+    // next run. Not on the Update gate, whose run must fail within 20 minutes (D7); the owner can press Update again.
+    if (!result.ok && fullGate) {
+      const first = fs.existsSync(out) ? fs.readFileSync(out, "utf8") : result.output;
+      let firstFailures: unknown = null;
+      try {
+        firstFailures = (JSON.parse(first) as { failures?: unknown }).failures ?? null;
+      } catch {
+        // Not the acceptance test's JSON: the detail keeps the output.
+      }
+      acceptanceRetry = { firstFailures, firstDetail: first.slice(-DETAIL_CHARS) };
+      console.log("== acceptance failed; running it once more");
+      result = attempt();
+    }
     // A failed start answers every route with one line; the boot record says why.
     const health = result.ok ? "" : `\n${sh(process.execPath, ["scripts/stage.ts", "run", stage, "health", "bootRecord,safeMode,runtime"], environment, { quiet: true }).output}`;
     return { ok: result.ok, detail: `${fs.existsSync(out) ? fs.readFileSync(out, "utf8") : result.output}${health}` };
@@ -237,7 +276,13 @@ if (flag("destroy") && !flag("no-deploy")) {
 if (flag("commit") && to !== from) {
   step("commit the new pin", () => {
     const add = sh("git", ["add", "t3code", ...PINNED_FILES], root);
-    const commit = sh("git", ["commit", "--quiet", "-m", `chore: bump t3code to ${to}`, "-m", `Proven by the ${gate} gate.`], root);
+    const notes = [
+      `Proven by the ${gate} gate${acceptanceRetry === undefined ? "" : ", the acceptance test passing on its second attempt"}.`,
+      ...(unclassifiedCapabilities !== undefined && unclassifiedCapabilities.length > 0
+        ? [`Capability flags stripped until classified in apps/environment/src/t3/capabilities.ts: ${unclassifiedCapabilities.join(", ")}.`]
+        : []),
+    ];
+    const commit = sh("git", ["commit", "--quiet", "-m", `chore: bump t3code to ${to}`, ...notes.flatMap((note) => ["-m", note])], root);
     return { ok: add.ok && commit.ok, detail: commit.output };
   });
 }

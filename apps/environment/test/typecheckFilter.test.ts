@@ -1,0 +1,49 @@
+// Fragility U10: the typecheck fails on errors in t3flare's files, and reports, without failing, errors in t3's own
+// files that only this program's configuration sees.
+import { describe, expect, it } from "vitest";
+
+import { parseDiagnostics, typecheckVerdict } from "../scripts/lib/typecheckFilter.ts";
+
+const cwd = "/repo/apps/environment";
+const t3Root = "/repo/t3code";
+
+const T3_ERROR = [
+  "../../t3code/apps/server/src/cloud/pinnedRuntime.ts(286,48): error TS2345: Argument of type 'Uint8Array<ArrayBufferLike>' is not assignable to parameter of type 'BufferSource'.",
+  "  Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'ArrayBufferView<ArrayBuffer>'.",
+].join("\n");
+const OUR_ERROR = "src/t3/capabilities.ts(113,12): error TS2741: Property 'accessTokenRenewal' is missing in type '{}'.";
+const SUGGESTION = "src/connect/service.ts(62,54): suggestion TS377141: Add `{ readonly brand: unique symbol }` as the second type argument.";
+
+describe("the typecheck's verdict", () => {
+  it("reads each diagnostic with the lines that continue it", () => {
+    const diagnostics = parseDiagnostics(`${SUGGESTION}\n${T3_ERROR}\n\n${OUR_ERROR}\n`);
+    expect(diagnostics.map((d) => [d.file, d.category])).toEqual([
+      ["src/connect/service.ts", "suggestion"],
+      ["../../t3code/apps/server/src/cloud/pinnedRuntime.ts", "error"],
+      ["src/t3/capabilities.ts", "error"],
+    ]);
+    expect(diagnostics[1]!.text).toBe(T3_ERROR);
+  });
+
+  it("passes when every error is in t3's own files, and reports them", () => {
+    const verdict = typecheckVerdict(2, `${SUGGESTION}\n${T3_ERROR}\n`, cwd, t3Root);
+    expect(verdict.ok).toBe(true);
+    expect(verdict.t3Errors.map((d) => d.text)).toEqual([T3_ERROR]);
+    expect(verdict.ours.map((d) => d.category)).toEqual(["suggestion"]);
+  });
+
+  it("fails on an error in our files, whatever t3's files hold", () => {
+    expect(typecheckVerdict(2, `${T3_ERROR}\n${OUR_ERROR}\n`, cwd, t3Root)).toMatchObject({ ok: false });
+    expect(typecheckVerdict(2, `${OUR_ERROR}\n`, cwd, t3Root)).toMatchObject({ ok: false });
+  });
+
+  it("fails when the compiler exits non-zero with no error to show for it", () => {
+    expect(typecheckVerdict(1, "error: could not read tsconfig.json\n", cwd, t3Root)).toMatchObject({ ok: false, reason: expect.stringMatching(/exited 1/) });
+    expect(typecheckVerdict(0, `${SUGGESTION}\n`, cwd, t3Root)).toMatchObject({ ok: true });
+  });
+
+  it("counts a file as t3's only inside the submodule", () => {
+    const sibling = "../../t3code-shims/x.ts(1,1): error TS1: no.";
+    expect(typecheckVerdict(2, `${sibling}\n`, cwd, t3Root)).toMatchObject({ ok: false });
+  });
+});

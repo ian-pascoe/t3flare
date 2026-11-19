@@ -5,16 +5,19 @@ import * as Effect from "effect/Effect";
 import * as ManagedPolicy from "t3/src/policy/ManagedPolicy.ts";
 import { describe, expect, it } from "vitest";
 
-import { CAPABILITIES, cloudCapabilities } from "../src/t3/capabilities.ts";
+import { CAPABILITIES, cloudCapabilities, unclassifiedCapabilities } from "../src/t3/capabilities.ts";
 import { layerManagedPolicy } from "../src/t3/managedPolicy.ts";
 
 describe("the descriptor's capabilities", () => {
-  it("classifies every capability t3's descriptor can carry, and nothing else", () => {
+  it("classifies only capabilities t3's descriptor can carry", () => {
     const fields = Object.keys(ExecutionEnvironmentCapabilities.fields);
-    const unclassified = fields.filter((key) => !Object.hasOwn(CAPABILITIES, key));
-    expect(unclassified, "classify each as kept or stripped (with a reason) in apps/environment/src/t3/capabilities.ts").toEqual([]);
     const stale = Object.keys(CAPABILITIES).filter((key) => !fields.includes(key));
     expect(stale, "t3 no longer has these; remove them from apps/environment/src/t3/capabilities.ts").toEqual([]);
+  });
+
+  it("strips a flag a nightly adds until it is classified, and names it", () => {
+    expect(unclassifiedCapabilities(["repositoryIdentity", "someNewFlag"])).toEqual(["someNewFlag"]);
+    expect(cloudCapabilities({ repositoryIdentity: true, someNewFlag: true } as unknown as ExecutionEnvironmentCapabilities)).toEqual({ repositoryIdentity: true });
   });
 
   it("strips what the Cloud Environment does not do and keeps the rest", () => {
