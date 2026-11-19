@@ -1,0 +1,73 @@
+name: Bug report
+description: Something in t3flare does not work as described.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Before you file it:
+        - A vulnerability goes through private reporting, never an issue (see SECURITY.md).
+        - A question about deploying or using t3flare goes to Discussions, Q&A.
+        - A bug in the stock T3 Code clients or unmodified t3code belongs to pingdotgg/t3code.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: The smallest set of steps that shows it, on a Deployment of your own.
+      placeholder: |
+        1. …
+        2. …
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: The commit of `main` your Stage runs (`git rev-parse --short HEAD` in the clone you deployed from).
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Deploying (stage.ts, alchemy, CI)
+        - Pairing and clients
+        - Pi Durable
+        - A CLI agent (Codex, Claude Code, OpenCode, Pi)
+        - Model endpoints
+        - Workspaces, Containers and git
+        - Harness panel or Settings server
+        - MCP servers
+        - Updates and bumps
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Client
+      description: The stock client and its version, if one is involved (web, desktop or mobile).
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant output or Workers logs. Remove tokens, keys, emails and hostnames you want kept private.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched the existing issues.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

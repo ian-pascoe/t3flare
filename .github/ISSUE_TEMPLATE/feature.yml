@@ -1,0 +1,36 @@
+name: Feature request
+description: Something t3flare should do that it does not.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        An open-ended idea fits Discussions, Ideas better. Use this form for a concrete change you would like made.
+        A feature of the stock T3 Code clients or of t3code itself belongs to pingdotgg/t3code.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you are trying to do, and what stops you today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What you would like t3flare to do. Name the GLOSSARY.md terms it touches if you can.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Other ways you considered, including any workaround you use now.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched the existing issues and discussions.
+          required: true
+        - label: I am willing to open a pull request for it.
