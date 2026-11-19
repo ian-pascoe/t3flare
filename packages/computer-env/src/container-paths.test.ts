@@ -54,4 +54,18 @@ describe("Container-only paths", () => {
       "!/.t3flare/**",
     ]);
   });
+
+  it("read a pattern's slashes at either end as one", () => {
+    expect(isContainerOnly("/workspace/target/x", ["///target///"])).toBe(true);
+    expect(isContainerOnly("/workspace/repo/target/x", ["///target///"])).toBe(false);
+    expect(isContainerOnly("/workspace/a", ["/a", "!//a//"])).toBe(false);
+    expect(isContainerOnly("/workspace/a", ["////"])).toBe(false);
+  });
+
+  it("compile a pattern with a long run of slashes inside it in linear time", () => {
+    const started = performance.now();
+
+    expect(isContainerOnly("/workspace/a/b", [`a${"/".repeat(32_000)}a`])).toBe(false);
+    expect(performance.now() - started).toBeLessThan(400);
+  });
 });
