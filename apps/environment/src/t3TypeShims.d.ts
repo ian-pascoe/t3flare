@@ -13,6 +13,15 @@ type T3PageElement = (HTMLElement | SVGElement) & {
   contains(other: any): boolean;
 };
 
+declare global {
+  interface SubtleCrypto {
+    // t3 `apps/server/src/cloud/pinnedRuntime.ts` `installPinnedRuntime`: digests the release archive, a
+    // `Uint8Array<ArrayBufferLike>`, which Node's types take and the DOM's `BufferSource` does not
+    // (since v0.1.11-nightly.20261119.4941).
+    digest(algorithm: AlgorithmIdentifier, data: Uint8Array): Promise<ArrayBuffer>;
+  }
+}
+
 declare module "playwright-core" {
   interface Locator {
     // t3 `apps/server/src/preview/ServerBrowserPage.ts` `type`: `focusTextTarget` takes its own `FocusCandidate`
