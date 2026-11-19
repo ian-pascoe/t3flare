@@ -1,6 +1,7 @@
 {
   "name": "@t3flare/environment",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "typecheck": "node scripts/typecheck.ts",

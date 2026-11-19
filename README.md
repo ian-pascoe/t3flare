@@ -42,3 +42,8 @@ Prod is served at a custom domain (the mechanism below works for one stage per z
 8. Optionally, deploy `prod` on every push to `main` ([`.github/workflows/deploy-prod.yml`](.github/workflows/deploy-prod.yml)): after a first deploy from the laptop, `pnpm --filter @t3flare/infra run ci:setup` also creates the `prod` GitHub environment (`main` only) with its own Cloudflare token (which also may attach Worker domains and edit the rate limit on prod's zone), the values in `dev.env` (`T3FLARE_MODEL_ENDPOINT` among them: each deploy adds that endpoint to prod when prod has none of its id, and never changes it once there), prod's `T3FLARE_DOMAIN` and the laptop's prod tokens; run it again after rotating any of them. Until it has run, a deploy skips the endpoint and says so.
 
 `pnpm run check` runs the typechecks, lint and tests ([ADR-0030](docs/adr/0030-pnpm-installs-node-runs-scripts-and-vite-plus-runs-the-checks.md)).
+
+## License
+
+[MIT](LICENSE), Copyright (c) 2026 Spirit-Led Software LLC. Some files come from other projects under their own
+licences; [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) lists them.

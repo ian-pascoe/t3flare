@@ -1,6 +1,7 @@
 {
   "name": "@t3flare/agents",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "typecheck": "effect-tsgo tsrs --noEmit",
