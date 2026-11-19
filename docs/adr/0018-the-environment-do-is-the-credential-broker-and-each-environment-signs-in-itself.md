@@ -179,3 +179,16 @@ Report: [`docs/steps/spi-1171.md`](../steps/spi-1171.md); the relay's side is AD
    stage but prod), whoever calls it, and the admin route checks the same (`expireHook.test.ts`).
 4. **Unverified live** (owner decision, 2026-11-16): no subscription was signed in on the stage, so no CLI turn on a
    subscription, no live mid-thread renewal and no live sign-out ran through the relay. Each is unit-tested.
+
+## Refinement (the open-source release, 2026-11-19): the sign-ins stay, with each vendor's terms in front of the Owner
+
+The Canonical repository is public, so "the owner" in items 8, 10 and 11 is any Deployment's Owner. The ChatGPT, Claude
+and Copilot sign-ins stay as built: each Deployment signs in for its one Owner and shares the sign-in with no one, and
+the Owner who signs in accepts the vendor's terms. The Claude and Copilot sign-ins present their requests as Claude Code
+and as the Copilot editor (items 10 and 11), which is the case those vendors' terms speak to most directly. Three things
+change, none of them in the broker:
+
+- `docs/model-endpoints.md` gives each vendor's terms in the vendor's own sentences, from
+  [`docs/research/oss-release-facts.md`](../research/oss-release-facts.md) Part D.
+- The Harness panel shows the same text where a sign-in starts, and the Owner ticks an acknowledgement before it starts.
+- The README names API keys only; the sign-ins are documented in `docs/model-endpoints.md`.

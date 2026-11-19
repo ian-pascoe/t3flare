@@ -167,3 +167,20 @@ CI, never by updating the Environment in place:
   - the hourly plan reads t3's tags with `git ls-remote` against `pins.ts`'s tag pattern.
   A change in any of these shows in the trial runs (plan D16) and in an Update that fails to start or report: one whose
   run the DO never finds fails after 15 minutes.
+
+## Refinement (ADR-0038 and ADR-0039, 2026-11-19): the Deployment repository, and the required check
+
+- **§11's repository is the Deployment repository.** The DO mints the dispatch token for the update target,
+  `T3FLARE_UPDATE_REPO`, now a Deployment setting with no default
+  ([ADR-0038](0038-a-deployment-is-configured-outside-the-source-tree.md)); `ian-pascoe/t3flare` was the Maintainer's
+  value. The repository has since moved to the organisation `spiritledsoftware`, as the Canonical repository, which is
+  also the Maintainer's Deployment repository. The target is still set on `prod` only, and the Consequences' App
+  installation must include the Deployment repository.
+- **§7's ruleset gains the required check.** Ruleset `main` now also requires the status check `check` from `ci.yml`,
+  and allows squash merges only ([ADR-0039](0039-outside-changes-are-checked-without-secrets-and-a-maintainers-merge-is-the-deploy.md)).
+  The deploy key and admins skip the whole ruleset, the check included, so `land.yml`'s push is unchanged; the two Apps'
+  pull-request bypass covers their merges.
+- **§7's premise was the personal account.** "GitHub Actions can't be a bypass actor on a personal account's repo" (and
+  the same line under Consequences) was written when the repository was a personal account's; it is now an
+  organisation's. The deploy-key design stays: its push starts `deploy-prod.yml`, which a push with the workflow's own
+  token would not, and the key lives in the `land` environment, apart from `prod`'s secrets.
