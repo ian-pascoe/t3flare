@@ -36,12 +36,14 @@ describe("sanitizeAttachmentName", () => {
   });
 
   it("drops the dashes next to a dot, and reads a long run of them in linear time", () => {
+    // The replaced `-+\.` regex is unreachable by a long run: `-{2,}` collapses each run to one dash first. No size
+    // separates the old code, so this is a sanity bound, not a ReDoS detector.
     const started = performance.now();
 
     expect(sanitizeAttachmentName("a -- .b.-- c")).toBe("a.b.c");
     expect(sanitizeAttachmentName(`${"-".repeat(100_000)}a`)).toBe("a");
     expect(sanitizeAttachmentName(`a${"- ".repeat(100_000)}.txt`)).toBe("a.txt");
-    expect(performance.now() - started).toBeLessThan(400);
+    expect(performance.now() - started).toBeLessThan(2_000);
   });
 
   it("cuts a long name to the limit, keeping its extension", () => {

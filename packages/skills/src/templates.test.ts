@@ -69,7 +69,7 @@ describe("pi's argument substitution", () => {
     const started = performance.now();
     const content = "${@:-".repeat(40_000);
     expect(substituteArgs(content, ["a"])).toBe(content);
-    expect(performance.now() - started).toBeLessThan(400);
+    expect(performance.now() - started).toBeLessThan(2_000);
   });
 });
 

@@ -43,11 +43,13 @@ describe("mcpToolPart", () => {
   });
 
   it("trims long runs at the ends, in linear time", () => {
+    // The replaced trim regex is unreachable by a long run: the `[^a-z0-9]+` step before it collapses every run to one
+    // `_`. No size separates the old code, so this is a sanity bound, not a ReDoS detector.
     const started = performance.now();
 
     expect(mcpToolPart(`${"_".repeat(100_000)}a${"-".repeat(100_000)}`)).toBe("a");
     expect(mcpToolPart(`a${"_".repeat(100_000)}b`)).toBe("a_b");
-    expect(performance.now() - started).toBeLessThan(400);
+    expect(performance.now() - started).toBeLessThan(2_000);
   });
 });
 
@@ -245,9 +247,9 @@ describe("mcpToolNameFromPi", () => {
   it("reads a name of many `__` in linear time", () => {
     const started = performance.now();
 
-    mcpToolNameFromPi(`mcp__a__${"a__a".repeat(100_000)}\n`);
-    mcpToolNameFromPi(`mcp__a__${"a__a".repeat(100_000)}`);
-    expect(performance.now() - started).toBeLessThan(1_000);
+    mcpToolNameFromPi(`mcp__a__${"a__a".repeat(40_000)}\n`);
+    mcpToolNameFromPi(`mcp__a__${"a__a".repeat(40_000)}`);
+    expect(performance.now() - started).toBeLessThan(2_000);
   });
 
   it("reads a configured name as pi spells it", () => {

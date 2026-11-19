@@ -63,9 +63,19 @@ describe("Container-only paths", () => {
   });
 
   it("compile a pattern with a long run of slashes inside it in linear time", () => {
-    const started = performance.now();
+    // A run of slashes inside a pattern becomes that many literal `/`s in its regex, which stops compiling past about
+    // 32_000 (V8's "Regular expression too large"): too small for the old quadratic trim to take 10s alone (~1.3s), and
+    // compiling such a regex costs ~50ms itself, so a fixed bound would flake on a loaded runner. The guard is relative:
+    // nine such patterns, against compiling and running the same nine regexes with no trim. A loaded runner slows both
+    // alike; the old trim made it ~25 times slower.
+    const patterns = Array.from({ length: 9 }, (_, index) => `a${"/".repeat(30_000)}${index}`);
 
-    expect(isContainerOnly("/workspace/a/b", [`a${"/".repeat(32_000)}a`])).toBe(false);
-    expect(performance.now() - started).toBeLessThan(400);
+    const baselineStarted = performance.now();
+    for (const pattern of patterns) new RegExp(`^${pattern}$`).test("a/b");
+    const baseline = Math.max(performance.now() - baselineStarted, 1);
+
+    const started = performance.now();
+    expect(isContainerOnly("/workspace/a/b", patterns)).toBe(false);
+    expect(performance.now() - started).toBeLessThan(baseline * 8);
   });
 });

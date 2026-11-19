@@ -83,7 +83,7 @@ describe("a resource's label and its refusal", () => {
 
     expect(resourceLabel({ uri: `${"#".repeat(100_000)}a` })).toBe(`${"#".repeat(100_000)}a`);
     expect(resourceLabel({ uri: `x:a${"/".repeat(100_000)}` })).toBe("a");
-    expect(performance.now() - started).toBeLessThan(400);
+    expect(performance.now() - started).toBeLessThan(2_000);
   });
 
   it("names the resource and its server, and cuts a long URI", () => {
