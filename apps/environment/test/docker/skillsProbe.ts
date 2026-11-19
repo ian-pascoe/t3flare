@@ -1,6 +1,6 @@
 // SPI-1151's skills probe fixture, shared by the Docker probe (`skills.docker.test.ts`, which runs the pinned CLIs over
 // it) and the unit test that binds discovery to what they loaded (`cliSkills.test.ts`, over the recorded
-// `docs/steps/spi-1151/m0-roots.json`).
+// `apps/environment/test/fixtures/spi-1151/m0-roots.json`).
 
 /** Repo-level candidate skill roots: each gets a marker named for it and, at the cwd, a `dup`. */
 export const REPO_SKILL_CANDIDATES: Readonly<Record<string, string>> = {

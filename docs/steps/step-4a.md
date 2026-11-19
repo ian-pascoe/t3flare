@@ -171,7 +171,7 @@ linked CLI pushes refused instead of asked).
 - Standards, fixed: `test:docker`'s image names the image's Node again (`FROM node:<v>`, the mise path); the
   `cliManifest.test.ts` Node check now covers it too.
 - Standards, judgement call, kept: `test/docker/codex-rpc.mjs` and `pi-rpc.mjs` are M0's probe drivers with the spawn
-  generalised (Duplicated Code with `docs/steps/step-4a/probes/`, which stays as the record of M0's evidence).
+  generalised (Duplicated Code with `apps/environment/scripts/probes/step-4a/`, which stays as the record of M0's evidence).
 - Standards: `test:docker` is a Vitest file under its own config (ADR-0019: Vitest stays on Node; Bun cannot import
   t3's `node:sea` users), excluded from the `node` project so `bun run check` does not need Docker.
 - Spec: every SPI-1043 item is done; the one change from the ticket is that the bump workflow was not dispatched on the

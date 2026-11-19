@@ -5,7 +5,7 @@
 // each CLI reports what it loaded: Codex by `skills/list`, pi by `get_commands`, Claude Code and OpenCode by their
 // `available_commands_update` (OpenCode's Skills by its server's `GET /api/skill`). No model is called. The test then
 // holds `CLI_ROOTS` to what they loaded, so a CLI bump that moves a root fails here.
-// T3FLARE_SKILLS_PROBE_OUT=<file> writes the report (docs/steps/spi-1151/m0-roots.json).
+// T3FLARE_SKILLS_PROBE_OUT=<file> writes the report (apps/environment/test/fixtures/spi-1151/m0-roots.json).
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
