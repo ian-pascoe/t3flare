@@ -68,7 +68,7 @@ if (step === "start") {
   const [kindText, file] = args;
   const kind = kindOf(kindText);
   if (file === undefined) throw new Error("start <kind> <file>");
-  const answer = await api("POST", "endpoints/sign-in", { op: "start", id: kind, signIn: kind, label: kind === "chatgpt" ? "ChatGPT" : "Claude" });
+  const answer = await api("POST", "endpoints/sign-in", { op: "start", id: kind, signIn: kind, label: kind === "chatgpt" ? "ChatGPT" : "Claude", acknowledgedTerms: true });
   const url = typeof answer.json?.authorizeUrl === "string" ? answer.json.authorizeUrl : undefined;
   if (url !== undefined) fs.writeFileSync(file, url, { mode: 0o600 });
   print({ kind, status: answer.status, ok: answer.json?.ok === true, authorize: url === undefined ? answer.json : describeAuthorize(url) });

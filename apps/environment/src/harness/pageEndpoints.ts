@@ -10,6 +10,9 @@
 // revocation: its Sign out says where the owner removes the grant (its kind's `revocation`). SPI-1166 adds GitHub Copilot,
 // a device sign-in (its kind's `device`): the form shows the code to enter at GitHub's device page, and asks the
 // Environment at GitHub's interval whether it was approved, with no paste; its card shows the API host its token names.
+// Each form's Start stays disabled until the owner ticks its acknowledgement of the vendor's terms (its kind's `terms`:
+// one sentence, linking to the docs that quote them), which the start carries and the Environment requires. A signed-out
+// card's Sign in leads to its kind's form, so every start passes that checkbox.
 import { endpointSlug, type EndpointApi, type EndpointPreset, isDeviceSignIn, isSignIn, type ModelEndpoint, SIGN_IN_KINDS, SIGN_INS, type SignIn } from "@t3flare/models/endpoints";
 
 import type { SignInStatus } from "../credentials/broker.ts";
@@ -87,7 +90,7 @@ const signInCard = (escape: Escape, endpoint: EndpointsView["endpoints"][number]
       ? `<button type="button" class="btn btn-sm" data-sign-in-out="${escape(endpoint.id)}" data-sign-in-title="${escape(signIn.title)}"${
           signIn.revocation === null ? "" : ` data-sign-in-revocation="${escape(signIn.revocation)}"`
         }>Sign out</button>`
-      : `<button type="button" class="btn btn-sm btn-primary" data-sign-in-start="${escape(endpoint.id)}" data-sign-in-kind="${escape(kind)}" data-sign-in-label="${escape(endpoint.label)}">Sign in with ${escape(signIn.title)}</button>`;
+      : `<button type="button" class="btn btn-sm btn-primary" data-sign-in-again="${escape(endpoint.id)}" data-sign-in-kind="${escape(kind)}" data-sign-in-label="${escape(endpoint.label)}">Sign in with ${escape(signIn.title)}</button>`;
   return `<article class="group server" aria-labelledby="${id}" data-endpoint-row="${escape(endpoint.id)}">
 <div class="server-head"><div><div class="server-name"><h3 id="${id}">${escape(endpoint.label)}</h3><span class="ident">${escape(endpoint.id)}</span><span class="tag">${escape(signIn.title)} sign-in</span></div><p class="server-url">${baseUrlOf(escape, endpoint, signIn)}</p></div>
 <dl class="facts"><div><dt>Models</dt><dd>${endpoint.models.length}</dd></div>${signInFacts(escape, endpoint.signIn)}</dl></div>
@@ -122,8 +125,9 @@ const signInForm = (escape: Escape, view: EndpointsView, kind: SignIn): string =
 <div class="field"><label for="${at("id")}">Id</label><input id="${at("id")}" name="id" type="text" required pattern="[a-z0-9](?:[a-z0-9\\-]{0,30}[a-z0-9])?" value="${escape(waiting[0]?.[0] ?? kind)}" autocapitalize="none" spellcheck="false"></div>
 <div class="field"><label for="${at("label")}">Label</label><input id="${at("label")}" name="label" type="text" maxlength="60" value="${escape(signIn.title)}"></div>
 ${step}
+<div class="field wide"><div class="inline-field sign-in-terms"><input id="${at("terms")}" name="acknowledgedTerms" type="checkbox" data-sign-in-terms><label for="${at("terms")}">${escape(signIn.terms.acknowledgement)} <a href="${escape(signIn.terms.docs)}" target="_blank" rel="noopener noreferrer">What ${escape(signIn.terms.vendor)}'s terms say</a></label></div></div>
 </div>
-<div class="form-foot"><p data-sign-in-note aria-live="polite"></p><button type="button" class="btn" data-sign-in-start>Start sign-in</button><button type="button" class="btn btn-primary" data-sign-in-finish>${escape(device?.check ?? "Finish sign-in")}</button></div>
+<div class="form-foot"><p data-sign-in-note aria-live="polite"></p><button type="button" class="btn" data-sign-in-start disabled>Start sign-in</button><button type="button" class="btn btn-primary" data-sign-in-finish>${escape(device?.check ?? "Finish sign-in")}</button></div>
 </form>`;
 };
 
@@ -258,6 +262,12 @@ for (const form of document.querySelectorAll("form[data-sign-in-form]")) {
   const link = form.querySelector("[data-sign-in-link]");
   const device = form.dataset.signInDevice !== undefined;
   const finish = form.querySelector("[data-sign-in-finish]");
+  // Start only once the owner has acknowledged the vendor's terms; the Environment refuses a start without it too.
+  const terms = form.querySelector("[data-sign-in-terms]");
+  const startButton = form.querySelector("button[data-sign-in-start]");
+  const syncTerms = () => { startButton.disabled = !terms.checked; };
+  terms.addEventListener("change", syncTerms);
+  syncTerms();
   // A device sign-in: the Environment is asked at the vendor's interval whether the owner approved, until the code lapses.
   let polling;
   const stopPolling = () => { if (polling !== undefined) clearTimeout(polling); polling = undefined; };
@@ -283,8 +293,10 @@ for (const form of document.querySelectorAll("form[data-sign-in-form]")) {
     }, intervalMs);
   };
   const start = async (id, label, control) => {
+    if (!terms.checked) { syncTerms(); note.textContent = "Tick the acknowledgement first."; return; }
     note.textContent = "Starting…";
-    const answer = await signInStep({ op: "start", id, signIn: kind, label }, control);
+    const answer = await signInStep({ op: "start", id, signIn: kind, label, acknowledgedTerms: true }, control);
+    syncTerms();
     if (answer === undefined) { note.textContent = ""; return; }
     field("id").value = id;
     field("label").value = label;
@@ -298,8 +310,15 @@ for (const form of document.querySelectorAll("form[data-sign-in-form]")) {
     }
     form.scrollIntoView();
   };
-  signInForms.set(kind, start);
-  form.querySelector("button[data-sign-in-start]").addEventListener("click", (event) => {
+  // A signed-out card's Sign in: this form, filled with its endpoint, for the acknowledgement and Start.
+  signInForms.set(kind, (id, label) => {
+    field("id").value = id;
+    field("label").value = label;
+    note.textContent = terms.checked ? "Start the sign-in for " + id + "." : "Tick the acknowledgement, then Start the sign-in for " + id + ".";
+    form.scrollIntoView();
+    (terms.checked ? startButton : terms).focus();
+  });
+  startButton.addEventListener("click", (event) => {
     if (!form.reportValidity()) return;
     void start(field("id").value.trim(), field("label").value.trim(), event.currentTarget);
   });
@@ -309,8 +328,8 @@ for (const form of document.querySelectorAll("form[data-sign-in-form]")) {
     await check(finish);
   });
 }
-for (const button of document.querySelectorAll("article button[data-sign-in-start]")) {
-  button.addEventListener("click", () => void signInForms.get(button.dataset.signInKind)?.(button.dataset.signInStart, button.dataset.signInLabel, button));
+for (const button of document.querySelectorAll("article button[data-sign-in-again]")) {
+  button.addEventListener("click", () => signInForms.get(button.dataset.signInKind)?.(button.dataset.signInAgain, button.dataset.signInLabel));
 }
 for (const button of document.querySelectorAll("button[data-sign-in-out]")) {
   button.addEventListener("click", async () => {

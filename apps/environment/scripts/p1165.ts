@@ -76,7 +76,7 @@ if (step === "page") {
   });
 } else if (step === "start") {
   if (file === undefined) throw new Error("start <file>: where the authorize URL is kept for `pending`");
-  const answer = await api("POST", "endpoints/sign-in", { op: "start", id: ID, signIn: "claude", label: "Claude" });
+  const answer = await api("POST", "endpoints/sign-in", { op: "start", id: ID, signIn: "claude", label: "Claude", acknowledgedTerms: true });
   const url = typeof answer.json?.authorizeUrl === "string" ? answer.json.authorizeUrl : undefined;
   if (url !== undefined) fs.writeFileSync(file, url, { mode: 0o600 });
   write({ status: answer.status, ok: answer.json?.ok === true, authorize: url === undefined ? answer.json : describeAuthorize(url) });

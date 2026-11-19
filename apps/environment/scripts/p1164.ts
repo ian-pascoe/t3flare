@@ -56,7 +56,7 @@ if (step === "page") {
     excerpt: (/<form class="group add" id="sign-in-form"[\s\S]*?<\/form>/.exec(page)?.[0] ?? page.slice(0, 500)).replace(/\s+/g, " ").slice(0, 3000),
   });
 } else if (step === "start") {
-  const answer = await api("POST", "endpoints/sign-in", { op: "start", id: ID, signIn: "chatgpt", label: "ChatGPT" });
+  const answer = await api("POST", "endpoints/sign-in", { op: "start", id: ID, signIn: "chatgpt", label: "ChatGPT", acknowledgedTerms: true });
   const url = typeof answer.json?.authorizeUrl === "string" ? answer.json.authorizeUrl : undefined;
   write({ status: answer.status, ok: answer.json?.ok === true, authorize: url === undefined ? answer.json : describeAuthorize(url) });
   // For the owner's browser (relayed): the link holds no secret, only this attempt's state and challenge.

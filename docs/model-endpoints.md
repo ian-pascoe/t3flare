@@ -29,7 +29,9 @@ agent names the API it needs), and a CLI agent's thread is refused at its start,
    - **A subscription sign-in**: ChatGPT (plan usage), Claude (a Pro or Max plan, Claude Code's sign-in) or GitHub
      Copilot. Start the sign-in, complete it in your browser, paste what the vendor shows when asked. The Environment
      keeps and refreshes the tokens ([ADR-0018](adr/0018-the-environment-do-is-the-credential-broker-and-each-environment-signs-in-itself.md)).
-     Claude's and Copilot's terms-of-service risk is yours.
+     Each vendor's terms bear on this use of your plan, and complying with them is your responsibility: read
+     [Subscription sign-ins and the vendors' terms](#subscription-sign-ins-and-the-vendors-terms) first. The panel asks
+     you to tick an acknowledgement before a sign-in starts. An API key is the supported path.
    - **No auth**: an endpoint that needs no key (a gateway of your own).
 3. Turn on the agents you use (t3's Settings → Providers): Pi Durable, Codex, Claude Code, OpenCode, Pi.
 4. Optionally, add Commissary's MCP tools as a direct server ([below](#commissary)).
@@ -68,6 +70,128 @@ count.
   (`<endpointId>/<modelId>` in the extension's Model setting). `web_search` needs an Anthropic Messages endpoint with an
   API key or no auth whose server takes Anthropic's web search tool (Anthropic's API, Commissary). The Advisor follows
   the thread's model unless you name one.
+
+## Subscription sign-ins and the vendors' terms
+
+A subscription sign-in uses your personal ChatGPT, Claude or GitHub Copilot plan through t3flare: the Environment holds
+the plan's tokens, renews them, and attaches them to the requests of the agents listed
+[above](#which-agent-uses-which-endpoint), most of which are not the vendor's own apps. Each vendor's terms say
+something about that kind of use. This section quotes them, so you can decide with the vendor's own words in front of
+you.
+
+- **You are responsible for complying with each vendor's terms.** Your plan, your account and your agreement with the
+  vendor are yours; the vendor may act on an account it finds in breach of them.
+- **t3flare and Spirit-Led Software LLC make no claim that using a subscription sign-in this way is permitted** by any
+  vendor, and give no legal advice about it.
+- **An API key is the supported, terms-safe path.** Anthropic and OpenAI sell API keys for programs like t3flare, and
+  other providers do too; an API-key endpoint (the Anthropic API or OpenAI API preset, or another provider's key) is the
+  way to use t3flare without this question.
+
+The Harness panel will not start a sign-in until you tick a checkbox that states the vendor's position in one sentence
+and links here; the Environment refuses a start that does not carry that acknowledgement.
+
+The quotes below are verbatim from the linked pages, read on 2026-11-19. Terms change: the linked page, not this one, is
+what applies.
+
+### Claude sign-in
+
+What t3flare does: the sign-in runs at claude.ai with Claude Code's OAuth client (as pi-ai does). The Environment then
+stores the plan's tokens, renews them, and sends the access token with requests from Pi Durable, Claude Code, OpenCode
+and pi.
+
+Anthropic's Claude Code legal page, section "Authentication and credential use"
+([code.claude.com/docs/en/legal-and-compliance](https://code.claude.com/docs/en/legal-and-compliance), read
+2026-11-19):
+
+> OAuth authentication is intended exclusively for purchasers of Claude Free, Pro, Max, Ultra, Team, and Enterprise
+> subscription plans and is designed to support ordinary use of Claude Code and other native Anthropic applications.
+
+> Anthropic does not permit third-party developers to offer Claude.ai login into their own applications, or to route
+> requests through Free, Pro, Max, or Ultra plan credentials on behalf of their users. Moreover, developers may not
+> collect, store, or intermediate Claude.ai credentials or session tokens — sign-in to a Claude account must complete
+> through Anthropic's own flow.
+
+> Anthropic reserves the right to take measures to enforce these restrictions and may do so without prior notice.
+
+Anthropic's Usage Policy, "Do Not Abuse Our Platform" ([anthropic.com/legal/aup](https://www.anthropic.com/legal/aup),
+effective Nov 12, 2026, read 2026-11-19):
+
+> Resell, proxy, or otherwise provide access to Claude through unauthorized means, including services that route
+> requests through consumer subscriptions or misrepresent the product or client being used
+
+Anthropic's Consumer Terms of Service ([anthropic.com/legal/consumer-terms](https://www.anthropic.com/legal/consumer-terms),
+effective Oct 8, 2025, read 2026-11-19):
+
+> Except when you are accessing our Services via an Anthropic API Key or where we otherwise explicitly permit it, to
+> access the Services through automated or non-human means, whether through a bot, script, or otherwise.
+
+(one of the things the Terms say you may not do) and:
+
+> You may not share your Account login information, Anthropic API key, or Account credentials with anyone else.
+
+The supported path: an **Anthropic API** endpoint with an API key from the Claude Console.
+
+### ChatGPT sign-in
+
+What t3flare does: the sign-in is OpenAI's "Sign in with ChatGPT" for open-source clients: the first sign-in registers
+a client with OpenAI, and later ones reuse it. The Environment then stores the plan's tokens, renews them, and sends the
+access token with requests from Pi Durable, Codex, OpenCode and pi.
+
+OpenAI documents plan usage for open-source tools. Its Sign in with ChatGPT quickstart
+([developers.openai.com/siwc/quickstart](https://developers.openai.com/siwc/quickstart), read 2026-11-19):
+
+> Let users run AI workloads in your tools with their ChatGPT plan, without requiring them to provide an API key.
+
+> ChatGPT plan usage is available to all open-source partners and selected private clients.
+
+OpenAI's list of open-source integrations ([learn.chatgpt.com/docs/sign-in-with-chatgpt](https://learn.chatgpt.com/docs/sign-in-with-chatgpt),
+read 2026-11-19) names T3 (T3 Code, which t3flare builds on), OpenCode and Pi; it does not name t3flare. OpenAI's Help
+Center ([Using your ChatGPT plan in other apps and sites](https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites),
+read 2026-11-19) adds: "Only sign in to apps and sites you trust."
+
+OpenAI's Terms of Use, "Registration and access" ([openai.com/policies/terms-of-use](https://openai.com/policies/terms-of-use/),
+effective January 1, 2026, read 2026-11-19):
+
+> You may not share your account credentials or make your account available to anyone else and are responsible for all
+> activities that occur under your account.
+
+OpenAI's Usage Policies, in the version effective November 20, 2026
+([openai.com/policies/usage-policies](https://openai.com/policies/usage-policies/), read 2026-11-19):
+
+> If you operate a model-access intermediary platform or other service that enables third parties to directly access
+> OpenAI models, you must obtain our prior review and approval. This requirement does not apply solely because an
+> application integrates OpenAI models to power its features or functionality.
+
+The supported path: an **OpenAI API** endpoint with an API key.
+
+### GitHub Copilot sign-in
+
+What t3flare does: the sign-in is GitHub's device flow with the Copilot editor extension's OAuth client (as pi-ai
+does), and each request carries the editor's headers (the client names itself as VS Code's Copilot Chat). The
+Environment stores the GitHub token, gets short-lived Copilot tokens with it, and sends them with requests from Pi
+Durable, OpenCode and pi.
+
+A personal Copilot plan is governed by the GitHub Terms of Service: GitHub Terms for Additional Products and Features
+([docs.github.com](https://docs.github.com/en/site-policy/github-terms/github-terms-for-additional-products-and-features),
+read 2026-11-19): "For all other GitHub Copilot users, your use of GitHub Copilot is governed by Section J (AI
+Features) of the GitHub Terms of Service." GitHub publishes no list of approved third-party clients and no policy on a
+third-party client using a personal Copilot token; its documented ways for a program to use Copilot are its own SDK and
+CLI ([Copilot SDK authentication](https://docs.github.com/en/copilot/how-tos/copilot-sdk/auth/authenticate)).
+
+GitHub Acceptable Use Policies, section 6 "Services Usage Limits"
+([docs.github.com](https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies), read
+2026-11-19):
+
+> You will not reproduce, duplicate, copy, sell, resell or exploit any portion of the Service, use of the Service, or
+> access to the Service without our express written permission.
+
+GitHub Terms of Service, section B.3 ([docs.github.com](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service#b-account-terms),
+effective April 27, 2026, read 2026-11-19):
+
+> Your login may only be used by one person — i.e., a single login may not be shared by multiple people.
+
+The supported path: an API-key endpoint at another provider. GitHub sells no Copilot API key for programs outside its
+own SDK.
 
 ## Usage limits and failures
 
@@ -164,6 +288,7 @@ the setup (`apps/environment/scripts/mask-endpoint.ts`) masks its key and each h
 | "The model <slug> is not available: its Model endpoint was removed or no longer lists it" | The thread's model is gone: pick another |
 | "The Model endpoint "<id>" refused its API key …" | The key is wrong, revoked or out of scope: enter it again in the panel |
 | "… is not signed in to <vendor> …" | The sign-in was signed out or its renewal refused: sign in again in the panel |
+| Start sign-in stays disabled, or a start is refused "acknowledge <vendor>'s terms first …" | Tick the acknowledgement above Start, after reading [the vendor's terms](#subscription-sign-ins-and-the-vendors-terms); a script sends `acknowledgedTerms: true` |
 | "Usage limit reached" naming an endpoint | That endpoint's limit; the thread resumes at the reset, or pick another endpoint's model |
 | An old Codex thread fails "this Codex thread runs on another Model endpoint than …" | Codex cannot move a live thread between Model endpoints: start a new thread |
 | `web_search` says no Anthropic Messages endpoint can search | Add one with an API key (or set the search model to one) |
