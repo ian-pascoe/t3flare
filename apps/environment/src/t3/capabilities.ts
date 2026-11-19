@@ -19,6 +19,9 @@ const UPDATE_BY_CI = "a stock client's server Update dispatches a t3 bump that C
 export const CAPABILITIES = {
   repositoryIdentity: keep,
   connectionProbe: keep,
+  // Not yet proven here: no acceptance check pairs with a DPoP key, and a client that sees the flag fails pairing when the
+  // exchange does. Absent, clients pair with a bearer, as before t3 added it.
+  accessTokenRenewal: strip("DPoP pairing and renewal at /oauth/token is not exercised by the acceptance test yet"),
   attachmentUploads: keep,
   questionAttachments: keep,
   fileAttachments: keep,
@@ -110,6 +113,8 @@ export const CAPABILITIES = {
   shellOlderSettled: keep,
   // t3 publishes a pull request refresh when a linked thread's answers change: its own `/ws` push.
   linkedThreadRefreshes: keep,
+  // `issues.linkedThreads`: t3's own `/ws` read over its own SQL, through the ported ThreadIssueService.
+  issueLinkedThreads: keep,
 } as const satisfies Record<keyof ExecutionEnvironmentCapabilities, Classification>;
 
 /** The values t3flare advertises for its `advertise` keys, each sent only where its feature is configured. */
