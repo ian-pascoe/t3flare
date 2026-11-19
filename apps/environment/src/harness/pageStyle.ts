@@ -91,6 +91,9 @@ section{display:flex;flex-direction:column;gap:.625rem;scroll-margin-top:1.5rem}
 .field .hint{font-size:.75rem;color:var(--muted-fg)}
 .inline-field{display:flex;align-items:center;gap:.625rem;flex-wrap:wrap}
 .inline-field label{font-size:.8125rem;font-weight:500}
+.sign-in-terms{flex-wrap:nowrap;align-items:flex-start}
+.sign-in-terms input{margin-top:.1875rem;flex:none}
+.sign-in-terms label{font-weight:400}
 input[type=text],input[type=url],input[type=password],input[type=number],select{height:2.25rem;padding:0 .625rem;border:1px solid var(--input);border-radius:var(--radius);background:var(--card);color:var(--fg);font:inherit;font-size:.875rem;transition:border-color .15s,box-shadow .15s}
 input[type=number]{width:7.5rem;font-variant-numeric:tabular-nums}
 textarea{min-height:5rem;width:100%;padding:.5rem .625rem;border:1px solid var(--input);border-radius:var(--radius);background:var(--card);color:var(--fg);font:inherit;font-size:.875rem;resize:vertical}

@@ -3,6 +3,10 @@
 // address the browser lands on, and sees the account or why it failed; a ChatGPT endpoint is saved with the models its
 // token lists; sign-out revokes and stops the endpoint's Sessions. The panel's answers, page and audit log never hold a
 // token. Against the panel's real routes, a real endpoint store and broker, and a fake of OpenAI's authorization server.
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+import { MODEL_ENDPOINTS_DOCS, SIGN_IN_KINDS, SIGN_INS } from "@t3flare/models/endpoints";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { credentialBroker } from "../src/credentials/broker.ts";
@@ -13,7 +17,9 @@ import { sealedStore } from "../src/credentials/sealed.ts";
 import type { Discovery } from "../src/endpoints/discover.ts";
 import { endpointStore } from "../src/endpoints/store.ts";
 import { csrfToken } from "../src/harness/csrf.ts";
+import { escapeHtml } from "../src/harness/page.ts";
 import { CSRF_HEADER, handleHarness, type HarnessCaller, type HarnessDeps } from "../src/harness/panel.ts";
+import { SCRIPT } from "../src/harness/pageScript.ts";
 import { harnessStore } from "../src/harness/store.ts";
 import { fakeAnthropic } from "./fixtures/fakeAnthropicAuth.ts";
 import { fakeGitHubCopilot } from "./fixtures/fakeGitHubCopilot.ts";
@@ -98,7 +104,7 @@ const setup = async () => {
 
 /** Start and paste, as the owner does; the answers' texts. */
 const signIn = async (context: Awaited<ReturnType<typeof setup>>) => {
-  const started = await context.post({ op: "start", id: "chatgpt", signIn: "chatgpt", label: "ChatGPT" });
+  const started = await context.post({ op: "start", id: "chatgpt", signIn: "chatgpt", label: "ChatGPT", acknowledgedTerms: true });
   const { authorizeUrl } = JSON.parse(started.text) as { authorizeUrl: string };
   const done = await context.post({ op: "complete", id: "chatgpt", label: "ChatGPT", pasted: context.vendor.approve(authorizeUrl, { email: "owner@example.com" }) });
   return { started, done };
@@ -167,7 +173,7 @@ describe("ChatGPT plan usage on the Harness panel", () => {
     expect(await context.endpoints.credential({ endpointId: "chatgpt", target })).toMatchObject({ apiKey: null, signedOut: true });
     // The endpoint stays, signed out, for a sign-in again.
     expect(context.endpoints.load().endpoints).toHaveLength(1);
-    expect(await context.page()).toContain('data-sign-in-start="chatgpt"');
+    expect(await context.page()).toContain('data-sign-in-again="chatgpt"');
     expect(context.leaks()).toEqual([]);
   });
 
@@ -200,7 +206,7 @@ describe("ChatGPT plan usage on the Harness panel", () => {
   it("refuses to start without a known sign-in kind", async () => {
     const context = await setup();
     expect((await context.post({ op: "start", id: "chatgpt", label: "ChatGPT" })).text).toMatch(/signIn is one of chatgpt/);
-    expect((await context.post({ op: "start", id: "chatgpt", signIn: "nope", label: "ChatGPT" })).status).toBe(400);
+    expect((await context.post({ op: "start", id: "chatgpt", signIn: "nope", label: "ChatGPT", acknowledgedTerms: true })).status).toBe(400);
   });
 
   it("keeps a sign-in endpoint's auth: no key, no headers, no other target, no switch to a key", async () => {
@@ -219,7 +225,7 @@ describe("ChatGPT plan usage on the Harness panel", () => {
   it("refuses a sign-in under an API-key endpoint's id", async () => {
     const context = await setup();
     await context.post({ op: "save", endpoint: { id: "openai", label: "OpenAI", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api-key", models: [] }, apiKey: "sk-key" }, "endpoints");
-    const started = await context.post({ op: "start", id: "openai", signIn: "chatgpt", label: "ChatGPT" });
+    const started = await context.post({ op: "start", id: "openai", signIn: "chatgpt", label: "ChatGPT", acknowledgedTerms: true });
     expect(started.status).toBe(400);
     expect(started.text).toMatch(/already an endpoint with an API key/);
   });
@@ -227,7 +233,7 @@ describe("ChatGPT plan usage on the Harness panel", () => {
 
 /** Start and paste a Claude sign-in, as the owner does: the code Anthropic's page shows. */
 const claudeSignInFlow = async (context: Awaited<ReturnType<typeof setup>>) => {
-  const started = await context.post({ op: "start", id: "claude", signIn: "claude", label: "Claude" });
+  const started = await context.post({ op: "start", id: "claude", signIn: "claude", label: "Claude", acknowledgedTerms: true });
   const { authorizeUrl } = JSON.parse(started.text) as { authorizeUrl: string };
   const shown = context.anthropic.approve(authorizeUrl, { email: "owner@example.com" });
   // While the attempt waits for its paste, nothing secret of it is on the page, in the audit or in the storage.
@@ -311,9 +317,9 @@ describe("Claude on the Harness panel (SPI-1165)", () => {
 
   it("refuses another attempt's code at once, and keeps the attempt waiting", async () => {
     const context = await setup();
-    const first = JSON.parse((await context.post({ op: "start", id: "claude", signIn: "claude" })).text) as { authorizeUrl: string };
+    const first = JSON.parse((await context.post({ op: "start", id: "claude", signIn: "claude", acknowledgedTerms: true })).text) as { authorizeUrl: string };
     const stale = context.anthropic.approve(first.authorizeUrl);
-    await context.post({ op: "start", id: "claude", signIn: "claude" });
+    await context.post({ op: "start", id: "claude", signIn: "claude", acknowledgedTerms: true });
     const done = await context.post({ op: "complete", id: "claude", pasted: stale });
     expect(JSON.parse(done.text)).toMatchObject({ ok: false, error: expect.stringMatching(/does not belong to the sign-in in progress/) });
     expect(context.anthropic.counts.exchanges).toBe(0);
@@ -330,7 +336,7 @@ describe("Claude on the Harness panel (SPI-1165)", () => {
     expect(context.anthropic.requests).toHaveLength(sent);
     expect(context.stopped).toEqual(["claude"]);
     expect(await context.endpoints.credential({ endpointId: "claude", target: CLAUDE_TARGET })).toMatchObject({ apiKey: null, signedOut: true });
-    expect(await context.page()).toContain('data-sign-in-start="claude"');
+    expect(await context.page()).toContain('data-sign-in-again="claude"');
     expect(context.leaks()).toEqual([]);
   });
 
@@ -359,7 +365,7 @@ describe("Claude on the Harness panel (SPI-1165)", () => {
 
 /** A Copilot sign-in as the owner does it: start, enter the code at GitHub and approve, the page asking until it is done. */
 const copilotSignInFlow = async (context: Awaited<ReturnType<typeof setup>>) => {
-  const started = await context.post({ op: "start", id: "copilot", signIn: "copilot", label: "Copilot" });
+  const started = await context.post({ op: "start", id: "copilot", signIn: "copilot", label: "Copilot", acknowledgedTerms: true });
   const { device } = JSON.parse(started.text) as { device: { userCode: string; intervalSeconds: number } };
   // The page asks before the owner approved: still waiting, and nothing secret of the attempt anywhere.
   context.advance(device.intervalSeconds * 1000);
@@ -463,7 +469,7 @@ describe("GitHub Copilot on the Harness panel (SPI-1166)", () => {
     expect(context.stopped).toEqual(["copilot"]);
     expect(await context.endpoints.credential({ endpointId: "copilot", target: COPILOT_TARGET })).toMatchObject({ apiKey: null, signedOut: true });
     const html = await context.page();
-    expect(html).toContain('data-sign-in-start="copilot"');
+    expect(html).toContain('data-sign-in-again="copilot"');
     expect(html).toContain("set by its GitHub Copilot token");
     expect(context.leaks()).toEqual([]);
   });
@@ -476,4 +482,71 @@ describe("GitHub Copilot on the Harness panel (SPI-1166)", () => {
     expect((await context.post({ op: "save", endpoint: { ...base, baseUrl: "https://api.business.githubcopilot.com" } }, "endpoints")).text).toMatch(/openai-responses at https:\/\/api\.individual\.githubcopilot\.com/);
     expect((await context.post({ op: "save", endpoint: { ...base, label: "Copilot Pro" } }, "endpoints")).status).toBe(200);
   });
+});
+
+/** GitHub's anchor for a Markdown heading: lowercased, punctuation dropped, spaces to hyphens. */
+const anchorOf = (heading: string) =>
+  heading
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N} -]/gu, "")
+    .replace(/ /g, "-");
+
+describe("the owner's acknowledgement of the vendor's terms before a sign-in", () => {
+  it("draws each sign-in form with its vendor's one-sentence acknowledgement, linking to the docs, and its Start disabled", async () => {
+    const html = await (await setup()).page();
+    for (const kind of SIGN_INS) {
+      const { terms } = SIGN_IN_KINDS[kind];
+      const form = new RegExp(`<form[^>]*data-sign-in-kind="${kind}"[\\s\\S]*?</form>`).exec(html)?.[0] ?? "";
+      expect(form).toContain(`<input id="sign-in-${kind}-terms" name="acknowledgedTerms" type="checkbox" data-sign-in-terms>`);
+      expect(form).not.toMatch(/data-sign-in-terms[^>]*checked/);
+      expect(form).toContain(`<label for="sign-in-${kind}-terms">${escapeHtml(terms.acknowledgement)} <a href="${terms.docs}" target="_blank" rel="noopener noreferrer">`);
+      expect(form).toContain('<button type="button" class="btn" data-sign-in-start disabled>Start sign-in</button>');
+      expect(terms.acknowledgement).toMatch(new RegExp(`${terms.vendor}'s terms`));
+      expect(terms.acknowledgement).toMatch(/is my responsibility/);
+      expect(terms.acknowledgement).toMatch(/API key is the supported path/);
+    }
+  });
+
+  it("links each acknowledgement to its own section of docs/model-endpoints.md", () => {
+    const doc = fs.readFileSync(path.join(import.meta.dirname, "../../../docs/model-endpoints.md"), "utf8");
+    const anchors = [...doc.matchAll(/^#{2,3} (.+)$/gm)].map(([, heading]) => anchorOf(heading!));
+    const docs = SIGN_INS.map((kind) => SIGN_IN_KINDS[kind].terms.docs);
+    expect(new Set(docs).size).toBe(SIGN_INS.length);
+    for (const link of docs) {
+      expect(link.startsWith(`${MODEL_ENDPOINTS_DOCS}#`)).toBe(true);
+      expect(anchors).toContain(link.slice(MODEL_ENDPOINTS_DOCS.length + 1));
+    }
+  });
+
+  it("starts only from the form, enabling Start when the box is ticked and sending the acknowledgement", () => {
+    expect(SCRIPT).toContain("const syncTerms = () => { startButton.disabled = !terms.checked; };");
+    expect(SCRIPT).toContain('terms.addEventListener("change", syncTerms);');
+    expect(SCRIPT).toContain('{ op: "start", id, signIn: kind, label, acknowledgedTerms: true }');
+    // A signed-out card's button leads to its kind's form; nothing outside a form starts a sign-in.
+    expect(SCRIPT).not.toContain("article button[data-sign-in-start]");
+    expect(SCRIPT).toContain("article button[data-sign-in-again]");
+  });
+
+  for (const kind of SIGN_INS) {
+    it(`refuses to start a ${SIGN_IN_KINDS[kind].title} sign-in without the acknowledgement, saying why, and starts nothing`, async () => {
+      const context = await setup();
+      const { title, terms } = SIGN_IN_KINDS[kind];
+      for (const acknowledgedTerms of [undefined, false, "true", 1]) {
+        const refused = await context.post({ op: "start", id: kind, signIn: kind, label: title, ...(acknowledgedTerms === undefined ? {} : { acknowledgedTerms }) });
+        expect(refused.status).toBe(400);
+        expect(refused.text).toContain(`acknowledge ${terms.vendor}'s terms first`);
+        expect(refused.text).toContain("is your responsibility");
+        expect(refused.text).toContain(terms.docs);
+      }
+      expect(context.signIns.status(kind).pendingSince).toBeNull();
+      expect(context.anthropic.requests).toHaveLength(0);
+      expect(context.github.requests).toHaveLength(0);
+      expect(context.store.auditLog(5)).toEqual([]);
+      // With it, the same start goes ahead, and the audit records the acknowledgement.
+      const started = await context.post({ op: "start", id: kind, signIn: kind, label: title, acknowledgedTerms: true });
+      expect(started.status).toBe(200);
+      expect(context.signIns.status(kind).pendingSince).not.toBeNull();
+      expect(context.store.auditLog(5)).toMatchObject([{ action: "endpoint.sign-in.start", target: kind, after: { signIn: kind, acknowledgedTerms: true } }]);
+    });
+  }
 });

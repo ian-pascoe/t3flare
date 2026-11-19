@@ -69,7 +69,7 @@ if (step === "page") {
     excerpt: (form === "" ? html.slice(0, 500) : form).replace(/\s+/g, " ").slice(0, 3000),
   });
 } else if (step === "start") {
-  const answer = await api("POST", "endpoints/sign-in", { op: "start", id: ID, signIn: "copilot", label: "GitHub Copilot" });
+  const answer = await api("POST", "endpoints/sign-in", { op: "start", id: ID, signIn: "copilot", label: "GitHub Copilot", acknowledgedTerms: true });
   const device = answer.json?.device as { userCode: string; expiresAt: number; intervalSeconds: number } | undefined;
   write({
     status: answer.status,

@@ -78,7 +78,16 @@ export interface SignInKind {
    * hinted with it (OpenAI's `login_hint`, with the client id OpenAI issued); otherwise the account is forgotten whole.
    */
   readonly keepsEmail: boolean;
+  /**
+   * What the owner acknowledges before a sign-in starts: the vendor whose terms govern the plan, one sentence of what
+   * those terms say about this use (the panel's checkbox label), and the docs section that quotes them. The panel's start
+   * carries the acknowledgement, and the Environment refuses a start without it.
+   */
+  readonly terms: { readonly vendor: string; readonly acknowledgement: string; readonly docs: string };
 }
+
+/** docs/model-endpoints.md on the public repository: where each sign-in's `terms` link to. */
+export const MODEL_ENDPOINTS_DOCS = "https://github.com/spiritledsoftware/t3flare/blob/main/docs/model-endpoints.md";
 
 /**
  * Every sign-in's facts, by kind: the one table SPI-1165 and SPI-1166 add to. The endpoint's API and base URL are the
@@ -102,6 +111,12 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
     revocation: null,
     listHeaders: {},
     keepsEmail: true,
+    terms: {
+      vendor: "OpenAI",
+      acknowledgement:
+        "OpenAI's terms say I may not share my account credentials or make my account available to anyone else; I accept that complying with OpenAI's terms is my responsibility, and that an OpenAI API key is the supported path.",
+      docs: `${MODEL_ENDPOINTS_DOCS}#chatgpt-sign-in`,
+    },
   },
   claude: {
     api: "anthropic-messages",
@@ -121,6 +136,12 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
     // Anthropic takes a Claude sign-in's token as a bearer only with its OAuth beta (SPI-1161 Q4).
     listHeaders: { "anthropic-beta": "oauth-2025-04-20" },
     keepsEmail: false,
+    terms: {
+      vendor: "Anthropic",
+      acknowledgement:
+        "Anthropic says it does not permit third-party apps to route requests through Claude plan credentials or to store Claude.ai tokens; I accept that complying with Anthropic's terms is my responsibility, and that an Anthropic API key is the supported path.",
+      docs: `${MODEL_ENDPOINTS_DOCS}#claude-sign-in`,
+    },
   },
   copilot: {
     // One API per endpoint: Copilot's Responses models (GPT, Grok). Its Claude models (Messages) and others (Chat
@@ -145,6 +166,12 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
     // The editor headers come from the Credential broker with each token (copilotOAuth.ts), never from here.
     listHeaders: COPILOT_LIST_HEADERS,
     keepsEmail: false,
+    terms: {
+      vendor: "GitHub",
+      acknowledgement:
+        "GitHub's terms say no part of its service, or access to it, may be exploited without its express written permission, and GitHub has not approved this client; I accept that complying with GitHub's terms is my responsibility, and that an API key is the supported path.",
+      docs: `${MODEL_ENDPOINTS_DOCS}#github-copilot-sign-in`,
+    },
   },
 };
 

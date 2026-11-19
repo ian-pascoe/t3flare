@@ -6,7 +6,9 @@
 //   POST /api/endpoints/discover   { endpoint, apiKey? }: the endpoint's model list with pi-ai's metadata, read with the
 //                                  key given, else the saved endpoint's own, but only at its saved target (API, base
 //                                  URL and headers)
-//   POST /api/endpoints/sign-in    a sign-in (SPI-1164): { op: "start", id, label } gives the authorize URL;
+//   POST /api/endpoints/sign-in    a sign-in (SPI-1164): { op: "start", id, signIn, label, acknowledgedTerms: true }
+//                                  gives the authorize URL; without the owner's acknowledgement of the vendor's
+//                                  terms (`SignInKind.terms`, the panel's checkbox) the start is refused, 400;
 //                                  { op: "complete", id, label, pasted } finishes it with the address the browser
 //                                  landed on and saves the sign-in's endpoint with the models its token lists;
 //                                  { op: "sign-out", id } revokes and stops the endpoint's Sessions; where the
@@ -253,9 +255,18 @@ export const endpointsSignIn = async (deps: EndpointsApiDeps, body: Record<strin
   if (body.op === "start") {
     if (!isSignInKind(body.signIn)) return { status: 400, text: `signIn is one of ${SIGN_INS.join(", ")}` };
     if (saved !== undefined && saved.auth !== body.signIn) return { status: 400, text: `the endpoint ${id} is another sign-in: pick another id` };
+    // The owner's acknowledgement that complying with the vendor's terms is theirs: the panel's checkbox, required here
+    // too, so no start skips it.
+    if (body.acknowledgedTerms !== true) {
+      const { title, terms } = SIGN_IN_KINDS[body.signIn];
+      return {
+        status: 400,
+        text: `acknowledge ${terms.vendor}'s terms first: complying with them when you sign in with ${title} is your responsibility (${terms.docs}). Tick the acknowledgement in the Harness panel, or send acknowledgedTerms: true`,
+      };
+    }
     try {
       const { authorizeUrl, device } = await signIns.start(id, body.signIn);
-      audit({ action: "endpoint.sign-in.start", target: id, after: { signIn: body.signIn } });
+      audit({ action: "endpoint.sign-in.start", target: id, after: { signIn: body.signIn, acknowledgedTerms: true } });
       return { status: 200, json: { ok: true, authorizeUrl, ...(device === undefined ? {} : { device }) } };
     } catch (error) {
       return { status: 400, text: error instanceof Error ? error.message : "the sign-in could not start" };
@@ -268,5 +279,5 @@ export const endpointsSignIn = async (deps: EndpointsApiDeps, body: Record<strin
     audit({ action: "endpoint.sign-out", target: id, after: { signedOut, revoked } });
     return { status: 200, json: { ok: true, signedOut, revoked, ...(revoked ? {} : revocationNote(kind)) } };
   }
-  return { status: 400, text: 'the body is { op: "start", id, signIn, label }, { op: "complete", id, label, pasted } or { op: "sign-out", id }' };
+  return { status: 400, text: 'the body is { op: "start", id, signIn, label, acknowledgedTerms: true }, { op: "complete", id, label, pasted } or { op: "sign-out", id }' };
 };
