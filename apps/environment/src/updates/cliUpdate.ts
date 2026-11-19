@@ -57,6 +57,9 @@ const COMMAND_DEADLINE_MS = 31 * 60_000;
 
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
+/** A package's name as one segment of a registry URL: a scope's `/` encoded (every one, should a name hold more). */
+const registryName = (name: string): string => name.replaceAll("/", "%2F");
+
 const npmDocument = async (fetchFn: Fetch, path: string): Promise<Record<string, unknown> | null> => {
   const response = await fetchFn(`https://registry.npmjs.org/${path}`, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS) });
   return response.ok ? ((await response.json()) as Record<string, unknown>) : null;
@@ -71,8 +74,8 @@ const stringField = (document: Record<string, unknown> | null, field: string): s
 export const lookupLatestCliVersion = async (cli: UpdatableCli, fetchFn: Fetch = (url, init) => fetch(url, init)): Promise<string | null> => {
   try {
     if (cli === "codex") return stringField(await npmDocument(fetchFn, "@openai%2Fcodex/latest"), "version");
-    if (cli === "pi") return stringField(await npmDocument(fetchFn, `${CLIS.pi.package.replace("/", "%2F")}/latest`), "version");
-    const adapter = await npmDocument(fetchFn, `${CLIS.claude.package.replace("/", "%2F")}/latest`);
+    if (cli === "pi") return stringField(await npmDocument(fetchFn, `${registryName(CLIS.pi.package)}/latest`), "version");
+    const adapter = await npmDocument(fetchFn, `${registryName(CLIS.claude.package)}/latest`);
     const range = (adapter?.dependencies as Record<string, unknown> | undefined)?.["@anthropic-ai/claude-agent-sdk"];
     const sdk = typeof range === "string" ? /\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/.exec(range)?.[0] : undefined;
     if (sdk === undefined) return null;
