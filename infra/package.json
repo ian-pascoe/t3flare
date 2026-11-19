@@ -1,6 +1,7 @@
 {
   "name": "@t3flare/infra",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "ci:setup": "bash -c 'set -a; . \"$HOME/.config/t3flare/dev.env\"; set +a; exec alchemy deploy --config github.ts --stage ci --profile admin' && node allow-actions-prs.ts",

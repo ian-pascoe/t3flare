@@ -1,6 +1,7 @@
 {
   "name": "@t3flare/codemode-sandbox",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "exports": { ".": "./src/worker.ts" },
   "scripts": { "typecheck": "effect-tsgo tsrs --noEmit" },

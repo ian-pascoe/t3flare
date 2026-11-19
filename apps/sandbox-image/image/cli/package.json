@@ -1,6 +1,7 @@
 {
   "name": "t3flare-cli-agents",
   "private": true,
+  "license": "MIT",
   "description": "The pi CLI the Workspace image installs (step 4a); its version is apps/sandbox-image/src/clis.ts's.",
   "dependencies": {
     "@earendil-works/pi-coding-agent": "1.5.2"

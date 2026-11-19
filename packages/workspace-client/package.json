@@ -1,6 +1,7 @@
 {
   "name": "@t3flare/workspace-client",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "typecheck": "effect-tsgo tsrs --noEmit", "test": "vitest run" },

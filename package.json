@@ -1,6 +1,7 @@
 {
   "name": "t3flare",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "gen:workspace": "node scripts/gen-workspace.ts",
