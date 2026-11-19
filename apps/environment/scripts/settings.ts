@@ -1042,7 +1042,8 @@ text(JSON.stringify(await a).slice(0, 1500));`;
     const escaped = /&lt;script&gt;alert\(1\)&lt;\/script&gt;|%3Cscript%3Ealert\(1\)%3C\/script%3E/.test(html);
     const bidiRaw = html.includes("\u202E");
     const bidiShown = /\\u\{202e\}/i.test(html);
-    const scripts = [...html.matchAll(/<script\b[^>]*>/g)].map((m) => m[0]);
+    // Any case: a browser runs `<SCRIPT>` as well.
+    const scripts = [...html.matchAll(/<script\b[^>]*>/gi)].map((m) => m[0]);
     await record(FILE, "4-add-server", {
       name: "a hostile change rendered inert: an added server's URL path holding <script> and U+202E is shown escaped, the override as \\u{202e}; the page has its own script alone",
       changeId,
