@@ -1,7 +1,7 @@
 // @effect-diagnostics globalFetch:off globalDate:off cryptoRandomUUID:off
 // The Environment DO's in-app Updates (ADR-0037): the records in its storage, and GitHub Actions on the update target's
 // repository with a token from the DO's own minter (`UPDATE_DISPATCH_GITHUB_PERMISSIONS`, plan D5), minted per request
-// and dropped. Without an update target (every stage but prod, plan D14) nothing is dispatched.
+// and dropped. Without an update target (`T3FLARE_UPDATE_REPO` unset, plan D14; docs/deploy.md) nothing is dispatched.
 import { UPDATE_DISPATCH_GITHUB_PERMISSIONS } from "@t3flare/github-app/permissions";
 
 import type { GitHubTokens } from "../agents/github.ts";

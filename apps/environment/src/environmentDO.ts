@@ -91,7 +91,7 @@ export interface EnvironmentEnv extends AgentsBindings {
   readonly T3FLARE_CONNECT_SERVICE_TOKEN?: string;
   /** Test stages: the stage-only probes and faults answer (step 4a's process probe). */
   readonly T3FLARE_FAULTS?: string;
-  /** In-app Updates' target (ADR-0037, plan D14): `owner/name` of the repository whose CI lands an Update. Set on prod only. */
+  /** In-app Updates' target (ADR-0037, plan D14): `owner/name` of the repository whose CI lands an Update (the Deployment repository); set only when the deploy sets `T3FLARE_UPDATE_REPO` (docs/deploy.md). */
   readonly T3FLARE_UPDATE_REPO?: string;
   /** The t3 host as deployed (alchemy.run.ts): the panel's Origin, the OAuth redirect's host, the CLIs' `/mcp`. */
   readonly T3FLARE_HOST?: string;

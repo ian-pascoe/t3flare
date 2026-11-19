@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { actionsClient, updateRepoOf, type ActionsClient, type WorkflowRun } from "../src/updates/actions.ts";
 import { serverUpdateRefusal, tagOf } from "../src/updates/policy.ts";
-import { QUEUED_CEILING_MS, UNLISTED_MS, UPDATE_EXPIRY_MS, UpdateRefused, updates, type PressRequest, type UpdateRecord } from "../src/updates/records.ts";
+import { NO_UPDATE_TARGET, QUEUED_CEILING_MS, UNLISTED_MS, UPDATE_EXPIRY_MS, UpdateRefused, updates, type PressRequest, type UpdateRecord } from "../src/updates/records.ts";
 import { committedOutcome, FAILED_REPLAY_MS, failedOutcome, makeLauncherClient, readyWithOutcome } from "../src/updates/selfUpdate.ts";
 import * as Effect from "effect/Effect";
 
@@ -176,7 +176,10 @@ describe("the update records", () => {
   it("refuses every press on a stage without an update target", async () => {
     const subject = updates({ store: mapStore(), actions: undefined, now: () => 0, newId: () => "x" });
     expect(subject.configured).toBe(false);
-    await expect(subject.press(serverPress(NEXT))).rejects.toThrow(/only prod/);
+    await expect(subject.press(serverPress(NEXT))).rejects.toThrow(NO_UPDATE_TARGET);
+    expect(NO_UPDATE_TARGET).toBe(
+      "This Environment has no update target. Update it by deploying: pull the Canonical repository's main and deploy this Stage again (docs/deploy.md, Updating).",
+    );
   });
 });
 
