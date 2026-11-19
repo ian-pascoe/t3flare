@@ -121,7 +121,7 @@ if (pin.kind === "cli") {
     const provenance = lockProvenance(afterLock.documents, mainLock.documents, t3Lock.documents);
     if (provenance.refused.length > 0) refuse(`the lock holds entries neither main's nor t3's lock vouches for, outside the npm registry: ${provenance.refused.slice(0, 10).join(", ")}`);
     for (const entry of provenance.registry) {
-      const response = await fetch(`https://registry.npmjs.org/${entry.name.replace("/", "%2F")}/${entry.version}`, { headers: { accept: "application/json" } });
+      const response = await fetch(`https://registry.npmjs.org/${entry.name.replaceAll("/", "%2F")}/${entry.version}`, { headers: { accept: "application/json" } });
       const published = response.ok ? ((await response.json()) as { dist?: { integrity?: string } }).dist?.integrity : undefined;
       if (published !== entry.integrity) refuse(`${entry.name}@${entry.version}'s integrity is not the npm registry's (${String(published)})`);
     }
