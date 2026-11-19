@@ -1,6 +1,46 @@
 # t3flare
 
-t3flare runs a t3code Environment on Cloudflare, so the stock t3 clients can orchestrate self-hosted cloud agents alongside the owner's laptop.
+t3flare runs a t3code Environment on Cloudflare, so the stock t3 clients can orchestrate self-hosted cloud agents alongside the Owner's laptop.
+
+## Deployments
+
+**Owner**:
+The one person who deploys and uses a Deployment, in a Cloudflare account they own: they pair its clients, answer its
+Approvals and change its settings. A person may own several Deployments.
+_Avoid_: user, admin, operator, deployer, maintainer
+
+**Deployment**:
+One Owner's t3flare in one Cloudflare account: its Stages and its Deployment settings ([docs/deploy.md](docs/deploy.md)).
+_Avoid_: instance, install, tenant
+
+**Deployment settings**:
+The values that differ from one Deployment to the next, such as its Owner's email and its domain, set outside the
+source tree.
+_Avoid_: config, owner constants
+
+**Stage**:
+One named copy of t3flare's Workers within a Deployment, running exactly one Cloud Environment: `prod` (the one the
+Owner works in), `bump` (CI's proving stage), or a throwaway one.
+_Avoid_: environment (that is t3's), instance, deployment
+
+**Maintainer**:
+A person with write access to the Canonical repository, who decides what lands on its `main`.
+_Avoid_: owner, author
+
+**Canonical repository**:
+The public repository t3flare is developed in, `spiritledsoftware/t3flare`, which every other copy follows.
+_Avoid_: upstream (informally t3code), source (that is a Skill source), origin, the repo
+
+**Deployment repository**:
+The GitHub repository whose CI deploys one Deployment: its `main` is what `prod` runs, and its workflows are what an
+Update dispatches. For the Maintainer's Deployment it is the Canonical repository; for another Owner's, their fork or
+clone. A Deployment deployed only from a laptop has none.
+_Avoid_: the repo, update target (the setting that names it)
+
+**Update target**:
+The Deployment repository `prod`'s in-app Updates dispatch CI on (`T3FLARE_UPDATE_REPO`); only `prod` takes one. A Stage
+without one updates only by being deployed again.
+_Avoid_: update repo, release channel
 
 ## Environments
 
@@ -9,11 +49,11 @@ One t3 server and everything it owns: projects, threads, providers, files and st
 _Avoid_: server, host, instance
 
 **Cloud Environment**:
-The Environment t3flare runs on Cloudflare.
+The Environment a Stage runs on Cloudflare.
 _Avoid_: remote, cloud server
 
 **Laptop Environment**:
-The owner's stock t3 Environment on his own machine.
+The Owner's stock t3 Environment on their own machine.
 _Avoid_: local server, desktop
 
 **Environment DO**:
@@ -30,12 +70,12 @@ _Avoid_: laptop link, incoming connection
 
 **Outbound link**:
 A Peer link the Cloud Environment made to another Environment, today the Laptop Environment. Made and governed as
-on stock t3: by the owner or at an agent's asking, at the access the owner picks.
+on stock t3: by the Owner or at an agent's asking, at the access the Owner picks.
 _Avoid_: reverse link, cloud-to-laptop link, laptop tunnel
 
 **Route**:
 One https address at which an Environment can be reached, and the kind of tunnel behind it (T3 Connect, Tailscale
-Funnel, or the owner's own Cloudflare Tunnel). Used in t3's sense.
+Funnel, or the Owner's own Cloudflare Tunnel). Used in t3's sense.
 _Avoid_: transport, endpoint, tunnel (for the address)
 
 **Linked work**:
@@ -44,9 +84,9 @@ Threads a Peer link started in the Environment it signed in to, and the work der
 _Avoid_: remote threads, foreign work
 
 **Link fence**:
-What Linked work from a link paired below full access may not do: change the owner's threads, projects, settings or
+What Linked work from a link paired below full access may not do: change the Owner's threads, projects, settings or
 schedules, or use that Environment's own links (t3's), or exceed the modes the link hands down (t3's). Pushes and MCP
-tools follow the linked thread's own mode (owner, 2026-11-12, back to stock: no push gateway, no per-push card).
+tools follow the linked thread's own mode.
 _Avoid_: sandbox, isolation
 
 **Remote task**:
@@ -56,7 +96,7 @@ _Avoid_: remote subagent, cloud task
 
 **T3 Connect**:
 The hosted relay at `t3.codes` that T3's mobile apps register with; it pushes an Environment's published thread
-phases to the owner's phone (ADR-0025), and gives an Environment that asks for one a public address.
+phases to the Owner's phone (ADR-0025), and gives an Environment that asks for one a public address.
 _Avoid_: the cloud, the relay service, push service
 
 **Publish-only link**:
@@ -106,7 +146,7 @@ The Durable agent provider as t3 lists it, under the driver kind `piDurable`. No
 _Avoid_: Pi (cloud), cloud Pi, Pi (that is the CLI agent)
 
 **Approval**:
-A Durable agent's tool call waiting for the owner's Approve or Decline, kept in the Session's storage so it survives the Session restarting. The runtime mode decides which calls ask.
+A Durable agent's tool call waiting for the Owner's Approve or Decline, kept in the Session's storage so it survives the Session restarting. The runtime mode decides which calls ask.
 _Avoid_: permission prompt, confirm
 
 **Write journal**:
@@ -163,8 +203,8 @@ Claude Code's highest settings source, shared by every Claude process in a Conta
 ## Tools
 
 **Harness panel**:
-The owner's page at `/_t3flare/harness` on the t3 host for t3flare's own settings: the Harness settings and the
-Environment settings, with Status, the audit log and the Open changes waiting for him.
+The Owner's page at `/_t3flare/harness` on the t3 host for t3flare's own settings: the Harness settings and the
+Environment settings, with Status, the audit log and the Open changes waiting for them.
 _Avoid_: settings page, dashboard, admin UI
 
 **Harness settings**:
@@ -182,7 +222,7 @@ is never a credential.
 _Avoid_: env var, environment variable (it reads as the Environment's own), secret
 
 **Global mise config**:
-The owner's mise configuration that every Container's commands get, under a repository's own.
+The Owner's mise configuration that every Container's commands get, under a repository's own.
 _Avoid_: Toolchains (cloudpid's word), global tools
 
 **Container size**:
@@ -202,12 +242,12 @@ _Avoid_: scripting, eval
 An MCP endpoint whose tools t3flare's agents may call: a Direct server, or the Settings server.
 
 **Direct server**:
-A remote MCP server added to the MCP server set by the owner in the Harness panel, or at an agent's asking, with its
+A remote MCP server added to the MCP server set by the Owner in the Harness panel, or at an agent's asking, with its
 own sign-in kept by t3flare.
 _Avoid_: custom server, Route B (the plan's word)
 
 **MCP server set**:
-Every MCP server the Environment offers, with each one's switches (enabled, Exposure) and the owner's Tool class
+Every MCP server the Environment offers, with each one's switches (enabled, Exposure) and the Owner's Tool class
 overrides.
 
 **MCP host**:
@@ -225,7 +265,7 @@ How a Durable agent is offered an MCP tool: `direct` (in its tool list), `deferr
 (from scripts only) or `hidden`.
 
 **Tool class**:
-Read or write: the tool's own `readOnlyHint` (true is read; anything else, write), unless the owner overrides it in
+Read or write: the tool's own `readOnlyHint` (true is read; anything else, write), unless the Owner overrides it in
 the Harness panel. A read runs; a write follows the thread's mode, Linked work included.
 _Avoid_: permission level
 
@@ -234,8 +274,8 @@ An opaque per-process bearer a CLI agent sends to the MCP relay; useless outside
 _Avoid_: token, nonce
 
 **Server question**:
-What an MCP server asks the owner during an agent's call: an elicitation (a form, or a page to open), or a Pause.
-The MCP host makes it a t3 card on the calling thread; only the owner answers it, in a t3 client.
+What an MCP server asks the Owner during an agent's call: an elicitation (a form, or a page to open), or a Pause.
+The MCP host makes it a t3 card on the calling thread; only the Owner answers it, in a t3 client.
 _Avoid_: prompt, approval request (a Server question may ask for input)
 
 **Pause**:
@@ -256,14 +296,14 @@ _Avoid_: admin MCP, builtin MCP, config server, Harness server
 
 **Door**:
 One of the Settings server's two ways in, over one implementation: the own agents' door (t3flare's own agents, in-process
-through the MCP host, owner-only cards) and the Owner-client door (Owner clients, at its endpoint behind Access). A
+through the MCP host, Owner-only cards) and the Owner-client door (Owner clients, at its endpoint behind Access). A
 change records the door it came through.
 _Avoid_: entrypoint, channel (a Process channel is another thing), transport
 
 **Owner client**:
-An MCP client outside t3flare, such as Claude Code or Cursor on the owner's laptop, that the owner signed in to the
-Settings server through Access. Its Elicitation mode is the owner's setting for it on the Harness panel, by its own
-name (`clientInfo.name`), which is a label, never proof of which client calls.
+An MCP client outside t3flare, such as Claude Code or Cursor on the Owner's own machine, that the Owner signed in to the
+Settings server through Access. Its Elicitation mode is the Owner's setting for it on the Harness panel, by its own
+name, which is a label, never proof of which client calls.
 _Avoid_: external agent, laptop client (the Laptop Environment is t3's), remote client
 
 **Settings change**:
@@ -282,14 +322,14 @@ An asked Settings change waiting for its answer, kept for at most 10 minutes and
 _Avoid_: Proposal (cloudpid's, a queue), pending request (t3's), draft
 
 **Change page**:
-The Harness panel's page for one Open change, where the owner reads it and answers. It is the only place a secret is
+The Harness panel's page for one Open change, where the Owner reads it and answers. It is the only place a secret is
 typed or a Direct server's sign-in is started for a change an agent asked.
 _Avoid_: confirm page, approval page
 
 **Elicitation mode**:
-How an Owner client's asked change is answered: `browser` (the owner, on the Change page), `native` (a form in the
+How an Owner client's asked change is answered: `browser` (the Owner, on the Change page), `native` (a form in the
 client) or `model` (the client's agent, by calling `resume`). Executor's names and meanings. Set per Owner client on the
-Harness panel (`browser` until the owner changes it); `?elicitation_mode=` on the URL overrides it, for clients that keep
+Harness panel (`browser` until the Owner changes it); `?elicitation_mode=` on the URL overrides it, for clients that keep
 a query. t3flare's own agents have none: theirs is always a Server question.
 _Avoid_: approval mode, form mode, URL mode (an elicitation is a form or a page)
 
@@ -306,7 +346,7 @@ _Avoid_: safety extension, policy
 ## Skills
 
 **Skill**:
-A directory with a `SKILL.md` (name, description, instructions) and supporting files, which an agent reads when a task matches its description or the owner names it.
+A directory with a `SKILL.md` (name, description, instructions) and supporting files, which an agent reads when a task matches its description or the Owner names it.
 _Avoid_: plugin, command, extension
 
 **Repo skill**:
@@ -318,15 +358,15 @@ A directory in which an agent looks for Skills, such as a repository's `.agents/
 _Avoid_: skills folder, skill path
 
 **Environment skill**:
-A Skill installed into the Cloud Environment by the owner, or at an agent's asking, offered to every agent in every Project: Durable agents and CLI agents alike.
-_Avoid_: global skill (the owner's informal word, and cloudpid's Global), owner skill, personal skill
+A Skill installed into the Cloud Environment by the Owner, or at an agent's asking, offered to every agent in every Project: Durable agents and CLI agents alike.
+_Avoid_: global skill (cloudpid's Global), owner skill, personal skill
 
 **Skill source**:
 Where an Environment skill was installed from: a GitHub repository, the Skill's folder, the ref named and the commit it is pinned to.
 _Avoid_: upstream, origin
 
 **Skill mention**:
-A `$name` in the owner's message that names a Skill; t3's composer writes one when a Skill is picked.
+A `$name` in the Owner's message that names a Skill; t3's composer writes one when a Skill is picked.
 _Avoid_: skill chip, invocation
 
 **Slash command**:
@@ -343,7 +383,7 @@ _Avoid_: prompt, snippet, MCP prompt
 One configured way to reach an agent or model provider, with its own credentials. Used in t3's sense.
 
 **Model endpoint**:
-One of the owner's own ways to reach models: where to send requests, with an API key, a sign-in or none, and the models it serves. Every model call t3flare makes goes to one. Set up in the Harness panel.
+One of the Owner's own ways to reach models: where to send requests, with an API key, a sign-in or none, and the models it serves. Every model call t3flare makes goes to one. Set up in the Harness panel.
 _Avoid_: provider (that is t3's or pi-ai's), connection, backend
 
 **Model relay**:
@@ -363,7 +403,7 @@ The usage windows one Model endpoint answer reported in its vendor's rate-limit 
 _Avoid_: quota report, usage record (that counts tokens)
 
 **Subscription**:
-The owner's own signed-in plan with a model vendor (ChatGPT plan usage, a Claude Pro or Max plan, GitHub Copilot), as opposed to an API key: a Model endpoint's sign-in, made in the Harness panel.
+An Owner's own paid plan with a model vendor (ChatGPT, Claude Pro or Max, GitHub Copilot), signed in to as a Model endpoint in the Harness panel, as opposed to an API key. It belongs to one Owner and one Deployment and is never shared.
 _Avoid_: Subscription login, OAuth, account
 
 **Credential broker**:
@@ -371,7 +411,7 @@ The Environment DO in its role as the one holder and refresher of every Subscrip
 _Avoid_: token service, auth server
 
 **Container token**:
-A GitHub installation token for one Workspace's one repo (code and pull requests write; `workflows` only when the Workspace is opted in), handed to git in its Container on the credential helper's request; never stored there. The agent's own git pushes with it (owner, 2026-11-12, back to stock).
+A GitHub installation token for one Workspace's one repo (code and pull requests write; `workflows` only when the Workspace is opted in), handed to git in its Container on the credential helper's request; never stored there. The agent's own git pushes with it.
 _Avoid_: repo token, deploy key (the repo's one deploy key is `land.yml`'s, ADR-0037 §7)
 
 **Environment token**:
@@ -389,39 +429,6 @@ _Avoid_: maintenance mode, recovery mode
 **Pairing window**:
 The minutes, opened by an admin route, during which t3's bootstrap grant exists and the bootstrap token pairs a client.
 _Avoid_: bootstrap mode
-
-## Deployments
-
-**Owner**:
-The person a Deployment belongs to, the one person its Access admits to the admin routes.
-_Avoid_: user, admin, maintainer (the Maintainer is the Owner of the Canonical repository's own Deployment)
-
-**Deployment**:
-One Owner's t3flare: their Cloudflare account, GitHub App and Stages ([docs/deploy.md](docs/deploy.md)).
-_Avoid_: install, instance, tenant
-
-**Stage**:
-One deployed copy of the Cloud Environment in a Deployment: `prod`, or a throwaway test Stage. Used in alchemy's sense.
-_Avoid_: environment (that is t3's, or a GitHub environment)
-
-**Deployment settings**:
-The Owner's own values a Deployment is made with (the Access team, the Owner's email, the workers.dev subdomain, `prod`'s
-domain, the update target and the rest). Read from the environment with no default; a deploy without one stops and
-names it.
-_Avoid_: config, env vars (alone), defaults
-
-**Canonical repository**:
-`spiritledsoftware/t3flare`, where t3flare is developed and whose `main` every Deployment updates from.
-_Avoid_: upstream (that is t3code), origin
-
-**Deployment repository**:
-The repository whose CI deploys a given Owner's `prod`, and an in-app Update's target when one is set.
-_Avoid_: fork (it may not be one), deploy repo
-
-**Update target**:
-The Deployment repository a Stage's in-app Updates dispatch CI on (`T3FLARE_UPDATE_REPO`). A Stage without one updates
-only by being deployed again.
-_Avoid_: update repo, release channel
 
 ## Upstream
 
@@ -473,16 +480,13 @@ The nightly bump's whole proof, every CLI agent's turn included; a landed Update
 _Avoid_: full test, slow gate
 
 **Land**:
-Fast-forward `main` to a proposed pin, then deploy prod.
+Fast-forward the Deployment repository's `main` to a proposed pin, then deploy `prod`.
 _Avoid_: merge, release
 
 **Update**:
-A bump and land requested from a stock client's Update button, of either kind: the server's (a t3 bump) or a CLI's (a CLI bump).
+A bump and land an Owner requests from a stock client's Update button, in their Deployment repository, of either kind:
+the server's (a t3 bump) or a CLI's (a CLI bump).
 _Avoid_: self-update, upgrade
-
-**Stage**:
-One deployment of t3flare's Workers under its own name: `prod` (the owner's), `bump` (CI's proving stage), or a throwaway one.
-_Avoid_: environment (that is t3's), instance
 
 **Workspace image**:
 The Container image every Workspace runs: git, the CLI agents at their CLI pins, and the tools.
