@@ -142,7 +142,8 @@ export const sanitizeAttachmentName = (raw: string): string => {
       .normalize("NFC")
       .replace(/[^\p{L}\p{M}\p{N}._-]+/gu, "-")
       .replace(/-{2,}/gu, "-")
-      .replace(/-+\./gu, ".")
+      // One dash at most before a dot once runs are one: a `-+\.` would be quadratic in a long run.
+      .replace(/-\./gu, ".")
       .replace(/\.-+/gu, "."),
   );
 
