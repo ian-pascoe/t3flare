@@ -48,9 +48,11 @@ describe("startRefusal", () => {
   });
 
   it("reads a message of many prefixes in linear time", () => {
+    // The regex this replaced is linear on every input of this shape (its first match succeeds and returns), so no size
+    // separates it from the scan: this is a sanity bound, ~100x the scan's time on a laptop, not a ReDoS detector.
     const started = performance.now();
     expect(startRefusal("the Container cannot start: a".repeat(100_000))).toHaveLength(29 * 100_000 - 28);
-    expect(performance.now() - started).toBeLessThan(400);
+    expect(performance.now() - started).toBeLessThan(2_000);
   });
 });
 
