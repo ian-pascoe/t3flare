@@ -416,6 +416,7 @@ export const make = (options: CompositionOptions) => {
 
   const layerGitManager = GitManager.layer.pipe(
     Layer.provide(Layer.merge(ProjectionStoreV2.layer, ProjectStore.layer)),
+    Layer.provide(layerPullRequestService.pipe(Layer.provide(RuntimeLayer.layerProjectService))),
     Layer.provideMerge(RuntimeLayer.layerProjectSetupScriptRunner),
     Layer.provideMerge(WorktreeSetupTracker.layer),
     Layer.provideMerge(GitVcsDriver.layer),
@@ -463,6 +464,8 @@ export const make = (options: CompositionOptions) => {
   const layerPortScanner = PortDiscoveryLayer.layer;
   // t3flare: t3's TerminalManager over our PTY adapter: shells in the Workspace's Container (step 2b, ADR-0021).
   const layerTerminal = TerminalLayer.layer;
+  // t3flare: no `PreviewTunnel.layer` (nor its `routeLayer`): it dials this process's loopback, where nothing listens;
+  // a Workspace's servers are in its Container (G11). `/api/preview/tunnel` answers 404, as from a server without it.
   const layerPreview = Layer.empty.pipe(Layer.provideMerge(PreviewManager.layer), Layer.provideMerge(layerPortScanner));
   const layerDevice = DeviceService.layer.pipe(
     Layer.provide(layerServerSettings),
@@ -777,6 +780,7 @@ export const make = (options: CompositionOptions) => {
     McpHttpServer.layer.pipe(
       Layer.provide(ProviderAdapterRegistry.layerFromProviderInstanceRegistry),
       Layer.provide(McpOAuth.layerMcpClientAuthenticator),
+      Layer.provide(ProjectionStoreV2.layer),
     ),
     Layer.effectDiscard(RemoteDelegation.RemoteDelegation.pipe(Effect.flatMap((remote) => remote.start()))),
   ).pipe(
