@@ -73,7 +73,8 @@ export const mcpToolPart = (tool: string): string =>
     .replaceAll(/[A-Z]+/g, "_$&")
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, "_")
-    .replaceAll(/^_+|_+$/g, "") || EMPTY_TOOL_PART;
+    // One `_` at most at each end once runs are collapsed: a `_+$` would be quadratic in a long run.
+    .replaceAll(/^_|_$/g, "") || EMPTY_TOOL_PART;
 
 /**
  * The 8 hex digits of `sha256("server\0tool")` that tell tools apart. The server is the normalized name, so a change of
@@ -145,8 +146,24 @@ export const mcpToolNames = (
   }
 };
 
-/** What pi names an MCP tool: `mcp__<server>__<tool>` with everything outside `[A-Za-z0-9_]` as `_`. */
-const PI_TOOL_NAME = /^mcp__(.+?)__(.+)$/;
+/** A line break, which no part of a pi tool name holds. */
+const LINE_BREAK = /[\n\r\u2028\u2029]/u;
+
+/**
+ * The server and tool parts of what pi names an MCP tool: `mcp__<server>__<tool>` with everything outside
+ * `[A-Za-z0-9_]` as `_`, the server ending at the first `__` after its first character, neither part empty. Read by hand:
+ * the lazy regex it was (`^mcp__(.+?)__(.+)$`) is quadratic in a run of `__`.
+ */
+const piParts = (name: string): { readonly server: string; readonly tool: string } | undefined => {
+  if (!name.startsWith(MCP_TOOL_NAME_PREFIX) || LINE_BREAK.test(name)) return undefined;
+
+  const rest = name.slice(MCP_TOOL_NAME_PREFIX.length);
+  const split = rest.indexOf("__", 1);
+
+  return split === -1 || split + 2 === rest.length
+    ? undefined
+    : { server: rest.slice(0, split), tool: rest.slice(split + 2) };
+};
 
 const piPart = (text: string): string => text.replaceAll(/[^A-Za-z0-9_]/g, "_");
 
@@ -184,7 +201,7 @@ export const mcpToolNameFromPi = (name: string, servers: ReadonlyArray<string> =
     return tool === "" ? name : mcpToolName(known.server, tool);
   }
 
-  const match = PI_TOOL_NAME.exec(name);
+  const parts = piParts(name);
 
-  return match === null ? name : mcpToolName(match[1] ?? "", match[2] ?? "");
+  return parts === undefined ? name : mcpToolName(parts.server, parts.tool);
 };
