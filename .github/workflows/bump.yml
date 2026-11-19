@@ -180,7 +180,7 @@ jobs:
             {
               echo "## t3code bump"
               echo '```json'
-              jq '{ok, gate, base, from, to, changed, note, steps: [.steps[] | {name, ok, seconds}], unclassifiedCapabilities, acceptanceRetry: (.acceptanceRetry | if . then {firstFailures} else null end), acceptance: (.acceptance | if . then {ok, failures, serverVersion, modelEndpoint, textGeneration, sqlAdapter, threadWindow, search, realTurn: (.realTurn | if . then {ok, failures, clone, turn, checkpointOps} else null end)} else null end), lock, rollback}' bump-report.json
+              jq '{ok, gate, base, from, to, changed, note, steps: [.steps[] | {name, ok, seconds}], unclassifiedCapabilities, t3TypeErrors, acceptanceRetry: (.acceptanceRetry | if . then {firstFailures} else null end), acceptance: (.acceptance | if . then {ok, failures, serverVersion, modelEndpoint, textGeneration, sqlAdapter, threadWindow, search, realTurn: (.realTurn | if . then {ok, failures, clone, turn, checkpointOps} else null end)} else null end), lock, rollback}' bump-report.json
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -249,12 +249,16 @@ jobs:
       # Not an Update: a pull request for the owner, which closes the older bump pull requests it supersedes.
       - name: Propose it
         if: steps.check.outputs.changed == 'true' && inputs.dry_run != true && inputs.land != true
-        # UNCLASSIFIED and RETRIED come from the report through check-proposal, which passes only flag-shaped names and a
-        # boolean (bumpReportNotes); they go into the body as data, never into a command.
+        # UNCLASSIFIED, RETRIED and T3_TYPE_ERRORS come from the report through check-proposal, which passes only
+        # flag-shaped names, a boolean and a whole number (bumpReportNotes); they go into the body as data, never into a
+        # command.
         run: |
           body="Pinned by the nightly bump job; the $GATE gate passed on the \`bump\` stage. See the run's report: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           if [ "$RETRIED" = "true" ]; then
             body+=$'\n\n'"**The acceptance test passed only on its second attempt.** The pass may be luck: read the first attempt's failures (\`acceptanceRetry\` in the report) before merging (fragility U18)."
+          fi
+          if [ "${T3_TYPE_ERRORS:-0}" != "0" ]; then
+            body+=$'\n\n'"The typecheck passed over $T3_TYPE_ERRORS type error(s) in t3's own files, which only our program's configuration sees (fragility U10): read them in the run's log."
           fi
           if [ -n "$UNCLASSIFIED" ]; then
             body+=$'\n\n'"**New capability flags, stripped until classified** in \`apps/environment/src/t3/capabilities.ts\` (fragility U4): $UNCLASSIFIED"
@@ -269,6 +273,7 @@ jobs:
           GATE: ${{ steps.check.outputs.gate }}
           UNCLASSIFIED: ${{ steps.check.outputs.unclassified }}
           RETRIED: ${{ steps.check.outputs.retried }}
+          T3_TYPE_ERRORS: ${{ steps.check.outputs.t3_type_errors }}
 
   # D18, review A3: a verify run that does not pass, for any reason (a failure, a timeout, a cancellation), opens an
   # issue (GitHub Issues sync to Linear). No automatic revert: migrations only go forward.

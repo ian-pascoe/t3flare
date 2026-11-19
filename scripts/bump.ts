@@ -38,7 +38,9 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+import { DETERMINISTIC_STEPS } from "../apps/environment/scripts/lib/land.ts";
 import { keptReportJson } from "../apps/environment/scripts/lib/modelEndpointSpec.ts";
+import { T3_ERRORS_COUNT } from "../apps/environment/scripts/lib/typecheckFilter.ts";
 import { newestNightly, PINNED_FILES } from "../apps/environment/src/updates/pins.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -109,13 +111,15 @@ const step = (name: string, run: () => { ok: boolean; detail?: string }, detailC
 let lockLine: string | undefined;
 /** The descriptor flags the new pin has and `capabilities.ts` does not classify: stripped until classified (U4). */
 let unclassifiedCapabilities: Array<string> | undefined;
+/** Type errors in t3's own files the typecheck passed over (U10): not ours to fix, but a new one is worth a look. */
+let t3TypeErrors: number | undefined;
 /** The first acceptance attempt's result, when it failed and a second ran. */
 let acceptanceRetry: { readonly firstFailures: unknown; readonly firstDetail: string } | undefined;
-/** The commit of t3flare this run tested: the plan job skips an hourly retry of a failure nothing has changed since. */
-const base = sh("git", ["rev-parse", "HEAD"], root, { quiet: true }).output.trim();
 let rollbackResult: { ok: boolean; t3code: string; pinnedFiles: string; install: string } | undefined;
 const from = sh("git", ["describe", "--tags", "--exact-match", "HEAD"], t3, { quiet: true }).output.trim() || sh("git", ["rev-parse", "HEAD"], t3, { quiet: true }).output.trim();
 const fromCommit = sh("git", ["rev-parse", "HEAD"], t3, { quiet: true }).output.trim();
+/** The commit of t3flare this run tested: the plan job skips an hourly retry of a failure nothing has changed since. */
+const base = sh("git", ["rev-parse", "HEAD"], root, { quiet: true }).output.trim();
 
 let to: string | undefined;
 step("find the newest nightly tag", () => {
@@ -141,6 +145,7 @@ const finish = (ok: boolean, note?: string) => {
       : null,
     lock: lockLine ?? null,
     unclassifiedCapabilities: unclassifiedCapabilities ?? null,
+    t3TypeErrors: t3TypeErrors ?? 0,
     acceptanceRetry: acceptanceRetry ?? null,
     rollback: rollbackResult ?? null,
   };
@@ -177,7 +182,7 @@ const rollback = () => {
 };
 
 const ok =
-  step(`move t3code to ${to}`, () => {
+  step(`${DETERMINISTIC_STEPS.move} ${to}`, () => {
     const result = sh("git", ["checkout", "--quiet", to!], t3);
     return { ok: result.ok, detail: result.output };
   }) &&
@@ -187,14 +192,16 @@ const ok =
     const result = sh(process.execPath, ["scripts/relock.ts"], root);
     return { ok: result.ok, detail: result.output };
   }) &&
-  step("lock matches t3's, one effect", () => {
+  step(DETERMINISTIC_STEPS.lock, () => {
     const result = sh(process.execPath, ["scripts/verify-lock.ts"], root);
     lockLine = result.output.split("\n").find((line) => line.startsWith("{"));
     return { ok: result.ok, detail: result.output };
   }) &&
   // The whole check, as prod's deploy runs it (D9; closes U27): the patches apply, typecheck, lint, tests.
-  step("check (pnpm run check: patches, typecheck, lint, test)", () => {
+  step(DETERMINISTIC_STEPS.check, () => {
     const result = sh("pnpm", ["run", "check"], root);
+    const t3Errors = T3_ERRORS_COUNT.exec(result.output)?.[1];
+    if (t3Errors !== undefined) t3TypeErrors = Number(t3Errors);
     return { ok: result.ok, detail: result.output };
   }) &&
   // Never fails the bump: a new flag is stripped until classified (U4). The report and the PR name each one.
@@ -281,6 +288,7 @@ if (flag("commit") && to !== from) {
       ...(unclassifiedCapabilities !== undefined && unclassifiedCapabilities.length > 0
         ? [`Capability flags stripped until classified in apps/environment/src/t3/capabilities.ts: ${unclassifiedCapabilities.join(", ")}.`]
         : []),
+      ...(t3TypeErrors !== undefined && t3TypeErrors > 0 ? [`The typecheck passed over ${t3TypeErrors} type error(s) in t3's own files (fragility U10).`] : []),
     ];
     const commit = sh("git", ["commit", "--quiet", "-m", `chore: bump t3code to ${to}`, ...notes.flatMap((note) => ["-m", note])], root);
     return { ok: add.ok && commit.ok, detail: commit.output };

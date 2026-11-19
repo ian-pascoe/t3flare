@@ -272,46 +272,67 @@ export interface T3PlanInput {
   readonly attempts?: ReadonlyArray<BumpAttempt | undefined> | undefined;
 }
 
+/**
+ * The names of `scripts/bump.ts`'s steps whose failure the same inputs reproduce: the same t3 tag on the same t3flare
+ * commit fails them again. bump.ts names its steps from here, so the plan's reading of a report follows a rename. The
+ * install (the registry) and every step after the check (Docker, Cloudflare, the stage, npm) can fail by chance.
+ */
+export const DETERMINISTIC_STEPS = {
+  /** Followed by the tag. */
+  move: "move t3code to",
+  lock: "lock matches t3's, one effect",
+  check: "check (pnpm run check: patches, typecheck, lint, test)",
+} as const;
+type DeterministicStep = keyof typeof DETERMINISTIC_STEPS;
+
 /** An earlier bump job's attempt, read from its report (untrusted; `bumpAttemptOf`). */
 export interface BumpAttempt {
   /** The commit of t3flare it tested, and the tag it tried. */
   readonly base: string;
   readonly to: string;
-  /** The first step that failed, or undefined when none did. */
-  readonly failedStep: string | undefined;
+  /**
+   * Its first failed step: one of DETERMINISTIC_STEPS' keys, `other` for any other step, or undefined when none failed.
+   * Never the report's own text, which a trusted job must not print (ADR-0037).
+   */
+  readonly failed: DeterministicStep | "other" | undefined;
 }
 
-/**
- * The steps whose failure the same inputs reproduce: the same t3 tag on the same t3flare commit fails them again.
- * The install (the registry) and every step after the check (Docker, Cloudflare, the stage, npm) can fail by chance.
- */
-const DETERMINISTIC_STEPS = ["move t3code to ", "lock matches t3's", "check (pnpm run check"] as const;
+/** A report's top-level object, or why not: the one parse every reader of an untrusted report shares. */
+const reportObject = (text: string): Record<string, unknown> | string => {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return parsed === null || typeof parsed !== "object" || Array.isArray(parsed) ? "the report is not a JSON object" : (parsed as Record<string, unknown>);
+  } catch {
+    return "the report is not JSON";
+  }
+};
+
+const stepKindOf = (name: string): DeterministicStep | "other" => {
+  if (name.startsWith(`${DETERMINISTIC_STEPS.move} `)) return "move";
+  if (name === DETERMINISTIC_STEPS.lock) return "lock";
+  if (name === DETERMINISTIC_STEPS.check) return "check";
+  return "other";
+};
 /** How many hourly attempts in a row must fail a deterministic step before the plan stops retrying: one retry covers a flaky unit test. */
 export const DETERMINISTIC_FAILURES_TO_STOP = 2;
 
 /** An attempt from a bump job's report, or undefined when the report is not one this can read. */
 export const bumpAttemptOf = (text: string): BumpAttempt | undefined => {
-  let report: Record<string, unknown>;
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
-    report = parsed as Record<string, unknown>;
-  } catch {
-    return undefined;
-  }
+  const report = reportObject(text);
+  if (typeof report === "string") return undefined;
   if (typeof report.base !== "string" || !/^[0-9a-f]{40}$/.test(report.base)) return undefined;
   if (typeof report.to !== "string" || !NIGHTLY_TAG.test(report.to)) return undefined;
   if (!Array.isArray(report.steps)) return undefined;
   const failed = (report.steps as Array<unknown>).find((s): s is { name: string } => s !== null && typeof s === "object" && (s as { ok?: unknown }).ok === false && typeof (s as { name?: unknown }).name === "string");
-  return { base: report.base, to: report.to, failedStep: failed?.name };
+  return { base: report.base, to: report.to, failed: failed === undefined ? undefined : stepKindOf(failed.name) };
 };
 
 const failedDeterministically = (attempt: BumpAttempt | undefined, tag: string, mainSha: string): boolean =>
   attempt !== undefined &&
   attempt.to === tag &&
   attempt.base === mainSha &&
-  attempt.failedStep !== undefined &&
-  DETERMINISTIC_STEPS.some((prefix) => attempt.failedStep!.startsWith(prefix));
+  attempt.failed !== undefined &&
+  attempt.failed !== "other";
 
 export type T3Plan = { readonly mode: "skip" | "bump" | "land"; readonly tag: string; readonly reason: string; readonly proven?: boolean };
 
@@ -335,7 +356,7 @@ export const planT3 = (input: T3PlanInput): T3Plan | string => {
     // nightly or a run by hand tries again.
     const recent = (input.attempts ?? []).slice(0, DETERMINISTIC_FAILURES_TO_STOP);
     if (input.mainSha !== undefined && recent.length === DETERMINISTIC_FAILURES_TO_STOP && recent.every((attempt) => failedDeterministically(attempt, newest, input.mainSha!))) {
-      return { mode: "skip", tag: newest, reason: `${newest} failed "${recent[0]!.failedStep}" on this main ${DETERMINISTIC_FAILURES_TO_STOP} times; a change to main, a newer nightly or a run by hand tries again` };
+      return { mode: "skip", tag: newest, reason: `${newest} failed its ${recent[0]!.failed} step on this main ${DETERMINISTIC_FAILURES_TO_STOP} times; a change to main, a newer nightly or a run by hand tries again` };
     }
     return { mode: "bump", tag: newest, reason: input.branch?.gate === "update" ? `${newest} was proven by the Update gate only; the Full gate proposes it` : `${newest} is new` };
   }
@@ -364,14 +385,8 @@ export const readBumpReport = (
     | { readonly kind: "t3"; readonly gate: "update" | "full"; readonly tag?: string | undefined }
     | { readonly kind: "cli"; readonly cli: string; readonly running?: string | undefined },
 ): { readonly changed: boolean; readonly to: string; readonly gate: "update" | "full"; readonly callLand: boolean } | string => {
-  let report: Record<string, unknown>;
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return "the report is not a JSON object";
-    report = parsed as Record<string, unknown>;
-  } catch {
-    return "the report is not JSON";
-  }
+  const report = reportObject(text);
+  if (typeof report === "string") return report;
   if (report.ok !== true) return "the report is not a pass";
   if (typeof report.changed !== "boolean") return "report.changed is not a boolean";
   const changed = report.changed;
@@ -394,21 +409,18 @@ const CAPABILITY_KEY = /^[A-Za-z][A-Za-z0-9]{0,63}$/;
 
 /**
  * What a t3 bump's pull request tells its reader beyond the pass (fragility U4, U18), from the untrusted report: the
- * capability flags stripped until classified (only names shaped as flags; anything else is dropped), and whether the
- * acceptance test passed only on its second attempt. Never part of a decision to publish or land.
+ * capability flags stripped until classified (only names shaped as flags; anything else is dropped), whether the
+ * acceptance test passed only on its second attempt, and how many type errors in t3's own files the typecheck passed
+ * over (U10; a whole number, else 0). Never part of a decision to publish or land.
  */
-export const bumpReportNotes = (text: string): { readonly unclassified: ReadonlyArray<string>; readonly acceptanceRetried: boolean } => {
-  let report: Record<string, unknown> = {};
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) report = parsed as Record<string, unknown>;
-  } catch {
-    // No notes.
-  }
+export const bumpReportNotes = (text: string): { readonly unclassified: ReadonlyArray<string>; readonly acceptanceRetried: boolean; readonly t3TypeErrors: number } => {
+  const parsed = reportObject(text);
+  const report = typeof parsed === "string" ? {} : parsed;
   const unclassified = Array.isArray(report.unclassifiedCapabilities)
     ? report.unclassifiedCapabilities.filter((key): key is string => typeof key === "string" && CAPABILITY_KEY.test(key)).slice(0, 50)
     : [];
-  return { unclassified, acceptanceRetried: report.acceptanceRetry !== undefined && report.acceptanceRetry !== null };
+  const t3TypeErrors = Number.isInteger(report.t3TypeErrors) && (report.t3TypeErrors as number) >= 0 && (report.t3TypeErrors as number) < 100_000 ? (report.t3TypeErrors as number) : 0;
+  return { unclassified, acceptanceRetried: report.acceptanceRetry !== undefined && report.acceptanceRetry !== null, t3TypeErrors };
 };
 
 /**

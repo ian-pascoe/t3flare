@@ -7,7 +7,7 @@
 //   plan-t3 --event <e> [--tag <t>] [--land true] [--verify <what>]   bump.yml: skip, bump or land (mode, tag, pin, sha)
 //   check-proposal --kind t3|cli --dir <artifact dir> (--gate <g> [--tag <t>] | --cli <c> [--running <v>])
 //                       no token: the report read and the bundled commit checked (changed, pin, sha, gate, call_land;
-//                       and for the PR's body: unclassified, retried)
+//                       and for the PR's body: unclassified, retried, t3_type_errors)
 //   publish-proposal --pin <pin> --sha <sha> --gate <g>      token: push `bump/*`, mark the commit proven
 //   land-plan --pin <pin> [--sha <sha>]   land.yml: land (the branch's tip is `sha`, proven) or deploy-only
 //                                         (mode, branch, sha, verify)
@@ -125,7 +125,7 @@ switch (command) {
       if (checked.status !== 0) fail("the land check refused the proposed pin");
     }
     // For the pull request's body only (U4, U18): validated names and a boolean, never part of a decision.
-    const notes = kind === "t3" ? bumpReportNotes(text) : { unclassified: [], acceptanceRetried: false };
+    const notes = kind === "t3" ? bumpReportNotes(text) : { unclassified: [], acceptanceRetried: false, t3TypeErrors: 0 };
     output({
       changed: String(report.changed),
       pin: pinText(pin as Pin),
@@ -134,6 +134,7 @@ switch (command) {
       call_land: String(report.callLand),
       unclassified: notes.unclassified.join(", "),
       retried: String(notes.acceptanceRetried),
+      t3_type_errors: String(notes.t3TypeErrors),
     });
     break;
   }

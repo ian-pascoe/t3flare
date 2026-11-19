@@ -4,7 +4,7 @@
 import { spawnSync } from "node:child_process";
 import * as path from "node:path";
 
-import { typecheckVerdict } from "./lib/typecheckFilter.ts";
+import { t3ErrorsHeading, typecheckVerdict } from "./lib/typecheckFilter.ts";
 
 const cwd = path.resolve(import.meta.dirname, "..");
 const t3Root = path.resolve(cwd, "../../t3code");
@@ -21,7 +21,7 @@ const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
 const verdict = typecheckVerdict(result.status, output, cwd, t3Root);
 for (const diagnostic of verdict.ours) console.log(diagnostic.text);
 if (verdict.t3Errors.length > 0) {
-  console.log(`\n${verdict.t3Errors.length} error(s) in t3's own files, which only this program's configuration sees (fragility U10); not failing:`);
+  console.log(`\n${t3ErrorsHeading(verdict.t3Errors.length)}`);
   for (const diagnostic of verdict.t3Errors) console.log(diagnostic.text);
 }
 if (!verdict.ok) {

@@ -2,7 +2,7 @@
 // files that only this program's configuration sees.
 import { describe, expect, it } from "vitest";
 
-import { parseDiagnostics, typecheckVerdict } from "../scripts/lib/typecheckFilter.ts";
+import { parseDiagnostics, T3_ERRORS_COUNT, t3ErrorsHeading, typecheckVerdict } from "../scripts/lib/typecheckFilter.ts";
 
 const cwd = "/repo/apps/environment";
 const t3Root = "/repo/t3code";
@@ -16,7 +16,8 @@ const SUGGESTION = "src/connect/service.ts(62,54): suggestion TS377141: Add `{ r
 
 describe("the typecheck's verdict", () => {
   it("reads each diagnostic with the lines that continue it", () => {
-    const diagnostics = parseDiagnostics(`${SUGGESTION}\n${T3_ERROR}\n\n${OUR_ERROR}\n`);
+    const { diagnostics, unparsed } = parseDiagnostics(`${SUGGESTION}\n${T3_ERROR}\n\n${OUR_ERROR}\n`);
+    expect(unparsed).toEqual([]);
     expect(diagnostics.map((d) => [d.file, d.category])).toEqual([
       ["src/connect/service.ts", "suggestion"],
       ["../../t3code/apps/server/src/cloud/pinnedRuntime.ts", "error"],
@@ -40,6 +41,17 @@ describe("the typecheck's verdict", () => {
   it("fails when the compiler exits non-zero with no error to show for it", () => {
     expect(typecheckVerdict(1, "error: could not read tsconfig.json\n", cwd, t3Root)).toMatchObject({ ok: false, reason: expect.stringMatching(/exited 1/) });
     expect(typecheckVerdict(0, `${SUGGESTION}\n`, cwd, t3Root)).toMatchObject({ ok: true });
+  });
+
+  it("prints a heading over t3's errors that the bump reads their count back from", () => {
+    expect(T3_ERRORS_COUNT.exec(`ours\n\n${t3ErrorsHeading(3)}\n${T3_ERROR}`)?.[1]).toBe("3");
+    expect(T3_ERRORS_COUNT.exec(OUR_ERROR)).toBeNull();
+  });
+
+  it("fails beside a t3 error when the compiler printed anything else, or died by a signal", () => {
+    expect(typecheckVerdict(2, `${T3_ERROR}\nerror TS2688: Cannot find type definition file for 'node'.\n`, cwd, t3Root)).toMatchObject({ ok: false, reason: expect.stringMatching(/TS2688/) });
+    expect(typecheckVerdict(2, `${T3_ERROR}\npanic: runtime error: index out of range\ngoroutine 1 [running]:\n`, cwd, t3Root)).toMatchObject({ ok: false });
+    expect(typecheckVerdict(null, `${T3_ERROR}\n`, cwd, t3Root)).toMatchObject({ ok: false, reason: expect.stringMatching(/signal/) });
   });
 
   it("counts a file as t3's only inside the submodule", () => {
