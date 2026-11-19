@@ -407,6 +407,52 @@ describe("the check's header", () => {
 });
 
 describe("withVisualCheckPrelude", () => {
+  it.each([
+    "<html><head><title>x</title></head></html>",
+    "<HTML lang=en><HEAD data-x='1'>\n<title>x</title></HEAD></HTML>",
+    "<html><header>x</header></html>",
+    "<head <head>",
+    "<head \n",
+    "<html \n",
+    "<!doctype html><p>x",
+    "  <!DOCTYPE html>",
+    "<p>x</p>",
+  ])("puts a script where the regexes it replaces did, in %j", (html) => {
+    const reference = (page: string, script: string): string => {
+      const head = /<head(\s[^>]*)?>/i.exec(page);
+
+      if (head !== null) {
+        const at = head.index + head[0].length;
+
+        return `${page.slice(0, at)}${script}${page.slice(at)}`;
+      }
+
+      const root = /<html(\s[^>]*)?>/i.exec(page);
+
+      if (root !== null) {
+        const at = root.index + root[0].length;
+
+        return `${page.slice(0, at)}<head>${script}</head>${page.slice(at)}`;
+      }
+
+      const doctype = /^\s*<!doctype[^>]*>/i.exec(page);
+
+      return doctype === null
+        ? `${script}${page}`
+        : `${doctype[0]}${script}${page.slice(doctype[0].length)}`;
+    };
+
+    expect(withVisualShim(html)).toBe(reference(html, `<script>${VISUAL_SHIM}</script>`));
+  });
+
+  it("finds the head of a page of unclosed tags in linear time", () => {
+    const started = performance.now();
+
+    expect(withVisualCheckPrelude("<head ".repeat(50_000), "dark").startsWith("<script>")).toBe(true);
+    expect(withVisualCheckPrelude("<html ".repeat(50_000), "dark").startsWith("<script>")).toBe(true);
+    expect(performance.now() - started).toBeLessThan(400);
+  });
+
   it("puts the prelude first in the head, as the shim goes", () => {
     const page = withVisualCheckPrelude("<html><head><title>x</title></head></html>", "dark");
 

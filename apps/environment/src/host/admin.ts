@@ -48,6 +48,7 @@
 //                                                the Model endpoints' keys too (SPI-1167), the sign-ins' tokens by hash (SPI-1171)
 //   POST /_t3flare/check/sign-in-expire?id=<id>  SPI-1171 (stages only): a sign-in's access token marked expired, so its
 //                                                next use renews it
+import { adminFailureBody, logAdminFailure } from "./adminFailure.ts";
 import * as BootState from "./bootState.ts";
 import * as Idle from "./idle.ts";
 import * as ModuleState from "./moduleState.ts";
@@ -172,24 +173,6 @@ const sqlCheck = async (environment: EnvironmentDO, request: Request) => {
   const runtime = await environment.boot("check-sql", request);
   const { sqlChecks } = await import("./checks.ts");
   return runtime.run(sqlChecks);
-};
-
-/** The chain of `cause`s under an error, as text: t3's tagged errors wrap the SQL or schema error that matters. */
-const causesOf = (error: unknown): Array<string> => {
-  const out: Array<string> = [];
-  let current = (error as { cause?: unknown })?.cause;
-  for (let depth = 0; current !== undefined && current !== null && depth < 6; depth++) {
-    const message = (current as { message?: unknown }).message;
-    let text: string;
-    try {
-      text = typeof message === "string" ? message : (JSON.stringify(current) ?? "");
-    } catch {
-      text = "unprintable cause";
-    }
-    out.push(text.slice(0, 2000));
-    current = (current as { cause?: unknown }).cause;
-  }
-  return out;
 };
 
 export const handleAdmin = async (request: Request, environment: EnvironmentDO): Promise<Response> => {
@@ -550,6 +533,8 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
     }
   } catch (error) {
     if (error instanceof SafeModeError) return json({ error: error.message, safeMode: error.safeMode }, 503);
-    return json({ error: String(error), causes: causesOf(error), stack: (error as Error)?.stack?.split("\n").slice(0, 8) }, 500);
+    // The stack goes to Workers Logs, never into the answer.
+    logAdminFailure(route, error);
+    return json(adminFailureBody(error), 500);
   }
 };

@@ -74,6 +74,16 @@ describe("a resource's label and its refusal", () => {
     expect(resourceLabel({ name: "  ", uri: "file:///docs/a.md" })).toBe("a.md");
     expect(resourceLabel({ uri: "https://wiki.test/home/" })).toBe("home");
     expect(resourceLabel({ uri: "///" })).toBe("///");
+    expect(resourceLabel({ uri: "https://wiki.test/home/?#/" })).toBe("home");
+    expect(resourceLabel({ uri: "https://wiki.test/a?b#c" })).toBe("a?b#c");
+  });
+
+  it("reads a URI of a long run of separators in linear time", () => {
+    const started = performance.now();
+
+    expect(resourceLabel({ uri: `${"#".repeat(100_000)}a` })).toBe(`${"#".repeat(100_000)}a`);
+    expect(resourceLabel({ uri: `x:a${"/".repeat(100_000)}` })).toBe("a");
+    expect(performance.now() - started).toBeLessThan(400);
   });
 
   it("names the resource and its server, and cuts a long URI", () => {

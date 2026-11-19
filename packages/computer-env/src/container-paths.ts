@@ -25,6 +25,17 @@ export const withHarnessKept = (patterns: readonly string[]): readonly string[] 
   ...HARNESS_KEPT,
 ];
 
+/** `text` without the `/`s at its ends: a loop, where a regex would take quadratic time over a long run of them. */
+const trimSlashes = (text: string): string => {
+  let start = 0;
+  let end = text.length;
+
+  while (start < end && text[start] === "/") start++;
+  while (end > start && text[end - 1] === "/") end--;
+
+  return text.slice(start, end);
+};
+
 const escape = (text: string): string => text.replace(/[.+^${}()|[\]\\?]/g, "\\$&");
 
 /** A pattern, compiled: whether it takes paths back, and the test of a path relative to the mount root. */
@@ -34,7 +45,7 @@ type CompiledPattern = { readonly exclude: boolean; readonly test: RegExp };
 const compile = (raw: string): CompiledPattern => {
   const pattern = raw.trim();
   const exclude = pattern.startsWith("!");
-  const body = (exclude ? pattern.slice(1) : pattern).replace(/^\/+|\/+$/g, "");
+  const body = trimSlashes(exclude ? pattern.slice(1) : pattern);
   const segments = body === "" ? [] : body.split("/");
 
   let source = "";

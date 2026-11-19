@@ -33,7 +33,13 @@ import { parseArgs } from "node:util";
 import { GitHubApp, notInstalledOn } from "@t3flare/github-app/app";
 
 import { requiredSetting } from "../apps/environment/scripts/lib/deploymentSettings.ts";
-import { type GitHubAppManifest, githubAppManifest, withDevEnvValues } from "./src/github-app.ts";
+import {
+  type GitHubAppManifest,
+  githubAppManifest,
+  isManifestCode,
+  manifestConversionUrl,
+  withDevEnvValues,
+} from "./src/github-app.ts";
 
 /** The GitHub environments whose deploys bind the app's secrets. */
 const ENVIRONMENTS: ReadonlyArray<string> = ["bump"];
@@ -151,7 +157,8 @@ const register = async (): Promise<string> => {
       if (
         url.pathname !== "/registered" ||
         url.searchParams.get("state") !== state ||
-        given === null
+        given === null ||
+        !isManifestCode(given)
       ) {
         response.writeHead(404).end();
 
@@ -186,7 +193,7 @@ type Registered = {
 
 /** The app GitHub registered, its private key included, for the registration's `code`. */
 const convertManifest = async (code: string): Promise<Registered> => {
-  const response = await fetch(`https://api.github.com/app-manifests/${code}/conversions`, {
+  const response = await fetch(manifestConversionUrl(code), {
     method: "POST",
     headers: { accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" },
   });

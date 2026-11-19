@@ -104,12 +104,20 @@ export const AttachedResource = Schema.Struct({
 
 export type AttachedResource = typeof AttachedResource.Type;
 
+/** `uri` without the `/`, `?` and `#` it ends with: a loop, where `[/?#]+$` is quadratic in a long run of them. */
+const withoutTrailingSeparators = (uri: string): string => {
+  let end = uri.length;
+
+  while (end > 0 && "/?#".includes(uri.charAt(end - 1))) end--;
+
+  return uri.slice(0, end);
+};
+
 /** What a chip of an Attached resource is called: its name, else the last part of its URI, else the URI. */
 export const resourceLabel = (resource: Pick<AttachedResource, "name" | "uri">): string => {
   if (resource.name !== undefined && resource.name.trim() !== "") return resource.name;
 
-  const tail = resource.uri
-    .replace(/[/?#]+$/u, "")
+  const tail = withoutTrailingSeparators(resource.uri)
     .split(/[/:]/u)
     .pop();
 

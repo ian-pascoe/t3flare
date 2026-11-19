@@ -25,6 +25,22 @@ export const githubAppManifest = (options: {
 /** The manifest the setup posts to GitHub. */
 export type GitHubAppManifest = ReturnType<typeof githubAppManifest>;
 
+/** The shape of a registration's `code` as GitHub hands it out (hex today); anything else is refused. */
+const MANIFEST_CODE = /^[A-Za-z0-9_-]{1,128}$/;
+
+/** Whether `code`, from the browser's way back, is one GitHub could have handed out. */
+export const isManifestCode = (code: string): boolean => MANIFEST_CODE.test(code);
+
+/**
+ * The endpoint that hands over the app registered under `code`. The code arrives on the setup's local page from the
+ * browser, so it is checked and encoded before it goes into a URL path.
+ */
+export const manifestConversionUrl = (code: string): string => {
+  if (!MANIFEST_CODE.test(code)) throw new Error("GitHub's registration code is not one it hands out");
+
+  return `https://api.github.com/app-manifests/${encodeURIComponent(code)}/conversions`;
+};
+
 /** `value` as one single-quoted shell word, whatever it holds (line breaks included). */
 const shellWord = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`;
 

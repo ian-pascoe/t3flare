@@ -750,7 +750,12 @@ const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const DATE_TIME =
   /^(\d{4}-\d{2}-\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:[Zz]|[+-](\d{2}):(\d{2}))$/;
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/**
+ * `local@domain` with a `.` in the domain that neither starts nor ends it, no space and one `@`. The domain's first
+ * character is read alone and the rest up to its first `.` without one, so no two parts can take the same characters (a
+ * `[^\s@]+\.[^\s@]+` domain is quadratic in a run of `.`s).
+ */
+const EMAIL = /^[^\s@]+@[^\s@][^\s@.]*\.[^\s@]+$/;
 
 const isLeap = (year: number) => (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 

@@ -2,7 +2,7 @@
 // skill set's precedence.
 import { describe, expect, it } from "vitest";
 
-import { discoverSkills, type Skill } from "./discovery.ts";
+import { directoriesUp, discoverSkills, type Skill, withoutTrailingSlashes } from "./discovery.ts";
 import { memoryFiles, skillMd } from "./testing.ts";
 
 const ROOT = "/workspace/repo";
@@ -145,3 +145,18 @@ describe("the Environment skill set", () => {
   });
 });
 
+describe("the directories above a cwd", () => {
+  it("read a cwd's trailing slashes as none, and the root as /", () => {
+    expect(withoutTrailingSlashes("/workspace/repo///")).toBe("/workspace/repo");
+    expect(withoutTrailingSlashes("///")).toBe("/");
+    expect(withoutTrailingSlashes("")).toBe("/");
+    expect(directoriesUp("/workspace/repo/a/b//", "/workspace/repo")).toEqual(["/workspace/repo/a/b", "/workspace/repo/a", "/workspace/repo"]);
+  });
+
+  it("trim a cwd with a long run of slashes inside it in linear time", () => {
+    const started = performance.now();
+    expect(withoutTrailingSlashes(`/workspace/repo${"/".repeat(100_000)}a`)).toHaveLength(100_016);
+    expect(directoriesUp(`/workspace/repo${"/".repeat(100_000)}a/`, "/workspace/repo")).toEqual(["/workspace/repo/a", "/workspace/repo"]);
+    expect(performance.now() - started).toBeLessThan(400);
+  });
+});

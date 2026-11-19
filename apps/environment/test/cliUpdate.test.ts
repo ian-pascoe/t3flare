@@ -29,6 +29,21 @@ describe("the CLIs' latest versions (the card's advisory)", () => {
     expect(await lookupLatestCliVersion("claude", registry)).toBe("2.1.326");
   });
 
+  it("asks npm for each package with its scope's slash encoded", async () => {
+    const asked: Array<string> = [];
+    const recording = async (url: string) => {
+      asked.push(url);
+      return registry(url);
+    };
+    await lookupLatestCliVersion("pi", recording);
+    await lookupLatestCliVersion("claude", recording);
+    expect(asked).toEqual([
+      "https://registry.npmjs.org/@earendil-works%2Fpi-coding-agent/latest",
+      "https://registry.npmjs.org/@agentclientprotocol%2Fclaude-agent-acp/latest",
+      "https://registry.npmjs.org/@anthropic-ai%2Fclaude-agent-sdk/0.3.326",
+    ]);
+  });
+
   it("says nothing when npm does not answer", async () => {
     expect(await lookupLatestCliVersion("codex", npm({}))).toBeNull();
     expect(await lookupLatestCliVersion("claude", async () => Promise.reject(new Error("offline")))).toBeNull();

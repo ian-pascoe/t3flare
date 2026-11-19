@@ -6,7 +6,7 @@
 import { parse } from "yaml";
 
 import type { CommandSource } from "./cliRoots.ts";
-import { join, type SkillFiles } from "./discovery.ts";
+import { join, type SkillFiles, withoutTrailingSlashes } from "./discovery.ts";
 
 /** A Prompt template as discovery lists it; its body is read when a message uses it. */
 export interface PromptTemplate {
@@ -98,6 +98,13 @@ export const parseCommandArgs = (args: string): Array<string> => {
   return words;
 };
 
+/** `${N:-`, `${@:-` or `${ARGUMENTS:-` at the `$` it is tried at: a placeholder with a default, up to the next `}`. */
+const DEFAULT_START = /\$\{(\d+|ARGUMENTS|@):-/y;
+/** `${@:N}` or `${@:N:L}` at the `$` it is tried at. */
+const SLICE = /\$\{@:(\d+)(?::(\d+))?\}/y;
+/** `$N`, `$@` or `$ARGUMENTS` at the `$` it is tried at. */
+const SIMPLE = /\$(ARGUMENTS|@|\d+)/y;
+
 /**
  * `content` with its placeholders filled from `args`: `$1`… for one argument, `$@` and `$ARGUMENTS` for all,
  * `${N:-default}` (and `${@:-default}`, `${ARGUMENTS:-default}`) for a missing or empty one, `${@:N}` from the Nth on and
@@ -105,22 +112,56 @@ export const parseCommandArgs = (args: string): Array<string> => {
  */
 export const substituteArgs = (content: string, args: ReadonlyArray<string>): string => {
   const all = args.join(" ");
-  return content.replace(
-    /\$\{(\d+|ARGUMENTS|@):-([^}]*)\}|\$\{@:(\d+)(?::(\d+))?\}|\$(ARGUMENTS|@|\d+)/g,
-    (_match, defaultTarget: string | undefined, defaultValue: string | undefined, sliceStart: string | undefined, sliceLength: string | undefined, simple: string | undefined) => {
-      if (defaultTarget !== undefined) {
-        const value = defaultTarget === "@" || defaultTarget === "ARGUMENTS" ? all : args[Number.parseInt(defaultTarget, 10) - 1];
-        return value === undefined || value === "" ? (defaultValue ?? "") : value;
+  const argument = (n: string): string | undefined => args[Number.parseInt(n, 10) - 1];
+  // A scan from each `$`, as `replace` with one regex of the three forms would match, but in linear time: that regex's
+  // `${N:-[^}]*}` read to the end of the template from every `${N:-` when no `}` follows, quadratic in a run of them.
+  let out = "";
+  let copied = 0;
+  // The first `}` at or after the last default's start; -1 once none is left.
+  let close = content.indexOf("}");
+  let at = content.indexOf("$");
+  while (at !== -1) {
+    let replacement: string | undefined;
+    let end = at;
+    DEFAULT_START.lastIndex = at;
+    const withDefault = DEFAULT_START.exec(content);
+    if (withDefault !== null && close !== -1) {
+      const valueStart = DEFAULT_START.lastIndex;
+      if (close < valueStart) close = content.indexOf("}", valueStart);
+      if (close !== -1) {
+        const target = withDefault[1] ?? "";
+        const value = target === "@" || target === "ARGUMENTS" ? all : argument(target);
+        replacement = value === undefined || value === "" ? content.slice(valueStart, close) : value;
+        end = close + 1;
       }
-      if (sliceStart !== undefined) {
+    }
+    if (replacement === undefined) {
+      SLICE.lastIndex = at;
+      const slice = SLICE.exec(content);
+      if (slice !== null) {
         // `${@:0}` is `${@:1}`, as in bash, where the arguments start at 1.
-        const start = Math.max(Number.parseInt(sliceStart, 10) - 1, 0);
-        return (sliceLength === undefined ? args.slice(start) : args.slice(start, start + Number.parseInt(sliceLength, 10))).join(" ");
+        const start = Math.max(Number.parseInt(slice[1] ?? "0", 10) - 1, 0);
+        replacement = (slice[2] === undefined ? args.slice(start) : args.slice(start, start + Number.parseInt(slice[2], 10))).join(" ");
+        end = SLICE.lastIndex;
       }
-      if (simple === "ARGUMENTS" || simple === "@") return all;
-      return args[Number.parseInt(simple ?? "0", 10) - 1] ?? "";
-    },
-  );
+    }
+    if (replacement === undefined) {
+      SIMPLE.lastIndex = at;
+      const simple = SIMPLE.exec(content)?.[1];
+      if (simple !== undefined) {
+        replacement = simple === "ARGUMENTS" || simple === "@" ? all : (argument(simple) ?? "");
+        end = SIMPLE.lastIndex;
+      }
+    }
+    if (replacement === undefined) {
+      at = content.indexOf("$", at + 1);
+      continue;
+    }
+    out += content.slice(copied, at) + replacement;
+    copied = end;
+    at = content.indexOf("$", end);
+  }
+  return out + content.slice(copied);
 };
 
 /** The template whose Slash command `text` starts with, and the arguments after its name; undefined for other text. */
@@ -151,7 +192,7 @@ const PI_PROMPTS: ReadonlyArray<CommandSource> = [{ directory: PROMPTS_DIRECTORY
  * over `MAX_TEMPLATE_BYTES`.
  */
 export const discoverPrompts = async (files: SkillFiles, cwd: string, sources: ReadonlyArray<CommandSource> = PI_PROMPTS): Promise<ReadonlyArray<PromptTemplate>> => {
-  const base = cwd.replace(/\/+$/, "") || "/";
+  const base = withoutTrailingSlashes(cwd);
   const listed = await Promise.all(
     sources.map(async (source) => {
       const root = join(base, source.directory);

@@ -560,23 +560,35 @@ export const VISUAL_SHIM = `(function () {
   });
 })();`;
 
+/** The start of a `<head>` or `<head …>` tag, up to the character after its name. */
+const HEAD_START = /<head[\s>]/i;
+
+/** The start of an `<html>` or `<html …>` tag, up to the character after its name. */
+const HTML_START = /<html[\s>]/i;
+
+/**
+ * Where the first tag `start` finds ends (after its `>`), or undefined when it has none: what `/<head(\s[^>]*)?>/i` matches,
+ * found in linear time (that regex reads on to the end from every `<head ` when no `>` follows).
+ */
+const tagEnd = (html: string, start: RegExp): number | undefined => {
+  const tag = start.exec(html);
+
+  if (tag === null) return undefined;
+
+  const close = html.indexOf(">", tag.index + tag[0].length - 1);
+
+  return close === -1 ? undefined : close + 1;
+};
+
 /** `html` with `script` first in its `<head>` (or right after `<html>`, or first of all), so it runs before the page's scripts. */
 const withScriptFirst = (html: string, script: string): string => {
-  const head = /<head(\s[^>]*)?>/i.exec(html);
+  const head = tagEnd(html, HEAD_START);
 
-  if (head !== null) {
-    const at = head.index + head[0].length;
+  if (head !== undefined) return `${html.slice(0, head)}${script}${html.slice(head)}`;
 
-    return `${html.slice(0, at)}${script}${html.slice(at)}`;
-  }
+  const root = tagEnd(html, HTML_START);
 
-  const root = /<html(\s[^>]*)?>/i.exec(html);
-
-  if (root !== null) {
-    const at = root.index + root[0].length;
-
-    return `${html.slice(0, at)}<head>${script}</head>${html.slice(at)}`;
-  }
+  if (root !== undefined) return `${html.slice(0, root)}<head>${script}</head>${html.slice(root)}`;
 
   const doctype = /^\s*<!doctype[^>]*>/i.exec(html);
 

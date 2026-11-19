@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { withDevEnvValues } from "./github-app.ts";
+import { isManifestCode, manifestConversionUrl, withDevEnvValues } from "./github-app.ts";
 
 /** What `set -a; . file` gives bash for `name`, as a deploy from a workstation loads dev.env. */
 const sourced = (text: string, name: string): string => {
@@ -51,5 +51,20 @@ describe("the dev.env the setup writes the app's secrets into", () => {
     expect(after).toBe(
       "A=1\n# a note\nCLOUDPID_GITHUB_APP_ID='2'\nCLOUDPID_GITHUB_APP_PRIVATE_KEY='new key'\nB=2\n",
     );
+  });
+});
+
+describe("the registration's code the setup exchanges for the app", () => {
+  it("goes into the conversion URL as it is when GitHub could have handed it out", () => {
+    expect(manifestConversionUrl("a180b1a3d263c81bc6441d7b990bae27d4c10679")).toBe(
+      "https://api.github.com/app-manifests/a180b1a3d263c81bc6441d7b990bae27d4c10679/conversions",
+    );
+  });
+
+  it("is refused when it could reach another path or host", () => {
+    for (const code of ["", "../../user", "a/b", "a?b", "a#b", "a%2Fb", "@evil.example", "a b", "x".repeat(129)]) {
+      expect(isManifestCode(code)).toBe(false);
+      expect(() => manifestConversionUrl(code)).toThrow(/not one it hands out/);
+    }
   });
 });

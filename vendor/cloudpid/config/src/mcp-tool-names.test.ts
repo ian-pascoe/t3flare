@@ -41,6 +41,14 @@ describe("mcpToolPart", () => {
       expect(mcpToolPart(mcpToolPart(tool))).toBe(mcpToolPart(tool));
     }
   });
+
+  it("trims long runs at the ends, in linear time", () => {
+    const started = performance.now();
+
+    expect(mcpToolPart(`${"_".repeat(100_000)}a${"-".repeat(100_000)}`)).toBe("a");
+    expect(mcpToolPart(`a${"_".repeat(100_000)}b`)).toBe("a_b");
+    expect(performance.now() - started).toBeLessThan(400);
+  });
 });
 
 describe("mcpToolName", () => {
@@ -220,6 +228,26 @@ describe("mcpToolNameFromPi", () => {
     expect(mcpToolNameFromPi("mcp__a__b__getUser", ["a__b"])).toBe("mcp__a__b__get_user");
     expect(mcpToolNameFromPi("mcp__a__b__getUser", ["a", "a__b"])).toBe("mcp__a__b__get_user");
     expect(mcpToolNameFromPi("mcp__a__b__getUser", ["a"])).toBe("mcp__a__b_get_user");
+  });
+
+  it.each(["mcp__a__", "mcp___x", "mcp__a__b\nc", "mcp__a\r__b", "mcp__a__b\u2028"])(
+    "leaves %j as it is, as the regex it replaces did",
+    (name) => {
+      expect(mcpToolNameFromPi(name)).toBe(name);
+    },
+  );
+
+  it("splits at the first `__` after the server's first character", () => {
+    expect(mcpToolNameFromPi("mcp_____x")).toBe(mcpToolName("_", "_x"));
+    expect(mcpToolNameFromPi("mcp__a___b")).toBe(mcpToolName("a", "_b"));
+  });
+
+  it("reads a name of many `__` in linear time", () => {
+    const started = performance.now();
+
+    mcpToolNameFromPi(`mcp__a__${"a__a".repeat(100_000)}\n`);
+    mcpToolNameFromPi(`mcp__a__${"a__a".repeat(100_000)}`);
+    expect(performance.now() - started).toBeLessThan(1_000);
   });
 
   it("reads a configured name as pi spells it", () => {

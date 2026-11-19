@@ -9,11 +9,22 @@
 /** How deep a cause chain is followed: computer nests two or three levels; a cycle must not loop forever. */
 const MAX_CAUSE_DEPTH = 10;
 
+/** What the budget's refusal starts with. */
+const REFUSED = "the Container cannot start: ";
+
 /**
- * The reason after the budget's own prefix. It ends at a `"` because computer quotes an inner message inside its own
- * (`priorExit="…"`, JSON-quoted causes), and at the end of the text otherwise.
+ * The reason after the budget's own prefix, at least one character. It ends at a `"` because computer quotes an inner
+ * message inside its own (`priorExit="…"`, JSON-quoted causes), and at the end of the text otherwise. Scanned by hand: a
+ * lazy regex for it is quadratic over a run of prefixes.
  */
-const REFUSED = /the Container cannot start: (.+?)(?:"|$)/s;
+const refusalIn = (text: string): string | undefined => {
+  const at = text.indexOf(REFUSED);
+  if (at === -1) return undefined;
+  const start = at + REFUSED.length;
+  if (start >= text.length) return undefined;
+  const end = text.indexOf('"', start + 1);
+  return text.slice(start, end === -1 ? text.length : end);
+};
 
 /** The whole reason a start was refused for, from the deepest error in `error`'s cause chain that carries it. */
 export const startRefusal = (error: unknown): string | undefined => {
@@ -21,7 +32,7 @@ export const startRefusal = (error: unknown): string | undefined => {
   let current: unknown = error;
   for (let depth = 0; depth < MAX_CAUSE_DEPTH && current !== undefined && current !== null; depth++) {
     const text = current instanceof Error ? current.message : typeof current === "string" ? current : "";
-    const reason = REFUSED.exec(text)?.[1];
+    const reason = refusalIn(text);
     if (reason !== undefined) found = reason;
     current = current instanceof Error ? current.cause : undefined;
   }

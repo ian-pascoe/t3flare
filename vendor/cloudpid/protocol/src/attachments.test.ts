@@ -35,6 +35,15 @@ describe("sanitizeAttachmentName", () => {
     expect(sanitizeAttachmentName("///")).toBe("attachment");
   });
 
+  it("drops the dashes next to a dot, and reads a long run of them in linear time", () => {
+    const started = performance.now();
+
+    expect(sanitizeAttachmentName("a -- .b.-- c")).toBe("a.b.c");
+    expect(sanitizeAttachmentName(`${"-".repeat(100_000)}a`)).toBe("a");
+    expect(sanitizeAttachmentName(`a${"- ".repeat(100_000)}.txt`)).toBe("a.txt");
+    expect(performance.now() - started).toBeLessThan(400);
+  });
+
   it("cuts a long name to the limit, keeping its extension", () => {
     const long = `${"a".repeat(300)}.tar.gz`;
     const name = sanitizeAttachmentName(long);
