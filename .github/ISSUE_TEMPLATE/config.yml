@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question
+    url: https://github.com/spiritledsoftware/t3flare/discussions/categories/q-a
+    about: Ask about deploying or using t3flare in Discussions, Q&A.
+  - name: Security vulnerability
+    url: https://github.com/spiritledsoftware/t3flare/security/advisories/new
+    about: Report a vulnerability privately. Never in a public issue.
+  - name: Stock T3 Code clients or t3code
+    url: https://github.com/pingdotgg/t3code/issues
+    about: Bugs in unmodified t3code or the stock clients belong upstream.

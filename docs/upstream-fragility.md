@@ -1681,7 +1681,7 @@ Moved from U58 when its Commissary readers went (SPI-1176).
 
 ## Gaps in detection
 
-Checks worth adding, each closing a silent or late path above. Each has a ticket in Linear (team SPI, project ian-pascoe/t3flare).
+Checks worth adding, each closing a silent or late path above. Each has a ticket in Linear (team SPI, project t3flare).
 
 | # | Check | Covers | Ticket |
 | --- | --- | --- | --- |

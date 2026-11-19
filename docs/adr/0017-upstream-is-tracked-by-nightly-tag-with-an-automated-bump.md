@@ -44,3 +44,16 @@ nothing had changed. Four rules now keep those from failing it, or from failing 
   newest nightly on the current commit of main, and both failed the move, the lock check or `pnpm run check`, the plan
   skips. The install and every later step can fail by chance, so those are retried. A commit on main, a newer nightly
   or a run by hand tries again.
+
+## Refinement (ADR-0038, 2026-11-19): the scheduled bump is per Deployment repository
+
+"The owner" above is the Owner of the Maintainer's Deployment; the bump belongs to a Deployment repository, not to
+t3flare as a whole ([ADR-0038](0038-a-deployment-is-configured-outside-the-source-tree.md)).
+
+- **Each Deployment repository runs its own bump, or none.** The hourly bump proposes pins to the `main` of the
+  repository it runs in, with that repository's `bump` environment and its own fixture repository
+  (`T3FLARE_FIXTURE_REPO`, a Deployment setting with no default). GitHub starts a public fork with its scheduled
+  workflows off, so an Owner's fork bumps only once they turn it on.
+- **A bump that lands makes the fork diverge.** Its pin commits are its own, so its `main` stops fast-forwarding from
+  the Canonical repository's. An Owner who follows the Canonical repository's `main` leaves the bump off, pulls `main`
+  and deploys (`docs/deploy.md`, Updating).

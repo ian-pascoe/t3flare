@@ -76,3 +76,13 @@ no managed OAuth, so t3's root well-known documents are untouched, and prod keep
 [ADR-0036](0036-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md)
 records the layout, the conditions it rests on (owner step 1 passed; Cursor's redirect, step 2, is open), and when it moves to a host of
 its own.
+
+## Refinement (ADR-0038, 2026-11-19): the Owner's email and the Access team are Deployment settings
+
+The admin application's Allow policy names the Owner's email, `T3FLARE_OWNER_EMAIL`, and the Worker checks assertions
+against the keys of the Access team, `T3FLARE_ACCESS_TEAM_DOMAIN`. Both are Deployment settings with no default
+([ADR-0038](0038-a-deployment-is-configured-outside-the-source-tree.md)): a deploy without them stops before anything is
+built. Until now they defaulted to the Maintainer's values, which another Owner who forgot to set them would have
+deployed into their own Access policy. `prod`'s custom domain (`T3FLARE_DOMAIN`) and its zone (`T3FLARE_DOMAIN_ZONE_ID`)
+are Deployment settings too, so the domain and zone named above are the Maintainer's Deployment's. `prod` still needs a
+domain in a zone, for the rate limit.

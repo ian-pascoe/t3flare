@@ -1,5 +1,7 @@
 # Triage Labels
 
+**Contributors** (no Linear access, `docs/agents/issue-tracker.md`): triage is the Maintainer's. Apply no labels; suggest a triage role in a comment on the GitHub issue, and stop here.
+
 The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in this repo's issue tracker: labels of the Linear team **SPI** (`docs/agents/issue-tracker.md`), with the ids Executor's Linear tools take (`labelId`, `labelIds`). The `linear` CLI takes the names.
 
 | Label in mattpocock/skills | Label in our tracker | Linear label id                        | Meaning                                  |
