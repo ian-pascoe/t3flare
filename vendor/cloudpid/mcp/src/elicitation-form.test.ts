@@ -475,6 +475,32 @@ describe("the validator", () => {
     });
   });
 
+  it.each([
+    ["a@b.c", true],
+    ["a.b@c.d.e", true],
+    ["a@.b.c", true],
+    ["a@b..c", true],
+    ["a@b.", false],
+    ["a@.b", false],
+    ["a@b", false],
+    ["@b.c", false],
+    ["a@b@c.d", false],
+    ["a b@c.d", false],
+    ["a@b.c d", false],
+  ])("reads %s as an email address: %s", (mail, ok) => {
+    const result = check({ name: "Ada", mail });
+
+    expect(Result.isSuccess(result)).toBe(ok);
+  });
+
+  it("checks an email address of a long run of dots in linear time", () => {
+    const started = performance.now();
+    const result = check({ name: "Ada", mail: `!@!.${"!.".repeat(8_000)} ` });
+
+    expect(Result.isFailure(result) && result.failure["mail"]).toBe("must be an email address");
+    expect(performance.now() - started).toBeLessThan(100);
+  });
+
   it("checks lengths, counts and whole numbers", () => {
     const result = check({ name: "A", n: 1.5, tags: ["a", "b", "c"] });
 
