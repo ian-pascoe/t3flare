@@ -1,6 +1,6 @@
 # Pi harness parity (the owner's pi setup vs the Durable agent)
 
-The second checklist beside [`parity.md`](parity.md): what the owner's local pi harness offers, and whether t3flare's Durable agent (pi-durable in `apps/agents/src/session/SessionDO.ts`) has it. First audit 2026-11-12, against the owner's `~/.pi/agent` (core pi, npm packages, `ian-pascoe/pi-extensions`, cloudpid, local extensions, `mcp.json`). Update rows as ports land; each gap has a Linear ticket (project ian-pascoe/t3flare).
+The second checklist beside [`parity.md`](parity.md): what the owner's local pi harness offers, and whether t3flare's Durable agent (pi-durable in `apps/agents/src/session/SessionDO.ts`) has it. First audit 2026-11-12, against the owner's `~/.pi/agent` (core pi, npm packages, `ian-pascoe/pi-extensions`, cloudpid, local extensions, `mcp.json`). Update rows as ports land; each gap has a Linear ticket (project t3flare).
 
 The CLI agents (Codex, Pi CLI, Claude Code, OpenCode) run with clean, managed profiles (steps 4a, 4b), so none of the owner's extensions load there either; this checklist is about the Durable agent.
 
