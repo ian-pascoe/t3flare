@@ -24,7 +24,7 @@ jobs:
   project:
     name: project
     # Forks have neither the secret nor the Linear project.
-    if: github.repository == 'ian-pascoe/t3flare'
+    if: github.repository == 'spiritledsoftware/t3flare'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
