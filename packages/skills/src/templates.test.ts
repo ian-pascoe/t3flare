@@ -28,6 +28,49 @@ describe("pi's argument substitution", () => {
   it("does not substitute inside an argument", () => {
     expect(substituteArgs("$1 $2", ["$2", "x"])).toBe("$2 x");
   });
+
+  it("leaves a default without its } and what follows it as written, and does not substitute inside a default", () => {
+    expect(substituteArgs("${1:-x $2", ["", "b"])).toBe("${1:-x b");
+    expect(substituteArgs("${1:-$2} $2", [])).toBe("$2 ");
+    expect(substituteArgs("${1:-a}${2:-b}}", [])).toBe("ab}");
+    expect(substituteArgs("$$1 ${x} $ ${@:-} ${@:0}", ["a"])).toBe("$a ${x} $ a a");
+  });
+
+  it("matches the single regex it replaces on every mix of its pieces", () => {
+    const reference = (content: string, args: ReadonlyArray<string>) => {
+      const all = args.join(" ");
+      return content.replace(
+        /\$\{(\d+|ARGUMENTS|@):-([^}]*)\}|\$\{@:(\d+)(?::(\d+))?\}|\$(ARGUMENTS|@|\d+)/g,
+        (_match, target: string | undefined, fallback: string | undefined, sliceStart: string | undefined, sliceLength: string | undefined, simple: string | undefined) => {
+          if (target !== undefined) {
+            const value = target === "@" || target === "ARGUMENTS" ? all : args[Number.parseInt(target, 10) - 1];
+            return value === undefined || value === "" ? (fallback ?? "") : value;
+          }
+          if (sliceStart !== undefined) {
+            const start = Math.max(Number.parseInt(sliceStart, 10) - 1, 0);
+            return (sliceLength === undefined ? args.slice(start) : args.slice(start, start + Number.parseInt(sliceLength, 10))).join(" ");
+          }
+          if (simple === "ARGUMENTS" || simple === "@") return all;
+          return args[Number.parseInt(simple ?? "0", 10) - 1] ?? "";
+        },
+      );
+    };
+    const pieces = ["$", "{", "}", ":", "-", "@", "1", "2", "0", "ARGUMENTS", "x", " "];
+    let seed = 7;
+    const next = () => (seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648);
+    for (let run = 0; run < 5000; run++) {
+      const content = Array.from({ length: next() % 24 }, () => pieces[next() % pieces.length]).join("");
+      const args = [["a", "", "c d"], [], ["", ""]][run % 3]!;
+      expect(substituteArgs(content, args), content).toBe(reference(content, args));
+    }
+  });
+
+  it("fills a template of unclosed defaults in linear time", () => {
+    const started = performance.now();
+    const content = "${@:-".repeat(40_000);
+    expect(substituteArgs(content, ["a"])).toBe(content);
+    expect(performance.now() - started).toBeLessThan(400);
+  });
 });
 
 describe("argument quoting", () => {

@@ -74,6 +74,13 @@ const MAX_LINKED_ENTRIES = 200;
 
 export const join = (directory: string, path: string): string => (directory === "/" ? `/${path}` : `${directory}/${path}`);
 
+/** `path` without its trailing `/`s, `/` for the root: a loop, where a regex would take quadratic time over a run of them. */
+export const withoutTrailingSlashes = (path: string): string => {
+  let end = path.length;
+  while (end > 0 && path[end - 1] === "/") end--;
+  return path.slice(0, end) || "/";
+};
+
 /** `text`'s YAML frontmatter, as pi's `parseFrontmatter` finds it, or undefined. */
 const frontmatterOf = (text: string): string | undefined => {
   const normalized = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
@@ -120,7 +127,7 @@ export const parseSkill = (filePath: string, text: string): Skill | { readonly r
 
 /** The directories whose skill roots count for `cwd`: it and those above it up to `root`, nearest first. */
 export const directoriesUp = (cwd: string, root: string): ReadonlyArray<string> => {
-  const directory = cwd.replace(/\/+$/, "") || "/";
+  const directory = withoutTrailingSlashes(cwd);
   if (directory !== root && !directory.startsWith(`${root}/`)) return [root];
   const below = directory.slice(root.length).split("/").filter(Boolean);
   return [...below.map((_, depth) => `${root}/${below.slice(0, below.length - depth).join("/")}`), root];
