@@ -20,6 +20,10 @@ name: Land
 # Idempotent (review F2): when main already holds the pin (or a newer one), there is nothing to push, and the run only
 # deploys main's tip. A press after a land whose deploy failed recovers that way, with or without its branch.
 #
+# The callers pass T3FLARE_LAND_DEPLOY_KEY by name (`secrets:` on their `land` job): a reusable workflow's environment
+# secret resolves to an empty string unless its caller passes it, and the passed name still resolves to the `land`
+# environment's value only in the job that enters that environment.
+#
 # Called by bump.yml and cli-bump.yml on a fresh runner that ran no upstream code and holds no stage secrets, with the
 # pin as one validated string (`t3:<tag>`, `cli:<cli>:<version>`). They never call it on a dry run. By hand, `dry_run`
 # runs the `check` job only: the binding to the proof and the land check, then nothing (no push, no deploy, no branch
@@ -32,6 +36,8 @@ on:
       pin: { type: string, required: true }
       sha: { type: string, required: false, default: "" }
       dry_run: { type: boolean, required: false, default: false }
+    secrets:
+      T3FLARE_LAND_DEPLOY_KEY: { required: true }
   workflow_dispatch:
     inputs:
       pin:

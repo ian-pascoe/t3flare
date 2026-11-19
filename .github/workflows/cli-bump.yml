@@ -177,3 +177,6 @@ jobs:
       pin: ${{ needs.publish.outputs.pin }}
       sha: ${{ needs.publish.outputs.sha }}
       dry_run: ${{ inputs.dry_run == true }}
+    # Pass the land environment's deploy key by name; land.yml's `land` job alone resolves it (land.yml header).
+    secrets:
+      T3FLARE_LAND_DEPLOY_KEY: ${{ secrets.T3FLARE_LAND_DEPLOY_KEY }}
