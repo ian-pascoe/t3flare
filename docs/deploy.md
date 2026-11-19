@@ -120,6 +120,7 @@ When `prod` is deployed by CI with `T3FLARE_UPDATE_REPO` set to the Deployment r
 buttons work too: a press dispatches that repository's bump workflow, which proves the new pin on the `bump` Stage and
 lands it on `main`, and the push deploys `prod`
 ([ADR-0037](adr/0037-stock-clients-update-buttons-land-a-bump-the-do-dispatches-ci-which-proves-and-fast-forwards-main.md)).
-The GitHub App must be installed on that repository. Without an update target, a press answers: "This Environment has
+The GitHub App must be installed on that repository. Only `prod` takes an update target: a deploy of any other Stage
+with `T3FLARE_UPDATE_REPO` set is refused, since a press there would land on `main` and deploy `prod`. Without an update target, a press answers: "This Environment has
 no update target. Update it by deploying: pull the Canonical repository's main and deploy this Stage again
 (docs/deploy.md, Updating)."

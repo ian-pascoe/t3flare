@@ -65,6 +65,8 @@ export const deployPlan = (input: {
   // domain). An environment that carries prod's T3FLARE_DOMAIN (a sourced dev.env) is refused, not stripped.
   const domain = env.T3FLARE_DOMAIN ?? "";
   if (stage !== "prod" && domain !== "") return { ok: false, error: `t3flare: T3FLARE_DOMAIN is set (to ${domain}) for the stage ${stage}: only prod has a custom domain; unset it (was dev.env sourced into the shell?)` };
+  // A press on a stage with an update target lands a bump on the Deployment repository's main, which deploys prod.
+  if (stage !== "prod" && (env.T3FLARE_UPDATE_REPO ?? "") !== "") return { ok: false, error: `t3flare: T3FLARE_UPDATE_REPO is set for the stage ${stage}: only prod has an update target (a press would land on main and deploy prod); unset it` };
   if (args.includes("--no-model-proxy")) return { ok: false, error: "t3flare: --no-model-proxy is gone: there is no Model proxy; deploy without it" };
   const deployEnv = Object.fromEntries(Object.entries(read).filter(([name]) => name !== MODEL_ENDPOINT_VAR));
   const missing = DEPLOY_SECRETS.filter((name) => deployEnv[name] === undefined);

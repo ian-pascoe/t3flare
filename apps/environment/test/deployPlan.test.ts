@@ -81,8 +81,12 @@ describe("the Deployment settings (docs/deploy.md)", () => {
     expect(deployPlan({ stage: "p1176", args: [], read: { ...REQUIRED }, env: laptop })).toMatchObject({ ok: true, alchemyEnv: REQUIRED });
   });
 
-  it("takes an update target on any stage, unset or well-formed", () => {
+  it("takes an update target on prod alone, unset or well-formed", () => {
     expect(deployPlan({ stage: "prod", args: [], read: { ...REQUIRED }, env: { ...ci, T3FLARE_UPDATE_REPO: "someone/t3flare" } })).toMatchObject({ ok: true });
+    expect(deployPlan({ stage: "p1176", args: [], read: { ...REQUIRED }, env: { ...laptop, T3FLARE_UPDATE_REPO: "someone/t3flare" } })).toMatchObject({
+      ok: false,
+      error: expect.stringMatching(/^t3flare: T3FLARE_UPDATE_REPO is set for the stage p1176: only prod has an update target/),
+    });
     expect(deployPlan({ stage: "p1176", args: [], read: { ...REQUIRED }, env: { ...laptop, T3FLARE_UPDATE_REPO: "" } })).toMatchObject({ ok: true });
     expect(deployPlan({ stage: "prod", args: [], read: { ...REQUIRED }, env: { ...ci, T3FLARE_UPDATE_REPO: "t3flare" } })).toEqual({ ok: false, error: malformedSettingMessage("T3FLARE_UPDATE_REPO") });
   });

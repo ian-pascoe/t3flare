@@ -129,9 +129,12 @@ export default Alchemy.Stack(
     const teamDomain = yield* required("T3FLARE_ACCESS_TEAM_DOMAIN");
     const ownerEmail = yield* required("T3FLARE_OWNER_EMAIL");
     // In-app Updates (ADR-0037, plan D14): the repository whose CI an Update dispatches (the Deployment repository), on
-    // whichever stage it is set for; unset, the Environment has no update target. A press lands a bump on that
-    // repository's main, which deploys its prod, so only prod's deploy sets it (deploy-prod.yml).
+    // prod; unset, the Environment has no update target. A press lands a bump on that repository's main, which deploys
+    // its prod, so another stage given one is refused (stage.ts refuses it first, scripts/lib/deployPlan.ts).
     const updateRepo = yield* optional("T3FLARE_UPDATE_REPO");
+    if (stage !== "prod" && updateRepo !== undefined) {
+      return yield* Effect.die(new Error(`T3FLARE_UPDATE_REPO is set for the stage ${stage}: only prod has an update target`));
+    }
     // A shorter idle delay for test stages (ADR-0003's default is 60 s).
     const idleAfterMs = yield* Config.String("T3FLARE_IDLE_AFTER_MS").pipe(Config.withDefault(""));
     // Prod's sweep purges only when the owner sets it (the `prod` GitHub environment variable, SPI-974).
