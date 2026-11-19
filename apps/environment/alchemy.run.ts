@@ -333,7 +333,7 @@ export default Alchemy.Stack(
         ...(stage === "prod" ? {} : { T3FLARE_FAULTS: "1" }),
         // In-app Updates (ADR-0037, plan D14): only prod has an update target. A press on any other stage would land a
         // bump on main, which deploys prod.
-        ...(stage === "prod" ? { T3FLARE_UPDATE_REPO: "ian-pascoe/t3flare" } : {}),
+        ...(stage === "prod" ? { T3FLARE_UPDATE_REPO: "spiritledsoftware/t3flare" } : {}),
         ...(sweepGraceMs === "" ? {} : { T3FLARE_SWEEP_GRACE_MS: sweepGraceMs }),
       },
       assets: {
