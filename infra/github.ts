@@ -131,8 +131,14 @@ export default Alchemy.Stack(
     yield* GitHub.Variable("WorkersDevSubdomain", { ...repo, name: "T3FLARE_WORKERS_DEV_SUBDOMAIN", value: settings.value.T3FLARE_WORKERS_DEV_SUBDOMAIN });
     yield* GitHub.Secret("OwnerEmail", { ...repo, name: "T3FLARE_OWNER_EMAIL", value: Redacted.make(settings.value.T3FLARE_OWNER_EMAIL) });
 
-    // Retained on destroy: deleting a GitHub environment also deletes whatever was set on it by hand.
-    const bump = yield* GitHub.Environment("Bump", { ...repo, name: "bump" }).pipe(
+    // Retained on destroy: deleting a GitHub environment also deletes whatever was set on it by hand. Deployable from
+    // `main` only, like `prod`: bump.yml and cli-bump.yml run from `main`, and a run sends the whole policy, so one left
+    // out here would clear the policy set on the environment.
+    const bump = yield* GitHub.Environment("Bump", {
+      ...repo,
+      name: "bump",
+      deploymentBranchPolicy: { customBranchPolicies: ["main"] },
+    }).pipe(
       Alchemy.RemovalPolicy.retain(),
     );
 
