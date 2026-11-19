@@ -90,6 +90,11 @@ describe("htmlToMarkdown", () => {
     ).toBe("![pic \\[1\\]](a%20b.png)");
   });
 
+  it("escapes a backslash in an image's alt text, so it cannot escape the closing bracket", () => {
+    expect(htmlToMarkdown('<img src="a.png" alt="C:\\dir\\">')).toBe("![C:\\\\dir\\\\](a.png)");
+    expect(htmlToMarkdown('<img src="a.png" alt="x\\]">')).toBe("![x\\\\\\]](a.png)");
+  });
+
   it("renders a rule, a hard break, and a table as one line per row", () => {
     expect(
       htmlToMarkdown(

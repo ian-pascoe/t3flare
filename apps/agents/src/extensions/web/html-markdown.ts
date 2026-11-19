@@ -363,7 +363,7 @@ export const htmlToMarkdown = (html: string): string => {
         const source = attributes.src ?? "";
 
         if (source !== "" && !source.startsWith("data:")) {
-          const alt = (attributes.alt ?? "").replace(/\s+/g, " ").trim().replace(/[[\]]/g, "\\$&");
+          const alt = (attributes.alt ?? "").replace(/\s+/g, " ").trim().replace(/[\\[\]]/g, "\\$&");
 
           put(`${pendingSpace ? " " : ""}![${alt}](${destination(source)})`);
           pendingSpace = false;
