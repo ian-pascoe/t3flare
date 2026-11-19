@@ -343,7 +343,7 @@ Fixed by ADR-0030: `scripts/bump.ts` runs the whole `pnpm run check`, as prod's 
 
 - **Where**: Codex's `-c` keys (`cliProfiles.ts` `codexOverrides`: the provider's `auth` command, `allow_login_shell`, the `features.*` that reach github.com and chatgpt.com, `shell_environment_policy.*`), pi's `models.json`/`settings.json` shape and its `PI_*` variables (`PI_CODING_AGENT_SESSION_DIR`, `PI_OFFLINE`).
 - **Breaks when**: a CLI bump renames a key (Codex 0.167.2 already refuses a process-level `approval_policy="untrusted"`) or adds a default network call. These move with `clis.ts`, not with t3.
-- **Detection**: `test:docker` (in the bump job) fails on a tunnel to any host at all for pi (`piRelay.docker.test.ts`), on an internal network whose only way out is a CONNECT logger; it covers the settings we pass, not a new call a CLI makes only in a feature we never use. Codex has no Docker run: its egress is checked only by `acceptance --codex` on the bump stage. Re-run M0's local probes (`docs/steps/step-4a/probes`: `p10b.sh`, `p8.sh`) on a CLI bump for what it does not cover; `acceptance --codex --pi` for the rest.
+- **Detection**: `test:docker` (in the bump job) fails on a tunnel to any host at all for pi (`piRelay.docker.test.ts`), on an internal network whose only way out is a CONNECT logger; it covers the settings we pass, not a new call a CLI makes only in a feature we never use. Codex has no Docker run: its egress is checked only by `acceptance --codex` on the bump stage. Re-run M0's local probes (`apps/environment/scripts/probes/step-4a`: `p10b.sh`, `p8.sh`) on a CLI bump for what it does not cover; `acceptance --codex --pi` for the rest.
 
 ### U33. Our ACP flavors on t3's ACP adapter (step 4b)
 
@@ -365,7 +365,7 @@ Fixed by ADR-0030: `scripts/bump.ts` runs the whole `pnpm run check`, as prod's 
 
 - **Where**: `apps/environment/src/agents/acpProfiles.ts`: Claude Code's managed-settings keys (`apiKeyHelper`, `allowedProviders`, `availableModels`, `permissions.*`, `skipWebFetchPreflight`, `disableClaudeAiConnectors`, `sandbox`; the repository's `.claude/` is honoured otherwise since the back-to-stock cut, owner 2026-11-12), the variables pinned in its managed `env` (`CLAUDE_PINNED_EMPTY`) and its switches (`CLAUDE_CODE_*`, `DISABLE_*`); `claude-agent-acp`'s mode ids, option ids (`exit-plan-*`, `allow-once`), its `model`/`effort`/`mode` config options and `CLAUDE_AGENT_ACP_EXPERIMENTAL_V2`; OpenCode's system configuration keys (`providers`, `policies` actions, `permissions` rules, `agents`, `plugins`, `snapshots`, `update`, `share`, `lsp`, `formatter`), its plugin API (`ctx.provider.transform`), its `OPENCODE_DISABLE_*` variables and its database tables (`permission`, `account*`, sanitised by the launcher); the image's launchers (`apps/sandbox-image/image/t3flare-claude-agent-acp`, `t3flare-claude-key`, `t3flare-opencode`, `opencode-key-plugin`).
 - **Breaks when**: a CLI bump renames a key (OpenCode drops a statement it cannot read with only a log warning: the launcher ends the process on a diagnostic about our file), changes a mode or option id, renames its `auto` mode (t3's `auto` then stays in `default`), or adds a default network call. These move with `clis.ts`, not with t3.
-- **Detection**: `test/acpProfiles.test.ts` validates OpenCode's file against the pinned 2.2.7 schema (`test/fixtures/opencode-2.2.7-config.schema.json`; refresh it with the CLI); `acceptance --claude --opencode`; re-run M0's probes (`docs/steps/step-4b/probes`: `p3.sh` egress, `p4-*.sh` hostile repo and modes) on a CLI bump; `test:docker` for these CLIs is SPI-1044.
+- **Detection**: `test/acpProfiles.test.ts` validates OpenCode's file against the pinned 2.2.7 schema (`test/fixtures/opencode-2.2.7-config.schema.json`; refresh it with the CLI); `acceptance --claude --opencode`; re-run M0's probes (`apps/environment/scripts/probes/step-4b`: `p3.sh` egress, `p4-*.sh` hostile repo and modes) on a CLI bump; `test:docker` for these CLIs is SPI-1044.
 - **Fix**: the CLI's own settings reference and changelog; then the profile and the probes.
 
 ### U36. Claude Code and OpenCode against t3's compatibility manifest (step 4b)
@@ -716,7 +716,7 @@ CLI behaviour over ACP is the silent part.
   its static command entries; `claude-agent-acp` stops expanding a leading `/name`; OpenCode changes its skill
   tool's output, or starts returning a command's reply over ACP (its repo commands would then be worth listing).
 - **Detection**: the bump's check step: typecheck for the hook and the imports; `apps/environment/test/cliSkills.test.ts`
-  (discovery with `CLI_ROOTS` against the recorded `docs/steps/spi-1151/m0-roots.json`; the built-ins and the `/goal`
+  (discovery with `CLI_ROOTS` against the recorded `apps/environment/test/fixtures/spi-1151/m0-roots.json`; the built-ins and the `/goal`
   pin), `skillsSnapshot.test.ts`, `cliSkillDispatch.test.ts` (the rewrite and the embed through t3's real ACP adapter
   against the scripted agent; the note's wording and the planner's pattern pinned to `ClaudeSkillDispatch.ts`), `cliProfiles.test.ts` (pi's flags). The
   bump's `test:docker` step: `test/docker/skills.docker.test.ts` re-runs the probe on the pinned CLIs and holds

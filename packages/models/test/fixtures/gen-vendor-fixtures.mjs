@@ -1,0 +1,57 @@
+// SPI-1172: writes packages/models/test/fixtures/vendors.json, the recorded vendor answers the failure table is tested
+// with, in the shapes each source gives (read 2026-11-16). No vendor is called. Run: node packages/models/test/fixtures/gen-vendor-fixtures.mjs > packages/models/test/fixtures/vendors.json
+
+const S = {
+  anthropicErrors: "https://platform.claude.com/docs/en/api/errors",
+  anthropicLimits: "https://platform.claude.com/docs/en/api/rate-limits",
+  claudeCode: "Claude Code 2.1.325's client (header names; reset in epoch seconds) and @anthropic-ai/claude-agent-sdk 0.3.321 SDKRateLimitInfo (status allowed|allowed_warning|rejected, resetsAt, rateLimitType); not in Anthropic's public docs",
+  openaiErrors: "https://platform.openai.com/docs/guides/error-codes",
+  openaiLimits: "https://platform.openai.com/docs/guides/rate-limits",
+  codex: "https://github.com/openai/codex/blob/662a634e88fcc809d77da393d75572c3d814cb27/codex-rs/codex-api/src/api_bridge.rs (UsageErrorBody: type, plan_type, resets_at; api_bridge_tests.rs)",
+  planUsage: "https://developers.openai.com/siwc/token-sharing-open-source/errors-and-recovery",
+  piAi: "@earendil-works/pi-ai 1.5.0 dist/utils/retry.js (NON_RETRYABLE_PROVIDER_LIMIT_ERROR_PATTERN)",
+};
+const j = (v) => JSON.stringify(v);
+const anth = (type, message, extra = {}) => j({ type: "error", error: { type, message, ...extra }, request_id: "req_018EeWyXxfu5pfWkrYcMdjWG" });
+const oai = (message, type, code, param = null) => j({ error: { message, type, param, code } });
+const A = 1794823200; // 2026-11-16T10:00:00Z
+const answers = {
+  anthropicRateLimit: { api: "anthropic-messages", source: S.anthropicLimits, status: 429, headers: { "retry-after": "17", "anthropic-ratelimit-requests-reset": "2026-11-16T10:00:17Z" }, body: anth("rate_limit_error", "This request would exceed your organization's rate limit of 50 requests per minute. For details, refer to: https://docs.claude.com/en/api/rate-limits.") },
+  anthropicRateLimitBare: { api: "anthropic-messages", source: S.anthropicErrors, status: 429, headers: {}, body: anth("rate_limit_error", "Number of request tokens has exceeded your per-minute rate limit") },
+  anthropicSpendCap: { api: "anthropic-messages", source: S.anthropicLimits, status: 429, headers: {}, body: j({ type: "error", error: { type: "rate_limit_error", message: "You have reached your API usage limits: your organization has crossed its monthly API usage threshold, set based on your organization's API tier. You will regain access on 2026-09-01 at 00:00 UTC.", details: { error_code: "enforced_spend_limit_reached" } }, request_id: "req_018EeWyXxfu5pfWkrYcMdjWG" }) },
+  anthropicSubscriptionLimit: { api: "anthropic-messages", source: S.claudeCode, status: 429, headers: { "anthropic-ratelimit-unified-status": "rejected", "anthropic-ratelimit-unified-reset": String(A + 2 * 3600), "anthropic-ratelimit-unified-representative-claim": "five_hour", "anthropic-ratelimit-unified-5h-status": "rejected", "anthropic-ratelimit-unified-5h-reset": String(A + 2 * 3600), "anthropic-ratelimit-unified-7d-status": "allowed" }, body: anth("rate_limit_error", "This request would exceed your account's rate limit. Please try again later.") },
+  anthropicSubscriptionLimitNoReset: { api: "anthropic-messages", source: S.claudeCode, status: 429, headers: { "anthropic-ratelimit-unified-status": "rejected", "retry-after": "7200" }, body: anth("rate_limit_error", "This request would exceed your account's rate limit. Please try again later.") },
+  anthropicRateLimitLong: { api: "anthropic-messages", source: S.anthropicLimits, status: 429, headers: { "retry-after": "600" }, body: anth("rate_limit_error", "This request would exceed your organization's rate limit of 400,000 input tokens per minute.") },
+  anthropicOwnerSpendLimit: { api: "anthropic-messages", source: S.anthropicLimits, status: 400, headers: {}, body: anth("invalid_request_error", "You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC.") },
+  anthropicKeyRefused: { api: "anthropic-messages", source: S.anthropicErrors, status: 401, headers: {}, body: anth("authentication_error", "invalid x-api-key") },
+  anthropicPermission: { api: "anthropic-messages", source: S.anthropicErrors, status: 403, headers: {}, body: anth("permission_error", "Your API key does not have permission to use the specified resource.") },
+  anthropicBilling: { api: "anthropic-messages", source: S.anthropicErrors, status: 402, headers: {}, body: anth("billing_error", "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.") },
+  anthropicOverloaded: { api: "anthropic-messages", source: S.anthropicErrors, status: 529, headers: {}, body: anth("overloaded_error", "Overloaded") },
+  anthropicApiError: { api: "anthropic-messages", source: S.anthropicErrors, status: 500, headers: {}, body: anth("api_error", "Internal server error") },
+  openaiInsufficientQuota: { api: "openai-responses", source: S.openaiErrors, status: 429, headers: {}, body: oai("You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.", "insufficient_quota", "insufficient_quota") },
+  openaiCreditBalance: { api: "openai-responses", source: S.openaiErrors, status: 429, headers: {}, body: oai("Your organization has no prepaid credits remaining.", "insufficient_quota", "credit_balance_exhausted") },
+  openaiProjectSpend: { api: "openai-completions", source: S.openaiErrors, status: 429, headers: {}, body: oai("Your project reached its enforced spend limit.", "insufficient_quota", "project_spend_limit_exceeded") },
+  openaiRateLimit: { api: "openai-responses", source: S.openaiLimits, status: 429, headers: { "retry-after": "20", "x-ratelimit-limit-requests": "60", "x-ratelimit-remaining-requests": "0", "x-ratelimit-reset-requests": "1s", "x-ratelimit-limit-tokens": "150000", "x-ratelimit-remaining-tokens": "0", "x-ratelimit-reset-tokens": "6m0s" }, body: oai("Rate limit reached for gpt-5-mini in organization org-abc123 on tokens per min (TPM): Limit 150000, Used 150000, Requested 1200. Please try again in 6m0s.", "tokens", "rate_limit_exceeded") },
+  openaiRateLimitResetHeaders: { api: "openai-completions", source: S.openaiLimits, status: 429, headers: { "x-ratelimit-remaining-requests": "0", "x-ratelimit-reset-requests": "1s", "x-ratelimit-remaining-tokens": "0", "x-ratelimit-reset-tokens": "6m0s" }, body: oai("Rate limit reached for requests.", "requests", "rate_limit_exceeded") },
+  openaiRateLimitNoneExhausted: { api: "openai-responses", source: S.openaiLimits, status: 429, headers: { "x-ratelimit-remaining-requests": "12", "x-ratelimit-reset-requests": "1s", "x-ratelimit-remaining-tokens": "4000", "x-ratelimit-reset-tokens": "6m0s" }, body: oai("Rate limit reached for requests.", "requests", "rate_limit_exceeded") },
+  openaiPaymentRequired: { api: "openai-completions", source: "HTTP 402 Payment Required (RFC 9110 §15.5.3), as OpenAI-compatible gateways answer an unpaid account", status: 402, headers: {}, body: oai("Insufficient credits.", "payment_required", null) },
+  openaiKeyRefused: { api: "openai-responses", source: S.openaiErrors, status: 401, headers: {}, body: oai("Incorrect API key provided: sk-proj-********************************************AbCd. You can find your API key at https://platform.openai.com/account/api-keys.", "invalid_request_error", "invalid_api_key") },
+  openaiRegion: { api: "openai-responses", source: S.openaiErrors, status: 403, headers: {}, body: oai("Country, region, or territory not supported", "request_forbidden", "unsupported_country_region_territory") },
+  openaiOverloaded: { api: "openai-responses", source: S.openaiErrors, status: 503, headers: { "retry-after": "5" }, body: oai("The requested model is temporarily overloaded.", "service_unavailable_error", "server_is_overloaded") },
+  openaiServerError: { api: "openai-completions", source: S.openaiErrors, status: 500, headers: {}, body: oai("The server had an error while processing your request. Sorry about that!", "server_error", null) },
+  chatgptUsageLimitReached: { api: "openai-responses", source: S.codex, status: 429, headers: {}, body: j({ error: { type: "usage_limit_reached", message: "The usage limit has been reached", plan_type: "plus", resets_at: A + 3 * 3600 } }) },
+  chatgptUsageLimitRetryAfter: { api: "openai-responses", source: S.codex, status: 429, headers: { "retry-after": "5400" }, body: j({ error: { type: "usage_limit_reached", message: "The usage limit has been reached", plan_type: "pro" } }) },
+  chatgptUsageNotIncluded: { api: "openai-responses", source: S.codex, status: 429, headers: {}, body: j({ error: { type: "usage_not_included", message: "Your plan does not include this usage." } }) },
+  planUsageLimit: { api: "openai-responses", auth: "chatgpt", source: S.planUsage, status: 429, headers: {}, body: oai("You have reached your ChatGPT usage limit.", "invalid_request_error", "subscription_sharing_usage_limit_exceeded") },
+  planUsageWorkspaceLimit: { api: "openai-responses", auth: "chatgpt", source: S.piAi, status: 429, headers: {}, body: oai("Your workspace admin set a usage limit for you.", "invalid_request_error", "subscription_sharing_workplace_individual_usage_limit_exceeded") },
+  planUsageNotEligible: { api: "openai-responses", auth: "chatgpt", source: S.planUsage, status: 403, headers: {}, body: oai("ChatGPT plan usage is not available for this user.", "invalid_request_error", "subscription_sharing_user_not_eligible") },
+  planUsageInvalidUser: { api: "openai-responses", auth: "chatgpt", source: S.planUsage, status: 401, headers: {}, body: oai("The subscriber context could not be validated.", "invalid_request_error", "subscription_sharing_invalid_user") },
+  planUsageUnavailable: { api: "openai-responses", auth: "chatgpt", source: S.planUsage, status: 503, headers: {}, body: oai("Usage availability could not be checked.", "server_error", "subscription_sharing_usage_unavailable") },
+  planUsageUnsupported: { api: "openai-responses", auth: "chatgpt", source: S.planUsage, status: 400, headers: {}, body: oai("This capability is not supported with ChatGPT plan usage.", "invalid_request_error", "subscription_sharing_unsupported_capability", "tools") },
+  planUsageAdmission: { api: "openai-responses", auth: "chatgpt", source: S.planUsage, status: 401, headers: {}, body: j({ detail: "Signed identity was not accepted." }) },
+};
+const streamed = {
+  anthropicOverloaded: { api: "anthropic-messages", source: "https://platform.claude.com/docs/en/build-with-claude/streaming (error events)", text: j({ type: "error", error: { type: "overloaded_error", message: "Overloaded" } }) },
+  openaiQuotaFailed: { api: "openai-responses", source: "pi-ai 1.5.0 dist/api/openai-responses-shared.js (response.failed: `${error.code}: ${error.message}`)", text: "insufficient_quota: You exceeded your current quota, please check your plan and billing details." },
+};
+process.stdout.write(JSON.stringify({ read: "2026-11-16", now: "2026-11-16T10:00:00.000Z", note: "Doc-shaped, not recorded: each answer is written in the shape its source documents (each entry's source, read on `read`), because no vendor was called with real credentials to record one. Bodies are as a client would receive them.", answers, streamed }, null, 2) + "\n");

@@ -627,7 +627,7 @@ Each milestone is demoable on the throwaway stage `step4b` (never prod), has exi
 (the scripts' JSON and screenshots), lands with its tests, and keeps `bun run check` green at its head.
 
 **Dependencies on 4a.** M0 needs nothing of 4a's code: its probes run in local Docker with 4a's probe harness
-(`docs/steps/step-4a/probes/`: the `computer.internal` key sidecar, the CONNECT logger, an `--internal` network) and,
+(`apps/environment/scripts/probes/step-4a/`: the `computer.internal` key sidecar, the CONNECT logger, an `--internal` network) and,
 for P4, t3's Node server with a `docker exec -i` spawner (4a's P7 pattern); P6 is a build. M1 onward need 4a's M1
 (channel, `ProcessHost`, `processGroup.ts` Shadow) and M2 (image CLI layer, profiles, key route and gate, `clis.ts`);
 M5 needs 4a's M6 (leak scan, egress logger, D1 for CLIs, acceptance flags). **Before 4a merges**, 4b's code lives on a

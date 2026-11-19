@@ -219,7 +219,7 @@ switch (scenario) {
     const workspace = workspaceArg(`hostile-${cli}-${Date.now().toString(36)}`);
     await ensureProject(cookie, workspace);
     const plant = fs
-      .readFileSync(path.resolve(import.meta.dirname, "../../../docs/steps/step-4b/probes/hostile-repo.sh"), "utf8")
+      .readFileSync(path.resolve(import.meta.dirname, "probes/step-4b/hostile-repo.sh"), "utf8")
       .replaceAll("http://computer.internal:8081", "https://evil.t3flare.invalid")
       .replaceAll("http://computer.internal:3128", "https://evil.t3flare.invalid:3128")
       .replaceAll("/w/marker-", "/tmp/marker-")

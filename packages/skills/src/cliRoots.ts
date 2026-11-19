@@ -1,5 +1,5 @@
 // The CLI agents' roots (SPI-1151 §1 and §2): where each pinned CLI finds a repository's Skills and commands, as its
-// M0 probe found them (`docs/steps/spi-1151/m0-roots.json`; `apps/environment/test/docker/skills.docker.test.ts`
+// M0 probe found them (`apps/environment/test/fixtures/spi-1151/m0-roots.json`; `apps/environment/test/docker/skills.docker.test.ts`
 // re-runs it, so a CLI bump that moves a root fails there). The CLIs are pinned in `apps/sandbox-image/src/clis.ts`.
 // Repo-level only: a CLI's own home is built fresh per process and holds none of the repository's.
 

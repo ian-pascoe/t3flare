@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/@effect/tsgo/oxlint-schema.json",
-  "ignorePatterns": ["t3code/**", "**/dist/**", "**/.alchemy/**", "**/.wrangler/**"],
+  "ignorePatterns": ["t3code/**", "**/dist/**", "**/.alchemy/**", "**/.wrangler/**", "apps/environment/scripts/probes/**"],
   "plugins": ["typescript", "unicorn", "oxc"],
   "options": {
     "typeAware": true

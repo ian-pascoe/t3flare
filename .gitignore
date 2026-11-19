@@ -6,6 +6,10 @@ dist/
 .env.spike
 /bump-report.json
 .worktrees/
-docs/steps/step-4a/out/
 apps/environment/test/docker/.work-*
+# Step evidence stays out of the tree (docs/steps/README.md): only the reports, and the directories that hold them.
+docs/steps/**
+!docs/steps/**/
+!docs/steps/**/*.md
+docs/steps/step-4a/out/
 docs/steps/step-4b/out/

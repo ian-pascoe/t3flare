@@ -4,7 +4,7 @@ Date: 2026-11-12. Branch `step-4b`, built on `origin/step-4a` at 5f232cc and reb
 landed); see **Rebase onto `main`**. t3code pinned at `v0.1.9-nightly.20261111.4515` (24e7747), untouched. Throwaway
 stage `step4b` (added to `STAGES`), deployed eight times and **destroyed** at the end. Plan: `docs/steps/step-4b-plan.md`, whose changelog (owner OD-1/OD-2, Fable review
 F1–F10) overrides its body. Evidence: `docs/steps/step-4b/` (`m0-local.json`, `m1-*.json`, `m2-*.json`, `m3-*.json`,
-`m4-*.json`, `m5-*.json`, `m5-desktop-*.png`, `rebase-*.json`); M0's probes in `docs/steps/step-4b/probes/`.
+`m4-*.json`, `m5-*.json`, `m5-desktop-*.png`, `rebase-*.json`); M0's probes in `apps/environment/scripts/probes/step-4b/`.
 
 ## What was built
 

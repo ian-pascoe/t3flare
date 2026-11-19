@@ -1,5 +1,5 @@
 // The CLI agents' roots table (SPI-1151 §1, M1): discovery with each CLI's roots finds, in the probe's fixture, the
-// repo Skills and commands that CLI itself loaded (`docs/steps/spi-1151/m0-roots.json`, recorded by
+// repo Skills and commands that CLI itself loaded (`apps/environment/test/fixtures/spi-1151/m0-roots.json`, recorded by
 // `test/docker/skills.docker.test.ts` from the pinned CLIs), with its winner of a same-named pair; and their built-in
 // commands.
 import * as NodeFs from "node:fs";
@@ -12,7 +12,7 @@ import { CLI_BUILT_IN_COMMANDS } from "../src/provider/cli/builtInCommands.ts";
 import { type Loaded, PROBED, repoFixture, repoView } from "./docker/skillsProbe.ts";
 
 const ROOT = "/workspace/repo";
-const recorded = JSON.parse(NodeFs.readFileSync(new URL("../../../docs/steps/spi-1151/m0-roots.json", import.meta.url), "utf8")) as { readonly loaded: Readonly<Record<string, Loaded>> };
+const recorded = JSON.parse(NodeFs.readFileSync(new URL("./fixtures/spi-1151/m0-roots.json", import.meta.url), "utf8")) as { readonly loaded: Readonly<Record<string, Loaded>> };
 const files: SkillFiles = memoryFiles(Object.fromEntries(Object.entries(repoFixture()).map(([file, text]) => [`${ROOT}/${file}`, text])));
 
 describe("the CLI agents' roots table", () => {

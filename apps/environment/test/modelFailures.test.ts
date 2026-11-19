@@ -1,6 +1,6 @@
 // SPI-1172: a Model endpoint's failed answer, classified by its endpoint's API and auth (the step-2a2 plan's §3 table
 // as the starting point). The answers are doc-shaped, not recorded: each is written in the shape its source documents,
-// cited with its read date in packages/models/test/fixtures/vendors.json (made by docs/steps/spi-1172/gen-vendor-fixtures.mjs),
+// cited with its read date in packages/models/test/fixtures/vendors.json (made by packages/models/test/fixtures/gen-vendor-fixtures.mjs),
 // because no vendor was called with real credentials.
 import type { EndpointApi, EndpointAuth } from "@t3flare/models/endpoints";
 import { classifyModelFailure, type FailedAnswer, modelFailureMessage, SHORT_RESET_MS } from "@t3flare/models/failures";
