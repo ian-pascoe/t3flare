@@ -6,8 +6,9 @@ name: Land
 #
 # The push uses the deploy key T3FLARE_LAND_DEPLOY_KEY, the one secret of the `land` environment (deployable from `main`
 # only; it holds none of prod's), because ruleset `main` requires pull requests: deploy keys and admins skip it always,
-# and the two Apps only when merging a pull request. GitHub Actions can't be a bypass actor on a personal account's
-# repo, and the t3flare App also mints agents' Container tokens, so it gets no direct-push skip. A deploy-key push,
+# and the two Apps only when merging a pull request. This was designed when the repo was a personal account's, where
+# GitHub Actions can't be a bypass actor; the repo is now an organisation's, and the design stays (ADR-0037's ADR-0038/0039
+# refinement). The t3flare App also mints agents' Container tokens, so it gets no direct-push skip. A deploy-key push,
 # unlike a GITHUB_TOKEN one, starts deploy-prod.yml. Two jobs: `check` (no environment, so no key on its runner) binds
 # to the proof and runs the land check on the candidate; `land` (environment `land`, its deploy key only) runs only
 # main's code and pushes the checked commit as a plain fast-forward (no force; the ruleset skip would allow one, so
