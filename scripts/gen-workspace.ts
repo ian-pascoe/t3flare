@@ -45,6 +45,9 @@ const OUR_OVERRIDES: Record<string, string> = {
   "@cloudflare/workers-types@^5.20261104.1": "5.20261108.1",
   // @alchemy.run/cloudflare's `^4.1.0`; t3 does not install it.
   "@effect/sql-d1": "4.1.1",
+  // just-bash (3.6.0, and 3.6.1, the latest) pins guarded-fetch 0.1.3, which pins undici 7.29.0: open Dependabot alerts
+  // (< 7.30.1). 7.30.2 is the 7.x t3's graph already installs. Drop this once a just-bash release moves past them.
+  "guarded-fetch>undici": "7.30.2",
 };
 
 // Ours, merged into t3's peerDependencyRules.allowedVersions (t3's strictPeerDependencies covers our packages too).
