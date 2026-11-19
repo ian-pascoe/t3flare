@@ -20,7 +20,7 @@ Dev-server previews and t3's server browser are part of parity and are **built l
 
 ## Consequences
 
-- A nightly that adds a host-bound feature adds a capability flag or a setting. The flag fails typecheck until it is classified (ADR-0023). The setting does not: classify it by hand when the bump's diff shows one (fragility U4).
+- A nightly that adds a host-bound feature adds a capability flag or a setting. The flag is stripped until it is classified, and the bump names it (ADR-0023's 2026-11-19 refinement). The setting does not: classify it by hand when the bump's diff shows one (fragility U4).
 - Lifting a refusal needs an ADR that says where the feature runs instead, as D4 does for previews.
 
 ## Refinement (tools step): local stdio MCP servers

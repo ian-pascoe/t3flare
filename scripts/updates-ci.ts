@@ -6,7 +6,8 @@
 //
 //   plan-t3 --event <e> [--tag <t>] [--land true] [--verify <what>]   bump.yml: skip, bump or land (mode, tag, pin, sha)
 //   check-proposal --kind t3|cli --dir <artifact dir> (--gate <g> [--tag <t>] | --cli <c> [--running <v>])
-//                       no token: the report read and the bundled commit checked (changed, pin, sha, gate, call_land)
+//                       no token: the report read and the bundled commit checked (changed, pin, sha, gate, call_land;
+//                       and for the PR's body: unclassified, retried, t3_type_errors)
 //   publish-proposal --pin <pin> --sha <sha> --gate <g>      token: push `bump/*`, mark the commit proven
 //   land-plan --pin <pin> [--sha <sha>]   land.yml: land (the branch's tip is `sha`, proven) or deploy-only
 //                                         (mode, branch, sha, verify)
@@ -19,9 +20,9 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import { clisField } from "../apps/environment/scripts/lib/cliPins.ts";
-import { landBindingRefusal, landMode, planT3, readBumpReport } from "../apps/environment/scripts/lib/land.ts";
+import { bumpAttemptOf, bumpReportNotes, DETERMINISTIC_FAILURES_TO_STOP, landBindingRefusal, landMode, planT3, readBumpReport } from "../apps/environment/scripts/lib/land.ts";
 import { branchOf, COMMIT, landedBranches, newestNightly, NIGHTLY_TAG, parsePin, type Pin, pinOf, pinText } from "../apps/environment/src/updates/pins.ts";
-import { branchTipOf, bumpBranches, git, nightlyTagsOf, optionOf, provenGateOf, setProven, thisRunUrl } from "./lib/updatesGit.ts";
+import { branchTipOf, bumpBranches, git, nightlyTagsOf, optionOf, provenGateOf, recentBumpReports, setProven, thisRunUrl } from "./lib/updatesGit.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const [command, ...args] = process.argv.slice(2);
@@ -82,7 +83,18 @@ switch (command) {
         commits: Number(git(["rev-list", "--count", `HEAD..${tip}`], root).out || "0"),
       };
     }
-    const plan = planT3({ event: event as "schedule" | "workflow_dispatch", tag: tagInput, land: option("land") === "true", verify: (option("verify") ?? "") !== "", newest, mainTag, branch });
+    // Hourly: the newest earlier attempts, so a failure nothing has changed since is not run again every hour. A read
+    // that fails only means the run goes ahead.
+    let attempts;
+    if (event === "schedule") {
+      try {
+        attempts = (await recentBumpReports(DETERMINISTIC_FAILURES_TO_STOP)).map((text) => (text === undefined ? undefined : bumpAttemptOf(text)));
+      } catch (error) {
+        console.error(`plan: earlier attempts unread, so this one runs: ${String(error)}`);
+      }
+    }
+    const mainSha = git(["rev-parse", "HEAD"], root).out;
+    const plan = planT3({ event: event as "schedule" | "workflow_dispatch", tag: tagInput, land: option("land") === "true", verify: (option("verify") ?? "") !== "", newest, mainTag, branch, mainSha, attempts });
     if (typeof plan === "string") fail(plan);
     const decided = plan as Exclude<typeof plan, string>;
     console.error(`plan: ${decided.mode}: ${decided.reason}`);
@@ -112,7 +124,18 @@ switch (command) {
       const checked = spawnSync(process.execPath, ["scripts/land-check.ts", "--ref", "refs/remotes/candidate", "--pin", pinText(pin as Pin)], { cwd: root, stdio: "inherit" });
       if (checked.status !== 0) fail("the land check refused the proposed pin");
     }
-    output({ changed: String(report.changed), pin: pinText(pin as Pin), sha, gate: report.gate, call_land: String(report.callLand) });
+    // For the pull request's body only (U4, U18): validated names and a boolean, never part of a decision.
+    const notes = kind === "t3" ? bumpReportNotes(text) : { unclassified: [], acceptanceRetried: false, t3TypeErrors: 0 };
+    output({
+      changed: String(report.changed),
+      pin: pinText(pin as Pin),
+      sha,
+      gate: report.gate,
+      call_land: String(report.callLand),
+      unclassified: notes.unclassified.join(", "),
+      retried: String(notes.acceptanceRetried),
+      t3_type_errors: String(notes.t3TypeErrors),
+    });
     break;
   }
   case "publish-proposal": {

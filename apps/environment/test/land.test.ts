@@ -3,7 +3,21 @@
 // `bump.yml` run does.
 import { describe, expect, it } from "vitest";
 
-import { landBindingRefusal, landMode, landRefusal, lockProvenance, planT3, readBumpReport, t3LockRefusal, t3ManifestRefusal, type LandFacts, type T3LockInput } from "../scripts/lib/land.ts";
+import {
+  bumpAttemptOf,
+  DETERMINISTIC_STEPS,
+  bumpReportNotes,
+  landBindingRefusal,
+  landMode,
+  landRefusal,
+  lockProvenance,
+  planT3,
+  readBumpReport,
+  t3LockRefusal,
+  t3ManifestRefusal,
+  type LandFacts,
+  type T3LockInput,
+} from "../scripts/lib/land.ts";
 
 const SHA = "cd9c39fe3c25ad71657cc0b8631b6de76775261e";
 const TAG = "v0.1.11-nightly.20261117.4825";
@@ -79,6 +93,17 @@ describe("a bump job's report, read by a trusted job", () => {
     expect(readBumpReport("[]", { kind: "t3", gate: "full" })).toMatch(/not a JSON object/);
   });
 
+  it("tells the pull request only flag-shaped names, whether the acceptance test was retried, and a count (U4, U10, U18)", () => {
+    expect(bumpReportNotes(JSON.stringify({ unclassifiedCapabilities: ["newFlag", "x\n## injected", 3, "$(rm -rf)"], acceptanceRetry: { firstFailures: [] }, t3TypeErrors: 2 }))).toEqual({
+      unclassified: ["newFlag"],
+      acceptanceRetried: true,
+      t3TypeErrors: 2,
+    });
+    expect(bumpReportNotes(JSON.stringify({ unclassifiedCapabilities: null, acceptanceRetry: null, t3TypeErrors: "2\n::x" }))).toEqual({ unclassified: [], acceptanceRetried: false, t3TypeErrors: 0 });
+    expect(bumpReportNotes(JSON.stringify({ t3TypeErrors: 1.5 }))).toMatchObject({ t3TypeErrors: 0 });
+    expect(bumpReportNotes("nope")).toEqual({ unclassified: [], acceptanceRetried: false, t3TypeErrors: 0 });
+  });
+
   it("records the gate the run was asked for: a report claiming another is refused (A8)", () => {
     expect(readBumpReport(JSON.stringify({ ok: true, changed: true, to: NEXT, gate: "full" }), { kind: "t3", gate: "update" })).toMatch(/not the requested update/);
   });
@@ -127,6 +152,43 @@ describe("what a bump.yml run does", () => {
 
   it("refuses an Update to a tag older than what main already pins, saying why (D6, A11)", () => {
     expect(planT3({ event: "workflow_dispatch", land: true, verify: false, tag: TAG, mainTag: NEXT })).toMatch(/prod is moving to v0\.1\.11-nightly\.20261117\.4851, newer than/);
+  });
+
+  it("hourly: stops retrying a tag that failed a deterministic step twice on this main, until main, the nightly or a hand moves", () => {
+    const MAIN = "a".repeat(40);
+    const failed = (step: "move" | "lock" | "check" | "other", to = NEXT, base = MAIN) => ({ base, to, failed: step });
+    const hourly = (attempts: Parameters<typeof planT3>[0]["attempts"], mainSha = MAIN) =>
+      planT3({ event: "schedule", land: false, verify: false, newest: NEXT, mainTag: TAG, mainSha, attempts });
+    const check = "check";
+    expect(hourly([failed(check), failed(check)])).toMatchObject({ mode: "skip", reason: expect.stringMatching(/failed its check step/) });
+    expect(hourly([failed("lock"), failed(check)])).toMatchObject({ mode: "skip" });
+    // One failure is retried once (a flaky unit test); so is a step that can fail by chance.
+    expect(hourly([failed(check)])).toMatchObject({ mode: "bump" });
+    expect(hourly([failed(check), failed("other")])).toMatchObject({ mode: "bump" });
+    expect(hourly([failed("other"), failed("other")])).toMatchObject({ mode: "bump" });
+    // Something moved: main, or the tag tried.
+    expect(hourly([failed(check), failed(check)], "b".repeat(40))).toMatchObject({ mode: "bump" });
+    expect(hourly([failed(check), failed(check, TAG)])).toMatchObject({ mode: "bump" });
+    // An unreadable report, or none read, never stops a run.
+    expect(hourly([failed(check), undefined])).toMatchObject({ mode: "bump" });
+    expect(hourly(undefined)).toMatchObject({ mode: "bump" });
+    // A run by hand is never stopped.
+    expect(planT3({ event: "workflow_dispatch", land: false, verify: false, tag: NEXT, mainSha: MAIN, attempts: [failed(check), failed(check)] })).toMatchObject({ mode: "bump" });
+  });
+
+  it("reads an attempt only from a strictly shaped report, keeping a fixed label for its failed step, never its text", () => {
+    const report = (steps: Array<{ name: string; ok: boolean }>) => JSON.stringify({ base: "c".repeat(40), to: NEXT, steps });
+    const failing = (name: string) => bumpAttemptOf(report([{ name: `${DETERMINISTIC_STEPS.move} ${NEXT}`, ok: true }, { name, ok: false }]));
+    expect(failing(DETERMINISTIC_STEPS.check)).toEqual({ base: "c".repeat(40), to: NEXT, failed: "check" });
+    expect(failing(DETERMINISTIC_STEPS.lock)).toMatchObject({ failed: "lock" });
+    expect(bumpAttemptOf(report([{ name: `${DETERMINISTIC_STEPS.move} ${NEXT}`, ok: false }]))).toMatchObject({ failed: "move" });
+    // A forged name that only starts like the check, or carries a workflow command, is `other`: retried, and never printed.
+    expect(failing(`${DETERMINISTIC_STEPS.check}\n::warning::forged`)).toMatchObject({ failed: "other" });
+    expect(failing("regenerate the workspace and install")).toMatchObject({ failed: "other" });
+    expect(bumpAttemptOf(report([{ name: "x", ok: true }]))).toMatchObject({ failed: undefined });
+    expect(bumpAttemptOf(JSON.stringify({ to: NEXT, steps: [] }))).toBeUndefined();
+    expect(bumpAttemptOf(JSON.stringify({ base: "c".repeat(40), to: "main", steps: [] }))).toBeUndefined();
+    expect(bumpAttemptOf("not json")).toBeUndefined();
   });
 
   it("verify and by-hand runs bump", () => {

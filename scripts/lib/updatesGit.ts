@@ -1,6 +1,10 @@
-// Git and GitHub reads the trusted update jobs share (ADR-0037): `scripts/updates-ci.ts` and `scripts/land-check.ts`.
+// Git and GitHub reads and writes for the trusted update jobs (ADR-0037): `scripts/updates-ci.ts` and
+// `scripts/land-check.ts`.
 // Plain Node: no dependency.
 import { spawnSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 
 import { COMMIT, NIGHTLY_TAG, type Gate, PROVEN_CONTEXT, proofRunRefusal, provenDescription, provenStatus } from "../../apps/environment/src/updates/pins.ts";
 
@@ -48,18 +52,23 @@ export const branchTipOf = (branch: string): string | undefined => lsRemote(["--
 /** The `bump/*` branches on origin. */
 export const bumpBranches = (): ReadonlyArray<string> => lsRemote(["--heads", "origin", "refs/heads/bump/*"]).map(([, ref]) => ref.replace(/^refs\/heads\//, ""));
 
-const api = async (method: string, pathname: string, body?: unknown): Promise<unknown> => {
+/** A request to this repository's GitHub API (`pathname` under `/repos/<repo>`, or a whole `https://api.github.com` URL). */
+const apiResponse = async (method: string, pathname: string, body?: unknown): Promise<Response> => {
   const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
   const repository = process.env.GITHUB_REPOSITORY;
   if (!token || !repository) throw new Error("GITHUB_TOKEN and GITHUB_REPOSITORY are required");
-  const response = await fetch(`https://api.github.com/repos/${repository}${pathname}`, {
+  const url = pathname.startsWith("https://api.github.com/") ? pathname : `https://api.github.com/repos/${repository}${pathname}`;
+  // fetch drops the authorization header when a redirect leaves the host (an artifact's download goes to blob storage).
+  const response = await fetch(url, {
     method,
     headers: { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28", "user-agent": "t3flare-ci", ...(body === undefined ? {} : { "content-type": "application/json" }) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   if (!response.ok) throw new Error(`GitHub answered ${method} ${pathname} with ${response.status}: ${(await response.text()).slice(0, 300)}`);
-  return response.json();
+  return response;
 };
+
+const api = async (method: string, pathname: string, body?: unknown): Promise<unknown> => (await apiResponse(method, pathname, body)).json();
 
 /**
  * The gate `sha` is proven through (review A1, B1): its newest `t3flare/proven` status, set by GitHub Actions, naming a
@@ -72,6 +81,36 @@ export const provenGateOf = async (sha: string): Promise<{ readonly gate: Gate }
   if (status.repository !== repository) return { gate: undefined, reason: `its proof names a run of ${status.repository}` };
   const refusal = proofRunRefusal((await api("GET", `/actions/runs/${status.runId}`)) as Parameters<typeof proofRunRefusal>[0], repository);
   return refusal === undefined ? { gate: status.gate } : { gate: undefined, reason: `its proof does not count: ${refusal}` };
+};
+
+/**
+ * The reports of the newest hourly bump jobs on main, newest first, at most `count` (a plan that skipped ran no bump job
+ * and is passed over; a run whose report cannot be read counts as undefined). Untrusted input: `bumpAttemptOf` reads it.
+ * The artifact is unpacked with the runner's `unzip`, one named file to stdout.
+ */
+export const recentBumpReports = async (count: number): Promise<Array<string | undefined>> => {
+  const runs = ((await api("GET", "/actions/workflows/bump.yml/runs?event=schedule&branch=main&status=completed&per_page=30")) as {
+    workflow_runs?: Array<{ id: number }>;
+  }).workflow_runs ?? [];
+  const reports: Array<string | undefined> = [];
+  for (const run of runs) {
+    if (reports.length >= count) break;
+    const artifacts = ((await api("GET", `/actions/runs/${run.id}/artifacts?name=bump`)) as { artifacts?: Array<{ archive_download_url: string; expired: boolean }> }).artifacts ?? [];
+    const artifact = artifacts.find((a) => !a.expired);
+    if (artifact === undefined) continue;
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bump-artifact-"));
+    try {
+      const zip = path.join(dir, "bump.zip");
+      fs.writeFileSync(zip, Buffer.from(await (await apiResponse("GET", artifact.archive_download_url)).arrayBuffer()));
+      const unzipped = spawnSync("unzip", ["-p", zip, "bump-report.json"], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+      reports.push(unzipped.status === 0 ? unzipped.stdout : undefined);
+    } catch {
+      reports.push(undefined);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  return reports;
 };
 
 /** Records that `sha` passed `gate` (the trusted publish job only). */

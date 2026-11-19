@@ -1,7 +1,11 @@
 // The descriptor's capability flags, classified (SPI-994, SPI-1012; fragility U4). The stock clients decide which
-// features to show from these flags, so the Cloud Environment strips every flag for a feature it does not do. Every key
-// of t3's `ExecutionEnvironmentCapabilities` is listed here: `satisfies` makes a key a nightly adds fail typecheck, and
-// `test/capabilities.test.ts` says which key to classify. Keep a flag only for a feature that works in the cloud.
+// features to show from these flags, so the Cloud Environment strips every flag for a feature it does not do. Keep a
+// flag only for a feature that works in the cloud.
+//
+// A flag a nightly adds is stripped until it is classified here: the client then hides that feature, as it does for an
+// older server. That keeps a new flag from blocking the bump, and t3 adds several a week. The bump reports each one
+// (`scripts/capabilities-unclassified.ts`, in the report and the bump PR's body) to be classified. `satisfies` still
+// fails typecheck on a key t3 no longer has, or a misspelt one.
 //
 // Three classifications (ADR-0023): kept (t3's own value goes out), stripped, and advertised by t3flare: a value t3 never
 // sends in the DO (it has no launcher or desktop app), which t3flare sends itself where its own code does the feature.
@@ -115,7 +119,10 @@ export const CAPABILITIES = {
   linkedThreadRefreshes: keep,
   // `issues.linkedThreads`: t3's own `/ws` read over its own SQL, through the ported ThreadIssueService.
   issueLinkedThreads: keep,
-} as const satisfies Record<keyof ExecutionEnvironmentCapabilities, Classification>;
+} as const satisfies { readonly [K in keyof ExecutionEnvironmentCapabilities]?: Classification };
+
+/** The flags of t3's descriptor (`fields`, its schema's keys) that are not classified here: each is stripped. */
+export const unclassifiedCapabilities = (fields: ReadonlyArray<string>): Array<string> => fields.filter((key) => !Object.hasOwn(CAPABILITIES, key));
 
 /** The values t3flare advertises for its `advertise` keys, each sent only where its feature is configured. */
 export interface AdvertisedCapabilities {
@@ -129,8 +136,8 @@ export const cloudCapabilities = (capabilities: ExecutionEnvironmentCapabilities
     ...Object.fromEntries(
       Object.entries(capabilities).filter(([key]) => {
         const classification: Classification | undefined = (CAPABILITIES as Record<string, Classification>)[key];
-        // A key t3 sends that its schema does not list: kept, as the client reads it (the schema check catches the rest).
-        return classification === undefined || "keep" in classification;
+        // Unclassified (a flag a nightly added, or one t3 sends that its schema does not list): stripped until classified.
+        return classification !== undefined && "keep" in classification;
       }),
     ),
     ...Object.fromEntries(

@@ -25,3 +25,22 @@ The job is `pnpm run bump` (`scripts/bump.ts`), run nightly by `.github/workflow
 - **The bookmark is not taken.** The first paragraph says a DO SQLite point-in-time bookmark is taken before t3's
   migrations run. No code takes one. Recovery from a bad nightly on prod is Safe mode and a revert by the owner; a
   pre-migration bookmark and an admin restore route are a follow-up (plan D15).
+
+## Refinement (2026-11-19): what stops failing the bump
+
+Of the 63 bump runs that failed between 11-10 and 11-19, most were not upstream changes that needed porting. They were
+differences of configuration, flags waiting to be classified, flakes, or the hourly job running a failure again that
+nothing had changed. Four rules now keep those from failing it, or from failing it again:
+
+- **Type errors in t3's own files do not fail the typecheck.** `apps/environment`'s typecheck
+  (`scripts/typecheck.ts`) prints them apart and passes. t3 checks them under its own configuration, and this program's
+  differs (the DOM lib, other packages' global types). Errors in t3flare's files still fail (fragility U10).
+- **A new capability flag is stripped until classified**, instead of failing typecheck (ADR-0023's refinement,
+  fragility U4). The report, the pin's commit message and the bump PR name it.
+- **The acceptance test runs once more on the Full gate** when it fails. A pass on its second attempt keeps the first
+  attempt's failures in the report, and the PR says the pass may be luck. The Update gate does not retry: its run must
+  fail within 20 minutes (ADR-0037, D7).
+- **The hourly job stops retrying a failure nothing has changed since.** When the two newest hourly attempts tried the
+  newest nightly on the current commit of main, and both failed the move, the lock check or `pnpm run check`, the plan
+  skips. The install and every later step can fail by chance, so those are retried. A commit on main, a newer nightly
+  or a run by hand tries again.
