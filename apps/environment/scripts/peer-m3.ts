@@ -15,7 +15,8 @@ import { spawnSync } from "node:child_process";
 import { admin, dispatch, pair, sleep, uuid } from "./lib/client.ts";
 import { createThread, MODEL, pendingOf, projection, replyOf, say, settled, until } from "./lib/cloudThread.ts";
 import { writeEvidence } from "./lib/evidence.ts";
-import { ensureCloudFixtureProject, FIXTURE } from "./lib/fixtureProject.ts";
+import { ensureCloudFixtureProject } from "./lib/fixtureProject.ts";
+import { fixtureRepo } from "./lib/scriptSettings.ts";
 import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
 
 const at = process.argv.indexOf("--only");
@@ -162,7 +163,7 @@ if (wants("env-restart-delegated")) {
 }
 
 if (wants("push")) {
-  const remoteMain = () => spawnSync("git", ["ls-remote", `https://github.com/${FIXTURE}.git`, "refs/heads/main"], { encoding: "utf8", env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } }).stdout.split(/\s/)[0] ?? "";
+  const remoteMain = () => spawnSync("git", ["ls-remote", `https://github.com/${fixtureRepo()}.git`, "refs/heads/main"], { encoding: "utf8", env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } }).stdout.split(/\s/)[0] ?? "";
   // gh's credentials for this machine's own git (the owner's), never the stage's.
   const ghGit = (args: Array<string>) => spawnSync("gh", ["api", ...args], { encoding: "utf8" });
   const originalMain = remoteMain();
@@ -215,7 +216,7 @@ if (wants("push")) {
     check("push: the approved push pushed once", pushes[1] !== undefined && pushes[1].mainAfter !== originalMain, answers);
     // Restore the fixture's main (the owner's gh, this machine).
     if (finalMain !== originalMain) {
-      const restored = ghGit(["-X", "PATCH", `repos/${FIXTURE}/git/refs/heads/main`, "-f", `sha=${originalMain}`, "-F", "force=true"]);
+      const restored = ghGit(["-X", "PATCH", `repos/${fixtureRepo()}/git/refs/heads/main`, "-f", `sha=${originalMain}`, "-F", "force=true"]);
       (out.push as Record<string, unknown>).restored = { status: restored.status, main: remoteMain() };
       check("push: the fixture's main is restored", remoteMain() === originalMain, out.push);
     }

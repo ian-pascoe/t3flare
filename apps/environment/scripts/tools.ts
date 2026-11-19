@@ -19,8 +19,9 @@ import { cliTurn, enable as enableCli } from "./lib/cliTurn.ts";
 import { admin, dispatch, itemsOf, mutateProject, pair, projectionOf, readDoText, runsOf, SETTLED, sendMessage, sleep, threadWindow, updateSettings, uuid, wsCall } from "./lib/client.ts";
 import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
 import { tailing } from "./lib/tail.ts";
+import { fixtureRepo, workersDevUrl } from "./lib/scriptSettings.ts";
 
-const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
+const FIXTURE = fixtureRepo();
 const SLUG = process.env.T3FLARE_TOOLS_MODEL ?? "anthropic/claude-sonnet-5-5";
 const MODEL = { instanceId: "piDurable", model: SLUG, options: /claude/.test(SLUG) ? [{ id: "thinking", value: "low" }] : [] };
 // T3FLARE_EVIDENCE_DIR (repo-relative) sends the evidence elsewhere: the Settings server's runs re-use `panel` and `cli-mcp`.
@@ -548,7 +549,7 @@ const panel = async () => {
 // MCP on Durable threads (parts 2 and 4): the fixture server, direct (Route B) or through Commissary (Route A)
 
 // The stage's own fixture Worker (alchemy.run.ts) when T3FLARE_FIXTURE_URL names it; the tools stage's by default.
-const FIXTURE_URL = process.env.T3FLARE_FIXTURE_URL ?? "https://t3flare-mcpfixture-tools.ian-g-pascoe.workers.dev";
+const FIXTURE_URL = process.env.T3FLARE_FIXTURE_URL ?? workersDevUrl("t3flare-mcpfixture-tools");
 const fixture = async (pathname: string, method = "GET") =>
   (await fetch(`${FIXTURE_URL}${pathname}`, { method, headers: { authorization: `Bearer ${process.env.T3FLARE_FIXTURE_BEARER ?? ""}` } })).json() as Promise<any>;
 const notes = async (): Promise<Array<string>> => (await fixture("/log")).lines ?? [];

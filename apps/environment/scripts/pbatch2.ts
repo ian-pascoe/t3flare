@@ -9,9 +9,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { admin, base, pair, sleep, wsCall, wsFirst } from "./lib/client.ts";
+import { workersDevUrl } from "./lib/scriptSettings.ts";
 
 const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/parity-batch-2");
-const PROBE = `https://t3flare-probe-pbatch2.ian-g-pascoe.workers.dev`;
+const PROBE = workersDevUrl("t3flare-probe-pbatch2");
 const PROBE_KEY = process.env.T3FLARE_PROBE_KEY ?? "";
 
 const SECRET_KEYS = /token|authorization|cookie|secret|bearer|credential|managementKey/i;

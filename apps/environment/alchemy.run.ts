@@ -9,8 +9,12 @@
 // The Worker is prebuilt by build.ts and uploaded with `bundle: false` (ADR-0020): alchemy 2.0.0-beta.85 drops
 // `build.input.plugins` on every update after the first deploy.
 //
-// Prod alone has a custom domain (`T3FLARE_DOMAIN`; any other stage with one is refused below, a hostname in a Cloudflare zone of the account; prod's is
-// `t3.ianpascoe.dev`, from the GitHub environment `prod` in CI and the laptop's environment otherwise). When set, it is
+// The Owner's own values (the Access team, the Owner's email, the account's workers.dev subdomain, prod's domain, the
+// update target) are Deployment settings (docs/deploy.md), read from the environment with no default: a missing or
+// malformed one stops the deploy with its message (scripts/lib/deploymentSettings.ts; stage.ts checks them first).
+//
+// Prod alone has a custom domain (`T3FLARE_DOMAIN`; any other stage with one is refused below, a hostname in a Cloudflare
+// zone of the account, from the GitHub environment `prod` in CI and the laptop's environment otherwise). When set, it is
 // attached as a Workers Custom Domain and becomes the stage's only host: its workers.dev URL and preview URLs are
 // turned off, so the domain's rate limit (below) cannot be sidestepped. A stage without a domain is served at workers.dev.
 //
@@ -33,6 +37,7 @@ import * as Cloudflare from "@alchemy.run/cloudflare";
 import * as Output from "alchemy/Output";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -42,16 +47,23 @@ import { sandboxImageContext } from "@t3flare/sandbox-image";
 import { MCP_WORKER_COMPATIBILITY } from "../mcp-worker/src/engine/compatibility.ts";
 
 import { COMPATIBILITY } from "./build.ts";
+import { type DeploymentSettingName, optionalSetting, requiredSetting } from "./scripts/lib/deploymentSettings.ts";
 import { credentialsFile, standinFile } from "./stage-files.ts";
 import { ownerEndpointOn, SETTINGS_MCP_PATH, SETTINGS_OAUTH_GRANT, SETTINGS_OAUTH_REDIRECT_URIS, settingsMcpUrl } from "./src/settings/endpointLayout.ts";
 
 const here = import.meta.dirname;
 
-/** The Access team (`<team>.cloudflareaccess.com`) of the owner's account, and the one person it admits. */
-const ACCESS_TEAM_DOMAIN = "spirit-led-software.cloudflareaccess.com";
-const OWNER_EMAIL = "ian.g.pascoe@gmail.com";
-/** The account's workers.dev subdomain: the Worker's host has to be known to name the Access destination. */
-const WORKERS_DEV_SUBDOMAIN = "ian-g-pascoe";
+/** A Deployment setting from the environment, unset when it is unset or empty; a malformed one dies with its message. */
+const optional = Effect.fn("optional")(function* (name: DeploymentSettingName) {
+  const result = optionalSetting({ [name]: Option.getOrUndefined(yield* Config.option(Config.String(name))) }, name);
+  return result.ok ? result.value : yield* Effect.die(new Error(result.error));
+});
+
+/** A Deployment setting from the environment, with no default: a missing or malformed one dies with its message. */
+const required = Effect.fn("required")(function* (name: DeploymentSettingName) {
+  const result = requiredSetting({ [name]: Option.getOrUndefined(yield* Config.option(Config.String(name))) }, name);
+  return result.ok ? result.value : yield* Effect.die(new Error(result.error));
+});
 
 /**
  * The routes of t3's server (t3code, pinned) that take a credential from a caller who has no session yet, and so are
@@ -76,7 +88,7 @@ const WORKERS_DEV_SUBDOMAIN = "ian-g-pascoe";
 const AUTH_PATHS = ["/oauth/token", "/api/auth/browser-session", "/oauth/mcp/register", "/oauth/mcp/approval", "/oauth/mcp/decision", "/oauth/mcp/token"];
 
 /**
- * 10 such requests per 10 s from one IP (per Cloudflare data center), then 429 for 10 s. The zone (`ianpascoe.dev`) is
+ * 10 such requests per 10 s from one IP (per Cloudflare data center), then 429 for 10 s. The zone (prod's, at first) is
  * on the Free plan, which allows one rate limiting rule, a 10 s period and a 10 s block, counted by IP. Normal use
  * peaks well below: pairing is 1 request per client (desktop and web paired at once from one network: 2), an MCP
  * client's sign-in 3 to 4 (register, approval, decision, token), so even all of those at once from one network (6)
@@ -86,8 +98,7 @@ const AUTH_PATHS = ["/oauth/token", "/api/auth/browser-session", "/oauth/mcp/reg
  */
 const AUTH_RATE_LIMIT = { requestsPerPeriod: 10, period: 10, mitigationTimeout: 10 };
 
-/** SPI-1061: the zone a test stage's stand-in hostname is made in, and the port its t3 listens on in its container. */
-const STANDIN_ZONE = "ianpascoe.dev";
+/** SPI-1061: the port a test stage's stand-in t3 listens on in its container (its zone is `T3FLARE_STANDIN_ZONE`). */
 const STANDIN_PORT = 3773;
 
 export default Alchemy.Stack(
@@ -103,9 +114,10 @@ export default Alchemy.Stack(
     const probeName = `t3flare-probe-${stage}`;
     // Test stages: the tools step's fixture MCP server, when the stage has its bearer (scripts/stage.ts).
     const fixtureBearer = stage === "prod" ? "" : yield* Config.String("T3FLARE_FIXTURE_BEARER").pipe(Config.withDefault(""));
-    const workersDevHost = `${name}.${WORKERS_DEV_SUBDOMAIN}.workers.dev`;
+    // The account's workers.dev subdomain: the Worker's host has to be known to name the Access destination.
+    const workersDevHost = `${name}.${yield* required("T3FLARE_WORKERS_DEV_SUBDOMAIN")}.workers.dev`;
     // The stage's custom domain, if it has one (unset or empty: workers.dev only).
-    const domain = yield* Config.String("T3FLARE_DOMAIN").pipe(Config.withDefault(""));
+    const domain = (yield* optional("T3FLARE_DOMAIN")) ?? "";
     // SPI-1175: only prod has one. Another stage given prod's domain would take over prod's Access application (alchemy
     // finds it by domain) and the zone's rate-limit ruleset (owned whole by one stage); stage.ts refuses it first
     // (scripts/lib/deployPlan.ts), and this refuses a direct alchemy run.
@@ -113,8 +125,13 @@ export default Alchemy.Stack(
       return yield* Effect.die(new Error(`T3FLARE_DOMAIN is set (to ${domain}) for the stage ${stage}: only prod has a custom domain`));
     }
     const host = domain === "" ? workersDevHost : domain;
-    const teamDomain = yield* Config.String("T3FLARE_ACCESS_TEAM_DOMAIN").pipe(Config.withDefault(ACCESS_TEAM_DOMAIN));
-    const ownerEmail = yield* Config.String("T3FLARE_OWNER_EMAIL").pipe(Config.withDefault(OWNER_EMAIL));
+    // The Access team (`<team>.cloudflareaccess.com`) of the Owner's account, and the one person it admits.
+    const teamDomain = yield* required("T3FLARE_ACCESS_TEAM_DOMAIN");
+    const ownerEmail = yield* required("T3FLARE_OWNER_EMAIL");
+    // In-app Updates (ADR-0037, plan D14): the repository whose CI an Update dispatches (the Deployment repository), on
+    // whichever stage it is set for; unset, the Environment has no update target. A press lands a bump on that
+    // repository's main, which deploys its prod, so only prod's deploy sets it (deploy-prod.yml).
+    const updateRepo = yield* optional("T3FLARE_UPDATE_REPO");
     // A shorter idle delay for test stages (ADR-0003's default is 60 s).
     const idleAfterMs = yield* Config.String("T3FLARE_IDLE_AFTER_MS").pipe(Config.withDefault(""));
     // Prod's sweep purges only when the owner sets it (the `prod` GitHub environment variable, SPI-974).
@@ -331,9 +348,8 @@ export default Alchemy.Stack(
         ...(stage === "prod" ? {} : { T3FLARE_CONNECT_KEEP_ACCOUNT_TOKEN: "1", T3FLARE_CONNECT_SERVICE_TOKEN: "1" }),
         // Step 4a: the process channel's probe program and stage-only checks answer on test stages only.
         ...(stage === "prod" ? {} : { T3FLARE_FAULTS: "1" }),
-        // In-app Updates (ADR-0037, plan D14): only prod has an update target. A press on any other stage would land a
-        // bump on main, which deploys prod.
-        ...(stage === "prod" ? { T3FLARE_UPDATE_REPO: "spiritledsoftware/t3flare" } : {}),
+        // In-app Updates (ADR-0037, plan D14): the update target, when the deploy sets one (above).
+        ...(updateRepo === undefined ? {} : { T3FLARE_UPDATE_REPO: updateRepo }),
         ...(sweepGraceMs === "" ? {} : { T3FLARE_SWEEP_GRACE_MS: sweepGraceMs }),
       },
       assets: {
@@ -376,7 +392,7 @@ export default Alchemy.Stack(
     let standinHost: string | undefined;
     let standinCredentials: unknown;
     if (standin) {
-      standinHost = `t3flare-${stage}-standin.${STANDIN_ZONE}`;
+      standinHost = `t3flare-${stage}-standin.${yield* required("T3FLARE_STANDIN_ZONE")}`;
       const tunnel = yield* Cloudflare.Tunnel.Tunnel("StandinTunnel", {
         name: `t3flare-${stage}-standin`,
         // cloudflared runs in the stand-in's container, beside t3; `Host` is passed as it is, which t3 needs.

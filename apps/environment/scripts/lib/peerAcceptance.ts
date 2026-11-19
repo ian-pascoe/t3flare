@@ -18,6 +18,7 @@
 // F11 (the bootstrap token at `/oauth/mcp/decision`) runs in `acceptance.ts` around the Pairing window.
 import { base, dispatch, mutateProject, projectionOf, runsOf, SETTLED, sleep, threadWindow, updateSettings, uuid, wsCall, wsFirst } from "./client.ts";
 import { ensureCloudFixtureProject } from "./fixtureProject.ts";
+import { fixtureRepo } from "./scriptSettings.ts";
 import { decide, HELD_WAIT_FLOOR_MS, McpClient, mintPairingCode, registerPeerClient, signIn, type ToolAnswer, WAIT_CHUNK_MS } from "./peer.ts";
 
 /**
@@ -234,7 +235,7 @@ export const peerAcceptance = async (cookie: string, options: { readonly only?: 
   }
   if (wants("F2")) {
     const create = await mcp.call("t3_project_create", { title: `link project ${stamp}`, workspaceRoot: `/w/link-${stamp}`, createWorkspaceRootIfMissing: true });
-    const clone = await mcp.call("t3_project_clone", { destinationPath: `/w/link-clone-${stamp}`, remoteUrl: "https://github.com/ian-pascoe/t3flare-fixture.git" });
+    const clone = await mcp.call("t3_project_clone", { destinationPath: `/w/link-clone-${stamp}`, remoteUrl: `https://github.com/${fixtureRepo()}.git` });
     const prefs = await mcp.call("t3_environment_preferences_update", { newWorktreesStartFromOrigin: true });
     const schedule = await mcp.call("schedule_task", { projectId: fixture.projectId, title: `link schedule ${stamp}`, prompt: "hi", schedule: { type: "interval", everyMs: 3_600_000 } });
     report.F2 = { create: create.text.slice(0, 200), clone: clone.text.slice(0, 200), prefs: prefs.text.slice(0, 200), schedule: schedule.text.slice(0, 200) };

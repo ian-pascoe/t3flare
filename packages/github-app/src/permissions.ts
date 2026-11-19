@@ -65,7 +65,7 @@ export const SKILL_FETCH_GITHUB_PERMISSIONS = {
 
 /**
  * The Environment DO's token for an in-app Update (ADR-0037): dispatch t3flare's bump workflows and read their runs, on
- * the repository the update target names (`ian-pascoe/t3flare`) only. Minted per dispatch and per poll, used for those
+ * the repository the update target names only. Minted per dispatch and per poll, used for those
  * requests and dropped; never a Container's or a Session's.
  */
 export const UPDATE_DISPATCH_GITHUB_PERMISSIONS = {

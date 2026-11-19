@@ -25,6 +25,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { admin, base, dispatch, itemsOf, mutateProject, pair, runsOf, sendMessage, SETTLED, sleep, updateSettings, uuid, waitFor, wsCall } from "./lib/client.ts";
+import { fixtureRepo } from "./lib/scriptSettings.ts";
 
 const [scenario = "ps"] = process.argv.slice(2);
 const flag = (name: string) => process.argv.includes(`--${name}`);
@@ -182,7 +183,7 @@ switch (scenario) {
     const id = `part2-${stamp}`;
     const destination = `/w/${id}`;
     const cloned = (await wsCall(cookie, "sourceControl.cloneRepository", {
-      remoteUrl: `https://github.com/${process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture"}.git`,
+      remoteUrl: `https://github.com/${fixtureRepo()}.git`,
       destinationPath: destination,
     })) as { cwd?: string };
     const projectId = uuid();

@@ -12,9 +12,10 @@ import { enable as enableCli, ensureProject } from "./lib/cliTurn.ts";
 import { admin, base, dispatch, itemsOf, pair, projectionOf, runsOf, sendMessage, sleep, threadWindow, uuid, wsCall, wsFirst } from "./lib/client.ts";
 import { findSession } from "./lib/peerAcceptance.ts";
 import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
+import { fixtureRepo } from "./lib/scriptSettings.ts";
 
 const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/parity-batch");
-const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
+const FIXTURE = fixtureRepo();
 const PROJECT = "pbatch-fixture";
 const DURABLE = { instanceId: "piDurable", model: "anthropic/claude-haiku-5-5", options: [] };
 const CODEX = { instanceId: "codex", model: "gpt-6-luna", options: [] };

@@ -5,6 +5,9 @@
  *
  *   pnpm --filter @t3flare/infra run github-app:setup [--name t3flare] [--repo owner/name]
  *
+ * The repository (the Deployment repository, whose environment `bump` gets the app's secrets) is `--repo`, else
+ * GITHUB_REPOSITORY, from the shell or ~/.config/t3flare/dev.env; there is no default (docs/deploy.md).
+ *
  * 1. It serves a page on 127.0.0.1 that posts the manifest (`githubAppManifest`) to GitHub; you confirm the app's name
  *    there, and GitHub sends you back with a code the app's ID and private key are fetched with. GitHub shows the key
  *    only then.
@@ -28,6 +31,8 @@ import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import { GitHubApp, notInstalledOn } from "@t3flare/github-app/app";
+
+import { requiredSetting } from "../apps/environment/scripts/lib/deploymentSettings.ts";
 import { type GitHubAppManifest, githubAppManifest, withDevEnvValues } from "./src/github-app.ts";
 
 /** The GitHub environments whose deploys bind the app's secrets. */
@@ -37,7 +42,7 @@ const ENVIRONMENTS: ReadonlyArray<string> = ["bump"];
 const DEV_ENV = join(homedir(), ".config", "t3flare", "dev.env");
 
 /** The app's homepage. */
-const HOMEPAGE = "https://github.com/ian-pascoe/t3flare";
+const HOMEPAGE = "https://github.com/spiritledsoftware/t3flare";
 
 /** GitHub allows an hour between the registration and the code's exchange. */
 const REGISTRATION_TIMEOUT_MS = 60 * 60_000;
@@ -45,10 +50,20 @@ const REGISTRATION_TIMEOUT_MS = 60 * 60_000;
 const { values: args } = parseArgs({
   options: {
     name: { type: "string", default: "t3flare" },
-    repo: { type: "string", default: process.env.GITHUB_REPOSITORY ?? "ian-pascoe/t3flare" },
+    repo: { type: "string" },
     environment: { type: "string", multiple: true },
   },
 });
+
+/** The repository whose environments get the app's secrets: `--repo`, else GITHUB_REPOSITORY. */
+const repo = (() => {
+  const setting = requiredSetting({ GITHUB_REPOSITORY: args.repo ?? process.env.GITHUB_REPOSITORY }, "GITHUB_REPOSITORY");
+  if (!setting.ok) {
+    console.error(setting.error);
+    process.exit(1);
+  }
+  return setting.value;
+})();
 
 /** The environments this run writes the app's secrets into: those named, else every one. */
 const environments: ReadonlyArray<string> = args.environment ?? ENVIRONMENTS;
@@ -199,10 +214,10 @@ const storeSecrets = async (app: Registered) => {
 
   for (const environment of environments) {
     for (const [name, value] of Object.entries(values)) {
-      await run("gh", ["secret", "set", name, "--env", environment, "--repo", args.repo], value);
+      await run("gh", ["secret", "set", name, "--env", environment, "--repo", repo], value);
     }
 
-    console.log(`Set them in ${args.repo}'s GitHub environment ${environment}.`);
+    console.log(`Set them in ${repo}'s GitHub environment ${environment}.`);
   }
 };
 

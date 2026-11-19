@@ -31,6 +31,7 @@ import { CLI_ROOTS, type EnvironmentPrecedence } from "@t3flare/skills";
 
 import { ensureProject } from "./lib/cliTurn.ts";
 import { admin, dispatch, itemsOf, pair, projectionOf, runsOf, sendMessage, sleep, threadWindow, uuid, wsCall } from "./lib/client.ts";
+import { fixtureRepo } from "./lib/scriptSettings.ts";
 
 type Cli = "codex" | "pi" | "claude" | "opencode";
 const SONNET = process.env.T3FLARE_PCLIENV_MODEL ?? "anthropic/claude-sonnet-5-5";
@@ -56,7 +57,7 @@ const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
 const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/env-skills-cli");
 const REPO_FIXTURE = path.resolve(import.meta.dirname, "../test/fixtures/cli-skills");
 const SETTLED = new Set(["completed", "failed", "interrupted", "cancelled"]);
-const FIXTURE_REPO = "ian-pascoe/t3flare-fixture";
+const FIXTURE_REPO = fixtureRepo();
 const BRANCH = "spi1153-env";
 const PROJECT = process.env.T3FLARE_PCLIENV_PROJECT ?? "pclienv-proj";
 const root = `/w/${PROJECT}`;

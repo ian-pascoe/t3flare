@@ -23,10 +23,11 @@ import * as path from "node:path";
 import { admin, base, dispatch, itemsOf, pair, projectionOf, runsOf, SETTLED, sleep, updateSettings, uuid, wsCall, wsFirst } from "./lib/client.ts";
 import { pendingOf, projection as cloudProjection } from "./lib/cloudThread.ts";
 import { writeEvidence } from "./lib/evidence.ts";
-import { ensureCloudFixtureProject, FIXTURE } from "./lib/fixtureProject.ts";
+import { ensureCloudFixtureProject } from "./lib/fixtureProject.ts";
 import { Laptop } from "./lib/laptop.ts";
 import { laptopModel, laptopPiEnvironment, piInstanceMutation } from "./lib/laptopAgent.ts";
 import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
+import { fixtureRepo } from "./lib/scriptSettings.ts";
 
 const arg = (name: string, fallback: string) => {
   const at = process.argv.indexOf(`--${name}`);
@@ -82,7 +83,7 @@ try {
   laptopCookie = await laptop.pair();
   await lp.wsCall(laptopCookie, "server.updateSettings", { patch: { linkedEnvironmentsEnabled: true }, providerInstanceMutation: piInstanceMutation() });
   const clone = path.join(dir, "fixture");
-  const cloned = spawnSync("gh", ["repo", "clone", FIXTURE, clone, "--", "--depth", "1"], { encoding: "utf8" });
+  const cloned = spawnSync("gh", ["repo", "clone", fixtureRepo(), clone, "--", "--depth", "1"], { encoding: "utf8" });
   if (!check("the fixture clones on the laptop", cloned.status === 0, cloned.stderr.slice(-300))) throw new Error("no clone");
   const laptopProject = uuid();
   await lp.mutateProject(laptopCookie, { type: "project.create", commandId: uuid(), projectId: laptopProject, title: "fixture", workspaceRoot: clone, createWorkspaceRootIfMissing: false });

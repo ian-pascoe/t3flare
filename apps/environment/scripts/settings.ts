@@ -31,12 +31,13 @@ import { enable as enableCli, ensureProject, modelOf } from "./lib/cliTurn.ts";
 import { admin, dispatch, itemsOf, pair, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, updateSettings, uuid, wsCall } from "./lib/client.ts";
 import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
 import { tailing } from "./lib/tail.ts";
+import { accessTeamDomain, fixtureRepo, prodDomain, workersDevUrl } from "./lib/scriptSettings.ts";
 
 const STAGE = process.env.T3FLARE_STAGE ?? "psmcp";
 const T3 = process.env.T3_URL ?? "";
 const HOST = new URL(T3 || "http://localhost").host;
 const SETTINGS_MCP = process.env.T3FLARE_SETTINGS_MCP_URL ?? "";
-const FIXTURE_URL = process.env.T3FLARE_FIXTURE_URL ?? `https://t3flare-mcpfixture-${STAGE}.ian-g-pascoe.workers.dev`;
+const FIXTURE_URL = process.env.T3FLARE_FIXTURE_URL ?? workersDevUrl(`t3flare-mcpfixture-${STAGE}`);
 const WORKERS = [`t3flare-environment-${STAGE}`, `t3flare-agents-${STAGE}`];
 const SLUG = process.env.T3FLARE_TOOLS_MODEL ?? "anthropic/claude-sonnet-5-5";
 const DURABLE = { instanceId: "piDurable", model: SLUG, options: /claude/.test(SLUG) ? [{ id: "thinking", value: "low" }] : [] };
@@ -470,7 +471,7 @@ const m1 = async () => {
     const mcpMalformed = await harness("POST", "/_t3flare/harness/api/mcp", { op: "server", server: "fixture", exposure: "deferred", expectedRevision: -1 });
     results.push({ route: "mcp", case: "malformed (-1): 400", status: mcpMalformed.status, body: mcpMalformed.json });
     // No skill is kept on the stage: an install (which previews the source on GitHub) with a stale revision.
-    const skillsStale = await harness("POST", "/_t3flare/harness/api/skills/install", { source: "ian-pascoe/t3flare-fixture", commit: "0".repeat(40), folders: ["."], expectedRevision: (await environment()).revision - 1 });
+    const skillsStale = await harness("POST", "/_t3flare/harness/api/skills/install", { source: fixtureRepo(), commit: "0".repeat(40), folders: ["."], expectedRevision: (await environment()).revision - 1 });
     results.push({ route: "skills/install", case: "stale: 409", status: skillsStale.status, body: skillsStale.json });
     const skillsMalformed = await harness("POST", "/_t3flare/harness/api/skills/remove", { name: "no-such-skill", expectedRevision: 1.5 });
     results.push({ route: "skills/remove", case: "malformed (1.5): 400", status: skillsMalformed.status, body: skillsMalformed.json });
@@ -1208,7 +1209,7 @@ const m5a = async () => {
 /** M5a item 4c: prod's host as it is today, read-only and unauthenticated (no deploy, no credential). */
 const m5aProd = async () => {
   const FILE = "m5a-settings-owner-browser.json";
-  const prod = "https://t3.ianpascoe.dev";
+  const prod = `https://${prodDomain()}`;
   const at = async (p: string, method = "GET") => {
     const response = await fetch(new URL(p, prod), { method, redirect: "manual", headers: { accept: "application/json", ...(method === "POST" ? { "content-type": "application/json" } : {}) }, ...(method === "POST" ? { body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }) } : {}) });
     const text = await response.text();
@@ -1243,7 +1244,7 @@ const m5aProd = async () => {
   const harnessKid = answers[5]!.locationKid;
   await record(FILE, "4c", {
     name: "prod's host as it is today (read-only, unauthenticated GETs and one unauthenticated POST ping; nothing changed): the baseline for the first prod deploy of SettingsAccess",
-    host: "t3.ianpascoe.dev",
+    host: prodDomain(),
     answers,
     expectedWhileExcluded: "/_t3flare/mcp gets the admin application's Access login (same kid as /_t3flare/harness), no resource_metadata challenge",
     sameKidAsHarness: mcp.locationKid !== null && mcp.locationKid === harnessKid,
@@ -1919,7 +1920,7 @@ const ownerOAuth = async () => {
   const { spawnSync } = await import("node:child_process");
   const b64 = (b: Buffer) => b.toString("base64url");
   const discovered = await (await fetch(new URL("/.well-known/cloudflare-access-protected-resource/_t3flare/mcp", T3))).json().catch(() => ({})) as any;
-  const team = String(discovered.authorization_servers?.[0] ?? "https://spirit-led-software.cloudflareaccess.com");
+  const team = String(discovered.authorization_servers?.[0] ?? `https://${accessTeamDomain()}`);
   const metadata = (await (await fetch(`${team}/.well-known/oauth-authorization-server`)).json().catch(() => ({}))) as any;
   const registration = metadata.registration_endpoint ?? `${team}/cdn-cgi/access/oauth/registration`;
   const port = 40_000 + (randomBytes(2).readUInt16BE(0) % 20_000);

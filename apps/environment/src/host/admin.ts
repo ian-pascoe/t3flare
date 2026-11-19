@@ -15,7 +15,8 @@
 //   POST /_t3flare/check/sql                    withTransaction rollback and >100 parameters through t3's client
 //   POST /_t3flare/fixtures/turn-items          {"threadIds": [...], "runs": 3, "marker": "..."}
 //   POST /_t3flare/check/workspaces             step 2a M2: unlisted `/w` ids fail without touching a DO; `/w` lists the registry
-//   POST /_t3flare/check/agents?budget=0|1      step 2a M0: the agents Worker both ways, Containers, paths, budget, token scope
+//   POST /_t3flare/check/agents?repo=<o/n>&other=<o/n>[&budget=0|1]  step 2a M0: the agents Worker both ways, Containers,
+//                                               paths, budget, token scope (repo and other required: 400 without them)
 //   GET  /_t3flare/agents/session?thread=<id>   a Session's state as it would push it (differ fixtures, diagnosis)
 //   POST /_t3flare/agents/drop-turns?thread=<id> a test's fault: the Session forgets its turns (the inverse guard)
 //   GET  /_t3flare/agents/session-diagnostics?thread=<id>  a Session's start and alarm counts
@@ -528,8 +529,10 @@ export const handleAdmin = async (request: Request, environment: EnvironmentDO):
         return json(await workspacesCheck());
       }
       case "POST /_t3flare/check/agents": {
-        const { agentsCheck } = await import("./agentsCheck.ts");
-        return json(await agentsCheck(environment, request));
+        const { agentsCheck, agentsCheckRepos } = await import("./agentsCheck.ts");
+        const repos = agentsCheckRepos(url);
+        if ("error" in repos) return json({ error: repos.error }, 400);
+        return json(await agentsCheck(environment, request, repos));
       }
       case "POST /_t3flare/fixtures/turn-items": {
         const body = (await request.json()) as { threadIds?: Array<string>; runs?: number; marker?: string };

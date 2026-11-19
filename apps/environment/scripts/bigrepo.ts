@@ -2,7 +2,7 @@
 // A large repo with a submodule as a project and a worktree thread (the prod bug of 2026-11-11: t3flare itself, whose
 // `t3code` submodule has 31,946 files), through t3's own RPCs:
 //
-//   node scripts/stage.ts run <stage> bigrepo [--repo ian-pascoe/t3flare] [--out <file>]
+//   node scripts/stage.ts run <stage> bigrepo --repo <owner/name> [--out <file>]   (the 2026-11-11 run used t3flare itself)
 //
 // Clones the repo as a project; launches a worktree thread whose turn checks the submodule out, commits an edit and
 // answers; reads status and the diff in the worktree, then the same reads with its Container stopped; removes the
@@ -17,7 +17,11 @@ const arg = (name: string) => {
   const index = args.indexOf(`--${name}`);
   return index === -1 ? undefined : args[index + 1];
 };
-const repo = arg("repo") ?? "ian-pascoe/t3flare";
+const repo = arg("repo");
+if (repo === undefined || !/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/.test(repo)) {
+  console.error("usage: node scripts/stage.ts run <stage> bigrepo --repo <owner/name> [--out <file>]");
+  process.exit(2);
+}
 const report: Record<string, unknown> = { repo, at: new Date().toISOString() };
 const failures: Array<string> = [];
 const check = (name: string, ok: boolean, detail?: unknown) => {

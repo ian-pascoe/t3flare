@@ -162,11 +162,14 @@ export const scrubValue = (value: unknown, secrets: ReadonlyArray<string>): unkn
 
 /**
  * A report as kept (the acceptance test's, `bump-report.json`: an artifact), as indented JSON with the stage's Model
- * endpoint's key and header values scrubbed from it (`stageEndpointSpec(env)`).
+ * endpoint's key and header values scrubbed from it (`stageEndpointSpec(env)`), and the Owner's email (a secret in CI,
+ * docs/deploy.md).
  */
 export const keptReportJson = (report: unknown, env: Readonly<Record<string, string | undefined>>): string => {
   const endpoint = stageEndpointSpec(env);
-  return JSON.stringify(scrubValue(report, endpoint.ok ? endpoint.specs.flatMap(secretsOf) : []), null, 2);
+  const ownerEmail = (env.T3FLARE_OWNER_EMAIL ?? "").trim();
+  const secrets = [...(endpoint.ok ? endpoint.specs.flatMap(secretsOf) : []), ...(ownerEmail.length >= MIN_SECRET_LENGTH ? [ownerEmail] : [])];
+  return JSON.stringify(scrubValue(report, secrets), null, 2);
 };
 
 /**

@@ -1,6 +1,7 @@
 // @effect-diagnostics globalDate:off asyncFunction:off
 // M0's exit check (step 2a plan, section 7): `POST /_t3flare/check/agents`. Calls into the agents Worker and back,
 // starts Containers in two Workspaces, checks the paths, the Container budget, and a GitHub token's scope. Never boots t3.
+// `?repo=<owner/name>&other=<owner/name>`, both required: the repo a Container token is minted for, and one outside it.
 import { CONTAINER_GITHUB_PERMISSIONS } from "@t3flare/github-app/permissions";
 
 import { byName } from "../agents/rpc.ts";
@@ -22,7 +23,17 @@ echo "agent file: $(cat /workspace/repo/from-do.txt 2>/dev/null || echo missing)
 const lsRemote = (repo: string, token: string) =>
   `git -c credential.helper= ls-remote https://x-access-token:${token}@github.com/${repo}.git HEAD >/dev/null 2>&1 && echo ok || echo refused`;
 
-export const agentsCheck = async (environment: EnvironmentDO, request: Request) => {
+const REPO = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
+
+/** The check's two repositories from its query, or the reason it is refused (400). No default: they are the Owner's. */
+export const agentsCheckRepos = (url: URL): { readonly repo: string; readonly other: string } | { readonly error: string } => {
+  const repo = url.searchParams.get("repo") ?? "";
+  const other = url.searchParams.get("other") ?? "";
+  if (!REPO.test(repo) || !REPO.test(other)) return { error: "repo and other are required query parameters, each owner/name: the repo a Container token is minted for, and one outside it" };
+  return { repo, other };
+};
+
+export const agentsCheck = async (environment: EnvironmentDO, request: Request, repos: { readonly repo: string; readonly other: string }) => {
   const url = new URL(request.url);
   const agents = environment.agents;
   const report: Record<string, unknown> = { at: new Date().toISOString() };
@@ -70,8 +81,7 @@ export const agentsCheck = async (environment: EnvironmentDO, request: Request) 
   }
 
   // 4. A Container token names its one repo.
-  const repo = url.searchParams.get("repo") ?? "ian-pascoe/t3flare-fixture";
-  const other = url.searchParams.get("other") ?? "ian-pascoe/mac-bridge";
+  const { repo, other } = repos;
   if (environment.github.configured) {
     const [owner = "", name = ""] = repo.split("/");
     const minted = await environment.github.mint({ owner, repositories: [name], permissions: CONTAINER_GITHUB_PERMISSIONS });

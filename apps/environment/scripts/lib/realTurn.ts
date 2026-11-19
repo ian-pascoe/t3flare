@@ -10,8 +10,8 @@ import { spawnSync } from "node:child_process";
 
 import { admin, dispatch, itemsOf, mutateProject, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall, wsStream } from "./client.ts";
 import { committed, headCommit, t3Commit } from "./t3Commit.ts";
+import { fixtureRepo } from "./scriptSettings.ts";
 
-const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
 // T3FLARE_REAL_TURN_MODEL names another model of the proxy (a Claude model gets a thinking level, any other none).
 const SLUG = process.env.T3FLARE_REAL_TURN_MODEL ?? "anthropic/claude-haiku-5-5";
 const modelOf = (slug: string) => ({ instanceId: "piDurable", model: slug, options: /claude/.test(slug) ? [{ id: "thinking", value: "low" }] : [] });
@@ -30,7 +30,7 @@ export const realTurn = async (cookie: string, options: { readonly push: boolean
     if (!ok) failures.push(`${name}${detail === undefined ? "" : `: ${JSON.stringify(detail).slice(0, 500)}`}`);
     return ok;
   };
-  const report: Record<string, unknown> = { fixture: FIXTURE, model: MODEL.model };
+  const report: Record<string, unknown> = { fixture: fixtureRepo(), model: MODEL.model };
   const started = Date.now();
   const id = `acceptance-${Date.now().toString(36)}`;
   const destination = `/w/${id}`;
@@ -43,7 +43,7 @@ export const realTurn = async (cookie: string, options: { readonly push: boolean
 
   // 1. Clone, as the client's Add project → Clone does.
   const cloneStarted = Date.now();
-  const cloned = (await wsCall(cookie, "sourceControl.cloneRepository", { remoteUrl: `https://github.com/${FIXTURE}.git`, destinationPath: destination }).catch(
+  const cloned = (await wsCall(cookie, "sourceControl.cloneRepository", { remoteUrl: `https://github.com/${fixtureRepo()}.git`, destinationPath: destination }).catch(
     (error: unknown) => ({ error: String(error).slice(0, 500) }),
   )) as { cwd?: string; error?: string };
   report.clone = { destination, ms: Date.now() - cloneStarted, cwd: cloned.cwd ?? null, error: cloned.error ?? null };

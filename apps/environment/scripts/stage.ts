@@ -11,6 +11,13 @@
 // `.alchemy/stages/<stage>.env.json` (gitignored, 0600); its Access service token's credentials are written next
 // to it by alchemy.run.ts. Nothing secret is printed. The alchemy profile is $ALCHEMY_PROFILE or `default`.
 // CI passes the tokens in the environment instead (deploy-prod.yml: the laptop's prod tokens; CI never makes them).
+//
+// Every deploy needs the Deployment settings (docs/deploy.md; lib/deploymentSettings.ts), from the environment or else
+// ~/.config/t3flare/dev.env, the environment winning, so one can be given on the command line:
+//
+//   T3FLARE_OWNER_EMAIL=you@example.com node scripts/stage.ts deploy <stage>
+//
+// A missing or malformed one is refused before anything is built.
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import * as fs from "node:fs";
@@ -23,7 +30,7 @@ import { t3ServerVersion } from "../serverVersion.ts";
 import { buildAgentsWorker } from "../../agents/build.ts";
 import { isDurableObjectClassNotFound } from "./deploy-retry.ts";
 import { adminClient, ensureModelEndpoint } from "./lib/modelEndpoint.ts";
-import { allDeploySettings, deployPlan, devEnvNames } from "./lib/deployPlan.ts";
+import { allDeploySettings, deployPlan, devEnvNames, OPTIONAL_DEPLOY_SETTINGS } from "./lib/deployPlan.ts";
 import { MODEL_ENDPOINT_VAR, type ModelEndpointSpecResult } from "./lib/modelEndpointSpec.ts";
 
 const here = path.resolve(import.meta.dirname, "..");
@@ -77,7 +84,7 @@ const stageSecrets = (): Record<string, string> => {
 };
 
 /**
- * The deploy-wide secrets (step 2a): the GitHub App (lib/deployPlan.ts lists them), and `extra`, from the environment
+ * The deploy-wide settings (step 2a): the GitHub App and the Deployment settings (lib/deployPlan.ts lists them), and `extra`, from the environment
  * (CI) or else ~/.config/t3flare/dev.env (0600,
  * outside the repo), which bash reads as it is written (multi-line values included). Shell variables win. Never printed.
  */
@@ -164,9 +171,9 @@ switch (command) {
     }
     // SPI-1175: what is bound and set up, decided before anything is built (lib/deployPlan.ts): the stage's Model endpoints
     // come from T3FLARE_MODEL_ENDPOINT, else a logged skip (the stage then starts in the setup state).
-    const plan = deployPlan({ stage, args: rest, read: deploySecrets([MODEL_ENDPOINT_VAR]), env: process.env });
+    const plan = deployPlan({ stage, args: rest, read: deploySecrets([MODEL_ENDPOINT_VAR, ...OPTIONAL_DEPLOY_SETTINGS]), env: process.env });
     if (!plan.ok) {
-      console.error(`t3flare: ${plan.error}`);
+      console.error(plan.error);
       process.exit(1);
     }
     for (const note of plan.notes) console.log(`t3flare: ${note}`);
@@ -216,8 +223,9 @@ switch (command) {
       env: {
         ...process.env,
         ...stageSecrets(),
-        // The Model endpoint's setting too (SPI-1175): acceptance.ts sets it up before its turns.
-        ...deploySecrets([MODEL_ENDPOINT_VAR]),
+        // The Model endpoint's setting too (SPI-1175): acceptance.ts sets it up before its turns. And the Deployment
+        // settings, the fixture repository among them, which the scripts read through lib/scriptSettings.ts.
+        ...deploySecrets([MODEL_ENDPOINT_VAR, ...OPTIONAL_DEPLOY_SETTINGS]),
         T3_URL: access.url,
         T3FLARE_HARNESS_URL: access.url,
         // The Settings server's Owner-client endpoint (ADR-0035, plan D13), for the stage's MCP clients.
@@ -233,7 +241,7 @@ switch (command) {
       console.error("t3flare: prod holds the owner's threads; pass --really-destroy-prod to destroy it");
       process.exit(2);
     }
-    const { status } = await alchemy(["destroy"], { ...stageSecrets(), ...deploySecrets() });
+    const { status } = await alchemy(["destroy"], { ...stageSecrets(), ...deploySecrets(OPTIONAL_DEPLOY_SETTINGS) });
     if (status === 0) {
       fs.rmSync(secretsFile, { force: true });
       fs.rmSync(credentialsFile(stage), { force: true });

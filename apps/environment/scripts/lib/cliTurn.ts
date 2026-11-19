@@ -3,15 +3,15 @@
 // request answered, and the projection's evidence. Used by `scripts/cli4a.ts` and `acceptance.ts --codex/--pi`.
 import { dispatch, endpointModelFor, itemsOf, mutateProject, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall } from "./client.ts";
 import { cloudProjects } from "./fixtureProject.ts";
+import { fixtureRepo } from "./scriptSettings.ts";
 
-const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
 
 /** A Workspace with the fixture cloned through t3's own clone, and its project (made once per id). */
 export const ensureProject = async (cookie: string, id: string): Promise<{ projectId: string; root: string }> => {
   const root = `/w/${id}`;
   const existing = (await cloudProjects(cookie)).find((project) => project.workspaceRoot === root);
   if (existing !== undefined) return { projectId: existing.id, root };
-  const cloned = (await wsCall(cookie, "sourceControl.cloneRepository", { remoteUrl: `https://github.com/${FIXTURE}.git`, destinationPath: root }).catch((error: unknown) => ({
+  const cloned = (await wsCall(cookie, "sourceControl.cloneRepository", { remoteUrl: `https://github.com/${fixtureRepo()}.git`, destinationPath: root }).catch((error: unknown) => ({
     error: String(error).slice(0, 300),
   }))) as { cwd?: string; error?: string };
   if (cloned.cwd !== root && !String(cloned.error).includes("exist")) throw new Error(`clone of ${id} failed: ${cloned.error}`);

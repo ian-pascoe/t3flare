@@ -213,6 +213,10 @@ describe("keptReportJson (the acceptance report and bump-report.json)", () => {
     expect(kept).not.toContain("quoted");
   });
 
+  it("scrubs the Owner's email (a secret in CI)", () => {
+    expect(JSON.parse(keptReportJson({ who: "owner@example.com signed in" }, { T3FLARE_OWNER_EMAIL: "owner@example.com" }))).toEqual({ who: "[redacted] signed in" });
+  });
+
   it("is the plain report when there is no endpoint", () => {
     expect(JSON.parse(keptReportJson(report, { GITHUB_ACTIONS: "true" }))).toEqual(report);
   });
