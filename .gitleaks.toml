@@ -1,0 +1,30 @@
+# gitleaks configuration (ci.yml's `secrets` job): gitleaks' default rules, plus allowlists for
+# what this repo holds on purpose and is not a secret. A finding outside these is a real one until shown otherwise; mark
+# a deliberate made-up credential on its line with `gitleaks:allow`.
+title = "t3flare"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Tests and test harnesses: made-up credentials the redaction and refusal tests look for"
+paths = [
+  '''(^|/)test/''',
+  '''\.test\.ts$''',
+]
+
+[[allowlists]]
+description = "Step evidence: Access audience tags, credential-store key names and caller ids, none of them secret"
+paths = ['''^docs/steps/''']
+
+[[allowlists]]
+description = "Values that look like keys but are public or fixed"
+regexTarget = "line"
+regexes = [
+  # RFC 6455's sample Sec-WebSocket-Key.
+  '''"sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ=="''',
+  # Clerk's publishable key and CLI OAuth client id, public by design (t3's own Connect config).
+  '''^\s*(clerkPublishableKey|clerkCliOAuthClientId): "''',
+  # A PEM armour line in an error message.
+  '''-----BEGIN PRIVATE KEY-----\)''',
+]

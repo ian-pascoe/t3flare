@@ -1,0 +1,10 @@
+# Findings in past commits that are not secrets (made-up JWTs in fault fixtures, a token *name*); see .gitleaks.toml.
+48322afd953c0afe020da1edc69ecda147feb28b:apps/agents/src/session/proxyLimits.ts:jwt:85
+5eaea975da86657e4c0990fac44aa690bd260558:apps/agents/src/session/proxyLimits.ts:jwt:85
+6e17e5ab66716fd97f358367a8f11a1b59fc826b:apps/environment/scripts/p1172.ts:jwt:29
+89035bc0aa066a3f0c45e5f98f51c0f1c0c7f0e4:apps/agents/src/session/proxyLimits.ts:jwt:85
+99f6f4c45a46fc34bf8384da8cbd881e3a1301d4:apps/agents/src/session/proxyLimits.ts:jwt:85
+b7d7ba42f85ea0f028a0464d2d547904d4e64fd2:apps/environment/scripts/p1172.ts:jwt:29
+bc956f49fde3e5140bcc0a8b655e7d170846557d:infra/github.ts:generic-api-key:88
+f7fa2f7bb3efb0612f1428307a4247c7d910a5af:apps/environment/scripts/p1172.ts:jwt:29
+f97ec30733d11cad20aab0faea102a2a7ad36094:apps/environment/scripts/p1172.ts:jwt:29

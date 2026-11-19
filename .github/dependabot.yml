@@ -1,0 +1,13 @@
+# Version updates for the workflows' actions only, monthly and in one PR. npm updates stay off: the workspace and the
+# lock come from t3code's through `pnpm run relock` (ADR-0030), and t3code's pin moves by the nightly bump (ADR-0017).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/setup
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
