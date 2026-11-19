@@ -2,8 +2,8 @@
 // Step 3: the stage's project on the fixture repo, cloned through t3's own clone once per stage and reused, so the
 // laptop's local clone of the same repo resolves to it (`RemoteDelegation.resolveRemoteProject`).
 import { mutateProject, uuid, wsCall, wsFirst } from "./client.ts";
+import { fixtureRepo } from "./scriptSettings.ts";
 
-export const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
 export const CLOUD_FIXTURE_ROOT = "/w/step3-fixture";
 
 /** Every project object in the shell snapshot, wherever the snapshot nests them. */
@@ -25,7 +25,7 @@ export const ensureCloudFixtureProject = async (cookie: string): Promise<{ reado
   const existing = (await cloudProjects(cookie)).find((project) => project.workspaceRoot === CLOUD_FIXTURE_ROOT);
   if (existing !== undefined) return { projectId: existing.id, workspaceRoot: CLOUD_FIXTURE_ROOT, cloned: false };
   const cloned = (await wsCall(cookie, "sourceControl.cloneRepository", {
-    remoteUrl: `https://github.com/${FIXTURE}.git`,
+    remoteUrl: `https://github.com/${fixtureRepo()}.git`,
     destinationPath: CLOUD_FIXTURE_ROOT,
   }).catch((error: unknown) => ({ error: String(error).slice(0, 500) }))) as { cwd?: string; error?: string };
   if (cloned.cwd !== CLOUD_FIXTURE_ROOT && !String(cloned.error).includes("exist")) throw new Error(`fixture clone failed: ${cloned.error}`);

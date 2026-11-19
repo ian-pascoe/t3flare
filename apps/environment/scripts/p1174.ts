@@ -30,6 +30,7 @@ import { RpcClient } from "effect/rpc";
 import { cliTurn as acpTurn, enable as enableAcp } from "./lib/acpTurn.ts";
 import { admin, base, createProjectAndThread, pair, projectionOf, protocol, runsOf, sendMessage, SETTLED, sleep, threadWindow, wsCall } from "./lib/client.ts";
 import { cliTurn } from "./lib/cliTurn.ts";
+import { workersDevUrl } from "./lib/scriptSettings.ts";
 
 const option = (name: string) => {
   const index = process.argv.indexOf(`--${name}`);
@@ -39,7 +40,7 @@ const out = option("out");
 const staleWaitMin = Number(option("stale-wait-min") ?? "31");
 const probeKey = process.env.T3FLARE_PROBE_KEY ?? "";
 const stage = base.hostname.split(".")[0]!.replace(/^t3flare-environment-/, "");
-const PROBE = `https://t3flare-probe-${stage}.ian-g-pascoe.workers.dev`;
+const PROBE = workersDevUrl(`t3flare-probe-${stage}`);
 const secrets = [probeKey].filter((value) => value.length >= 8);
 const failures: Array<string> = [];
 const head = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).stdout.trim();

@@ -13,9 +13,10 @@ import * as path from "node:path";
 
 import { enable as enableCli, ensureProject, modelOf } from "./lib/cliTurn.ts";
 import { admin, dispatch, itemsOf, pair, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall } from "./lib/client.ts";
+import { workersDevUrl } from "./lib/scriptSettings.ts";
 
 const STAGE = process.env.T3FLARE_STAGE ?? "spi1079";
-const FIXTURE_URL = process.env.T3FLARE_FIXTURE_URL ?? `https://t3flare-mcpfixture-${STAGE}.ian-g-pascoe.workers.dev`;
+const FIXTURE_URL = process.env.T3FLARE_FIXTURE_URL ?? workersDevUrl(`t3flare-mcpfixture-${STAGE}`);
 const SLUG = process.env.T3FLARE_TOOLS_MODEL ?? "anthropic/claude-sonnet-5-5";
 const MODEL = { instanceId: "piDurable", model: SLUG, options: /claude/.test(SLUG) ? [{ id: "thinking", value: "low" }] : [] };
 const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/spi-1079");

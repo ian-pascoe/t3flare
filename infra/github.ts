@@ -11,9 +11,18 @@
  * `ci:setup` also allows GitHub Actions to create pull requests on the repository (the job proposes each new pin as
  * `bump/<tag>`), which no alchemy resource covers.
  *
- Read from the environment (never committed; `ci:setup` exports ~/.config/t3flare/dev.env first):
+ * Read from the environment (never committed; `ci:setup` exports ~/.config/t3flare/dev.env first). The Deployment
+ * settings (docs/deploy.md) have no default; a missing or malformed one stops the run with its message
+ * (apps/environment/scripts/lib/deploymentSettings.ts):
  *
- *   GITHUB_REPOSITORY  owner/name (default: ian-pascoe/t3flare)
+ *   GITHUB_REPOSITORY  the Deployment repository, owner/name (required)
+ *   T3FLARE_DOMAIN, T3FLARE_DOMAIN_ZONE_ID   prod's custom domain and the id of its zone (required): the variable
+ *                      T3FLARE_DOMAIN on `prod`, and the zone permissions of prod's token
+ *   T3FLARE_ACCESS_TEAM_DOMAIN, T3FLARE_WORKERS_DEV_SUBDOMAIN   (required) repository variables of those names
+ *   T3FLARE_OWNER_EMAIL  (required) a repository secret: Actions logs are public, and a variable prints unmasked
+ *   T3FLARE_FIXTURE_REPO  (required) the variable of that name on `bump`: the fixture its acceptance test uses
+ *   T3FLARE_UPDATE_REPO  (optional) the variable of that name on `prod`, prod's update target; unset, none is set (and a
+ *                      run removes one an earlier run set), and prod has no in-app Update
  *   T3FLARE_GITHUB_APP_ID, T3FLARE_GITHUB_APP_PRIVATE_KEY   (required)
  *   T3FLARE_MODEL_ENDPOINT  the Model endpoints CI's stages set up through the panel's API (SPI-1175; the format is in
  *                      apps/environment/scripts/lib/modelEndpointSpec.ts): one, or a list with one per API. The bump's
@@ -44,6 +53,7 @@ import * as Redacted from "effect/Redacted";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { optionalSetting, requiredSettings } from "../apps/environment/scripts/lib/deploymentSettings.ts";
 import { MODEL_ENDPOINT_VAR, modelEndpointSecret, modelEndpointSpec } from "../apps/environment/scripts/lib/modelEndpointSpec.ts";
 
 /** Account-scoped "Access: Apps and Policies Write" (the catalog name is shared with a zone-scoped group). */
@@ -67,14 +77,16 @@ const STAGE_DEPLOY_PERMISSIONS = [
   ACCESS_SERVICE_TOKENS_WRITE,
 ] as const;
 
-/**
- * prod's custom domain (apps/environment/alchemy.run.ts reads it as T3FLARE_DOMAIN), and the zone it is in. Attaching a
- * Workers Custom Domain needs zone permissions the other stages do not: Zone Read (alchemy looks the zone up by name)
- * and Workers Routes Write ("Worker domains and routes"), on this zone only, for the prod token only. Zone WAF Write:
- * the rate limit on t3's auth routes (the zone's `http_ratelimit` phase, ADR-0010).
- */
-const PROD_DOMAIN = "t3.ianpascoe.dev";
-const PROD_DOMAIN_ZONE_ID = "c36c6e2b6bda856f9d4f6175059c6df4"; // ianpascoe.dev
+/** The Deployment settings this run needs (docs/deploy.md), every one required. */
+const SETTINGS = [
+  "GITHUB_REPOSITORY",
+  "T3FLARE_DOMAIN",
+  "T3FLARE_DOMAIN_ZONE_ID",
+  "T3FLARE_ACCESS_TEAM_DOMAIN",
+  "T3FLARE_WORKERS_DEV_SUBDOMAIN",
+  "T3FLARE_OWNER_EMAIL",
+  "T3FLARE_FIXTURE_REPO",
+] as const;
 
 /** prod's bootstrap and admin tokens from the laptop's stage file (apps/environment/stage-files.ts), never printed. */
 const readStageTokens = (file: string) => {
@@ -95,10 +107,29 @@ export default Alchemy.Stack(
   Effect.gen(function* () {
     const { accountId } = yield* yield* Cloudflare.CloudflareEnvironment;
 
-    const [owner = "", repository = ""] = (yield* Config.String("GITHUB_REPOSITORY").pipe(
-      Config.withDefault("ian-pascoe/t3flare"),
-    )).split("/");
+    // Every setting is checked before anything is planned, and every problem reported at once.
+    const settings = requiredSettings(process.env, SETTINGS);
+    if (!settings.ok) return yield* Effect.die(new Error(settings.error));
+    const updateRepo = optionalSetting(process.env, "T3FLARE_UPDATE_REPO");
+    if (!updateRepo.ok) return yield* Effect.die(new Error(updateRepo.error));
+    const {
+      GITHUB_REPOSITORY,
+      T3FLARE_DOMAIN: prodDomain,
+      // The zone prod's custom domain is in (apps/environment/alchemy.run.ts reads the domain as T3FLARE_DOMAIN). Attaching
+      // a Workers Custom Domain needs zone permissions the other stages do not: Zone Read (alchemy looks the zone up by
+      // name) and Workers Routes Write ("Worker domains and routes"), on this zone only, for the prod token only. Zone WAF
+      // Write: the rate limit on t3's auth routes (the zone's `http_ratelimit` phase, ADR-0010).
+      T3FLARE_DOMAIN_ZONE_ID: prodDomainZoneId,
+    } = settings.value;
+
+    const [owner = "", repository = ""] = GITHUB_REPOSITORY.split("/");
     const repo = { owner, repository };
+
+    // The Deployment settings every deploy needs (apps/environment/alchemy.run.ts), for both workflows: two repository
+    // variables, and the Owner's email as a repository secret (a variable's value prints unmasked in the public logs).
+    yield* GitHub.Variable("AccessTeamDomain", { ...repo, name: "T3FLARE_ACCESS_TEAM_DOMAIN", value: settings.value.T3FLARE_ACCESS_TEAM_DOMAIN });
+    yield* GitHub.Variable("WorkersDevSubdomain", { ...repo, name: "T3FLARE_WORKERS_DEV_SUBDOMAIN", value: settings.value.T3FLARE_WORKERS_DEV_SUBDOMAIN });
+    yield* GitHub.Secret("OwnerEmail", { ...repo, name: "T3FLARE_OWNER_EMAIL", value: Redacted.make(settings.value.T3FLARE_OWNER_EMAIL) });
 
     // Retained on destroy: deleting a GitHub environment also deletes whatever was set on it by hand.
     const bump = yield* GitHub.Environment("Bump", { ...repo, name: "bump" }).pipe(
@@ -132,6 +163,9 @@ export default Alchemy.Stack(
       value: accountId,
     });
 
+    // The fixture repository the bump's acceptance test clones and pushes to.
+    yield* GitHub.Variable("BumpFixtureRepo", { ...repo, environment: bump, name: "T3FLARE_FIXTURE_REPO", value: settings.value.T3FLARE_FIXTURE_REPO });
+
     // SPI-1175: the Model endpoints both workflows' stages set up through the panel's API, one JSON secret holding their
     // keys: dev.env's T3FLARE_MODEL_ENDPOINT (an endpoint, or a list of them). Never printed.
     const endpoint = modelEndpointSpec(process.env);
@@ -161,7 +195,7 @@ export default Alchemy.Stack(
           effect: "allow",
           permissionGroups: ["Zone Read", "Workers Routes Write", "Zone WAF Write"],
           resources: {
-            [`com.cloudflare.api.account.${accountId}`]: { [`com.cloudflare.api.account.zone.${PROD_DOMAIN_ZONE_ID}`]: "*" },
+            [`com.cloudflare.api.account.${accountId}`]: { [`com.cloudflare.api.account.zone.${prodDomainZoneId}`]: "*" },
           },
         },
       ],
@@ -199,8 +233,11 @@ export default Alchemy.Stack(
       ...repo,
       environment: prod,
       name: "T3FLARE_DOMAIN",
-      value: PROD_DOMAIN,
+      value: prodDomain,
     });
+    // prod's update target (in-app Updates, ADR-0037), when dev.env names one; deploy-prod.yml logs whether it is set.
+    if (updateRepo.value === undefined) yield* Effect.logWarning("ci:setup: no T3FLARE_UPDATE_REPO: prod gets no update target, so it has no in-app Update");
+    else yield* GitHub.Variable("ProdUpdateRepo", { ...repo, environment: prod, name: "T3FLARE_UPDATE_REPO", value: updateRepo.value });
 
     return { environments: ["bump", "prod"], tokens: ["t3flare-ci-bump", "t3flare-ci-prod"] };
   }),

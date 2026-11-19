@@ -12,8 +12,9 @@ import { cliTurn as acpTurn, enable as enableAcp, ensureProject as ensureAcpProj
 import { cliTurn, enable as enableCli } from "./lib/cliTurn.ts";
 import { admin, dispatch, itemsOf, mutateProject, pair, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, updateSettings, uuid, wsCall } from "./lib/client.ts";
 import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
+import { fixtureRepo } from "./lib/scriptSettings.ts";
 
-const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
+const FIXTURE = fixtureRepo();
 const DURABLE = { instanceId: "piDurable", model: "anthropic/claude-sonnet-5-5", options: [{ id: "thinking", value: "low" }] };
 const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/stock");
 const marker = Date.now().toString(36);

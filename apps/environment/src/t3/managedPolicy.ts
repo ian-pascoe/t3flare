@@ -10,7 +10,7 @@ const off = { value: false, locked: true } as const;
 export const T3FLARE_POLICY = {
   schemaVersion: 1,
   organization: "t3flare",
-  supportUrl: "https://github.com/ian-pascoe/t3flare",
+  supportUrl: "https://github.com/spiritledsoftware/t3flare",
   settings: {
     // Guest links arrive through routes the Environment does not mount (ADR-0010); the share link would 404.
     guestSharingEnabled: off,

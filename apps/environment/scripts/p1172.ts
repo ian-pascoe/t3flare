@@ -29,6 +29,7 @@ import * as path from "node:path";
 import { cliTurn as acpCliTurn, enable as acpEnable } from "./lib/acpTurn.ts";
 import { cliTurn as cli4aTurn, enable as cli4aEnable } from "./lib/cliTurn.ts";
 import { admin, base, dispatch, itemsOf, mutateProject, pair, runsOf, sendMessage, SETTLED, sleep, updateSettings, uuid, waitFor, wsCall } from "./lib/client.ts";
+import { fixtureRepo } from "./lib/scriptSettings.ts";
 
 /** The made-up credentials the `anthropicKeyRefused` fault echoes (apps/agents/src/session/proxyLimits.ts). */
 const ECHOED = [
@@ -142,7 +143,7 @@ switch (step) {
     const id = `p1172-${stamp}`;
     const destination = `/w/${id}`;
     const cloned = (await wsCall(cookie, "sourceControl.cloneRepository", {
-      remoteUrl: `https://github.com/${process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture"}.git`,
+      remoteUrl: `https://github.com/${fixtureRepo()}.git`,
       destinationPath: destination,
     })) as { cwd?: string };
     const projectId = uuid();

@@ -7,7 +7,7 @@ import * as Effect from "effect/Effect";
 import { describe, expect, it } from "vitest";
 
 import { CLI_UPDATE_COMMAND, CLI_UPDATE_TOKEN_ENV, cliMaintenance, isCliUpdateSpawn, lookupLatestCliVersion, runCliUpdate } from "../src/updates/cliUpdate.ts";
-import { updates, type UpdateStore } from "../src/updates/records.ts";
+import { NO_UPDATE_TARGET, updates, type UpdateStore } from "../src/updates/records.ts";
 import type { ActionsClient, WorkflowRun } from "../src/updates/actions.ts";
 
 const npm = (documents: Record<string, unknown>) => async (url: string) => {
@@ -111,7 +111,7 @@ describe("t3flare-cli-update", () => {
 
   it("refuses an unknown CLI, and every CLI where no update target is configured", async () => {
     expect((await runCliUpdate(["opencode"], options(fakeRuns("success").client))).exitCode).toBe(2);
-    expect((await runCliUpdate(["claude"], { updates: undefined })).stderr).toMatch(/only prod/);
+    expect((await runCliUpdate(["claude"], { updates: undefined })).stderr).toBe(`${NO_UPDATE_TARGET}\n`);
   });
 
   it("starts from the image's pin", async () => {

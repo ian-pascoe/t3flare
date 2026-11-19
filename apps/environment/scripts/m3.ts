@@ -7,7 +7,9 @@
 //   node scripts/stage.ts run step2a m3 question     a question-only turn with the Container stopped: it stays stopped
 //   node scripts/stage.ts run step2a m3 edit-only    an edit-only turn (full-access), then status reads: Container stays stopped
 //   node scripts/stage.ts run step2a m3 wait [--minutes 7]  an approval waits through a Session restart and >5 heartbeats
-//   node scripts/stage.ts run step2a m3 agent-push   (M5) the agent commits on a branch and pushes from its bash; a push to another repo fails
+//   node scripts/stage.ts run step2a m3 agent-push --other <owner/name>
+//                                                    (M5) the agent commits on a branch and pushes from its bash; a push to
+//                                                    `--other`, a repo outside the Workspace's token, fails
 //
 // Each prints a JSON report (also written to /tmp/m3-<check>.json).
 import * as fs from "node:fs";
@@ -20,6 +22,16 @@ const MODEL = { instanceId: "piDurable", model: "anthropic/claude-haiku-5-5", op
 
 const [check = "approve", ...flags] = process.argv.slice(2);
 const minutes = Number(flags[flags.indexOf("--minutes") + 1] ?? 7);
+/** agent-push: a repository the Workspace's token does not cover, which the push must fail to reach. */
+const otherRepo = (): string => {
+  const index = flags.indexOf("--other");
+  const repo = index === -1 ? undefined : flags[index + 1];
+  if (repo === undefined || !/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/.test(repo)) {
+    console.error("usage: node scripts/stage.ts run <stage> m3 agent-push --other <owner/name>");
+    process.exit(2);
+  }
+  return repo;
+};
 
 const cookie = await pair();
 
@@ -245,7 +257,7 @@ switch (check) {
         `1. \`git switch -c ${branch}\``,
         "2. Append the line `pushed by the agent (M5)` to README.md with the edit tool, then `git commit -am 'M5: agent push check'`.",
         `3. \`git push -u origin ${branch}\``,
-        "4. `git push https://github.com/ian-pascoe/mac-bridge.git HEAD:refs/heads/t3flare-m5-should-fail` (expected to fail; do not retry or work around it).",
+        `4. \`git push https://github.com/${otherRepo()}.git HEAD:refs/heads/t3flare-m5-should-fail\` (expected to fail; do not retry or work around it).`,
         "5. `git switch main`",
         "Then tell me in two sentences which pushes succeeded.",
       ].join("\n"),

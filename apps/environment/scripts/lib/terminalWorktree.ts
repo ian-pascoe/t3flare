@@ -6,6 +6,7 @@
 import { admin, DEFAULT_MODEL, mutateProject, runsOf, sleep, updateSettings, uuid, wsCall, wsFirst } from "./client.ts";
 import { settled, until } from "./cloudThread.ts";
 import { attachTerminal } from "./terminal.ts";
+import { fixtureRepo } from "./scriptSettings.ts";
 
 /** One entry of the admin route `GET /_t3flare/agents/router-trace` (`TraceEntry`), as far as the removal reads it. */
 interface RouterTraceEntry {
@@ -16,7 +17,6 @@ interface RouterTraceEntry {
   readonly route: string;
 }
 
-const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
 
 export const terminalWorktree = async (cookie: string, options: { readonly terminal: boolean; readonly worktree: boolean }) => {
   const failures: Array<string> = [];
@@ -26,7 +26,7 @@ export const terminalWorktree = async (cookie: string, options: { readonly termi
   };
   const report: Record<string, unknown> = {};
   const id = `acc2b-${Date.now().toString(36)}`;
-  const cloned = (await wsCall(cookie, "sourceControl.cloneRepository", { remoteUrl: `https://github.com/${FIXTURE}.git`, destinationPath: `/w/${id}` }).catch(
+  const cloned = (await wsCall(cookie, "sourceControl.cloneRepository", { remoteUrl: `https://github.com/${fixtureRepo()}.git`, destinationPath: `/w/${id}` }).catch(
     (error: unknown) => ({ error: String(error).slice(0, 300) }),
   )) as { cwd?: string; error?: string };
   if (!check("clone", cloned.cwd === `/w/${id}`, cloned)) return { ok: false, failures, ...report };

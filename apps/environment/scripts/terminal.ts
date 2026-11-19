@@ -13,8 +13,9 @@ import * as fs from "node:fs";
 
 import { admin, pair, readDoText, sleep, uuid, wsCall } from "./lib/client.ts";
 import { attachTerminal, stripAnsi } from "./lib/terminal.ts";
+import { fixtureRepo } from "./lib/scriptSettings.ts";
 
-const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
+const FIXTURE = fixtureRepo();
 const [scenario = "basic", ...args] = process.argv.slice(2);
 const arg = (name: string) => {
   const index = args.indexOf(`--${name}`);

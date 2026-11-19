@@ -52,7 +52,7 @@ Turn T3 Connect on in the desktop app (Settings → T3 Connect). Nothing else.
 5. Check the Route as above.
 6. To turn it off: `sudo cloudflared service uninstall`, `cloudflared tunnel delete t3-laptop`, and delete the DNS record.
 
-A hostname in prod's own zone (`ianpascoe.dev`) is reached from the Worker as a same-zone fetch, straight to the tunnel. Only prod can prove that path; if it fails there, use a hostname in another zone.
+A hostname in prod's own zone (the zone of `T3FLARE_DOMAIN`) is reached from the Worker as a same-zone fetch, straight to the tunnel. Only prod can prove that path; if it fails there, use a hostname in another zone.
 
 ## Linking
 

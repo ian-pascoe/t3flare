@@ -15,7 +15,8 @@ import { base, pair, updateSettings, uuid, wsCall } from "./lib/client.ts";
 import { writeEvidence } from "./lib/evidence.ts";
 import { Laptop } from "./lib/laptop.ts";
 import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
-import { ensureCloudFixtureProject, FIXTURE } from "./lib/fixtureProject.ts";
+import { ensureCloudFixtureProject } from "./lib/fixtureProject.ts";
+import { fixtureRepo } from "./lib/scriptSettings.ts";
 
 const arg = (name: string, fallback: string) => {
   const at = process.argv.indexOf(`--${name}`);
@@ -66,7 +67,7 @@ try {
   const clone = path.join(dir, "fixture");
   const laptopProjectId = uuid();
   if (!skipRepo) {
-    const cloned = spawnSync("gh", ["repo", "clone", FIXTURE, clone, "--", "--depth", "1"], { encoding: "utf8" });
+    const cloned = spawnSync("gh", ["repo", "clone", fixtureRepo(), clone, "--", "--depth", "1"], { encoding: "utf8" });
     check("the fixture clones on the laptop", cloned.status === 0, cloned.stderr.slice(-300));
     await laptop.client.mutateProject(laptopCookie, {
       type: "project.create",

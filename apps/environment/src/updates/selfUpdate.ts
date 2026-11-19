@@ -23,7 +23,7 @@ import packageJson from "t3/package.json" with { type: "json" };
 
 import { environmentServices } from "../agents/bindings.ts";
 import { serverUpdateRefusal, tagOf } from "./policy.ts";
-import type { UpdateRecord, Updates } from "./records.ts";
+import { NO_UPDATE_TARGET, type UpdateRecord, type Updates } from "./records.ts";
 
 /** How often the fiber reads a run in flight. */
 const POLL_INTERVAL = Duration.seconds(20);
@@ -100,7 +100,7 @@ export const make = (options: { readonly version?: string; readonly updates?: ()
       update: (input) =>
         Effect.gen(function* () {
           const updates = updatesOf();
-          if (updates === undefined) return yield* failWith("This Environment has no update target; only prod updates itself.");
+          if (updates === undefined) return yield* failWith(NO_UPDATE_TARGET);
           const refusal = serverUpdateRefusal(input, version);
           if (refusal !== undefined) return yield* failWith(refusal);
           const target = input.targetVersion.trim();

@@ -1,6 +1,6 @@
 // @effect-diagnostics globalFetch:off globalDate:off globalTimers:off effectFnOpportunity:off cryptoRandomUUID:off
 // CLI updates from t3's stock provider-update button (ADR-0037; in-app updates plan D21, D22): the pi CLI, Codex and
-// Claude Code each get a real `update` capability on a stage with an update target (prod, D14), whose command is
+// Claude Code each get a real `update` capability on a stage with an update target (D14; docs/deploy.md), whose command is
 // `t3flare-cli-update <cli>`. t3's `ProviderMaintenanceRunner` runs it through the `ChildProcessSpawner`, which is our
 // process router: it dispatches `cli-bump.yml` and blocks while it follows the run (t3's 30-minute timeout). CI resolves
 // the CLI's newest version, edits the image's pin, proves it on the `bump` stage and lands it; the prod deploy restarts
@@ -26,7 +26,7 @@ import * as HttpClient from "effect/http/HttpClient";
 
 import { environmentServices } from "../agents/bindings.ts";
 import { isUpdatableCli, pinVersionOf, type UpdatableCli } from "./pins.ts";
-import type { Updates } from "./records.ts";
+import { NO_UPDATE_TARGET, type Updates } from "./records.ts";
 
 /** The command t3's runner spawns; the process router answers it (`agents/processRouter.ts`). */
 export const CLI_UPDATE_COMMAND = "t3flare-cli-update";
@@ -150,7 +150,7 @@ export const runCliUpdate = async (
   const cli = argv[0];
   if (!isUpdatableCli(cli) || argv.length !== 1) return { exitCode: 2, stdout: "", stderr: `usage: ${CLI_UPDATE_COMMAND} pi|codex|claude\n` };
   const updates = "updates" in options ? options.updates : configuredUpdates();
-  if (updates === undefined) return { exitCode: 1, stdout: "", stderr: "This Environment has no update target; only prod updates its CLIs.\n" };
+  if (updates === undefined) return { exitCode: 1, stdout: "", stderr: `${NO_UPDATE_TARGET}\n` };
   const now = options.now ?? (() => Date.now());
   const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const started = now();

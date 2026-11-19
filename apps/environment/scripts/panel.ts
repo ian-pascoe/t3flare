@@ -12,6 +12,8 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
+import { workersDevUrl } from "./lib/scriptSettings.ts";
+
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
 const OUT = path.resolve(import.meta.dirname, "../../../docs/steps/panel");
 const headers = {
@@ -32,7 +34,7 @@ const api = async (method: string, pathname: string, body?: unknown) => {
   return { status: response.status, text };
 };
 
-const FIXTURE_URL = `https://t3flare-mcpfixture-panel.ian-g-pascoe.workers.dev`;
+const FIXTURE_URL = workersDevUrl("t3flare-mcpfixture-panel");
 
 const seed = async () => {
   // The stage's fixture MCP Worker (scripts/tools/fixtureMcp.ts), signed in with a header: a server that lists tools.

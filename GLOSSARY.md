@@ -390,6 +390,39 @@ _Avoid_: maintenance mode, recovery mode
 The minutes, opened by an admin route, during which t3's bootstrap grant exists and the bootstrap token pairs a client.
 _Avoid_: bootstrap mode
 
+## Deployments
+
+**Owner**:
+The person a Deployment belongs to, the one person its Access admits to the admin routes.
+_Avoid_: user, admin, maintainer (the Maintainer is the Owner of the Canonical repository's own Deployment)
+
+**Deployment**:
+One Owner's t3flare: their Cloudflare account, GitHub App and Stages ([docs/deploy.md](docs/deploy.md)).
+_Avoid_: install, instance, tenant
+
+**Stage**:
+One deployed copy of the Cloud Environment in a Deployment: `prod`, or a throwaway test Stage. Used in alchemy's sense.
+_Avoid_: environment (that is t3's, or a GitHub environment)
+
+**Deployment settings**:
+The Owner's own values a Deployment is made with (the Access team, the Owner's email, the workers.dev subdomain, `prod`'s
+domain, the update target and the rest). Read from the environment with no default; a deploy without one stops and
+names it.
+_Avoid_: config, env vars (alone), defaults
+
+**Canonical repository**:
+`spiritledsoftware/t3flare`, where t3flare is developed and whose `main` every Deployment updates from.
+_Avoid_: upstream (that is t3code), origin
+
+**Deployment repository**:
+The repository whose CI deploys a given Owner's `prod`, and an in-app Update's target when one is set.
+_Avoid_: fork (it may not be one), deploy repo
+
+**Update target**:
+The Deployment repository a Stage's in-app Updates dispatch CI on (`T3FLARE_UPDATE_REPO`). A Stage without one updates
+only by being deployed again.
+_Avoid_: update repo, release channel
+
 ## Upstream
 
 **State directory**:

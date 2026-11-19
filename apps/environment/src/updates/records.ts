@@ -16,6 +16,12 @@ import type { UpdatableCli } from "./pins.ts";
  * 35-minute replay of a failed outcome (U92).
  */
 export const UPDATE_EXPIRY_MS = 110 * 60_000;
+/**
+ * What a press is told on a stage without an update target (`T3FLARE_UPDATE_REPO` unset; docs/deploy.md): such a
+ * Deployment updates by being deployed again.
+ */
+export const NO_UPDATE_TARGET =
+  "This Environment has no update target. Update it by deploying: pull the Canonical repository's main and deploy this Stage again (docs/deploy.md, Updating).";
 /** A run still waiting its turn this long after the dispatch has failed. */
 export const QUEUED_CEILING_MS = 3 * 60 * 60_000;
 /** A dispatch whose run GitHub never lists within this has failed. */
@@ -140,7 +146,7 @@ export const updates = (deps: {
       return isInFlight(current) ? settleWith(current, "failed", reason) : current;
     },
     press: async (request) => {
-      if (deps.actions === undefined) throw new UpdateRefused("This Environment has no update target; only prod updates itself.");
+      if (deps.actions === undefined) throw new UpdateRefused(NO_UPDATE_TARGET);
       // A press settles what it can first, so a finished run does not hold the next one off.
       const existing = await settle(request.key).catch(() => record(request.key));
       if (isInFlight(existing)) {

@@ -4,8 +4,15 @@
 import { describe, expect, it } from "vitest";
 
 import { allDeploySettings, deployPlan, devEnvNames } from "../scripts/lib/deployPlan.ts";
+import { malformedSettingMessage, missingSettingMessage } from "../scripts/lib/deploymentSettings.ts";
 
-const REQUIRED = { T3FLARE_GITHUB_APP_ID: "1", T3FLARE_GITHUB_APP_PRIVATE_KEY: "pem" };
+const REQUIRED = {
+  T3FLARE_GITHUB_APP_ID: "1",
+  T3FLARE_GITHUB_APP_PRIVATE_KEY: "pem",
+  T3FLARE_ACCESS_TEAM_DOMAIN: "team.cloudflareaccess.com",
+  T3FLARE_OWNER_EMAIL: "owner@example.com",
+  T3FLARE_WORKERS_DEV_SUBDOMAIN: "account",
+};
 /** The retired settings, as a dev.env or a shell may still hold them. */
 const RETIRED = { MODEL_PROXY_URL: "https://llm.example.com", MODEL_PROXY_API_KEY: "cms_spi1176-proxy-key-0123456789", COMMISSARY_CONTAINER_API_KEY: "cms_container" };
 const ENDPOINT = JSON.stringify({ id: "mine", baseUrl: "https://api.example.com", apiKey: "sk-mine-0000" });
@@ -33,7 +40,7 @@ describe("deployPlan", () => {
   it("refuses --no-model-proxy, which no longer means anything", () => {
     expect(deployPlan({ stage: "p1176", args: ["--web", "--no-model-proxy"], read: { ...REQUIRED }, env: laptop })).toEqual({
       ok: false,
-      error: "--no-model-proxy is gone: there is no Model proxy; deploy without it",
+      error: "t3flare: --no-model-proxy is gone: there is no Model proxy; deploy without it",
     });
   });
 
@@ -41,7 +48,7 @@ describe("deployPlan", () => {
     const domain = { T3FLARE_DOMAIN: "t3.example.dev" };
     expect(deployPlan({ stage: "p1176", args: [], read: { ...REQUIRED }, env: { ...laptop, ...domain } })).toEqual({
       ok: false,
-      error: "T3FLARE_DOMAIN is set (to t3.example.dev) for the stage p1176: only prod has a custom domain; unset it (was dev.env sourced into the shell?)",
+      error: "t3flare: T3FLARE_DOMAIN is set (to t3.example.dev) for the stage p1176: only prod has a custom domain; unset it (was dev.env sourced into the shell?)",
     });
     expect(deployPlan({ stage: "bump", args: [], read: { ...REQUIRED }, env: { ...ci, ...domain } })).toMatchObject({ ok: false });
     // deploy-prod.yml's `bump` run passes the `bump` environment's unset variable as "".
@@ -50,8 +57,44 @@ describe("deployPlan", () => {
   });
 
   it("refuses an unusable endpoint setting and a missing required setting", () => {
-    expect(deployPlan({ stage: "p1176", args: [], read: { ...REQUIRED, T3FLARE_MODEL_ENDPOINT: "{" }, env: ci })).toEqual({ ok: false, error: "T3FLARE_MODEL_ENDPOINT is not JSON" });
-    expect(deployPlan({ stage: "p1176", args: [], read: {}, env: laptop })).toMatchObject({ ok: false, error: expect.stringMatching(/^missing T3FLARE_GITHUB_APP_ID/) });
+    expect(deployPlan({ stage: "p1176", args: [], read: { ...REQUIRED, T3FLARE_MODEL_ENDPOINT: "{" }, env: ci })).toEqual({ ok: false, error: "t3flare: T3FLARE_MODEL_ENDPOINT is not JSON" });
+    expect(deployPlan({ stage: "p1176", args: [], read: {}, env: laptop })).toMatchObject({ ok: false, error: expect.stringMatching(/^t3flare: missing T3FLARE_GITHUB_APP_ID/) });
+  });
+});
+
+describe("the Deployment settings (docs/deploy.md)", () => {
+  it("refuses a deploy missing any of them, before anything is built, naming each", () => {
+    const { T3FLARE_ACCESS_TEAM_DOMAIN: _team, T3FLARE_WORKERS_DEV_SUBDOMAIN: _sub, ...read } = REQUIRED;
+    expect(deployPlan({ stage: "p1176", args: [], read, env: laptop })).toEqual({
+      ok: false,
+      error: [missingSettingMessage("T3FLARE_ACCESS_TEAM_DOMAIN"), missingSettingMessage("T3FLARE_WORKERS_DEV_SUBDOMAIN")].join("\n"),
+    });
+    expect(deployPlan({ stage: "prod", args: [], read: { ...REQUIRED, T3FLARE_OWNER_EMAIL: "" }, env: ci })).toEqual({ ok: false, error: missingSettingMessage("T3FLARE_OWNER_EMAIL") });
+  });
+
+  it("refuses a malformed one, and passes them all to alchemy", () => {
+    expect(deployPlan({ stage: "p1176", args: [], read: { ...REQUIRED, T3FLARE_ACCESS_TEAM_DOMAIN: "team" }, env: laptop })).toEqual({
+      ok: false,
+      error: malformedSettingMessage("T3FLARE_ACCESS_TEAM_DOMAIN"),
+    });
+    expect(deployPlan({ stage: "prod", args: [], read: { ...REQUIRED }, env: { ...ci, T3FLARE_DOMAIN: "https://t3.example.dev" } })).toEqual({ ok: false, error: malformedSettingMessage("T3FLARE_DOMAIN") });
+    expect(deployPlan({ stage: "p1176", args: [], read: { ...REQUIRED }, env: laptop })).toMatchObject({ ok: true, alchemyEnv: REQUIRED });
+  });
+
+  it("takes an update target on prod alone, unset or well-formed", () => {
+    expect(deployPlan({ stage: "prod", args: [], read: { ...REQUIRED }, env: { ...ci, T3FLARE_UPDATE_REPO: "someone/t3flare" } })).toMatchObject({ ok: true });
+    expect(deployPlan({ stage: "p1176", args: [], read: { ...REQUIRED }, env: { ...laptop, T3FLARE_UPDATE_REPO: "someone/t3flare" } })).toMatchObject({
+      ok: false,
+      error: expect.stringMatching(/^t3flare: T3FLARE_UPDATE_REPO is set for the stage p1176: only prod has an update target/),
+    });
+    expect(deployPlan({ stage: "p1176", args: [], read: { ...REQUIRED }, env: { ...laptop, T3FLARE_UPDATE_REPO: "" } })).toMatchObject({ ok: true });
+    expect(deployPlan({ stage: "prod", args: [], read: { ...REQUIRED }, env: { ...ci, T3FLARE_UPDATE_REPO: "t3flare" } })).toEqual({ ok: false, error: malformedSettingMessage("T3FLARE_UPDATE_REPO") });
+  });
+
+  it("needs the stand-in's zone only when the stage asks for its stand-in", () => {
+    expect(deployPlan({ stage: "link", args: [], read: { ...REQUIRED }, env: { ...laptop, T3FLARE_STANDIN: "1" } })).toEqual({ ok: false, error: missingSettingMessage("T3FLARE_STANDIN_ZONE") });
+    expect(deployPlan({ stage: "link", args: [], read: { ...REQUIRED, T3FLARE_STANDIN_ZONE: "example.dev" }, env: { ...laptop, T3FLARE_STANDIN: "1" } })).toMatchObject({ ok: true });
+    expect(deployPlan({ stage: "link", args: [], read: { ...REQUIRED }, env: laptop })).toMatchObject({ ok: true });
   });
 });
 
@@ -64,7 +107,10 @@ describe("devEnvNames", () => {
   });
   it("reads every setting when a required one is missing, and never a retired one", () => {
     expect(devEnvNames({}, ["T3FLARE_MODEL_ENDPOINT"])).toEqual(allDeploySettings(["T3FLARE_MODEL_ENDPOINT"]));
-    expect(allDeploySettings()).toEqual(["T3FLARE_GITHUB_APP_ID", "T3FLARE_GITHUB_APP_PRIVATE_KEY"]);
+    expect(allDeploySettings()).toEqual(["T3FLARE_GITHUB_APP_ID", "T3FLARE_GITHUB_APP_PRIVATE_KEY", "T3FLARE_ACCESS_TEAM_DOMAIN", "T3FLARE_OWNER_EMAIL", "T3FLARE_WORKERS_DEV_SUBDOMAIN"]);
+    // A Deployment setting missing from the environment (a laptop passing only some on the command line) reads them all.
+    const { T3FLARE_OWNER_EMAIL: _, ...withoutEmail } = REQUIRED;
+    expect(devEnvNames(withoutEmail, [])).toEqual(allDeploySettings());
     expect(devEnvNames({ ...REQUIRED, ...RETIRED }, [])).toEqual([]);
   });
 });

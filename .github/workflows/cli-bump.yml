@@ -16,7 +16,8 @@ name: CLI bump
 # runs (the Environment DO sends it): when main already holds the newest pin and prod does not run it, the run only
 # deploys main (review F2). `dry_run` runs the path through the check and pushes, marks and lands nothing (review B3).
 #
-# Needs the `bump` environment's secrets, as bump.yml (see there), in the bump job only; prod's never reach it
+# Needs the Deployment settings and the `bump` environment's secrets and variables, as bump.yml (see there), in the bump
+# job's CLI bump step only; prod's never reach it
 # (land.yml's job enters only the `land` environment, whose one secret is its deploy key).
 
 run-name: ${{ inputs.update_id && format('CLI update {0}', inputs.update_id) || format('CLI bump {0}', inputs.cli) }}
@@ -94,6 +95,10 @@ jobs:
           T3FLARE_MODEL_ENDPOINT: ${{ secrets.T3FLARE_MODEL_ENDPOINT }}
           T3FLARE_GITHUB_APP_ID: ${{ secrets.T3FLARE_GITHUB_APP_ID }}
           T3FLARE_GITHUB_APP_PRIVATE_KEY: ${{ secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY }}
+          T3FLARE_ACCESS_TEAM_DOMAIN: ${{ vars.T3FLARE_ACCESS_TEAM_DOMAIN }}
+          T3FLARE_WORKERS_DEV_SUBDOMAIN: ${{ vars.T3FLARE_WORKERS_DEV_SUBDOMAIN }}
+          T3FLARE_OWNER_EMAIL: ${{ secrets.T3FLARE_OWNER_EMAIL }}
+          T3FLARE_FIXTURE_REPO: ${{ vars.T3FLARE_FIXTURE_REPO }}
 
       - name: Report
         if: always()

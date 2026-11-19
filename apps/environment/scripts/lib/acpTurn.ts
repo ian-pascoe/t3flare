@@ -2,8 +2,8 @@
 // Step 4b: Claude Code and OpenCode turns from t3's own client protocol, shared by `scripts/cli4b.ts` (the milestones'
 // evidence) and `scripts/acceptance.ts --claude --opencode`.
 import { admin, dispatch, endpointModelFor, itemsOf, mutateProject, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall } from "./client.ts";
+import { fixtureRepo } from "./scriptSettings.ts";
 
-const FIXTURE = process.env.T3FLARE_FIXTURE_REPO ?? "ian-pascoe/t3flare-fixture";
 
 export const INSTANCE: Readonly<Record<string, { readonly instanceId: string; readonly driver: string; readonly model: string }>> = {
   claude: { instanceId: "claudeAgent", driver: "claudeAgent", model: "anthropic/claude-sonnet-5-5" },
@@ -16,7 +16,7 @@ export const ensureProject = async (cookie: string, id: string): Promise<{ proje
   const known = projects.get(id);
   if (known !== undefined) return known;
   const root = `/w/${id}`;
-  const cloned = (await wsCall(cookie, "sourceControl.cloneRepository", { remoteUrl: `https://github.com/${FIXTURE}.git`, destinationPath: root }).catch((error: unknown) => ({
+  const cloned = (await wsCall(cookie, "sourceControl.cloneRepository", { remoteUrl: `https://github.com/${fixtureRepo()}.git`, destinationPath: root }).catch((error: unknown) => ({
     error: String(error).slice(0, 300),
   }))) as { cwd?: string; error?: string };
   if (cloned.cwd !== root && !String(cloned.error).includes("exist")) throw new Error(`clone of ${id} failed: ${cloned.error}`);

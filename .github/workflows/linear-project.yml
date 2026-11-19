@@ -23,8 +23,9 @@ concurrency:
 jobs:
   project:
     name: project
-    # Forks have neither the secret nor the Linear project.
-    if: github.repository == 'spiritledsoftware/t3flare'
+    # Only where the repository variable T3FLARE_LINEAR_SYNC is `true` (the Canonical repository): a fork or another
+    # Deployment repository has neither the secret nor the Linear project.
+    if: vars.T3FLARE_LINEAR_SYNC == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:

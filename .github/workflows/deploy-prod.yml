@@ -15,17 +15,25 @@ name: Deploy prod
 # The pnpm store cache (restored, and saved after a pass, under the lock's key) is used on prod only, where the code is
 # main's; a `bump` stage deploy neither restores nor saves it (ADR-0037 §4).
 #
-# Needs, made by `pnpm --filter @t3flare/infra run ci:setup` (infra/github.ts) on the GitHub environment `prod` (main only):
+# Needs, made by `pnpm --filter @t3flare/infra run ci:setup` (infra/github.ts). The Deployment settings (docs/deploy.md),
+# on the repository:
+#   vars.T3FLARE_ACCESS_TEAM_DOMAIN     the Access team (<team>.cloudflareaccess.com)
+#   vars.T3FLARE_WORKERS_DEV_SUBDOMAIN  the account's workers.dev subdomain (also this job's environment URL)
+#   secrets.T3FLARE_OWNER_EMAIL         the Owner, whom Access admits (a secret: a variable prints unmasked in the logs)
+# On the GitHub environment `prod` (main only):
 #   secrets.CLOUDFLARE_API_TOKEN   the account token `t3flare-ci-prod`
 #   vars.CLOUDFLARE_ACCOUNT_ID     the account the stages deploy to
 #   vars.T3FLARE_DOMAIN            prod's custom domain (unset on `bump`, which stays on workers.dev)
+#   vars.T3FLARE_UPDATE_REPO       prod's update target (in-app Updates, ADR-0037): the Deployment repository, owner/name.
+#     The one Deployment setting that fails open: unset, prod has no in-app Update, and the Deploy step logs
+#     `update target: unset`.
 #   secrets.T3FLARE_GITHUB_APP_ID, secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY
 #   secrets.T3FLARE_MODEL_ENDPOINT   the Model endpoints stage.ts sets up through the panel's API after the deploy
 #     (SPI-1175; one, or a list): each added when prod has no endpoint of its id, never changed once there. Unset: skipped, and the log says so.
 #   secrets.T3_BOOTSTRAP_TOKEN, secrets.T3FLARE_ADMIN_TOKEN   prod's own tokens, the same as the laptop's
 #     (apps/environment/.alchemy/stages/prod.env.json); stage.ts refuses to make new ones for prod in CI.
 # The Access service token's credentials come from alchemy's state on every deploy, so nothing else is stored.
-# The secrets reach only the Deploy and Smoke steps, never the install or the check, where dependency code runs
+# The secrets (T3FLARE_OWNER_EMAIL among them) reach only the Deploy and Smoke steps, never the install or the check, where dependency code runs
 # (review H4; dependency build scripts are denied too, pnpm-workspace.yaml's allowBuilds). One exception:
 # T3FLARE_MODEL_ENDPOINT also reaches the "Mask the Model endpoint" step, which runs node on
 # apps/environment/scripts/mask-endpoint.ts alone (no dependency code) and writes only GitHub's mask commands to the log.
@@ -62,11 +70,14 @@ jobs:
     timeout-minutes: 45
     environment:
       name: ${{ inputs.stage || 'prod' }}
-      url: ${{ vars.T3FLARE_DOMAIN && format('https://{0}', vars.T3FLARE_DOMAIN) || format('https://t3flare-environment-{0}.ian-g-pascoe.workers.dev', inputs.stage || 'prod') }}
+      url: ${{ vars.T3FLARE_DOMAIN && format('https://{0}', vars.T3FLARE_DOMAIN) || format('https://t3flare-environment-{0}.{1}.workers.dev', inputs.stage || 'prod', vars.T3FLARE_WORKERS_DEV_SUBDOMAIN) }}
     env:
       STAGE: ${{ inputs.stage || 'prod' }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       T3FLARE_DOMAIN: ${{ vars.T3FLARE_DOMAIN }}
+      # The Deployment settings that are variables (docs/deploy.md); the Owner's email is a secret, passed to Deploy and Smoke only.
+      T3FLARE_ACCESS_TEAM_DOMAIN: ${{ vars.T3FLARE_ACCESS_TEAM_DOMAIN }}
+      T3FLARE_WORKERS_DEV_SUBDOMAIN: ${{ vars.T3FLARE_WORKERS_DEV_SUBDOMAIN }}
       # The Workspace sweep's real purge (SPI-974): `1` on prod once the owner turned it on.
       T3FLARE_SWEEP_PURGE: ${{ vars.T3FLARE_SWEEP_PURGE }}
       NPM_CONFIG_WORKSPACE_DIR: ${{ github.workspace }}
@@ -110,9 +121,15 @@ jobs:
 
       - name: Deploy
         working-directory: apps/environment
-        run: node scripts/stage.ts deploy "$STAGE" --web
+        run: |
+          # The update target is the one Deployment setting that fails open, so the log says which way it went.
+          if [ -n "$T3FLARE_UPDATE_REPO" ]; then echo "update target: set"; else echo "update target: unset"; fi
+          node scripts/stage.ts deploy "$STAGE" --web
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          T3FLARE_OWNER_EMAIL: ${{ secrets.T3FLARE_OWNER_EMAIL }}
+          # prod's update target; never on `bump`, whose Update would land on main, even if the variable were the repository's.
+          T3FLARE_UPDATE_REPO: ${{ (inputs.stage || 'prod') == 'prod' && vars.T3FLARE_UPDATE_REPO || '' }}
           # The Model endpoint (SPI-1175); unset until `ci:setup` sets it, and then skipped.
           T3FLARE_MODEL_ENDPOINT: ${{ secrets.T3FLARE_MODEL_ENDPOINT }}
           T3FLARE_GITHUB_APP_ID: ${{ secrets.T3FLARE_GITHUB_APP_ID }}
@@ -129,6 +146,7 @@ jobs:
           COMMIT: ${{ inputs.checked_sha || github.sha }}
           SERVER_VERSION: ${{ steps.version.outputs.server }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          T3FLARE_OWNER_EMAIL: ${{ secrets.T3FLARE_OWNER_EMAIL }}
           T3FLARE_GITHUB_APP_ID: ${{ secrets.T3FLARE_GITHUB_APP_ID }}
           T3FLARE_GITHUB_APP_PRIVATE_KEY: ${{ secrets.T3FLARE_GITHUB_APP_PRIVATE_KEY }}
           # Unset on `bump`, whose tokens the job makes fresh.

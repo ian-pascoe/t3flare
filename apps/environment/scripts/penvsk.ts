@@ -24,6 +24,7 @@ import * as path from "node:path";
 
 import { ensureProject } from "./lib/cliTurn.ts";
 import { admin, dispatch, itemsOf, pair, projectionOf, runsOf, sendMessage, sleep, threadWindow, uuid, wsCall } from "./lib/client.ts";
+import { fixtureRepo } from "./lib/scriptSettings.ts";
 
 const SLUG = process.env.T3FLARE_PENVSK_MODEL ?? "anthropic/claude-sonnet-5-5";
 const DURABLE = { instanceId: "piDurable", model: SLUG, options: [] };
@@ -36,7 +37,7 @@ const scriptHeaders = { ...accessHeaders, authorization: `Bearer ${process.env.T
 const SETTLED = new Set(["completed", "failed", "interrupted", "cancelled"]);
 const PROJECT = "penvsk-proj";
 const MOUNT = "/workspace/.agents/skills";
-const FIXTURE_REPO = "ian-pascoe/t3flare-fixture";
+const FIXTURE_REPO = fixtureRepo();
 const ENV_BRANCH = "spi1148-env";
 const REFUSALS_BRANCH = "spi1148-refusals";
 
@@ -442,7 +443,7 @@ const refusals = async () => {
   pushBranch(REFUSALS_BRANCH, refusalFiles());
   const cases: Record<string, unknown> = {};
   cases.notInstalledOwner = await harness("POST", "skills/preview", { source: "octocat/private-skills-nope" });
-  cases.notInTheInstallation = await harness("POST", "skills/preview", { source: "ian-pascoe/no-such-private-repo" });
+  cases.notInTheInstallation = await harness("POST", "skills/preview", { source: `${FIXTURE_REPO.split("/")[0]}/no-such-private-repo` });
   const preview = await harness("POST", "skills/preview", { source: `https://github.com/${FIXTURE_REPO}/tree/${REFUSALS_BRANCH}` });
   cases.preview = brief(preview);
   const folderOf = (name: string) => (preview.json.skills as Array<any>).find((skill) => skill.name === name)?.path;
