@@ -1,0 +1,82 @@
+name: CI
+
+# Every pull request, from a branch or a fork: `pnpm run check` on the PR's merge commit, and a gitleaks scan of its
+# commits. No secrets and a read-only token, so an outside change is checked as it is without reaching anything (an
+# outside contributor's runs wait for a maintainer's approval first). Merging deploys prod (deploy-prod.yml), and
+# `check` is a required check of ruleset `main`; `secrets` is not, yet.
+#
+# The pnpm store cache is neither restored nor saved: a PR's install must not write the store deploy-prod restores with
+# prod's secrets (ADR-0037 §4). No path filters: a required check that does not run blocks the merge.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NPM_CONFIG_WORKSPACE_DIR: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The submodule is fetched by hand, not by the action (see bump.yml).
+      - run: git submodule update --init t3code
+
+      # The Docker-backed tests run only when their image is already local (apps/agents/test/*Script.test.ts,
+      # processWrapper, terminalWrapper), so pull them here, by digest, under the tags the tests name. ubuntu:26.04 is
+      # the Workspace image's base at the Dockerfile's digest (globalMiseScript.test.ts pins the same).
+      - name: Pull the test images
+        run: |
+          pull() { docker pull -q "$1@$2" && docker tag "$1@$2" "$3"; }
+          pull ubuntu sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c ubuntu:26.04
+          pull node sha256:9d266751ca3d7fdbe651c878ffd5ad0a42fed49a18c283509267c97f025b7496 node:24
+
+      - uses: ./.github/actions/setup
+        with:
+          cache: "false"
+
+      - run: pnpm run check
+
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install gitleaks
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "$GITLEAKS_SHA256  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+
+      # The PR's own commits, with the base branch's allowlists (.gitleaks.toml, .gitleaksignore), so a PR cannot widen
+      # them for itself; the PR's copies only when the base has none.
+      - name: Scan the PR's commits
+        run: |
+          for f in .gitleaks.toml .gitleaksignore; do
+            git show "$BASE:$f" > "$RUNNER_TEMP/$f" 2>/dev/null || cp "$f" "$RUNNER_TEMP/$f"
+          done
+          "$RUNNER_TEMP/gitleaks" git --no-banner --redact --exit-code 1 \
+            --config "$RUNNER_TEMP/.gitleaks.toml" --gitleaks-ignore-path "$RUNNER_TEMP/.gitleaksignore" \
+            --log-opts "$BASE..$HEAD" .
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
