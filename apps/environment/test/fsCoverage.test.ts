@@ -91,6 +91,16 @@ describe("fsUsageOf", () => {
     expect(result.opaque).toEqual(["NodeFS.promises (node:fs/promises) used as a value"]);
   });
 
+  it("calls node:fs's `promises` destructured into a binding opaque", () => {
+    const opaqueOf = (code: string) => usage(`import * as NS from "node:fs"; ${code}`).opaque;
+    expect(opaqueOf("const { promises } = NS; await promises.opendir(p);")).toEqual(["NS.promises (node:fs/promises) destructured into a binding"]);
+    expect(opaqueOf("const { promises: fsp } = NS; fsp.opendir(p);")).toEqual(["NS.promises (node:fs/promises) destructured into a binding"]);
+    expect(opaqueOf("const { promises: { cp } = {} } = NS;")).toEqual(["NS.promises (node:fs/promises) destructured into a binding"]);
+    expect(usage('const { promises } = await import("node:fs"); promises.opendir(p);').opaque).toEqual([
+      'import("node:fs").promises (node:fs/promises) destructured into a binding',
+    ]);
+  });
+
   it("calls a re-export of node:fs's `promises` opaque", () => {
     expect(usage('export { promises } from "node:fs";').opaque).toEqual(['export { promises } from "node:fs"']);
   });

@@ -140,7 +140,10 @@ export const fsUsageOf = (program: Program): FsUsage => {
         continue;
       }
       const inner = read(source, member);
-      if (inner !== undefined && isNode(property.value) && property.value.type === "ObjectPattern") destructure(inner, property.value);
+      if (inner === undefined) continue;
+      // `{ promises: { readFile } }` reads node:fs/promises's members; `{ promises }` or `{ promises: fsp }` binds them opaquely.
+      if (isNode(property.value) && property.value.type === "ObjectPattern") destructure(inner, property.value);
+      else opaque.push(`${inner.name} (${label(inner.module)}) destructured into a binding`);
     }
   };
 
