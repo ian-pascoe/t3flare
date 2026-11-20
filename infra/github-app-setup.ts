@@ -188,8 +188,14 @@ type Registered = {
   readonly slug: string;
   readonly pem: string;
   readonly html_url: string;
-  readonly owner: { readonly login: string } | null;
+  readonly owner: { readonly login: string; readonly type?: string } | null;
 };
+
+/** The app's settings page: GitHub takes an app's logo only there, never through the manifest or the API. */
+const settingsUrl = (app: Registered) =>
+  app.owner?.type === "Organization"
+    ? `https://github.com/organizations/${app.owner.login}/settings/apps/${app.slug}`
+    : `https://github.com/settings/apps/${app.slug}`;
 
 /** The app GitHub registered, its private key included, for the registration's `code`. */
 const convertManifest = async (code: string): Promise<Registered> => {
@@ -289,3 +295,4 @@ await install(app);
 console.log(
   "\nDone. Repos can be added to the installation later in GitHub's settings (Settings → Applications → t3flare → Configure).",
 );
+console.log(`Optional: give the app t3flare's logo, docs/assets/t3flare-app-icon.png, under Display information at ${settingsUrl(app)}.`);

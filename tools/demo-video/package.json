@@ -1,0 +1,37 @@
+{
+  "name": "@t3flare/demo-video",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "t3flare's launch video, made with Remotion from real T3 Code desktop footage",
+  "scripts": {
+    "dev": "remotion studio",
+    "render": "remotion render Launch out/t3flare-launch.mp4",
+    "still": "remotion still Poster out/poster.png",
+    "capture": "node capture/capture.ts",
+    "typecheck": "tsc",
+    "lint": "eslint src",
+    "check": "pnpm run typecheck && pnpm run lint && remotion compositions",
+    "brand": "remotion still LogoOnDark ../../docs/assets/t3flare-logo-dark.png --image-format=png && remotion still LogoOnLight ../../docs/assets/t3flare-logo-light.png --image-format=png && remotion still AppIcon ../../docs/assets/t3flare-app-icon.png --image-format=png"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.545",
+    "@remotion/google-fonts": "4.0.545",
+    "@remotion/media": "4.0.545",
+    "@remotion/studio": "4.0.545",
+    "@remotion/transitions": "4.0.545",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.545"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.545",
+    "@types/node": "^26.6.6",
+    "@types/react": "19.3.0",
+    "@types/web": "0.0.166",
+    "eslint": "10.12.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  }
+}
