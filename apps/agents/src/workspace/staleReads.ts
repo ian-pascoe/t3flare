@@ -18,7 +18,7 @@
 // longer exact is shown as its two sides. One file's reads (`:(top,literal)<path>`, the diff panel's) with no last
 // answer are computed from the repo's facts alone (SPI-1295; ADR-0009). Pure but for `RepoFacts`.
 // @effect-diagnostics asyncFunction:off preferEffectArray:off
-import { asOutput, byPath, EMPTY_BLOB, type FileChange, fileNumstat, filePatch, fileRaw, latin1, type TreeEntry } from "./gitPatch.ts";
+import { asOutput, byPath, type FileChange, fileNumstat, filePatch, fileRaw, latin1, type TreeEntry, typeChanged } from "./gitPatch.ts";
 
 /** What the repo says about one path now. */
 export interface PathFacts {
@@ -110,9 +110,12 @@ export const kindOf = (argv: ReadonlyArray<string>, env: Readonly<Record<string,
   return kind === undefined || one === undefined ? undefined : { kind, base, ...one };
 };
 
+/** Whether `path` is `dir` or lies under it (repo-relative). */
+const isUnder = (path: string, dir: string) => path === dir || path.startsWith(`${dir}/`);
+
 /** The written paths a read can see: all of them, or for one file's read those its pathspecs match (a path, or under it). */
 const journalFor = (shape: StaleShape, written: ReadonlyArray<string>): ReadonlyArray<string> =>
-  shape.paths === undefined ? written : written.filter((path) => shape.paths!.some((one) => path === one || path.startsWith(`${one}/`)));
+  shape.paths === undefined ? written : written.filter((path) => shape.paths!.some((one) => isUnder(path, one)));
 
 const ZERO_OID = "0".repeat(40);
 const parentDirs = (path: string): Array<string> => {
@@ -236,7 +239,8 @@ const headChange = async (path: string, facts: PathFacts, repo: RepoFacts): Prom
 
 /**
  * The changes of `paths` (HEAD, or the base, against the working tree), with exact renames paired as git pairs them: a
- * deleted file and an added one with the same blob and mode (never the empty blob, which git does not pair).
+ * deleted file and an added one with the same blob and of the same type (a mode change rides along), the deleted file
+ * with the same basename first.
  */
 const changesOf = async (paths: Iterable<string>, repo: RepoFacts): Promise<Array<Changed>> => {
   const changes: Array<Changed> = [];
@@ -249,9 +253,10 @@ const changesOf = async (paths: Iterable<string>, repo: RepoFacts): Promise<Arra
   for (const change of changes) {
     const added = change.new;
     if (change.old === null && added !== null) {
-      const source = changes.find(
-        (other) => !used.has(other) && other.new === null && other.old !== null && other.old.oid !== EMPTY_BLOB && other.old.oid === added.oid && other.old.mode === added.mode,
+      const sources = changes.filter(
+        (other) => !used.has(other) && other.new === null && other.old !== null && other.old.oid === added.oid && !typeChanged({ ...other, new: added }),
       );
+      const source = sources.find((other) => basename(other.oldPath) === basename(change.newPath)) ?? sources[0];
       if (source !== undefined) {
         used.add(source);
         out.push({ oldPath: source.oldPath, newPath: change.newPath, old: source.old, new: added, indexed: change.indexed });
@@ -262,6 +267,8 @@ const changesOf = async (paths: Iterable<string>, repo: RepoFacts): Promise<Arra
   }
   return out.filter((change) => !used.has(change));
 };
+
+const basename = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 
 /** Whether git could pair a deleted and an added file of `changes` as an inexact rename, whose similarity only git knows. */
 const mayPairInexactly = (changes: ReadonlyArray<Changed>): boolean =>
@@ -378,7 +385,7 @@ const patchOthers = async (stdout: string, journal: ReadonlyArray<string>, repo:
  * repo's files cannot say, so its entry stays as the last answer had it.
  */
 export const outsideSubmodules = (journal: ReadonlyArray<string>, submodules: ReadonlyArray<string>): ReadonlyArray<string> =>
-  submodules.length === 0 ? journal : journal.filter((path) => !submodules.some((sub) => path === sub || path.startsWith(`${sub}/`)));
+  submodules.length === 0 ? journal : journal.filter((path) => !submodules.some((sub) => isUnder(path, sub)));
 
 /** `stdout` (the last real answer of a `shape` read) patched with the paths written since it ran. */
 export const patchAnswer = (shape: StaleShape, stdout: string, written: ReadonlyArray<string>, repo: RepoFacts): Promise<string> => {
@@ -407,7 +414,7 @@ export const patchAnswer = (shape: StaleShape, stdout: string, written: Readonly
 const computeOneFile = async (shape: StaleShape, repo: RepoFacts): Promise<string | undefined> => {
   const paths = shape.paths;
   if (paths === undefined || shape.kind === "status" || shape.kind === "diff-index-numstat") return undefined;
-  if (paths.some((path) => repo.trackedUnder(path) || repo.submodules.some((sub) => path === sub || path.startsWith(`${sub}/`) || sub.startsWith(`${path}/`)))) return undefined;
+  if (paths.some((path) => repo.trackedUnder(path) || repo.submodules.some((sub) => isUnder(path, sub) || isUnder(sub, path)))) return undefined;
   for (const path of paths) if ((await repo.untrackedUnder(path)).length > 0) return undefined;
   if (shape.kind === "ls-files-others") return patchOthers("", paths, repo);
   if (repo.base === null) return undefined;
@@ -478,6 +485,10 @@ export type StaleOutcome =
  * with the paths written since where the shape allows and the DO can afford it; else that answer alone. One file's read
  * with no last answer is computed within the guard (`computeOneFile`).
  */
+/** The read's patched shape: undefined for a `.git`-scoped read, or argv no shape matches. */
+const shapeOf = (read: { readonly argv: ReadonlyArray<string>; readonly env?: Readonly<Record<string, string>> | undefined; readonly readScope?: "git-dir" | "repo" | undefined }) =>
+  (read.readScope ?? "repo") === "repo" ? kindOf(read.argv, read.env) : undefined;
+
 export const staleRead = async (
   read: { readonly argv: ReadonlyArray<string>; readonly env?: Readonly<Record<string, string>> | undefined; readonly readScope?: "git-dir" | "repo" | undefined },
   sources: StaleSources,
@@ -489,13 +500,13 @@ export const staleRead = async (
     if (theirs !== undefined) last = { rev: theirs.rev, answer: { ...theirs.answer, stdout: asStatusShape(theirs.answer.stdout, read.argv) } };
   }
   if (last === undefined) {
-    const shape = (read.readScope ?? "repo") === "repo" ? kindOf(read.argv, read.env) : undefined;
+    const shape = shapeOf(read);
     if (shape?.paths === undefined || !(await sources.withinGuard())) return { found: false };
     const stdout = await computeOneFile(shape, await sources.facts(shape.base));
     return stdout === undefined ? { found: false } : { found: true, answer: { exitCode: 0, stdout, stderr: "" }, stale: "patched" };
   }
   const asIs = (why?: string): StaleOutcome => ({ found: true, answer: last.answer, stale: "last-answer", ...(why === undefined ? {} : { why }) });
-  const shape = (read.readScope ?? "repo") === "repo" && last.answer.exitCode === 0 ? kindOf(read.argv, read.env) : undefined;
+  const shape = last.answer.exitCode === 0 ? shapeOf(read) : undefined;
   if (shape === undefined) return asIs();
   const written = journalFor(shape, sources.journalSince(last.rev));
   if (written.length === 0) return { found: true, answer: last.answer, stale: "patched" };

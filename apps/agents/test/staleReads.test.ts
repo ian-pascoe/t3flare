@@ -137,6 +137,36 @@ describe("stale reads: last answer plus the journal match git", { timeout: GIT_T
     });
   });
 
+  it("renames git pairs (an empty file, a mode change, the source with the same basename) and a file that became a symlink", async () => {
+    const r = setup("pairs");
+    r.put("empty.txt", "");
+    r.put("m.sh", "m\n");
+    r.put("dir_a.txt", "same\n");
+    r.put("z/b.txt", "same\n");
+    r.put("l", "x\n");
+    git(r.dir, ["add", "-A"]);
+    git(r.dir, ["commit", "-q", "-m", "one"]);
+    await compare(r.dir, () => {
+      git(r.dir, ["mv", "empty.txt", "empty2.txt"]);
+      git(r.dir, ["mv", "m.sh", "m2.sh"]);
+      fs.chmodSync(join(r.dir, "m2.sh"), 0o755);
+      git(r.dir, ["rm", "-q", "dir_a.txt", "z/b.txt"]);
+      r.put("new/b.txt", "same\n");
+      fs.unlinkSync(join(r.dir, "l"));
+      fs.symlinkSync("dir_a.txt", join(r.dir, "l"));
+      git(r.dir, ["add", "-A"]);
+      return ["empty.txt", "empty2.txt", "m.sh", "m2.sh", "dir_a.txt", "z/b.txt", "new", "new/b.txt", "l"];
+    }, {
+      only: [
+        [...STATS, "HEAD", "--"],
+        [...PATCH, "HEAD", "--"],
+        ["diff-index", "-M", "--numstat", "-z", "HEAD", "--"],
+        [...STATS, "HEAD", "--", one("l")],
+        [...PATCH, "HEAD", "--", one("l")],
+      ],
+    });
+  });
+
   it("a file put back as HEAD has it, and an untracked file removed", async () => {
     const r = setup("revert");
     r.put("f.txt", "one\n");
@@ -255,6 +285,10 @@ describe("a passive read while the Container is stopped (staleRead)", { timeout:
     expect(outcome).toEqual({ found: true, stale: "patched", answer: { exitCode: 0, stdout: git(dir, withFlagNab), stderr: "" } });
     expect(await staleRead({ argv: STATUS, env: undefined }, sourcesOver(dir, answers, ["after.txt"]))).toEqual({ found: false });
     expect(await staleRead({ argv: STATUS_NAB, env: undefined }, sourcesOver(dir, answers, ["after.txt"]))).toEqual({ found: false });
+    // And back: the --no-ahead-behind shape from the plain one's answer, its counts hidden as git hides them.
+    const plain = new Map([[withFlag.join(" "), git(dir, withFlag)]]);
+    const back = await staleRead({ argv: withFlagNab, env: undefined }, sourcesOver(dir, plain));
+    expect(back).toEqual({ found: true, stale: "patched", answer: { exitCode: 0, stdout: git(dir, withFlagNab), stderr: "" } });
   });
 
   it("more paths written than the DO patches: the last answer as it was", async () => {
@@ -311,6 +345,13 @@ describe("one file's review reads with no last answer are computed (SPI-1295)", 
     const written = ["edited.txt", "gone.txt", "src/kept.ts"];
     const paths = ["edited.txt", "before.txt", "gone.txt", "src/kept.ts", "ren.txt"];
     await expectComputed(r.dir, paths.flatMap((path) => [...reads(path, "HEAD"), ...reads(path, r.base)]), written);
+  });
+
+  it("a file that became a symlink: git's type change", async () => {
+    const r = branched("one-symlink");
+    fs.unlinkSync(join(r.dir, "before.txt"));
+    fs.symlinkSync("edited.txt", join(r.dir, "before.txt"));
+    await expectComputed(r.dir, reads("before.txt", "HEAD"), ["before.txt"]);
   });
 
   it("an untracked file is listed, and has no review diff", async () => {

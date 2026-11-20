@@ -139,8 +139,15 @@ const hunksOf = (oldText: string, newText: string): string => {
   return out;
 };
 
-/** One file's section of `git diff --patch`, as Latin-1 text. */
+const SYMLINK = "120000";
+
+/** Whether a file became a symlink, or a symlink a file: git's type change (`T`), which it patches as a delete and an add. */
+export const typeChanged = (change: FileChange): boolean =>
+  change.old !== null && change.new !== null && (change.old.mode === SYMLINK) !== (change.new.mode === SYMLINK);
+
+/** One file's section of `git diff --patch`, as Latin-1 text (a type change's two sections). */
 export const filePatch = (change: FileChange): string => {
+  if (typeChanged(change)) return filePatch({ ...change, new: null }) + filePatch({ ...change, old: null });
   const { old: before, new: after } = change;
   let out = `diff --git ${prefixed("a/", change.oldPath)} ${prefixed("b/", change.newPath)}\n`;
   const renamed = change.oldPath !== change.newPath && before !== null && after !== null;
@@ -203,7 +210,7 @@ export const fileNumstat = (change: FileChange): string => {
 export const fileRaw = (change: FileChange, indexed: boolean): string => {
   const { old: before, new: after } = change;
   const renamed = change.oldPath !== change.newPath && before !== null && after !== null;
-  const status = renamed ? "R100" : before === null ? "A" : after === null ? "D" : "M";
+  const status = renamed ? "R100" : before === null ? "A" : after === null ? "D" : typeChanged(change) ? "T" : "M";
   const newOid = after === null || !indexed ? ZERO : abbrev(after.oid);
   const path = (value: string) => latin1(new TextEncoder().encode(value));
   const paths = renamed ? `${path(change.oldPath)}\0${path(change.newPath)}` : path(change.newPath);
