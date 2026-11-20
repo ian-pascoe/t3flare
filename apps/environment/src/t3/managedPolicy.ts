@@ -21,11 +21,16 @@ export const T3FLARE_POLICY = {
     // Step 4b (review F7): t3 compacts idle Claude threads with a `/compact` turn, which would start a Container;
     // the worker is not started (composition.ts), and the setting shows as managed.
     idleCompaction: { value: "off", locked: true },
+    // The preview tunnel dials this process's loopback, where nothing listens; it is not mounted (composition.ts, U1).
+    enablePreviewTunnel: off,
   },
   limits: {
     // t3's product analytics (PostHog, `ingest.t3.codes`) is off in the Cloud Environment (owner decision D1, SPI-995).
     // A policy can only turn analytics off; t3's `AnalyticsService` then drops every event before sending.
     telemetry: false,
+    // With the setting, makes t3's `allowsPreviewTunnel` false on every client: none routes a loopback link through
+    // `/api/preview/tunnel`, which answers 404 here.
+    previewTunnel: false,
   },
 } as const satisfies ManagedPolicyDocument;
 

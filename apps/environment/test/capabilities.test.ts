@@ -72,9 +72,16 @@ describe("t3flare's managed policy", () => {
     const { summary } = await policy;
     expect(summary?.organization).toBe("t3flare");
     expect(new Set(summary?.lockedSettings)).toEqual(
-      new Set(["enableAgentDeviceAccess", "enableDeviceSupport", "guestSharingEnabled", "idleCompaction", "simlockDeviceHostsEnabled"]),
+      new Set([
+        "enableAgentDeviceAccess",
+        "enableDeviceSupport",
+        "enablePreviewTunnel",
+        "guestSharingEnabled",
+        "idleCompaction",
+        "simlockDeviceHostsEnabled",
+      ]),
     );
-    expect(summary?.limits).toEqual({ telemetry: false });
+    expect(summary?.limits).toEqual({ telemetry: false, previewTunnel: false });
   });
 
   it("leaves custom text generators to the owner, as stock t3 does (D5 lifted)", async () => {

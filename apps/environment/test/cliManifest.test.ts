@@ -5,14 +5,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { compareSemverVersions } from "@t3tools/shared/semver";
 import { CLIS } from "@t3flare/sandbox-image/clis";
 import { IMAGE_NODE } from "@t3flare/sandbox-image/leakscan";
 import { describe, expect, it } from "vitest";
 
 import { resolveProviderCompatibility } from "t3/src/provider/providerCompatibility.ts";
 import manifest from "t3/src/provider/model-manifest.json" with { type: "json" };
-import { MINIMUM_PI_VERSION } from "../../../t3code/packages/provider-pi/src/server/status.ts";
 
 const image = path.resolve(import.meta.dirname, "../../sandbox-image/image");
 
@@ -54,12 +52,16 @@ describe("the CLI manifest", () => {
     expect(fs.readFileSync(path.join(image, "t3flare-claude-agent-acp"), "utf8")).toContain(`node_modules/${CLIS.claude.package}/dist/index.js`);
   });
 
-  it("pins a Codex t3 marks supported, and a pi at or above t3's minimum: else bump the CLI in clis.ts", () => {
-    // SAFETY: the JSON is t3's ProviderCompatibilityPolicy array (model-manifest.json).
-    const codex = resolveProviderCompatibility(manifest.compatibility as never, "codex" as never, CLIS.codex.version);
-    expect(codex?.status, "bump the CLI in clis.ts").toBe("supported");
-    expect(compareSemverVersions(CLIS.pi.version, MINIMUM_PI_VERSION), "bump the CLI in clis.ts").toBeGreaterThanOrEqual(0);
-    for (const [driver, version] of [["claudeAgent", CLIS.claude.version], ["opencode", CLIS.opencode.version]] as const) {
+  it("pins a version of each CLI that t3's compatibility policy marks supported: else bump the CLI in clis.ts", () => {
+    // Pi's minimum is a policy entry since v0.1.11-nightly.20261120.4979 (it was `MINIMUM_PI_VERSION` in provider-pi's status.ts).
+    const pins = [
+      ["codex", CLIS.codex.version],
+      ["pi", CLIS.pi.version],
+      ["claudeAgent", CLIS.claude.version],
+      ["opencode", CLIS.opencode.version],
+    ] as const;
+    for (const [driver, version] of pins) {
+      // SAFETY: the JSON is t3's ProviderCompatibilityPolicy array (model-manifest.json).
       expect(resolveProviderCompatibility(manifest.compatibility as never, driver as never, version)?.status, `${driver}: bump the CLI in clis.ts`).toBe("supported");
     }
   });
