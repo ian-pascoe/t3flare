@@ -3,8 +3,10 @@
 // with `bundle: false` (alchemy.run.ts), because alchemy 2.0.0-beta.85 drops `build.input.plugins` on every
 // update after the first deploy.
 //
-//   node build.ts           bundle to dist/worker/ (and dist/build-report.json)
-//   node build.ts --check   only check that every Patch applies to the pinned t3code (`git apply --check`)
+//   node build.ts            bundle to dist/worker/ (and dist/build-report.json)
+//   node build.ts --check    only check that every Patch applies to the pinned t3code (`git apply --check`)
+//   node build.ts --check-fs only check, on a bundle kept in memory, that every node:fs member t3's bundled modules
+//                            read is one the State directory's shims implement (SPI-1301; `FS_ALLOWANCES`)
 //
 // Rolldown runs with the options alchemy's own Worker bundling uses (its Cloudflare plugin, minify,
 // strictExecutionOrder, lazyBarrel, inlineConst), plus t3flare's changes to t3 (ADR-0001):
@@ -23,6 +25,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { Plugin } from "rolldown";
 
+import { type FsAllowances, type FsCoverage, type FsUsage, FS_MODULE_OF, fsCoverage, fsUsageOf, shimSurfaceOf } from "./scripts/lib/fsCoverage.ts";
 import { stampedManifest, t3ServerVersion, t3TrackSetting } from "./serverVersion.ts";
 import type { T3Track } from "./src/updates/pins.ts";
 import { T3_CONNECT_DEFINES } from "./src/t3/connectPublicConfig.ts";
@@ -101,7 +104,13 @@ export interface BuildReport {
   readonly patches: ReadonlyArray<string>;
   readonly shadows: ReadonlyArray<string>;
   readonly buildShims: {
-    readonly fsAlias: { readonly rewritten: number; readonly importers: number; readonly skippedDependencyImports: number };
+    readonly fsAlias: {
+      readonly rewritten: number;
+      readonly importers: number;
+      readonly skippedDependencyImports: number;
+      /** The node:fs members t3's modules read that no shim implements (SPI-1301): empty, or the build fails. */
+      readonly coverage: FsCoverage & { readonly allowed: ReadonlyArray<string> };
+    };
     readonly builtinStubs: ReadonlyArray<string>;
     readonly dependencyStubs: ReadonlyArray<string>;
     readonly defines: ReadonlyArray<string>;
@@ -179,32 +188,93 @@ const IMPORT_SPECIFIER = /(^\s*(?:import|export|\})[^\n]*?\bfrom\s*|\bawait impo
  * The import-scoped builtin alias (ADR-0007), as a `transform` of t3's own modules: Cloudflare's Rolldown
  * plugin claims `node:*` builtins in a "pre" resolveId hook, so a resolveId alias never sees them.
  */
-const t3NodeFsAlias = (report: { rewritten: number; importers: Set<string>; skippedDependencyImports: number }): Plugin => ({
-  name: "t3flare:t3-node-fs",
-  buildStart() {
-    report.rewritten = 0;
-    report.skippedDependencyImports = 0;
-    report.importers.clear();
+type FsAliasReport = {
+  rewritten: number;
+  importers: Set<string>;
+  skippedDependencyImports: number;
+  /** Each aliased module's node:fs reads, for the coverage check (SPI-1301). */
+  usages: Array<{ readonly importer: string; readonly usage: FsUsage }>;
+};
+
+const t3NodeFsAlias = (report: FsAliasReport): Plugin => {
+  let parseAst: typeof import("rolldown/parseAst").parseAst | undefined;
+  return {
+    name: "t3flare:t3-node-fs",
+    async buildStart() {
+      report.rewritten = 0;
+      report.skippedDependencyImports = 0;
+      report.importers.clear();
+      report.usages.length = 0;
+      parseAst = (await import("rolldown/parseAst")).parseAst;
+    },
+    transform(code, id) {
+      if (T3_MODULE.test(id) && FS_ALIAS_SKIP.has(relativeToT3(id))) return null;
+      if (!T3_MODULE.test(id)) {
+        if (/["']node:fs["']/.test(code)) report.skippedDependencyImports++;
+        return null;
+      }
+      let count = 0;
+      let readsFs = false;
+      const next = code.replace(IMPORT_SPECIFIER, (match, lead: string, quote: string, specifier: string) => {
+        const target = FS_ALIASES[specifier];
+        if (target === undefined) return match;
+        count++;
+        if (FS_MODULE_OF[specifier] !== undefined) readsFs = true;
+        return `${lead}${quote}${target}${quote}`;
+      });
+      if (count === 0) return null;
+      report.rewritten += count;
+      report.importers.add(relativeToT3(id));
+      if (readsFs) {
+        let usage: FsUsage;
+        try {
+          usage = fsUsageOf(parseAst!(code, { lang: id.endsWith(".tsx") ? "tsx" : id.endsWith(".ts") ? "ts" : "js" }, id));
+        } catch (error) {
+          usage = { uses: [], opaque: [`not parsed: ${(error as Error).message.split("\n")[0]}`] };
+        }
+        report.usages.push({ importer: relativeToT3(id), usage });
+      }
+      return { code: next, map: null };
+    },
+  };
+};
+
+/**
+ * The node:fs members t3's bundled modules may read from workerd's own module rather than a shim's (SPI-1301), each
+ * with the reason that is safe. Any other member a shim does not implement fails the build: implement it in the shim,
+ * or allow it here with its reason. An allowance no module reads any more is listed in the report, to delete.
+ */
+export const FS_ALLOWANCES: FsAllowances = {
+  fs: {
+    write:
+      "resourceTelemetry/DesktopTelemetryReceiver.ts writes to the desktop app's control descriptor, which the Cloud Environment never has: composition.ts sets desktopTelemetryControlFd undefined, and sendControlMessage returns first",
   },
-  transform(code, id) {
-    if (T3_MODULE.test(id) && FS_ALIAS_SKIP.has(relativeToT3(id))) return null;
-    if (!T3_MODULE.test(id)) {
-      if (/["']node:fs["']/.test(code)) report.skippedDependencyImports++;
-      return null;
-    }
-    let count = 0;
-    const next = code.replace(IMPORT_SPECIFIER, (match, lead: string, quote: string, specifier: string) => {
-      const target = FS_ALIASES[specifier];
-      if (target === undefined) return match;
-      count++;
-      return `${lead}${quote}${target}${quote}`;
-    });
-    if (count === 0) return null;
-    report.rewritten += count;
-    report.importers.add(relativeToT3(id));
-    return { code: next, map: null };
-  },
-});
+  "fs/promises": {},
+};
+
+/** The coverage of the State directory's shims over `usages`, as the report keeps it. */
+const checkFsCoverage = async (usages: FsAliasReport["usages"]): Promise<FsCoverage & { readonly allowed: ReadonlyArray<string> }> => {
+  const { parseAst } = await import("rolldown/parseAst");
+  const surface = (name: string) => shimSurfaceOf(parseAst(fs.readFileSync(shim(name), "utf8"), { lang: "ts" }, shim(name)));
+  const coverage = fsCoverage(usages, { fs: surface("node-fs.ts"), "fs/promises": surface("node-fs-promises.ts") }, FS_ALLOWANCES);
+  const allowed = (Object.entries(FS_ALLOWANCES) as Array<[string, Record<string, string>]>)
+    .flatMap(([module, members]) => Object.keys(members).map((member) => `${module}.${member}`))
+    .filter((key) => !coverage.unusedAllowances.includes(key));
+  return { ...coverage, allowed };
+};
+
+/** The coverage check's failure, or undefined when every read is implemented or allowed. */
+export const fsCoverageFailure = (coverage: FsCoverage): string | undefined => {
+  if (coverage.uncovered.length === 0 && coverage.opaque.length === 0) return undefined;
+  const lines = [
+    ...coverage.uncovered.map(({ module, member, importers }) => `  node:${module}.${member}, read by ${importers.join(", ")}`),
+    ...coverage.opaque.map((description) => `  ${description} (its members cannot be read statically)`),
+  ];
+  return (
+    `t3flare: t3 reads node:fs members the State directory's shims do not implement, so they would reach workerd's own file system (SPI-1301):\n${lines.join("\n")}\n` +
+    `Implement each in src/shims/node-fs.ts or node-fs-promises.ts, or allow it in build.ts's FS_ALLOWANCES with the reason it is safe.`
+  );
+};
 
 /** Redirects every import that resolves to a shadowed t3 module to its Shadow. */
 const shadows = (applied: Set<string>): Plugin => {
@@ -351,10 +421,16 @@ const DEFINES = {
  * Bundles the Worker to `dist/worker/`, as alchemy would, and writes `dist/build-report.json`. The Deployment's t3
  * `track` (ADR-0041) names the pin's Server version, and the bundle's server Update policy takes only its releases.
  */
-export const buildWorker = async (options: { readonly track: T3Track; readonly quiet?: boolean }): Promise<BuildReport> => {
+export const buildWorker = async (options: {
+  readonly track: T3Track;
+  readonly quiet?: boolean;
+  /** Keep the bundle in memory and write nothing (`--check-fs`). Default true. */
+  readonly write?: boolean;
+}): Promise<BuildReport> => {
+  const write = options.write ?? true;
   const { rolldown } = await import("rolldown");
   const { default: cloudflare } = await import("@alchemy.run/cloudflare-runtime/rolldown");
-  const fsAlias = { rewritten: 0, importers: new Set<string>(), skippedDependencyImports: 0 };
+  const fsAlias: FsAliasReport = { rewritten: 0, importers: new Set<string>(), skippedDependencyImports: 0, usages: [] };
   const probe = { modules: 0, bindings: 0 };
   const stamp = { importers: 0 };
   const applied: Array<string> = [];
@@ -380,16 +456,11 @@ export const buildWorker = async (options: { readonly track: T3Track; readonly q
     experimental: { lazyBarrel: true },
     optimization: { inlineConst: { mode: "smart", pass: 3 } },
   });
-  fs.rmSync(path.join(here, "dist/worker"), { recursive: true, force: true });
-  const out = await bundle.write({
-    dir: path.join(here, "dist/worker"),
-    format: "esm",
-    sourcemap: "hidden",
-    minify: true,
-    keepNames: true,
-    strictExecutionOrder: true,
-  });
+  const outputOptions = { dir: path.join(here, "dist/worker"), format: "esm", sourcemap: "hidden", minify: true, keepNames: true, strictExecutionOrder: true } as const;
+  if (write) fs.rmSync(path.join(here, "dist/worker"), { recursive: true, force: true });
+  const out = write ? await bundle.write(outputOptions) : await bundle.generate(outputOptions);
   await bundle.close();
+  const coverage = await checkFsCoverage(fsAlias.usages);
   let bytes = 0;
   for (const chunk of out.output) {
     if (chunk.fileName.endsWith(".map")) continue;
@@ -401,7 +472,7 @@ export const buildWorker = async (options: { readonly track: T3Track; readonly q
     patches: applied,
     shadows: [...shadowed].sort(),
     buildShims: {
-      fsAlias: { rewritten: fsAlias.rewritten, importers: fsAlias.importers.size, skippedDependencyImports: fsAlias.skippedDependencyImports },
+      fsAlias: { rewritten: fsAlias.rewritten, importers: fsAlias.importers.size, skippedDependencyImports: fsAlias.skippedDependencyImports, coverage },
       builtinStubs: Object.keys(BUILTIN_STUBS),
       dependencyStubs: Object.keys(DEPENDENCY_STUBS),
       defines: Object.keys(DEFINES),
@@ -410,7 +481,10 @@ export const buildWorker = async (options: { readonly track: T3Track; readonly q
     moduleStateProbe: probe,
     bytes,
   };
-  fs.writeFileSync(path.join(here, "dist/build-report.json"), `${JSON.stringify(report, null, 2)}\n`);
+  if (write) fs.writeFileSync(path.join(here, "dist/build-report.json"), `${JSON.stringify(report, null, 2)}\n`);
+  // After the report, so it shows what failed; a bundle that would reach workerd's file system never ships.
+  const failure = fsCoverageFailure(coverage);
+  if (failure !== undefined) throw new Error(failure);
   if (!options.quiet) {
     console.log(
       `t3flare: built ${(bytes / 1024 / 1024).toFixed(2)} MiB for t3 ${report.t3} (Server version ${serverVersion.version}${serverVersion.exact ? "" : ", not an exact tag"}); ${applied.length} patches, ${shadowed.size} shadows, ` +
@@ -426,6 +500,20 @@ if (import.meta.main) {
     const results = checkPatches();
     for (const result of results) console.log(`${result.ok ? "ok  " : "FAIL"} ${result.patch}${result.ok ? "" : `\n${result.detail}`}`);
     process.exit(results.every((r) => r.ok) ? 0 : 1);
+  }
+  if (process.argv.includes("--check-fs")) {
+    // The track names only the Server version stamped into the bundle, not which modules it holds, so the check needs
+    // no Deployment setting (CI has none).
+    const report = await buildWorker({ track: "stable", quiet: true, write: false }).catch((error: Error) => {
+      console.error(error.message);
+      process.exit(1);
+    });
+    const { coverage } = report.buildShims.fsAlias;
+    console.log(
+      `t3flare: node:fs coverage: every member t3 reads is implemented by a shim or allowed (${coverage.allowed.length} allowed: ${coverage.allowed.join(", ") || "none"})` +
+        (coverage.unusedAllowances.length === 0 ? "" : `; allowances no module reads any more, to delete from FS_ALLOWANCES: ${coverage.unusedAllowances.join(", ")}`),
+    );
+    process.exit(0);
   }
   const started = performance.now();
   await buildWorker({ track: t3TrackSetting() });

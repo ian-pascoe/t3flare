@@ -82,6 +82,22 @@ describe("node:fs shim descriptors", () => {
     });
   });
 
+  it("answers the callback forms t3 calls on the State directory: realpath and stat", async () => {
+    await inObject("callbacks", async () => {
+      store.mkdir("/t3/c", { recursive: true });
+      fs.writeFileSync("/t3/c/f", "abc");
+      fs.symlinkSync("/t3/c/f", "/t3/c/link");
+      const realpath = (path: string) => new Promise<string>((resolve, reject) => fs.realpath(path, (error, resolved) => (error ? reject(error) : resolve(resolved!))));
+      const stat = (path: string) => new Promise<{ size: number }>((resolve, reject) => fs.stat(path, (error, stats) => (error ? reject(error) : resolve(stats))));
+      expect(await realpath("/t3/c/link")).toBe("/t3/c/f");
+      expect((await stat("/t3/c/f")).size).toBe(3);
+      await expect(stat("/t3/c/missing")).rejects.toThrow(/ENOENT/);
+      // As t3's usage reader calls it: promisified, with options.
+      expect((await new Promise<{ size: number }>((resolve) => fs.stat("/t3/c/f", {}, (_error, stats) => resolve(stats)))).size).toBe(3);
+      expect(fs.constants).toBe(NodeFS.constants);
+    });
+  });
+
   it("reads sequentially from the descriptor's position when none is given", async () => {
     await inObject("sequential-read", () => {
       store.mkdir("/t3/r", { recursive: true });
