@@ -9,8 +9,8 @@ import { describe, expect, it } from "vitest";
 
 import packageJson from "../package.json" with { type: "json" };
 
-/** Runs a package script as pnpm does, with `args` appended, and returns what alchemy and node were called with. */
-const runScript = (name: keyof typeof packageJson.scripts, args: ReadonlyArray<string>) => {
+/** Runs `ci:setup` as pnpm does, with `args` appended, and returns the arguments alchemy and node were called with. */
+const runCiSetup = (args: ReadonlyArray<string>) => {
   const dir = mkdtempSync(join(tmpdir(), "ci-setup-"));
   const bin = join(dir, "bin");
   mkdirSync(bin);
@@ -21,19 +21,19 @@ const runScript = (name: keyof typeof packageJson.scripts, args: ReadonlyArray<s
     chmodSync(join(bin, tool), 0o755);
   }
   const quoted = args.map((arg) => `'${arg.replaceAll("'", "'\\''")}'`).join(" ");
-  execFileSync("sh", ["-c", `${packageJson.scripts[name]} ${quoted}`], { env: { HOME: dir, PATH: `${bin}:/usr/bin:/bin` }, encoding: "utf8" });
+  execFileSync("sh", ["-c", `${packageJson.scripts["ci:setup"]} ${quoted}`], { env: { HOME: dir, PATH: `${bin}:/usr/bin:/bin` }, encoding: "utf8" });
   const log = (tool: string) => readFileSync(join(dir, `${tool}.log`), "utf8").trim();
   return { alchemy: log("alchemy"), node: log("node") };
 };
 
 describe("ci:setup", () => {
-  it("passes its arguments to alchemy deploy, so --yes skips the approval prompt (SPI-1300)", () => {
-    const calls = runScript("ci:setup", ["--yes"]);
-    expect(calls.alchemy).toBe("deploy --config github.ts --stage ci --profile admin --yes");
-    expect(calls.node).toBe("allow-actions-prs.ts");
+  it("passes its arguments to alchemy deploy, so --yes skips the approval prompt", () => {
+    const invocations = runCiSetup(["--yes"]);
+    expect(invocations.alchemy).toBe("deploy --config github.ts --stage ci --profile admin --yes");
+    expect(invocations.node).toBe("allow-actions-prs.ts");
   });
 
   it("runs as before with no arguments", () => {
-    expect(runScript("ci:setup", []).alchemy).toBe("deploy --config github.ts --stage ci --profile admin");
+    expect(runCiSetup([]).alchemy).toBe("deploy --config github.ts --stage ci --profile admin");
   });
 });
