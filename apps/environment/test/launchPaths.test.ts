@@ -40,6 +40,24 @@ describe("the CLI launch path", () => {
     expect(bareCommands(script)).toEqual(["sed", "tr", "cut", "mountpoint", "rmdir", "mkdir", "dirname", "basename", "sleep", "env", "setsid"]);
   });
 
+  it.each([
+    ["a backtick substitution", "x=`sed a`"],
+    ["a substitution inside ${…}", "y=${A:-$(sed a)}"],
+    ["a heredoc", "cat <<EOF\nsed\nEOF"],
+    ["an unterminated quote", "echo 'oops"],
+    ["an unterminated substitution", "x=$(sed a"],
+    ["a word that runs a string", "eval sed"],
+    ["a builtin that bypasses functions", "command sed"],
+    ["a trap", "trap 'rm -f x' EXIT"],
+    ["a shell's -c string", "/bin/sh -c 'sed a'"],
+    ["a program that runs another", "/usr/bin/xargs rm"],
+    ["a timeout", "/usr/bin/timeout 5 sed a"],
+    ["find -exec", "/usr/bin/find . -exec rm {} +"],
+    ["env -S", "/usr/bin/env -S 'sed x'"],
+  ])("fails closed on what it does not follow: %s", (_what, script) => {
+    expect(() => commandWords(script)).toThrow(/is not followed/);
+  });
+
   it("starts a process through a wrapper that names every program by its absolute path", () => {
     const wrapper = processCommand({
       marker: "proc-a",

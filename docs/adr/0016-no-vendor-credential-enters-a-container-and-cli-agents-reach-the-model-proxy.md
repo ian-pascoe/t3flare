@@ -293,17 +293,20 @@ Report: [`docs/steps/spi-1170.md`](../steps/spi-1170.md); evidence: `docs/steps/
 6. **Headers.** pi's own (`x-stainless-*`, `user-agent`, `accept-language`, `anthropic-dangerous-direct-browser-access`,
    Google's `x-goog-api-client`, and the prompt-cache affinity hints `session-id`, `x-client-request-id` and Mistral's
    `x-affinity`) are dropped; its turns need none of them. The allowlist is unchanged.
-7. **Absolute paths.** The launcher and the handle command run every program by its absolute path: the image puts
-   mise's shims first on PATH and trusts `/workspace`'s mise configuration, so a project's `env` would otherwise start
-   pi with the handle, or its `tr` be handed the holder's environment (review round 1, `test:docker`). This closed it
-   for pi's own launcher and handle command only; **SPI-1209** closed the rest of the launch path. The Workspace DO
-   runs a CLI process's shell by its absolute path (`PROCESS_SHELL`). The process command that starts every CLI
-   process (`processCommand`) names `setsid`, `mkdir`, `grep` and the rest by theirs, keeping setsid's name in argv
-   (`exec -a setsid`), since the holders are found by the command line `setsid --wait <launcher> …`. So do Claude
-   Code's launcher and handle helper and OpenCode's launcher, `env -u` included. `launchPaths.test.ts` fails on a bare
-   program name in any of them. `processWrapper.test.ts` and `test:docker`'s pi case run them with hostile shims
-   first on PATH. Nothing on the launch path runs a program from PATH while the handle is reachable; the commands an
-   agent runs itself remain as the SPI-1168 refinement states.
+7. **Absolute paths.** The launcher and the handle command run every program by its absolute path: the image puts mise's
+   shims first on PATH and trusts `/workspace`'s mise configuration, so a project's `env` would otherwise start pi with
+   the handle, or its `tr` be handed the holder's environment (review round 1, `test:docker`). **Residual** (superseded
+   by SPI-1209, below): this closes it for pi's own launcher and handle command only. The process command that starts
+   every CLI process (`processCommand`, `apps/sandbox-image/src/process.ts`) still runs `setsid`, `mkdir`, `grep`,
+   `base64`, `find` and others by name, under that PATH, with the handle in its environment, for pi as for Claude Code
+   and OpenCode; a project's shim named so would get the handle (or, as `setsid`, become its holder). Not fixed here:
+   filed as a follow-up by the orchestrator. **Superseded (SPI-1209):** the Workspace DO runs a CLI process's shell by
+   its absolute path (`PROCESS_SHELL`). The process command names `setsid`, `mkdir`, `grep` and the rest by theirs,
+   keeping setsid's name in argv (`exec -a setsid`), since the holders are found by the command line `setsid --wait
+   <launcher> …`. So do Claude Code's launcher and handle helper and OpenCode's launcher, `env -u` included.
+   `launchPaths.test.ts` fails on a bare program name in any of them. `processWrapper.test.ts` and `test:docker`'s pi
+   case run them with hostile shims first on PATH. Nothing on the launch path runs a program from PATH while the handle
+   is reachable; the commands an agent runs itself remain as the SPI-1168 refinement states.
 
 ## Refinement (SPI-1171, 2026-11-16): subscription sign-ins through the model relay
 

@@ -2,11 +2,14 @@
 // /workspace's mise configuration, so on a CLI agent's launch path (where the model handle is reachable) every program
 // must be named by its absolute path; this finds the ones that are not. A small lexer, not a full shell parser: it
 // knows what the launch path's scripts use (simple commands, pipelines, lists, `$(…)` in and out of double quotes,
-// `$((…))`, subshells, functions, if/while/for/case, redirections, `exec [-a name]`), and its own test pins that.
+// `$((…))`, subshells, functions, if/while/for/case, redirections, `exec [-a name]`, `env -u`, `setsid`), and its own
+// test pins that. It fails closed: anything it does not follow (backticks, heredocs, a substitution inside `${…}`,
+// unterminated quoting, a word that runs a string or another program it cannot see) throws, rather than passing a
+// command it never saw.
 
 /** Builtins of both dash and bash, and the reserved words: neither is looked up on PATH. */
 const SHELL = new Set([
-  ":", ".", "[", "break", "cd", "command", "continue", "echo", "eval", "exec", "exit", "export", "false", "getopts", "kill", "local", "printf", "pwd", "read", "readonly", "return", "set", "shift", "test", "trap", "true", "ulimit", "umask", "unset", "wait",
+  ":", "[", "break", "cd", "continue", "echo", "exec", "exit", "export", "false", "getopts", "kill", "local", "printf", "pwd", "read", "readonly", "return", "set", "shift", "test", "true", "ulimit", "umask", "unset", "wait",
   "!", "{", "}", "if", "then", "elif", "else", "fi", "while", "until", "for", "do", "done", "case", "esac", "in",
 ]);
 const STARTS_COMMAND = new Set(["!", "{", "if", "then", "elif", "else", "while", "until", "do"]);
@@ -18,16 +21,29 @@ const REDIRECTION = /^[0-9]*(?:>>|>&|<&|<>|>\||>|<)/;
  */
 const RUNS_NEXT = new Map<string, ReadonlySet<string>>([
   ["exec", new Set(["-a"])],
-  ["env", new Set(["-u", "-C", "-S", "--unset", "--chdir", "--split-string"])],
+  ["env", new Set(["-u", "--unset"])],
   ["setsid", new Set()],
-  ["nohup", new Set()],
 ]);
+/** Words that run a string, a file or another program this lexer does not follow: a script using one is refused. */
+const UNFOLLOWED = new Set([".", "source", "eval", "command", "trap", "builtin", "sh", "bash", "dash", "xargs", "timeout", "nohup", "nice", "sudo", "su", "chroot", "flock", "stdbuf", "unshare", "nsenter", "watch"]);
+/** Arguments that make the program before them run another (`find -exec`, `env -S`): refused as well. */
+const UNFOLLOWED_ARGUMENTS = new Set(["-exec", "-execdir", "-ok", "-okdir", "-S", "--split-string"]);
+
+const unfollowed = (what: string): never => {
+  throw new Error(`shellCommands: ${what} is not followed; extend the lexer (and its test) before using it`);
+};
 
 /** The first word of every simple command in `script` (after assignments and `exec`), in order. */
 export const commandWords = (script: string): ReadonlyArray<string> => {
   const words: Array<string> = [];
   const functions = new Set<string>();
   let i = 0;
+
+  /** The index just past the next `token` from `from`; an unterminated one is refused (it would loop forever). */
+  const past = (token: string, from: number): number => {
+    const at = script.indexOf(token, from);
+    return at === -1 ? unfollowed(`an unterminated \`${token}\``) : at + token.length;
+  };
 
   /** Reads one word from `i`, recursing into the command substitutions inside it. */
   const word = (): string => {
@@ -36,26 +52,38 @@ export const commandWords = (script: string): ReadonlyArray<string> => {
       const c = script[i]!;
       if (/[\s;&|()<>]/.test(c)) break;
       if (c === "\\") i += 2;
-      else if (c === "'") i = script.indexOf("'", i + 1) + 1;
+      else if (c === "`") unfollowed("a backtick substitution");
+      else if (c === "'") i = past("'", i + 1);
       else if (c === '"') {
         i++;
-        while (i < script.length && script[i] !== '"') {
+        while (script[i] !== '"') {
+          if (i >= script.length) unfollowed('an unterminated `"`');
           if (script[i] === "\\") i += 2;
-          else if (script.startsWith("$((", i)) i = script.indexOf("))", i) + 2;
+          else if (script[i] === "`") unfollowed("a backtick substitution");
+          else if (script.startsWith("$((", i)) i = past("))", i);
           else if (script.startsWith("$(", i)) {
             i += 2;
             list(")");
-          } else i++;
+          } else if (script.startsWith("${", i)) i = parameter(i);
+          else i++;
         }
         i++;
-      } else if (script.startsWith("$((", i)) i = script.indexOf("))", i) + 2;
+      } else if (script.startsWith("$((", i)) i = past("))", i);
       else if (script.startsWith("$(", i)) {
         i += 2;
         list(")");
-      } else if (script.startsWith("${", i)) i = script.indexOf("}", i) + 1;
+      } else if (script.startsWith("${", i)) i = parameter(i);
       else i++;
     }
     return script.slice(start, i);
+  };
+
+  /** Skips a `${…}` from its `$`, refusing one with a substitution inside (its `}` may not be the first one). */
+  const parameter = (from: number): number => {
+    const end = past("}", from);
+    const body = script.slice(from + 2, end);
+    if (body.includes("$(") || body.includes("`")) unfollowed("a substitution inside `${…}`");
+    return end;
   };
 
   /** A command list up to `stop` (`)` for a subshell or substitution, none for the script). */
@@ -63,7 +91,7 @@ export const commandWords = (script: string): ReadonlyArray<string> => {
     let command = true;
     /** After `exec` or a program that runs the next word: its options take that argument. */
     let runsNext: ReadonlySet<string> | undefined;
-    /** Inside `case … in`: true while reading a pattern (up to its `)`). */
+    /** The `case`s open here: reading the subject (up to `in`), a pattern (up to its `)`), or a pattern's commands. */
     const cases: Array<"subject" | "pattern" | "body"> = [];
     while (i < script.length) {
       const c = script[i]!;
@@ -105,6 +133,7 @@ export const commandWords = (script: string): ReadonlyArray<string> => {
         list(")");
         command = false;
       } else {
+        if (script.startsWith("<<", i)) unfollowed("a heredoc");
         const redirection = REDIRECTION.exec(script.slice(i));
         if (redirection !== null) {
           i += redirection[0].length;
@@ -128,7 +157,10 @@ export const commandWords = (script: string): ReadonlyArray<string> => {
           }
           continue;
         }
-        if (!command) continue;
+        if (!command) {
+          if (UNFOLLOWED_ARGUMENTS.has(w)) unfollowed(`\`${w}\``);
+          continue;
+        }
         // A function definition: `name() {`.
         if (/^\s*\(\s*\)/.test(script.slice(i))) {
           functions.add(w);
@@ -151,18 +183,22 @@ export const commandWords = (script: string): ReadonlyArray<string> => {
           command = true;
         } else if (runsNext !== undefined && w.startsWith("-")) {
           // An option of `exec` or of a program that runs the next word; `exec -a name` names argv[0], not a program.
+          if (UNFOLLOWED_ARGUMENTS.has(w)) unfollowed(`\`${w}\``);
           if (runsNext.has(w)) {
             while (script[i] === " ") i++;
             word();
           }
         } else {
           const name = w.replaceAll(/['"]/g, "");
+          const base = name.slice(name.lastIndexOf("/") + 1);
+          if (UNFOLLOWED.has(base)) unfollowed(`\`${base}\``);
           if (name !== "exec") words.push(name);
-          runsNext = RUNS_NEXT.get(name.slice(name.lastIndexOf("/") + 1));
+          runsNext = RUNS_NEXT.get(base);
           command = runsNext !== undefined;
         }
       }
     }
+    if (stop !== undefined) unfollowed(`an unterminated \`$(\` or \`(\``);
   };
 
   list();
