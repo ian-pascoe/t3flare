@@ -145,7 +145,7 @@ describe("verifySettingsRequest (ADR-0035, plan D13): the Owner-client endpoint'
     const panelAssertion = await sign(ownerClaims({ sub: "owner-sub" }));
     expect(await verifySettingsRequest(at("/_t3flare/mcp", { "cf-access-jwt-assertion": panelAssertion }), settings, keys, NOW)).toEqual({ admitted: false, reason: "wrong_audience" });
     const endpointAssertion = await sign(ownerClaims({ aud: [SETTINGS_AUD], sub: "owner-sub" }));
-    expect(await verifyHarnessRequest(at("/_t3flare/harness", { "cf-access-jwt-assertion": endpointAssertion }), config, keys, NOW)).toEqual({ admitted: false, reason: "wrong_audience" });
+    expect(await verifyHarnessRequest(at("/_t3flare/settings", { "cf-access-jwt-assertion": endpointAssertion }), config, keys, NOW)).toEqual({ admitted: false, reason: "wrong_audience" });
     expect(await verifyAdminRequest(at("/_t3flare/health", { "cf-access-jwt-assertion": endpointAssertion, authorization: "Bearer admin-token" }), config, keys, NOW)).toEqual({
       admitted: false,
       reason: "wrong_audience",

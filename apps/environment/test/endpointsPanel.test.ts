@@ -58,7 +58,7 @@ const headersOf = async (store: ReturnType<typeof setup>["store"]) => ({
 });
 
 const post = async (deps: HarnessDeps, path: string, body: unknown, headers: Record<string, string>) =>
-  handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/${path}`, { method: "POST", headers, body: typeof body === "string" ? body : JSON.stringify(body) }), deps);
+  handleHarness(new Request(`https://${HOST}/_t3flare/settings/api/${path}`, { method: "POST", headers, body: typeof body === "string" ? body : JSON.stringify(body) }), deps);
 
 const ENDPOINT = { id: "openai", label: "OpenAI", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api-key", headers: { "OpenAI-Organization": "org-1" }, models: ["gpt-5-mini"] };
 
@@ -79,7 +79,7 @@ describe("Model endpoints on the Harness panel", () => {
     // The header's value is not audited either: only its name.
     expect(JSON.stringify(store.auditLog(5))).not.toContain("org-1");
 
-    const listed = await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/endpoints`), deps);
+    const listed = await handleHarness(new Request(`https://${HOST}/_t3flare/settings/api/endpoints`), deps);
     const body = await listed.text();
     expect(body).not.toContain(SECRET);
     expect(JSON.parse(body)).toMatchObject({ revision: 1, credentialsKey: true, endpoints: [{ id: "openai", key: { set: true, setAt: NOW } }], presets: expect.any(Array) });
@@ -88,7 +88,7 @@ describe("Model endpoints on the Harness panel", () => {
   it("shows each endpoint on the page, escaped, with its slugs and never its key", async () => {
     const { store, deps } = setup();
     await post(deps, "endpoints", { op: "save", endpoint: { ...ENDPOINT, label: "<img src=x>" }, apiKey: SECRET }, await headersOf(store));
-    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
+    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/settings`), deps)).text();
     expect(html).toContain('id="endpoints"');
     expect(html).toContain("openai/gpt-5-mini");
     expect(html).toContain("&lt;img src=x&gt;");
@@ -106,9 +106,9 @@ describe("Model endpoints on the Harness panel", () => {
       now: () => NOW,
       endpoints: { store: endpointStore(kv, sealedStore(kv, "f".repeat(64))), discover: async () => ({ ok: true, models: [] }) },
     };
-    const listed = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/endpoints`), deps)).json();
+    const listed = await (await handleHarness(new Request(`https://${HOST}/_t3flare/settings/api/endpoints`), deps)).json();
     expect(listed).toMatchObject({ endpoints: [{ id: "openai", key: { set: true, readable: false } }] });
-    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
+    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/settings`), deps)).text();
     expect(html).toContain("cannot be read: enter it again");
   });
 

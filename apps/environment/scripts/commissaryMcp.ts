@@ -59,17 +59,17 @@ const harness = async (method: string, pathname: string, body?: unknown) => {
   return { status: response.status, json, text };
 };
 
-const rowOf = async () => ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((row: any) => row.name === SERVER);
+const rowOf = async () => ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).find((row: any) => row.name === SERVER);
 const sessionOf = (text: string) => text.match(/sbx_[0-9a-f]{8,}/)?.[0];
 
 const add = async () => {
   const answers: Array<string> = [];
-  if ((await rowOf()) !== undefined) answers.push((await harness("POST", "/_t3flare/harness/api/mcp", { op: "remove", server: SERVER })).text);
-  const added = await harness("POST", "/_t3flare/harness/api/mcp/servers", { server: SERVER, url: URL_, auth: { kind: "header", header: "x-api-key" }, value: KEY });
-  const tested = await harness("POST", "/_t3flare/harness/api/mcp/test", { server: SERVER });
-  const listed = await harness("GET", "/_t3flare/harness/api/mcp");
-  const page = await harness("GET", "/_t3flare/harness");
-  const audit = await harness("GET", "/_t3flare/harness/api/audit");
+  if ((await rowOf()) !== undefined) answers.push((await harness("POST", "/_t3flare/settings/api/mcp", { op: "remove", server: SERVER })).text);
+  const added = await harness("POST", "/_t3flare/settings/api/mcp/servers", { server: SERVER, url: URL_, auth: { kind: "header", header: "x-api-key" }, value: KEY });
+  const tested = await harness("POST", "/_t3flare/settings/api/mcp/test", { server: SERVER });
+  const listed = await harness("GET", "/_t3flare/settings/api/mcp");
+  const page = await harness("GET", "/_t3flare/settings");
+  const audit = await harness("GET", "/_t3flare/settings/api/audit");
   answers.push(added.text, tested.text, listed.text, page.text, audit.text);
   const row = (listed.json?.servers ?? []).find((server: any) => server.name === SERVER);
   const tools = (row?.tools ?? []).map((tool: any) => `${tool.upstream}:${tool.class}`);

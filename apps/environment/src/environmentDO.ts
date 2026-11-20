@@ -376,7 +376,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   }
 
   /**
-   * The harness panel (ADR-0026) at `/_t3flare/harness` on the t3 host, RPC from the Worker after it verified Access.
+   * The harness panel (ADR-0026) at `/_t3flare/settings` on the t3 host, RPC from the Worker after it verified Access.
    * Never boots t3. Not reachable through `fetch`.
    */
   async harness(request: Request, caller: AccessCaller): Promise<Response> {

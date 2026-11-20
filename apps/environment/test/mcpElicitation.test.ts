@@ -71,7 +71,7 @@ describe("planQuestion", () => {
     expect(plan.card.prompt).toContain("https://auth.example.org/connect?x=1");
     expect(plan.card.options?.[0]).toEqual({ decision: "accept", label: "Opened it" });
     expect(plan.answerOf({ decision: "accept" }).result).toEqual({ action: "accept" });
-    for (const url of ["http://auth.example.org/", "https://127.0.0.1/", "https://printer.local/", "https://t3.example.com/_t3flare/harness"]) {
+    for (const url of ["http://auth.example.org/", "https://127.0.0.1/", "https://printer.local/", "https://t3.example.com/_t3flare/settings"]) {
       expect(ask({ mode: "url", message: "x", url, elicitationId: "e" })).toMatchObject({ kind: "now", answer: { kind: "answered", result: { action: "decline" } } });
     }
   });

@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off globalConsole:off
-// The harness panel's routes (ADR-0026, plan §6): the page and its JSON API at `/_t3flare/harness` on the t3 host, behind
+// The harness panel's routes (ADR-0026, plan §6): the page and its JSON API at `/_t3flare/settings` on the t3 host, behind
 // the `/_t3flare` Access application (worker.ts verifies it before this runs; owner, 2026-11-12, back to stock: no admin
 // host). Pure over its deps, so the safety rules are tested without a Worker:
 //

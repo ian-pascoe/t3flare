@@ -1,8 +1,7 @@
 // The harness panel's icons (SPI-1086): one inline SVG sprite of simple 24-unit stroke shapes drawn here, referenced with
-// `<use href="#i-…">` (same document, so the CSP's `img-src 'none'` and `default-src 'none'` do not apply). No icon font
+// `<use href="#i-…">` (same document, so the CSP's `img-src` and `default-src 'none'` do not apply). No icon font
 // or library, nothing fetched.
 const SYMBOLS: Record<string, string> = {
-  logo: '<path d="M12 3.5L3.5 8 12 12.5 20.5 8z"/><path d="M3.5 12L12 16.5 20.5 12M3.5 16L12 20.5 20.5 16"/>',
   extensions: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><path d="M16.5 13v7M13 16.5h7"/>',
   server: '<rect x="3.5" y="4" width="17" height="7" rx="2"/><rect x="3.5" y="13" width="17" height="7" rx="2"/><path d="M7.5 7.5h.01M7.5 16.5h.01"/>',
   container: '<path d="M12 3.5l8 4.5v8L12 20.5 4 16V8z"/><path d="M4 8l8 4.5L20 8M12 12.5v8"/>',

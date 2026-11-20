@@ -315,7 +315,7 @@ export const defaultModelSlug = (endpoints: ModelEndpoints): string | undefined 
 };
 
 /** Where the owner sets up Model endpoints: what a provider needing setup, or a refused spawn, points to. */
-export const SETUP_HINT = "add one in the Harness panel (/_t3flare/harness), under Model endpoints";
+export const SETUP_HINT = "add one in the Harness panel (/_t3flare/settings), under Model endpoints";
 
 /** Pi Durable's text while no Model endpoint lists a model: its provider needs setup (SPI-1176). */
 export const NO_ENDPOINT_MESSAGE = `No Model endpoint is set up: ${SETUP_HINT}.`;

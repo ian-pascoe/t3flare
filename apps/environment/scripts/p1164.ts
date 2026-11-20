@@ -24,7 +24,7 @@ const [step, file] = process.argv.slice(2).filter((arg, index, all) => !arg.star
 const outIndex = process.argv.indexOf("--out");
 const out = outIndex === -1 ? undefined : process.argv[outIndex + 1];
 const ID = "chatgpt";
-const api = (method: string, path: string, body?: unknown) => admin(method, `/_t3flare/harness/api/${path}`, body);
+const api = (method: string, path: string, body?: unknown) => admin(method, `/_t3flare/settings/api/${path}`, body);
 
 const write = (report: Record<string, unknown>) => {
   const text = JSON.stringify({ at: new Date().toISOString(), step, ...report }, null, 2);
@@ -43,7 +43,7 @@ const describeAuthorize = (url: string) => {
 };
 
 if (step === "page") {
-  const full = await fetch(new URL("/_t3flare/harness", process.env.T3_URL), {
+  const full = await fetch(new URL("/_t3flare/settings", process.env.T3_URL), {
     headers: { "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID!, "cf-access-client-secret": process.env.T3FLARE_ACCESS_CLIENT_SECRET!, authorization: `Bearer ${process.env.T3FLARE_ADMIN_TOKEN}` },
   });
   const page = await full.text();

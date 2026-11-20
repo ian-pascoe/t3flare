@@ -2,9 +2,9 @@
 // SPI-1175: sets up a stage's Model endpoint (modelEndpointSpec.ts) through the Harness panel's own API, the way a script
 // reaches it (the stage's Access service token plus its admin token, so no CSRF token and no new route):
 //
-//   GET  /_t3flare/harness/api/endpoints            is it there already?
-//   POST /_t3flare/harness/api/endpoints/discover   its model list, when the spec names no models
-//   POST /_t3flare/harness/api/endpoints            { op: "save", endpoint, apiKey }: sealed and audited by the panel
+//   GET  /_t3flare/settings/api/endpoints            is it there already?
+//   POST /_t3flare/settings/api/endpoints/discover   its model list, when the spec names no models
+//   POST /_t3flare/settings/api/endpoints            { op: "save", endpoint, apiKey }: sealed and audited by the panel
 //
 // `stage.ts deploy` runs it after a deploy, and `acceptance.ts` before its turns. On prod (`overwrite: false`) an endpoint
 // already there is kept as the owner left it; a test stage saves it again. Text generation needs no call: while the owner
@@ -31,7 +31,7 @@ export interface EnsureOptions {
   readonly now?: () => number;
 }
 
-const PANEL = "/_t3flare/harness/api";
+const PANEL = "/_t3flare/settings/api";
 const RETRY_MS = 5_000;
 
 /** The admin calls of a deployed stage: its URL, admin token and Access service token's credentials. */

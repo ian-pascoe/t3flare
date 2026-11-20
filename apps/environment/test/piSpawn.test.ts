@@ -95,7 +95,7 @@ describe("spawnCli for pi", () => {
     bind({ endpoints: { revision: 1, endpoints: [endpoint("empty", "anthropic-messages", [])] } });
     const exit = await spawnPi();
     expect(exit._tag).toBe("Failure");
-    expect(String(exit._tag === "Failure" ? exit.cause : "")).toContain("Pi has no Model endpoint to run on: it needs one that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints");
+    expect(String(exit._tag === "Failure" ? exit.cause : "")).toContain("Pi has no Model endpoint to run on: it needs one that lists a model; add one in the Harness panel (/_t3flare/settings), under Model endpoints");
     expect(started).toEqual([]);
   });
 

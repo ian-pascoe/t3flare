@@ -58,7 +58,7 @@ const panelHeaders = async (f: SettingsFixture) => ({
   "x-t3flare-csrf": await csrfToken(f.store.csrfKey(), "owner-sub", f.now()),
 });
 const panelPost = async (f: SettingsFixture, path: string, body: unknown) =>
-  handleHarness(new Request(`https://${HOST}/_t3flare/harness${path}`, { method: "POST", headers: await panelHeaders(f), body: JSON.stringify(body) }), f.panel());
+  handleHarness(new Request(`https://${HOST}/_t3flare/settings${path}`, { method: "POST", headers: await panelHeaders(f), body: JSON.stringify(body) }), f.panel());
 
 describe("hostile: an injected agent asking repeatedly is stopped by the caps; 17 children leave the 17th refused", () => {
   it("one thread: a repeat of a declined change is refused, and the third decline in a row locks it out without a card", async () => {
@@ -121,7 +121,7 @@ describe("hostile: an injected agent asking repeatedly is stopped by the caps; 1
     const last = await f.call(f.durable(`child-${OPEN_ACROSS}`), "change_environment", { expectedRevision: 0, settings: { variables: { LAST_CHILD: "1" } } });
     expect(structured(last)).toMatchObject({ status: "refused", reason: "open-across" });
     expect(textOf(last)).toContain("Open changes list");
-    expect(textOf(last)).toContain(`https://${HOST}/_t3flare/harness`);
+    expect(textOf(last)).toContain(`https://${HOST}/_t3flare/settings`);
     expect(f.cards).toHaveLength(OPEN_ACROSS);
     expect(f.deps.changes.open()).toHaveLength(OPEN_ACROSS);
     expect(f.store.loadEnvironment().revision).toBe(0);

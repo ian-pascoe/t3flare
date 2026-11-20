@@ -43,7 +43,7 @@ const finish = () => {
   process.exit(report.ok ? 0 : 1);
 };
 
-const api = (method: string, path: string, body?: unknown) => admin(method, `/_t3flare/harness/api/${path}`, body);
+const api = (method: string, path: string, body?: unknown) => admin(method, `/_t3flare/settings/api/${path}`, body);
 
 const ANTHROPIC = { id: "commissary", label: "Commissary", api: "anthropic-messages", baseUrl: proxyUrl, auth: "api-key", headers: {} };
 const OPENAI =

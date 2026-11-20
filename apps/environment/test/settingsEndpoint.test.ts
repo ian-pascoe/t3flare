@@ -365,7 +365,7 @@ describe("layout (B): the endpoint's paths (settings/endpointLayout.ts)", () => 
     expect(settingsMcpUrl("t3.example.dev")).toBe(ENDPOINT);
     expect(isSettingsMcpPath("/_t3flare/mcp")).toBe(true);
     expect(isSettingsMcpPath("/_t3flare/mcp/anything")).toBe(true);
-    for (const path of ["/_t3flare/mcpx", "/_t3flare/harness", "/_t3flare", "/mcp", "/_t3flare/mc"]) expect(isSettingsMcpPath(path)).toBe(false);
+    for (const path of ["/_t3flare/mcpx", "/_t3flare/settings", "/_t3flare", "/mcp", "/_t3flare/mc"]) expect(isSettingsMcpPath(path)).toBe(false);
   });
 
   it("SPI-1195 review: prod is deployed without the endpoint until the owner turns it on, and bump (the t3 bump's) without it; every other stage with it", () => {

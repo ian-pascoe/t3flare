@@ -60,7 +60,7 @@ const writeEvidence = async (name: string, value: Record<string, unknown>) => {
 
 /** The panel's JSON API as a script calls it: the service token and the admin token. */
 const harness = async (method: string, pathname: string, body?: unknown) => {
-  const response = await fetch(new URL(`/_t3flare/harness/api/${pathname}`, HARNESS), {
+  const response = await fetch(new URL(`/_t3flare/settings/api/${pathname}`, HARNESS), {
     method,
     redirect: "manual",
     headers: { ...scriptHeaders, ...(body === undefined ? {} : { "content-type": "application/json" }) },
@@ -476,7 +476,7 @@ const shoot = async () => {
   await install(`https://github.com/${FIXTURE_REPO}/tree/${ENV_BRANCH}/tools/plum`);
   await install("mattpocock/skills", (skill) => skill.name === "grill-me");
   await harness("POST", "skills/enable", { name: "grill-me", enabled: false });
-  const page = new URL("/_t3flare/harness", HARNESS).toString();
+  const page = new URL("/_t3flare/settings", HARNESS).toString();
   for (const scheme of ["light", "dark"]) {
     for (const [name, width, height, scale] of [["desktop", 1280, 1600, 1], ["phone", 390, 1800, 2]] as const) {
       browser("--headers", JSON.stringify(scriptHeaders), "--color-scheme", scheme, "open", page);

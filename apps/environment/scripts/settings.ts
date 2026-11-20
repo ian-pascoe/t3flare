@@ -119,17 +119,17 @@ const harness = async (method: string, pathname: string, body?: unknown, headers
 };
 
 const environment = async () => {
-  const answer = await harness("GET", "/_t3flare/harness/api/environment");
+  const answer = await harness("GET", "/_t3flare/settings/api/environment");
   return { revision: answer.json?.revision as number, resolved: answer.json?.resolved as Record<string, any> };
 };
-const harnessRevision = async () => (await harness("GET", "/_t3flare/harness/api/settings")).json?.revision as number;
+const harnessRevision = async () => (await harness("GET", "/_t3flare/settings/api/settings")).json?.revision as number;
 /** The panel's Open changes list, each with `id` (the list names it `changeId`). */
-const openChanges = async () => (((await harness("GET", "/_t3flare/harness/api/changes")).json?.changes ?? []) as Array<any>).map((c) => ({ ...c, id: c.changeId }));
-const auditEntries = async () => ((await harness("GET", "/_t3flare/harness/api/audit")).json?.entries ?? []) as Array<any>;
+const openChanges = async () => (((await harness("GET", "/_t3flare/settings/api/changes")).json?.changes ?? []) as Array<any>).map((c) => ({ ...c, id: c.changeId }));
+const auditEntries = async () => ((await harness("GET", "/_t3flare/settings/api/audit")).json?.entries ?? []) as Array<any>;
 const auditOf = async (changeId: string | undefined) => (changeId === undefined ? [] : (await auditEntries()).filter((entry) => JSON.stringify(entry).includes(changeId)));
 /** The panel lowers the budget back (a free change, through the panel): the next asked change raises it again. */
-const resetBudget = async (to: number) => harness("POST", "/_t3flare/harness/api/environment", { settings: { containerBudget: to } });
-const setAccess = async (change: { enabled?: boolean; writes?: boolean }) => harness("POST", "/_t3flare/harness/api/mcp", { op: "server", server: "settings", ...change });
+const resetBudget = async (to: number) => harness("POST", "/_t3flare/settings/api/environment", { settings: { containerBudget: to } });
+const setAccess = async (change: { enabled?: boolean; writes?: boolean }) => harness("POST", "/_t3flare/settings/api/mcp", { op: "server", server: "settings", ...change });
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Workers Logs (wrangler tail, kept in memory): the Settings server's and the panel's lines
@@ -425,19 +425,19 @@ const shape = (answer: { status: number; json: any; contentType: string | null; 
 // setup
 
 const setup = async () => {
-  const rows = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []) as Array<any>;
+  const rows = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []) as Array<any>;
   // Commissary is a Direct server the owner adds (SPI-1160); `commissaryMcp add` adds it on a stage.
   const commissary = rows.some((row) => row.name === "commissary")
-    ? await harness("POST", "/_t3flare/harness/api/mcp/test", { server: "commissary" })
+    ? await harness("POST", "/_t3flare/settings/api/mcp/test", { server: "commissary" })
     : { status: null, json: "no Direct server named commissary: add it with `node scripts/stage.ts run <stage> commissaryMcp add`" };
   // fixture-keyed (m6 item 3, m4 item 6): a header Direct server on the stage's fixture Worker, with a placeholder value
   // the fixture refuses (an add needs one): the owner types the real one on the Change page.
   let keyed: any = { existed: true };
   if (!rows.some((row) => row.name === "fixture-keyed")) {
-    const added = await harness("POST", "/_t3flare/harness/api/mcp/servers", { server: "fixture-keyed", url: `${FIXTURE_URL}/mcp`, auth: { kind: "header", header: "Authorization" }, value: "Bearer placeholder-refused-by-the-fixture" });
+    const added = await harness("POST", "/_t3flare/settings/api/mcp/servers", { server: "fixture-keyed", url: `${FIXTURE_URL}/mcp`, auth: { kind: "header", header: "Authorization" }, value: "Bearer placeholder-refused-by-the-fixture" });
     keyed = { status: added.status, body: added.json };
   }
-  const listed = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).map((row: any) => ({ name: row.name, kind: row.setting?.kind, status: row.status, error: row.error, secret: row.secret ?? null, tools: (row.tools ?? []).map((tool: any) => `${tool.upstream}:${tool.class}`) }));
+  const listed = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).map((row: any) => ({ name: row.name, kind: row.setting?.kind, status: row.status, error: row.error, secret: row.secret ?? null, tools: (row.tools ?? []).map((tool: any) => `${tool.upstream}:${tool.class}`) }));
   console.log(JSON.stringify(redact({ commissary: { status: commissary.status, body: commissary.json }, keyed, listed }), null, 1));
 };
 
@@ -451,29 +451,29 @@ const m1 = async () => {
     const results: Array<any> = [];
     const env = await environment();
     const idle = Number(env.resolved.containerIdleMinutes);
-    const current = await harness("POST", "/_t3flare/harness/api/environment", { settings: { containerIdleMinutes: idle + 1 }, expectedRevision: env.revision });
+    const current = await harness("POST", "/_t3flare/settings/api/environment", { settings: { containerIdleMinutes: idle + 1 }, expectedRevision: env.revision });
     results.push({ route: "environment", case: "current revision applies", status: current.status, body: current.json });
     const afterEnv = await environment();
-    const stale = await harness("POST", "/_t3flare/harness/api/environment", { settings: { containerIdleMinutes: idle }, expectedRevision: afterEnv.revision - 1 });
+    const stale = await harness("POST", "/_t3flare/settings/api/environment", { settings: { containerIdleMinutes: idle }, expectedRevision: afterEnv.revision - 1 });
     const afterStale = await environment();
     results.push({ route: "environment", case: "stale revision: 409, nothing moved", status: stale.status, body: stale.json, revisionBefore: afterEnv.revision, revisionAfter: afterStale.revision });
-    const malformed = await harness("POST", "/_t3flare/harness/api/environment", { settings: { containerIdleMinutes: idle }, expectedRevision: "seven" });
-    await harness("POST", "/_t3flare/harness/api/environment", { settings: { containerIdleMinutes: idle } });
+    const malformed = await harness("POST", "/_t3flare/settings/api/environment", { settings: { containerIdleMinutes: idle }, expectedRevision: "seven" });
+    await harness("POST", "/_t3flare/settings/api/environment", { settings: { containerIdleMinutes: idle } });
     results.push({ route: "environment", case: "malformed: 400", status: malformed.status, body: malformed.json });
     const h = await harnessRevision();
-    const ext = await harness("POST", "/_t3flare/harness/api/extensions", { extension: "codemode", settings: { inlineBudget: 2000 }, expectedRevision: h });
+    const ext = await harness("POST", "/_t3flare/settings/api/extensions", { extension: "codemode", settings: { inlineBudget: 2000 }, expectedRevision: h });
     results.push({ route: "extensions", case: "current revision applies", status: ext.status, revision: ext.json?.revision });
     const h2 = await harnessRevision();
-    const extStale = await harness("POST", "/_t3flare/harness/api/extensions", { extension: "codemode", settings: { inlineBudget: 2000 }, expectedRevision: h2 - 1 });
+    const extStale = await harness("POST", "/_t3flare/settings/api/extensions", { extension: "codemode", settings: { inlineBudget: 2000 }, expectedRevision: h2 - 1 });
     results.push({ route: "extensions", case: "stale: 409, nothing moved", status: extStale.status, body: extStale.json, revisionAfter: await harnessRevision(), revisionBefore: h2 });
-    const mcpStale = await harness("POST", "/_t3flare/harness/api/mcp", { op: "server", server: "fixture", exposure: "deferred", expectedRevision: h2 - 1 });
+    const mcpStale = await harness("POST", "/_t3flare/settings/api/mcp", { op: "server", server: "fixture", exposure: "deferred", expectedRevision: h2 - 1 });
     results.push({ route: "mcp", case: "stale: 409", status: mcpStale.status, body: mcpStale.json });
-    const mcpMalformed = await harness("POST", "/_t3flare/harness/api/mcp", { op: "server", server: "fixture", exposure: "deferred", expectedRevision: -1 });
+    const mcpMalformed = await harness("POST", "/_t3flare/settings/api/mcp", { op: "server", server: "fixture", exposure: "deferred", expectedRevision: -1 });
     results.push({ route: "mcp", case: "malformed (-1): 400", status: mcpMalformed.status, body: mcpMalformed.json });
     // No skill is kept on the stage: an install (which previews the source on GitHub) with a stale revision.
-    const skillsStale = await harness("POST", "/_t3flare/harness/api/skills/install", { source: fixtureRepo(), commit: "0".repeat(40), folders: ["."], expectedRevision: (await environment()).revision - 1 });
+    const skillsStale = await harness("POST", "/_t3flare/settings/api/skills/install", { source: fixtureRepo(), commit: "0".repeat(40), folders: ["."], expectedRevision: (await environment()).revision - 1 });
     results.push({ route: "skills/install", case: "stale: 409", status: skillsStale.status, body: skillsStale.json });
-    const skillsMalformed = await harness("POST", "/_t3flare/harness/api/skills/remove", { name: "no-such-skill", expectedRevision: 1.5 });
+    const skillsMalformed = await harness("POST", "/_t3flare/settings/api/skills/remove", { name: "no-such-skill", expectedRevision: 1.5 });
     results.push({ route: "skills/remove", case: "malformed (1.5): 400", status: skillsMalformed.status, body: skillsMalformed.json });
     const ok =
       results[0].status === 200 &&
@@ -492,11 +492,11 @@ const m1 = async () => {
   // 3. The set-header route.
   {
     const before = { harness: await harnessRevision(), environment: (await environment()).revision };
-    const set = await harness("POST", "/_t3flare/harness/api/mcp/secret", { server: "fixture", value: `Bearer ${process.env.T3FLARE_FIXTURE_BEARER ?? ""}` });
-    const tested = await harness("POST", "/_t3flare/harness/api/mcp/test", { server: "fixture" });
+    const set = await harness("POST", "/_t3flare/settings/api/mcp/secret", { server: "fixture", value: `Bearer ${process.env.T3FLARE_FIXTURE_BEARER ?? ""}` });
+    const tested = await harness("POST", "/_t3flare/settings/api/mcp/test", { server: "fixture" });
     const after = { harness: await harnessRevision(), environment: (await environment()).revision };
     const audit = (await auditEntries()).find((entry) => entry.action === "mcp.secret.set" || JSON.stringify(entry).includes("mcp.secret.set"));
-    const row = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((r: any) => r.name === "fixture");
+    const row = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).find((r: any) => r.name === "fixture");
     const ok = set.status === 200 && tested.json?.status === "ok" && audit !== undefined && before.harness === after.harness && before.environment === after.environment && !JSON.stringify(set.json).includes(process.env.T3FLARE_FIXTURE_BEARER ?? "§");
     await record(FILE, "3", {
       name: "set-header route: sets the value (the next call authenticates), audited mcp.secret.set with the mark, no revision moved",
@@ -518,7 +518,7 @@ const m1Cold = async () => {
   await sleep(idleMs);
   const tailed = await tailing(WORKERS, async () => {
     const started = Date.now();
-    const response = await fetch(new URL("/_t3flare/harness", T3), { redirect: "manual", headers: { ...accessHeaders, authorization: adminBearer } });
+    const response = await fetch(new URL("/_t3flare/settings", T3), { redirect: "manual", headers: { ...accessHeaders, authorization: adminBearer } });
     const firstByte = Date.now() - started;
     const html = await response.text();
     return { status: response.status, firstByteMs: firstByte, totalMs: Date.now() - started, openChangesSection: /Open changes/.test(html) };
@@ -549,10 +549,10 @@ const exec = async (workspace: string, script: string, timeoutMs = 60_000) => ((
 const m2 = async () => {
   const FILE = "m2-cli-pi.json";
   await enableKind("pi");
-  const rows = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []) as Array<any>;
+  const rows = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []) as Array<any>;
   // Commissary is a Direct server the owner adds (SPI-1160): test it only when this stage has one.
-  if (rows.some((row) => row.name === "commissary")) await harness("POST", "/_t3flare/harness/api/mcp/test", { server: "commissary" });
-  const commissary = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((row: any) => row.name === "commissary");
+  if (rows.some((row) => row.name === "commissary")) await harness("POST", "/_t3flare/settings/api/mcp/test", { server: "commissary" });
+  const commissary = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).find((row: any) => row.name === "commissary");
   const readTool = (commissary?.tools ?? []).find((tool: any) => tool.class === "read");
   // Commissary through pi, in each runtime mode pi has (no plan mode: piDriver refuses plan turns).
   if (process.argv[3] === "t-pi-2") {
@@ -643,7 +643,7 @@ const m3 = async (kind: Kind) => {
     const audit = (await auditEntries()).find((entry) => entry.via === "mcp" && JSON.stringify(entry).includes(run.threadId));
     const ok = serverCards(run.cards).length === 0 && after.revision === env.revision + 1 && after.resolved.containerIdleMinutes === lower && statusIn(run.result) === "applied";
     await record(FILE, "2-free-full-access", { name: `${kind}: a free change (containerIdleMinutes lowered) runs in full access without a card`, before: { revision: env.revision, containerIdleMinutes: env.resolved.containerIdleMinutes }, after: { revision: after.revision, containerIdleMinutes: after.resolved.containerIdleMinutes }, ...run, audit, verdict: ok ? "pass" : "fail" });
-    await harness("POST", "/_t3flare/harness/api/environment", { settings: { containerIdleMinutes: env.resolved.containerIdleMinutes } });
+    await harness("POST", "/_t3flare/settings/api/environment", { settings: { containerIdleMinutes: env.resolved.containerIdleMinutes } });
   }
   // 3. A free change in approval-required: one owner-only card, approved.
   if (wanted("3")) {
@@ -654,7 +654,7 @@ const m3 = async (kind: Kind) => {
     const audit = (await auditEntries()).find((entry) => entry.via === "mcp" && JSON.stringify(entry).includes(run.threadId));
     const ok = serverCards(run.cards).length === 1 && after.revision === env.revision + 1 && statusIn(run.result) === "applied";
     await record(FILE, "3-free-approval-required", { name: `${kind}: a free change in approval-required asks on one card; approved, applied (audit mode card, answeredBy card)`, ...run, audit, verdict: ok ? "pass" : "fail" });
-    await harness("POST", "/_t3flare/harness/api/environment", { settings: { containerIdleMinutes: env.resolved.containerIdleMinutes } });
+    await harness("POST", "/_t3flare/settings/api/environment", { settings: { containerIdleMinutes: env.resolved.containerIdleMinutes } });
   }
   // 4. Plan mode refuses a write (pi has no plan mode: its plan turn is refused by piDriver).
   if (wanted("4")) {
@@ -822,8 +822,8 @@ const m4 = async (item: string) => {
     const threadId = await newThread("durable", "m4-4 expired", "approval-required");
     const run = await askOn("durable", threadId, args, () => undefined, { timeoutMs: 13 * 60_000 });
     const changeId = changeIdIn(run.result) ?? changeIdIn(JSON.stringify(run.cards));
-    const page = changeId === undefined ? undefined : await harness("GET", `/_t3flare/harness/changes/${changeId}`, undefined, { accept: "text/html" });
-    const post = changeId === undefined ? undefined : await harness("POST", `/_t3flare/harness/api/changes/${changeId}`, { action: "approve" });
+    const page = changeId === undefined ? undefined : await harness("GET", `/_t3flare/settings/changes/${changeId}`, undefined, { accept: "text/html" });
+    const post = changeId === undefined ? undefined : await harness("POST", `/_t3flare/settings/api/changes/${changeId}`, { action: "approve" });
     const after = await environment();
     const ok = statusIn(run.result) === "expired" && /Expired/i.test(page?.text ?? "") && after.revision === env.revision;
     await record(FILE, "4", {
@@ -876,7 +876,7 @@ const m4 = async (item: string) => {
     const run = askOn("durable", threadId, args, () => (done ? "cancel" : undefined));
     await waitForCard(threadId);
     const changes = await openChanges();
-    const page = await harness("GET", "/_t3flare/harness");
+    const page = await harness("GET", "/_t3flare/settings");
     listed = { api: changes.filter((c) => c.thread === threadId || JSON.stringify(c).includes(threadId)), all: changes.length, panelSection: /Open changes/.test(page.text) && page.text.includes(threadId.slice(0, 8)) };
     // get_status from the other thread (another caller): its own changes only (none).
     const otherRun = await durableCalls(other, settingsCall("get_status", {}), () => "accept");
@@ -886,7 +886,7 @@ const m4 = async (item: string) => {
     // get_status on the asking thread, after (its change closed: none open).
     const ownRun = await durableCalls(threadId, settingsCall("get_status", {}), () => "accept");
     ownStatus = ownRun.output.slice(0, 2500);
-    const ok = listed.api.length === 1 && listed.api[0].url?.includes("/_t3flare/harness/changes/") && listed.panelSection && !/chg_/.test(otherStatus);
+    const ok = listed.api.length === 1 && listed.api[0].url?.includes("/_t3flare/settings/changes/") && listed.panelSection && !/chg_/.test(otherStatus);
     await record(FILE, "8", {
       name: "the panel's list: the Open changes section and GET …/api/changes list the open change with its thread and link; get_status.openChanges lists it for its own thread only",
       threadId,
@@ -1023,7 +1023,7 @@ text(JSON.stringify(await a).slice(0, 1500));`;
   await waitForCard(threadId);
   const listed = (await openChanges()).find((c) => JSON.stringify(c).includes(threadId));
   const changeId: string | undefined = listed?.id ?? changeIdIn(JSON.stringify(listed ?? {}));
-  const pagePath = `/_t3flare/harness/changes/${changeId}`;
+  const pagePath = `/_t3flare/settings/changes/${changeId}`;
   // 1. Headers.
   {
     const page = await harness("GET", pagePath, undefined, { accept: "text/html" });
@@ -1062,13 +1062,13 @@ text(JSON.stringify(await a).slice(0, 1500));`;
       const response = await fetch(new URL(p, T3), { method, redirect: "manual", headers: { accept, ...(method === "POST" ? { "content-type": "application/json" } : {}) }, ...(method === "POST" ? { body: JSON.stringify({ action: "approve" }) } : {}) });
       return { method, path: p.replace(/chg_[A-Za-z0-9_-]+/, "chg_<id>"), accept, status: response.status, location: (response.headers.get("location") ?? "").replace(/\?.*/, "?…"), body: (await response.text()).slice(0, 80).includes("Change") };
     };
-    const answers = [await bare("GET", pagePath, "text/html"), await bare("GET", pagePath, "application/json"), await bare("POST", `/_t3flare/harness/api/changes/${changeId}`, "application/json"), await bare("GET", "/_t3flare/harness/api/changes", "application/json")];
+    const answers = [await bare("GET", pagePath, "text/html"), await bare("GET", pagePath, "application/json"), await bare("POST", `/_t3flare/settings/api/changes/${changeId}`, "application/json"), await bare("GET", "/_t3flare/settings/api/changes", "application/json")];
     const ok = answers.every((a) => [302, 401, 403].includes(a.status) && !a.body);
     await record(FILE, "2", { name: "without Access (no credential, from outside): the page and its API get Access's login, never the page", answers, verdict: ok ? "pass" : "fail" });
   }
   // 3. POST refusals.
   {
-    const api = `/_t3flare/harness/api/changes/${changeId}`;
+    const api = `/_t3flare/settings/api/changes/${changeId}`;
     const answers = {
       wrongOrigin: (await harness("POST", api, { action: "approve" }, { origin: "https://evil.example" })).status,
       crossSite: (await harness("POST", api, { action: "approve" }, { "sec-fetch-site": "cross-site" })).status,
@@ -1090,7 +1090,7 @@ text(JSON.stringify(await a).slice(0, 1500));`;
     const r2 = durableCalls(t2, settingsCall("change_environment", { expectedRevision: (await environment()).revision, settings: { variables } }), () => rel);
     await waitForCard(t2);
     const c2 = (await openChanges()).find((c) => JSON.stringify(c).includes(t2));
-    const page = await harness("GET", `/_t3flare/harness/changes/${c2?.id}`, undefined, { accept: "text/html" });
+    const page = await harness("GET", `/_t3flare/settings/changes/${c2?.id}`, undefined, { accept: "text/html" });
     const html = page.text;
     rel = "cancel";
     const done = await r2;
@@ -1102,7 +1102,7 @@ text(JSON.stringify(await a).slice(0, 1500));`;
   // 5. A closed and an unknown change id.
   {
     const closedPage = await harness("GET", pagePath, undefined, { accept: "text/html" });
-    const unknown = await harness("GET", `/_t3flare/harness/changes/chg_${"A".repeat(43)}`, undefined, { accept: "text/html" });
+    const unknown = await harness("GET", `/_t3flare/settings/changes/chg_${"A".repeat(43)}`, undefined, { accept: "text/html" });
     const ok = closedPage.status === 200 && !/data-action="approve"/.test(closedPage.text) && /withdrawn|Withdrawn|cancel/i.test(closedPage.text) && unknown.status === 404 && /gone/i.test(unknown.text);
     await record(FILE, "5", { name: "a closed and an unknown change id: the closed one shows its outcome without Approve; the unknown one is gone (404)", closed: { changeId, status: closedPage.status, approveShown: /data-action="approve"/.test(closedPage.text), outcomeShown: (/(Withdrawn|Declined|Applied|Expired|Moved)[^<]{0,80}/.exec(closedPage.text) ?? [""])[0] }, closedBy: statusIn(closed.output), unknown: { status: unknown.status, gone: /gone/i.test(unknown.text) }, verdict: ok ? "pass" : "fail" });
   }
@@ -1239,7 +1239,7 @@ const m5aProd = async () => {
     await at("/.well-known/cloudflare-access-protected-resource/_t3flare"),
     await at("/_t3flare/mcp"),
     await at("/_t3flare/mcp", "POST"),
-    await at("/_t3flare/harness"),
+    await at("/_t3flare/settings"),
   ];
   const mcp = answers[3]!;
   const harnessKid = answers[5]!.locationKid;
@@ -1247,7 +1247,7 @@ const m5aProd = async () => {
     name: "prod's host as it is today (read-only, unauthenticated GETs and one unauthenticated POST ping; nothing changed): the baseline for the first prod deploy of SettingsAccess",
     host: prodDomain(),
     answers,
-    expectedWhileExcluded: "/_t3flare/mcp gets the admin application's Access login (same kid as /_t3flare/harness), no resource_metadata challenge",
+    expectedWhileExcluded: "/_t3flare/mcp gets the admin application's Access login (same kid as /_t3flare/settings), no resource_metadata challenge",
     sameKidAsHarness: mcp.locationKid !== null && mcp.locationKid === harnessKid,
     firstProdDeploy: { pending: "CI's first prod deploy from this branch: its output shows no SettingsAccess and AdminAccess unchanged (owner-stage-run.md item 16)" },
     expectation: {
@@ -1447,14 +1447,14 @@ const m6 = async (item: string) => {
     const asking = askOn("durable", asker, args, () => release);
     await waitForCard(asker);
     const changeId = (await openChanges()).find((c) => JSON.stringify(c).includes(asker))?.id as string;
-    const pageUrl = `${T3}/_t3flare/harness/changes/${changeId}`;
+    const pageUrl = `${T3}/_t3flare/settings/changes/${changeId}`;
     const probe = (what: string, flags: string, url: string) => `echo "${what} $(curl -s -m 15 -o /dev/null -w '%{http_code} %{redirect_url}' ${flags} ${url} | sed 's/[?].*//')"`;
     const curls = [
       probe("page-html", "-H 'accept: text/html'", pageUrl),
       probe("page-json", "-H 'accept: application/json'", pageUrl),
-      probe("api-post", `-X POST -H 'content-type: application/json' --data '{"action":"approve"}'`, `${T3}/_t3flare/harness/api/changes/${changeId}`),
-      probe("panel", "", `${T3}/_t3flare/harness`),
-      probe("audit", "", `${T3}/_t3flare/harness/api/audit`),
+      probe("api-post", `-X POST -H 'content-type: application/json' --data '{"action":"approve"}'`, `${T3}/_t3flare/settings/api/changes/${changeId}`),
+      probe("panel", "", `${T3}/_t3flare/settings`),
+      probe("audit", "", `${T3}/_t3flare/settings/api/audit`),
     ].join("; ");
     console.log(`step: asker ${asker} open ${changeId}`);
     const shell = await newThread("durable", "m6-2 shell", "full-access");
@@ -1494,7 +1494,7 @@ const m6 = async (item: string) => {
     const asking = askOn("durable", asker, args, () => release);
     await waitForCard(asker);
     const changeId = (await openChanges()).find((c) => JSON.stringify(c).includes(asker))?.id as string;
-    const pageUrl = `${T3}/_t3flare/harness/changes/${changeId}`;
+    const pageUrl = `${T3}/_t3flare/settings/changes/${changeId}`;
     await updateSettings(cookie, { enableAgentBrowserAccess: true });
     const browserThread = await newThread("durable", "m6-2.2 preview browser", "full-access");
     const prompt = [
@@ -1502,7 +1502,7 @@ const m6 = async (item: string) => {
       `1. Call preview_open with url "${pageUrl}".`,
       "2. Call preview_snapshot and describe in one line what the page shows (its heading or form).",
       "3. Call preview_evaluate with expression: document.title + \" | \" + location.href",
-      `4. Call preview_open with url "${T3}/_t3flare/harness", then preview_evaluate with expression: document.title + " | " + location.href`,
+      `4. Call preview_open with url "${T3}/_t3flare/settings", then preview_evaluate with expression: document.title + " | " + location.href`,
       "Report each tool result verbatim on its own line.",
     ].join("\n");
     const run = await turn("durable", browserThread, prompt, () => "accept", { timeoutMs: 15 * 60_000 });
@@ -1678,7 +1678,7 @@ text("LIST " + JSON.stringify(listed).slice(0, 600) + "\\nREAD " + JSON.stringif
     const ownerList = await modernCall("tools/list");
     const ownerCall = await modernCall("tools/call", { name: "get_status", arguments: {} });
     results.ownerClient = { tools: (ownerList.json?.result?.tools ?? []).map((t: any) => t.name), call: ownerCall.json?.result ?? ownerCall.json?.error };
-    const stillOff = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((r: any) => r.name === "settings")?.setting?.enabled;
+    const stillOff = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).find((r: any) => r.name === "settings")?.setting?.enabled;
     // 8.3 The panel turns it on; the next call runs.
     await setAccess({ enabled: true });
     const t3 = await newThread("durable", "m6-8 back on", "approval-required");
@@ -1689,7 +1689,7 @@ text("LIST " + JSON.stringify(listed).slice(0, 600) + "\\nREAD " + JSON.stringif
     const t4 = await newThread("durable", "m6-8 read-only", "full-access");
     const ro = await durableCalls(t4, `const read = await tools.mcp__settings__get_status({}).catch((e) => ({ threw: String(e.message) }));\nconst names = ALL_TOOLS.map((t) => (typeof t === "string" ? t : t.name)).filter((n) => /settings/.test(n));\nlet w;\ntry { w = await tools.mcp__settings__change_mcp({ expectedRevision: 0, change: { op: "server", server: "settings", writes: true } }); } catch (e) { w = { threw: String(e && e.message || e) }; }\ntext(JSON.stringify({ read: JSON.stringify(read).slice(0, 300), settingsTools: names, write: w }));`, () => "accept");
     const ownerWrite = await modernCall("tools/call", { name: "change_mcp", arguments: { expectedRevision: await harnessRevision(), change: { op: "server", server: "settings", writes: true } } });
-    const stillReadOnly = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((r: any) => r.name === "settings")?.setting?.writes;
+    const stillReadOnly = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).find((r: any) => r.name === "settings")?.setting?.writes;
     await setAccess({ writes: true });
     results.readOnly = { thread: ro.output.slice(0, 1500), ownerClient: ownerWrite.json?.result ?? ownerWrite.json?.error, writesAfter: stillReadOnly };
     const ok =
@@ -1749,7 +1749,7 @@ const ownPage = async (label: string, tool: string, args: unknown, instructions:
     if (changeId === undefined) await sleep(1500);
   }
   if (changeId === undefined) banner([`${label}: no Open change for this thread (the call was answered without one); the script records its result.`]);
-  else banner([`OWNER, ${label}: open this Change page in the browser where you are signed in to the panel:`, "", `   ${T3}/_t3flare/harness/changes/${changeId}`, "", ...instructions.map((line) => `   ${line}`), "", "The script waits (up to the change's 10 minutes) and records what happens."]);
+  else banner([`OWNER, ${label}: open this Change page in the browser where you are signed in to the panel:`, "", `   ${T3}/_t3flare/settings/changes/${changeId}`, "", ...instructions.map((line) => `   ${line}`), "", "The script waits (up to the change's 10 minutes) and records what happens."]);
   if (changeId !== undefined) await options.afterOpen?.(changeId);
   const run = await running;
   const projection = projectionOf(await threadWindow(cookie, threadId));
@@ -1797,7 +1797,7 @@ const ownerItem = async (item: string) => {
   }
   if (item === "m4-6") {
     // A secret through the page; then m6 item 3's leak scan.
-    const before = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((r: any) => r.name === "fixture-keyed");
+    const before = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).find((r: any) => r.name === "fixture-keyed");
     const tail = await tailing(WORKERS, async () => {
       const out = await ownPage(
         "M4 item 6 and M6 item 3 (a header value through the page)",
@@ -1809,16 +1809,16 @@ const ownerItem = async (item: string) => {
         ],
         { openedIt: true },
       );
-      const pageAfter = out.changeId === null ? null : await harness("GET", `/_t3flare/harness/changes/${out.changeId}`, undefined, { accept: "text/html" });
-      const tested = await harness("POST", "/_t3flare/harness/api/mcp/test", { server: "fixture-keyed" });
+      const pageAfter = out.changeId === null ? null : await harness("GET", `/_t3flare/settings/changes/${out.changeId}`, undefined, { accept: "text/html" });
+      const tested = await harness("POST", "/_t3flare/settings/api/mcp/test", { server: "fixture-keyed" });
       // The agent's own reads after it (the same thread): read_audit, list_mcp_servers named, get_status.
       const reads = await durableCalls(out.threadId, `const a = await tools.mcp__settings__read_audit({ limit: 20 });\nconst l = await tools.mcp__settings__list_mcp_servers({ server: "fixture-keyed" });\nconst g = await tools.mcp__settings__get_status({});\ntext(JSON.stringify([a, l, g]));`, () => "accept");
       return { out, pageAfter: pageAfter?.text ?? "", tested: tested.json, reads: reads.output };
     });
     const { out, tested, reads, pageAfter } = tail.result;
-    const after = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((r: any) => r.name === "fixture-keyed");
-    const audit = (await harness("GET", "/_t3flare/harness/api/audit")).text;
-    const changes = (await harness("GET", "/_t3flare/harness/api/changes")).text;
+    const after = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).find((r: any) => r.name === "fixture-keyed");
+    const audit = (await harness("GET", "/_t3flare/settings/api/audit")).text;
+    const changes = (await harness("GET", "/_t3flare/settings/api/changes")).text;
     const transcript = JSON.stringify(itemsOf(projectionOf(await threadWindow(cookie, out.threadId))));
     const text = [tail.text, pageAfter, audit, changes, reads, out.result, transcript, JSON.stringify(out.cards)].join("\n");
     const leak = (await admin("POST", "/_t3flare/check/peer-leak", { workspace: WORKSPACE.durable, threads: [out.threadId], text })).json;
@@ -1846,8 +1846,8 @@ const ownerItem = async (item: string) => {
   }
   if (item === "m4-7") {
     // A sign-in through the page: the fixture's OAuth server (its authorize approves at once).
-    const rows = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []) as Array<any>;
-    if (!rows.some((r) => r.name === "fixture-oauth")) await harness("POST", "/_t3flare/harness/api/mcp/servers", { server: "fixture-oauth", url: `${FIXTURE_URL}/oauth-mcp`, auth: { kind: "oauth" } });
+    const rows = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []) as Array<any>;
+    if (!rows.some((r) => r.name === "fixture-oauth")) await harness("POST", "/_t3flare/settings/api/mcp/servers", { server: "fixture-oauth", url: `${FIXTURE_URL}/oauth-mcp`, auth: { kind: "oauth" } });
     const revision = await harnessRevision();
     const tail = await tailing(WORKERS, () =>
       ownPage("M4 item 7 (a sign-in through the page)", "start_mcp_sign_in", { expectedRevision: revision, server: "fixture-oauth" }, ["The harness presses Opened it on the card.", "On the page click 'Approve and sign in'. The fixture's authorization server approves at once and sends you back."], { openedIt: true }),
@@ -1857,7 +1857,7 @@ const ownerItem = async (item: string) => {
     if (out.status === "refused" && /revision/.test(out.result)) {
       out = await ownPage("M4 item 7 again (the revision had moved)", "start_mcp_sign_in", { expectedRevision: await harnessRevision(), server: "fixture-oauth" }, ["On the page click 'Approve and sign in'."], { openedIt: true });
     }
-    const row = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((r: any) => r.name === "fixture-oauth");
+    const row = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).find((r: any) => r.name === "fixture-oauth");
     const authorizeUrlInResult = /oauth\/authorize|code_challenge/.test(out.result);
     const authorizeUrlInLogs = /oauth\/authorize\?|code_challenge=/.test(tail.text.replace(/"url":\s*"[^"]*"/g, ""));
     const ok = out.status === "applied" && row?.oauth?.signedIn === true && !authorizeUrlInResult && !authorizeUrlInLogs;
@@ -1993,7 +1993,7 @@ const ownerOAuth = async () => {
   // A free change through the endpoint, to read the caller key the Environment derived (compared, never kept).
   const env = await environment();
   const free = await call("tools/call", { name: "change_environment", arguments: { expectedRevision: env.revision, settings: { containerIdleMinutes: Math.max(1, Number(env.resolved.containerIdleMinutes) - 1) } } }, 2);
-  await harness("POST", "/_t3flare/harness/api/environment", { settings: { containerIdleMinutes: env.resolved.containerIdleMinutes } });
+  await harness("POST", "/_t3flare/settings/api/environment", { settings: { containerIdleMinutes: env.resolved.containerIdleMinutes } });
   const entries = await auditEntries();
   const endpointEntry = entries.find((e) => e.via === "mcp" && String(e.caller).startsWith("owner:"));
   const pageEntry = entries.find((e) => e.answeredBy === "page" && String(e.caller).startsWith("owner:") && e !== endpointEntry) ?? entries.find((e) => (e.via === "panel" || e.via === undefined) && String(e.caller).startsWith("owner:"));
@@ -2021,10 +2021,10 @@ const ownerOAuth = async () => {
     return { path: p.replace(/chg_[A-Za-z0-9_-]+/, "chg_<open>"), header, method, status: r.status, location: (r.headers.get("location") ?? "").replace(/\?.*/, "?…"), servedThePage: r.status === 200 };
   };
   const paths: Array<[string, string]> = [
-    ["/_t3flare/harness", "GET"],
-    ["/_t3flare/harness/api/settings", "GET"],
+    ["/_t3flare/settings", "GET"],
+    ["/_t3flare/settings/api/settings", "GET"],
     ["/_t3flare/health", "GET"],
-    ...(openId === undefined ? [] : ([[`/_t3flare/harness/changes/${openId}`, "GET"], [`/_t3flare/harness/api/changes/${openId}`, "POST"]] as Array<[string, string]>)),
+    ...(openId === undefined ? [] : ([[`/_t3flare/settings/changes/${openId}`, "GET"], [`/_t3flare/settings/api/changes/${openId}`, "POST"]] as Array<[string, string]>)),
   ];
   result.P12 = [];
   for (const [p, method] of paths) for (const header of ["bearer", "cf-access-token"] as const) result.P12.push(await probe(p, header, method));

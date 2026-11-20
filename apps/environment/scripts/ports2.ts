@@ -48,8 +48,8 @@ const harness = async (method: string, pathname: string, body?: unknown) => {
 };
 
 const panel = async (change: unknown) => {
-  const answer = await harness("POST", "/_t3flare/harness/api/extensions", change);
-  const after = await harness("GET", "/_t3flare/harness/api/settings");
+  const answer = await harness("POST", "/_t3flare/settings/api/extensions", change);
+  const after = await harness("GET", "/_t3flare/settings/api/settings");
   const extensions = after.json?.resolved?.extensions ?? after.json?.extensions ?? {};
   return { change, status: answer.status, resolved: Object.fromEntries(["termctrl", "guardian", "advisor"].map((id) => [id, extensions[id] ?? null])) };
 };

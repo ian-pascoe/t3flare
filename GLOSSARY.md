@@ -203,7 +203,7 @@ Claude Code's highest settings source, shared by every Claude process in a Conta
 ## Tools
 
 **Harness panel**:
-The Owner's page at `/_t3flare/harness` on the t3 host for t3flare's own settings: the Harness settings and the
+The Owner's page at `/_t3flare/settings` on the t3 host for t3flare's own settings: the Harness settings and the
 Environment settings, with Status, the audit log and the Open changes waiting for them.
 _Avoid_: settings page, dashboard, admin UI
 

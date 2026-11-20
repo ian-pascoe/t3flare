@@ -116,7 +116,7 @@ const fixture = () => {
 // ── The panel's API, the Workspace, the client ───────────────────────────────────────────────────────────────────────
 
 const harness = async (method: string, pathname: string, body?: unknown) => {
-  const response = await fetch(new URL(`/_t3flare/harness/api/${pathname}`, HARNESS), {
+  const response = await fetch(new URL(`/_t3flare/settings/api/${pathname}`, HARNESS), {
     method,
     redirect: "manual",
     headers: { ...scriptHeaders, ...(body === undefined ? {} : { "content-type": "application/json" }) },

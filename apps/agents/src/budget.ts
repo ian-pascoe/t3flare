@@ -79,7 +79,7 @@ export class ContainerBudget extends DurableObject<BudgetEnv> {
         ok: false,
         // Short: computer keeps only the first 240 characters of a failed start's message, its own prefix included, and
         // the Workspace DO shows that message to terminals and CLI agents.
-        reason: `Container budget (${max}) reached: raise it at /_t3flare/harness#environment`,
+        reason: `Container budget (${max}) reached: raise it at /_t3flare/settings#environment`,
         running: others.map((lease) => lease.holder),
         max,
       };

@@ -37,14 +37,14 @@ const setup = (caller: AccessCaller = { kind: "service-token" }) => {
 
 const post = (deps: ReturnType<typeof setup>["deps"], path: string, body: unknown, headers: Record<string, string> = {}) =>
   handleHarness(
-    new Request(`https://${HOST}/_t3flare/harness/api/skills/${path}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) }),
+    new Request(`https://${HOST}/_t3flare/settings/api/skills/${path}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) }),
     deps,
   );
 const postJson = async (deps: ReturnType<typeof setup>["deps"], path: string, body: unknown) => {
   const response = await post(deps, path, body);
   return { status: response.status, body: response.headers.get("content-type")?.includes("json") ? ((await response.json()) as any) : await response.text() };
 };
-const get = async (deps: ReturnType<typeof setup>["deps"], path: string) => (await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/${path}`), deps)).json() as Promise<any>;
+const get = async (deps: ReturnType<typeof setup>["deps"], path: string) => (await handleHarness(new Request(`https://${HOST}/_t3flare/settings/api/${path}`), deps)).json() as Promise<any>;
 
 describe("Environment skills API", () => {
   it("previews, then installs what was previewed at its commit, even after the ref moves", async () => {

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { describeFailure, failureMessage, startRefusal } from "./startRefusal.ts";
 
-const REASON = "Container budget (1) reached: raise it at /_t3flare/harness#environment";
+const REASON = "Container budget (1) reached: raise it at /_t3flare/settings#environment";
 
 /** The error a refused start throws, as computer wraps it after a Container exited before (the case met on stage). */
 const wrapped = () => {

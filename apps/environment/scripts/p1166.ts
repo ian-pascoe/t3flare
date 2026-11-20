@@ -30,7 +30,7 @@ const outIndex = process.argv.indexOf("--out");
 const out = outIndex === -1 ? undefined : process.argv[outIndex + 1];
 const [step, ...args] = process.argv.slice(2).filter((arg, index, all) => !arg.startsWith("--") && all[index - 1] !== "--out");
 const ID = "copilot";
-const api = (method: string, path: string, body?: unknown) => admin(method, `/_t3flare/harness/api/${path}`, body);
+const api = (method: string, path: string, body?: unknown) => admin(method, `/_t3flare/settings/api/${path}`, body);
 /** GitHub's token forms (`gho_`, `ghu_`, …), a Copilot token (`tid=…;exp=…`), and a bearer header. */
 const TOKEN_FORMS = /gh[opusr]_[A-Za-z0-9]{8}|tid=[^;\s"]+;|Bearer /;
 
@@ -41,7 +41,7 @@ const write = (report: Record<string, unknown>) => {
 };
 
 const page = async (): Promise<{ readonly status: number; readonly html: string }> => {
-  const full = await fetch(new URL("/_t3flare/harness", process.env.T3_URL), {
+  const full = await fetch(new URL("/_t3flare/settings", process.env.T3_URL), {
     headers: { "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID!, "cf-access-client-secret": process.env.T3FLARE_ACCESS_CLIENT_SECRET!, authorization: `Bearer ${process.env.T3FLARE_ADMIN_TOKEN}` },
   });
   return { status: full.status, html: await full.text() };

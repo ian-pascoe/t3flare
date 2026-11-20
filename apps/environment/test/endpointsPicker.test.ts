@@ -56,7 +56,7 @@ describe("the setup state (SPI-1176)", () => {
       version: null,
       status: "warning",
       auth: { status: "unknown" },
-      message: "No Model endpoint is set up: add one in the Harness panel (/_t3flare/harness), under Model endpoints.",
+      message: "No Model endpoint is set up: add one in the Harness panel (/_t3flare/settings), under Model endpoints.",
     });
     expect(readinessOf(snapshotModels(ENDPOINTS), null, NO_ENDPOINT_MESSAGE)).toEqual({ installed: true, version: null, status: "ready", auth: { status: "authenticated" } });
     expect(readinessOf(snapshotModels(ENDPOINTS), "1.0", "setup", "a note")).toMatchObject({ status: "ready", message: "a note" });

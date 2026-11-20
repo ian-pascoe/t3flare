@@ -97,7 +97,7 @@ describe("Claude Code's profile", () => {
   it("is refused without an Anthropic Messages endpoint, saying so and where to add one (SPI-1176)", () => {
     const { claudeRelay: _none, ...without } = context;
     expect(profileLaunch({ cli: "claude", args: [], key: "proc-7", cwd: "/w/demo", env: {}, allowProbe: false }, without)).toEqual({
-      refused: "Claude Code has no Model endpoint to run on: it needs one that speaks Anthropic Messages and that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints",
+      refused: "Claude Code has no Model endpoint to run on: it needs one that speaks Anthropic Messages and that lists a model; add one in the Harness panel (/_t3flare/settings), under Model endpoints",
     });
   });
 });
@@ -255,7 +255,7 @@ describe("OpenCode's profile", () => {
     const { opencodeRelay: _none, ...without } = context;
     expect(profileLaunch({ cli: "opencode", args: ["acp"], key: "proc-7", cwd: "/w/demo", env: {}, allowProbe: false }, without)).toEqual({
       refused:
-        "OpenCode has no Model endpoint to run on: it needs one that speaks Anthropic Messages, OpenAI Responses or OpenAI-compatible Completions and that lists a model; add one in the Harness panel (/_t3flare/harness), under Model endpoints",
+        "OpenCode has no Model endpoint to run on: it needs one that speaks Anthropic Messages, OpenAI Responses or OpenAI-compatible Completions and that lists a model; add one in the Harness panel (/_t3flare/settings), under Model endpoints",
     });
   });
 });

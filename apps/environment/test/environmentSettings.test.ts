@@ -33,7 +33,7 @@ const setup = (caller: AccessCaller = owner) => {
 
 const post = (deps: ReturnType<typeof setup>["deps"], path: string, body: unknown, headers: Record<string, string>) =>
   handleHarness(
-    new Request(`https://${HOST}/_t3flare/harness/api/${path}`, {
+    new Request(`https://${HOST}/_t3flare/settings/api/${path}`, {
       method: "POST",
       headers: { "content-type": "application/json", ...headers },
       body: typeof body === "string" ? body : JSON.stringify(body),
@@ -48,7 +48,7 @@ const ownerHeaders = async (store: ReturnType<typeof setup>["store"]) => ({
 });
 
 const getJson = async (deps: ReturnType<typeof setup>["deps"], path: string) =>
-  (await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/${path}`), deps)).json() as Promise<any>;
+  (await handleHarness(new Request(`https://${HOST}/_t3flare/settings/api/${path}`), deps)).json() as Promise<any>;
 
 describe("Environment settings in the panel", () => {
   it("an Environment change moves only the Environment revision; a Harness change moves only the Harness one", async () => {
@@ -99,7 +99,7 @@ describe("Environment settings in the panel", () => {
   it("labels an audit entity the page does not know by its stored name (the audit entity is an open set)", async () => {
     const { kv, deps } = setup();
     kv.put(AUDIT_KEY, [{ at: NOW, entity: "models", caller: "owner:owner-sub", action: "models.change", target: "openai" }]);
-    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
+    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/settings`), deps)).text();
     expect(html).toContain('<td data-label="Settings"><div>models</div></td>');
   });
 
@@ -147,7 +147,7 @@ describe("Environment settings in the panel", () => {
   it("shows an Environment section with the size, the idle time, the budget beside the running Containers, and the cost table", async () => {
     const { store, deps } = setup();
     await post(deps, "environment", { settings: { containerSize: "standard-1" } }, await ownerHeaders(store));
-    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
+    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/settings`), deps)).text();
     expect(html).toContain('id="environment"');
     expect(html).toMatch(/<option value="standard-1" selected>/);
     expect(html).toContain('data-setting="containerIdleMinutes"');
@@ -180,7 +180,7 @@ describe("Environment settings in the panel", () => {
   it("renders the Global mise config as a text area without maxlength, its first newline kept", async () => {
     const { store, deps } = setup();
     await post(deps, "environment", { settings: { globalMiseConfig: "\n[tools]\n" } }, await ownerHeaders(store));
-    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
+    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/settings`), deps)).text();
     const area = /<textarea[^>]*data-setting="globalMiseConfig"[^>]*>([\s\S]*?)<\/textarea>/.exec(html);
     expect(area).not.toBeNull();
     expect(area![0]).not.toContain("maxlength");
@@ -238,7 +238,7 @@ describe("Variables in the panel", () => {
   it("shows the Variables as a list in the Environment section: each name and value, escaped, and a way to add one", async () => {
     const { store, deps } = setup();
     await post(deps, "environment", { settings: { variables: { NODE_ENV: "test", GREETING: '<b>"hi"</b>' } } }, await ownerHeaders(store));
-    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
+    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/settings`), deps)).text();
     expect(html).toContain('data-setting="variables" data-kind="variables"');
     expect(html).toContain('<input type="text" data-variable-name aria-label="Name" value="NODE_ENV"');
     expect(html).toContain(">test</textarea>");

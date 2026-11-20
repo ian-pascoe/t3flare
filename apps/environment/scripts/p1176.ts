@@ -96,7 +96,7 @@ const all = await tailing([`t3flare-agents-${stage}`, `t3flare-environment-${sta
   report.setupState = setup;
   for (const driver of DRIVERS) {
     const entry = setup[driver];
-    check(`${driver} needs setup with no endpoint: warning, no model, pointing to the Harness panel`, entry?.status === "warning" && entry.models.length === 0 && /Harness panel \(\/_t3flare\/harness\), under Model endpoints/.test(entry.message ?? ""), entry);
+    check(`${driver} needs setup with no endpoint: warning, no model, pointing to the Harness panel`, entry?.status === "warning" && entry.models.length === 0 && /Harness panel \(\/_t3flare\/settings\), under Model endpoints/.test(entry.message ?? ""), entry);
   }
   // A Pi Durable turn with no endpoint.
   const durable = await createProjectAndThread(cookie, { title: "setup state", workspaceRoot: `/w/p1176-setup-durable-${runId}` });

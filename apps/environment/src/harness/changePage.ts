@@ -1,6 +1,6 @@
 // @effect-diagnostics globalDate:off
 // The Change page (ADR-0035, plan D10), M4 (SPI-1199): one Open change, server-rendered from its `shown` (render.ts), at
-// `/_t3flare/harness/changes/<id>` under the panel's Access check, hash-only CSP and security headers. Every string that
+// `/_t3flare/settings/changes/<id>` under the panel's Access check, hash-only CSP and security headers. Every string that
 // is not a literal here is made visible (control and bidi characters shown as `\u{…}`) and then HTML-escaped, so a
 // hostile setting, server name, URL or SKILL.md is inert. No script computes a diff: the line diff is rendered here.
 //
@@ -12,7 +12,8 @@ import type { ChangeItem, ShownSkill } from "../settings/types.ts";
 import { fileUrl } from "../skills/api.ts";
 import { CHANGE_SCRIPT } from "./changePageScript.ts";
 import { escapeHtml, time, visibleHtml } from "./page.ts";
-import { OPEN_CHANGES_PATH } from "./paths.ts";
+import { BRAND_MARK, FAVICON, WORDMARK } from "./pageBrand.ts";
+import { HARNESS_PATH, OPEN_CHANGES_PATH } from "./paths.ts";
 import { STYLE } from "./pageStyle.ts";
 
 /** A value as JSON text, safe. */
@@ -115,7 +116,10 @@ const head = (title: string, csrf: string) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="t3flare-csrf" content="${escapeHtml(csrf)}">
-<title>${visibleHtml(title)} · t3flare</title><style>${STYLE}</style></head>`;
+<title>${visibleHtml(title)} · t3flare</title>${FAVICON}<style>${STYLE}</style></head>`;
+
+/** The brand above each page, back to the panel. */
+const brand = `<a class="brand" href="${HARNESS_PATH}">${BRAND_MARK}<div><strong>${WORDMARK}</strong><span>Settings</span></div></a>`;
 
 const foot = `<div id="result" class="notice" role="status" aria-live="polite" hidden></div></main>
 <script>${CHANGE_SCRIPT}</script>
@@ -123,7 +127,7 @@ const foot = `<div id="result" class="notice" role="status" aria-live="polite" h
 
 /** The page for an unknown id, or one pruned `CLOSED_KEPT_MS` after it closed. */
 export const renderGonePage = (csrf: string): string =>
-  `${head("Change", csrf)}<body><main class="change-main" id="main"><header class="page-head"><div><h1>This change is gone</h1><p>No change has this id: it closed over ${durationText(CLOSED_KEPT_MS)} ago, or never was. Nothing waits here.</p></div></header><p><a href="${OPEN_CHANGES_PATH}">The Harness panel's Open changes</a></p>${foot}`;
+  `${head("Change", csrf)}<body><main class="change-main" id="main">${brand}<header class="page-head"><div><h1>This change is gone</h1><p>No change has this id: it closed over ${durationText(CLOSED_KEPT_MS)} ago, or never was. Nothing waits here.</p></div></header><p><a href="${OPEN_CHANGES_PATH}">The Harness panel's Open changes</a></p>${foot}`;
 
 /** The Change page for `record` (plan D10). `now` decides the time left. */
 export const renderChangePage = (record: ChangeRecord, input: { readonly csrf: string; readonly now: number }): string => {
@@ -155,7 +159,7 @@ export const renderChangePage = (record: ChangeRecord, input: { readonly csrf: s
         record.needsPage === "sign-in" ? "Approve and sign in" : "Approve"
       }</button><button type="button" class="btn" data-action="decline">Decline</button><p class="desc">The first answer wins: the card on the thread and this page answer the same change.</p></form>`
     : "";
-  return `${head(title, input.csrf)}<body><main class="change-main" id="main">
+  return `${head(title, input.csrf)}<body><main class="change-main" id="main">${brand}
 <header class="page-head"><div><h1>${visibleHtml(title)}</h1><p>${visibleHtml(view?.appliesAt ?? "")}</p></div><a class="chip" href="${OPEN_CHANGES_PATH}">Open changes</a></header>
 <dl class="group kv">${facts}</dl>
 ${lines}

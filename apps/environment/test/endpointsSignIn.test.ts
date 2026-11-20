@@ -90,10 +90,10 @@ const setup = async () => {
     [CSRF_HEADER]: await csrfToken(store.csrfKey(), "owner-sub", NOW),
   };
   const post = async (body: unknown, path = "endpoints/sign-in") => {
-    const response = await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/${path}`, { method: "POST", headers, body: JSON.stringify(body) }), deps);
+    const response = await handleHarness(new Request(`https://${HOST}/_t3flare/settings/api/${path}`, { method: "POST", headers, body: JSON.stringify(body) }), deps);
     return { status: response.status, text: await response.text() };
   };
-  const page = async () => (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
+  const page = async () => (await handleHarness(new Request(`https://${HOST}/_t3flare/settings`), deps)).text();
   /** Everything a token must never reach: the storage, the audit log, the console. */
   const leaks = () => {
     const places = [JSON.stringify([...kv.map.entries()]), JSON.stringify(store.auditLog(50)), logged.join("\n")];

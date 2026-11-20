@@ -119,7 +119,7 @@ describe("runText on Model endpoints", () => {
     expect(calls.map((call) => `${call.endpointId}/${call.modelId}`)).toEqual(["big/gpt-5.4"]);
     bindEnvironmentServices({ agents: {}, modelEndpoints: () => ({ revision: 2, endpoints: [] }) } as unknown as EnvironmentServices);
     for (const old of ["default", "anthropic/claude-haiku-5-5"]) {
-      expect(detailOf(await run(old)), old).toBe("No Model endpoint is set up: add one in the Harness panel (/_t3flare/harness), under Model endpoints.");
+      expect(detailOf(await run(old)), old).toBe("No Model endpoint is set up: add one in the Harness panel (/_t3flare/settings), under Model endpoints.");
     }
   });
 

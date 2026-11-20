@@ -7,12 +7,12 @@ other way to reach a model: no Model proxy, no key of its own in a Worker settin
 Model proxy, Commissary, served every model, [ADR-0012](adr/0012-all-model-access-goes-through-the-model-proxy.md)).
 
 A new Environment has no endpoint, so it starts in the **setup state**: every agent's provider shows **Needs attention**
-with "No Model endpoint is set up: add one in the Harness panel (/_t3flare/harness), under Model endpoints." (each CLI
+with "No Model endpoint is set up: add one in the Harness panel (/_t3flare/settings), under Model endpoints." (each CLI
 agent names the API it needs), and a CLI agent's thread is refused at its start, saying so. Do the setup step below once.
 
 ## The setup step
 
-1. Open the Harness panel at `https://<your t3 host>/_t3flare/harness` (behind Cloudflare Access, as the owner) and go to
+1. Open the Harness panel at `https://<your t3 host>/_t3flare/settings` (behind Cloudflare Access, as the owner) and go to
    **Model endpoints**.
 2. **Add an endpoint** for each way you reach models:
    - **An API key**: pick a preset (Anthropic API, OpenAI API, OpenRouter) or **Custom** (any OpenAI-compatible
@@ -226,9 +226,9 @@ Nothing is read from a vendor's or Commissary's management API.
      key. It is stored write-only and never enters a Container.
   3. **Test** lists its tools.
 
-  The same from a script: `POST /_t3flare/harness/api/mcp/servers` on the t3 host, through Access with a service token
+  The same from a script: `POST /_t3flare/settings/api/mcp/servers` on the t3 host, through Access with a service token
   and the admin token, with the body `{"server": "commissary", "url": "https://<api host>/mcp", "auth": {"kind":
-  "header", "header": "x-api-key"}, "value": "<key>"}`, then `POST /_t3flare/harness/api/mcp/test` with
+  "header", "header": "x-api-key"}, "value": "<key>"}`, then `POST /_t3flare/settings/api/mcp/test` with
   `{"server": "commissary"}`. `apps/environment/scripts/commissaryMcp.ts add` does this on a throwaway stage
   (`T3FLARE_MCP_API_URL` and `T3FLARE_MCP_KEY` exported inline).
   - **No Commissary approval rules on it** (OD-T3): t3flare asks by each thread's mode; Commissary's rules would ask a
@@ -239,7 +239,7 @@ Nothing is read from a vendor's or Commissary's management API.
 ## The stages' Model endpoints
 
 SPI-1175. After each deploy, `stage.ts` saves the stage's Model endpoints through the Harness panel's own API
-(`/_t3flare/harness/api/endpoints`, with the stage's Access service token and admin token), and the acceptance test does
+(`/_t3flare/settings/api/endpoints`, with the stage's Access service token and admin token), and the acceptance test does
 the same before its turns; its real turn then runs on the first endpoint's small model. They are one setting,
 `T3FLARE_MODEL_ENDPOINT`, a JSON object holding an endpoint and its key, or a list of them
 ([`apps/environment/scripts/lib/modelEndpointSpec.ts`](../apps/environment/scripts/lib/modelEndpointSpec.ts)):

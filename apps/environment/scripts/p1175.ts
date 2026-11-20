@@ -41,7 +41,7 @@ const clean = <T>(value: T): T => {
 };
 
 // 1. The endpoint, as the panel lists it, and its audit.
-const listed = await admin("GET", "/_t3flare/harness/api/endpoints");
+const listed = await admin("GET", "/_t3flare/settings/api/endpoints");
 const endpoint = listed.json?.endpoints?.find((entry: any) => entry.id === spec.spec.id);
 report.endpoint = clean(
   endpoint === undefined
@@ -49,7 +49,7 @@ report.endpoint = clean(
     : { id: endpoint.id, label: endpoint.label, api: endpoint.api, auth: endpoint.auth, models: endpoint.models.map((model: any) => model.id), key: { set: endpoint.key?.set, readable: endpoint.key?.readable } },
 );
 check("the endpoint stage.ts saved is listed with a readable key", endpoint !== undefined && endpoint.key?.set === true && endpoint.key?.readable === true, report.endpoint);
-const audit = await admin("GET", "/_t3flare/harness/api/audit");
+const audit = await admin("GET", "/_t3flare/settings/api/audit");
 const saves = (audit.json?.entries ?? []).filter((entry: any) => entry.entity === "endpoints" && entry.target === spec.spec.id);
 report.audit = clean(saves.map((entry: any) => ({ action: entry.action, caller: entry.caller, key: entry.after?.key === undefined ? null : { set: entry.after.key.set } })));
 check("its saves are audited, by the service token", saves.length > 0 && saves.every((entry: any) => entry.caller === "service-token"), report.audit);

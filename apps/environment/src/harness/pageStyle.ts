@@ -37,10 +37,12 @@ svg.i{width:1rem;height:1rem;flex:none;fill:none;stroke:currentColor;stroke-widt
 .shell{display:grid;grid-template-columns:var(--side-w) minmax(0,1fr);min-height:100vh;background:linear-gradient(to right,var(--sidebar) calc(var(--side-w) - 1px),var(--border) 0 var(--side-w),transparent 0)}
 .side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:1.25rem;padding:1rem .75rem;background:var(--sidebar);border-right:1px solid var(--border)}
 .brand{display:flex;align-items:center;gap:.625rem;padding:.25rem .5rem}
-.brand-mark{display:grid;place-items:center;width:1.75rem;height:1.75rem;border-radius:var(--radius);background:var(--primary);color:var(--primary-fg)}
-.brand-mark svg.i{width:1rem;height:1rem}
-.brand strong{display:block;font-size:.875rem;font-weight:600;line-height:1.25}
-.brand div span{display:block;font-size:.75rem;color:var(--muted-fg);line-height:1.25}
+.brand-mark{display:grid;place-items:center;width:1.75rem;height:1.75rem;flex:none;border-radius:var(--radius);background:radial-gradient(60% 60% at 50% 50%,rgb(255 122 26/28%),transparent 70%),#000;box-shadow:inset 0 0 0 1px rgb(255 255 255/8%)}
+.brand-mark svg.flare{width:1.25rem;height:1.25rem;filter:drop-shadow(0 0 3px rgb(255 140 40/75%))}
+.brand strong{display:block;font-size:.9375rem;font-weight:600;line-height:1.25;letter-spacing:-.02em}
+.brand div>span{display:block;font-size:.75rem;color:var(--muted-fg);line-height:1.25}
+.wordmark-flare{background:linear-gradient(90deg,#FF7A1A,#FFB547);-webkit-background-clip:text;background-clip:text;color:transparent}
+a.brand{align-self:flex-start;padding:0;color:inherit;text-decoration:none}
 .nav{display:flex;flex-direction:column;gap:2px}
 .nav a{display:flex;align-items:center;gap:.625rem;min-height:2rem;padding:.375rem .625rem;border-radius:var(--radius);color:var(--fg);text-decoration:none;font-weight:450;transition:background-color .15s}
 .nav a svg.i{color:var(--muted-fg)}

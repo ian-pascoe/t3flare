@@ -316,7 +316,7 @@ describe("the Container's file operations", () => {
 // ADR-0032 §7: a Container-only path's file operation whose Container start the budget refused shows the whole refusal,
 // not computer's outer message, which it cuts at 240 characters (shorter after `priorExit=`, as met on stage).
 describe("a refused Container start", () => {
-  const REASON = "Container budget (1) reached: raise it at /_t3flare/harness#environment";
+  const REASON = "Container budget (1) reached: raise it at /_t3flare/settings#environment";
   const refused: ContainerAccess = {
     patterns: async () => ["**/node_modules"],
     running: () => false,

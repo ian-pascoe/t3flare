@@ -29,6 +29,7 @@ import type { PageReason } from "../settings/types.ts";
 import { type AskedBy, askedByText, sizeText } from "../settings/render.ts";
 import type { AuditEntry } from "./store.ts";
 
+import { BRAND_MARK, FAVICON, WORDMARK } from "./pageBrand.ts";
 import { ICON_SPRITE, icon, type IconName } from "./pageIcons.ts";
 import { changePagePath } from "./paths.ts";
 import { SCRIPT } from "./pageScript.ts";
@@ -49,7 +50,7 @@ const hashes = new Map<string, Promise<{ readonly style: string; readonly script
 
 /**
  * A page's Content-Security-Policy: nothing but the one constant stylesheet and its own constant script (the panel's,
- * or the Change page's), and calls to its own origin.
+ * or the Change page's), calls to its own origin, and `data:` images (the favicon, pageBrand.ts).
  */
 export const pageCsp = async (pageScript: string = SCRIPT): Promise<string> => {
   let pending = hashes.get(pageScript);
@@ -60,7 +61,7 @@ export const pageCsp = async (pageScript: string = SCRIPT): Promise<string> => {
     `style-src 'sha256-${style}'`,
     `script-src 'sha256-${script}'`,
     "connect-src 'self'",
-    "img-src 'none'",
+    "img-src data:",
     "form-action 'none'",
     "frame-ancestors 'none'",
     "base-uri 'none'",
@@ -619,12 +620,12 @@ export const renderPage = (input: PageInput): string => {
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="t3flare-csrf" content="${escapeHtml(input.csrf)}">
-<title>Harness · t3flare</title><style>${STYLE}</style></head>
+<title>Settings · t3flare</title>${FAVICON}<style>${STYLE}</style></head>
 <body>${ICON_SPRITE}
 <a class="skip" href="#main">Skip to content</a>
 <div class="shell">
 <aside class="side">
-<div class="brand"><span class="brand-mark">${icon("logo")}</span><div><strong>Harness</strong><span>t3flare · Pi Durable</span></div></div>
+<div class="brand">${BRAND_MARK}<div><strong>${WORDMARK}</strong><span>Settings</span></div></div>
 <nav class="nav" aria-label="Sections">
 ${input.openChanges === undefined ? "" : `${navItem("changes", "Open changes", "alert", `<span class="count">${input.openChanges.length}</span>`)}\n`}${navItem("extensions", "Extensions", "extensions", `<span class="count">${EXTENSIONS.length}</span>`)}
 ${navItem("mcp", "MCP servers", "server", failing > 0 ? `<span class="flag" role="img" aria-label="${plural(failing, "server", "servers")} failing"></span>` : `<span class="count">${rows.length}</span>`)}
@@ -636,7 +637,7 @@ ${navItem("audit", "Audit log", "audit", `<span class="count">${input.audit.leng
 <p class="side-foot">Harness revision <strong>${revision}</strong>, applied at each thread's next turn. Environment revision <strong>${environment.revision}</strong>: Container settings apply at each Container's next start, Environment skills at each thread's next turn.</p>
 </aside>
 <main id="main" tabindex="-1"><div class="content">
-<header class="page-head"><div><h1>Harness</h1><p>t3flare's own settings for this Cloud Environment: the Harness settings (Pi Durable's extensions and MCP servers, applied at each thread's next turn) and the Environment settings (what every Container gets, applied at its next start).</p></div><span class="chip">Revision <strong>${revision}</strong></span></header>
+<header class="page-head"><div><h1>Settings</h1><p>t3flare's own settings for this Cloud Environment: the Harness settings (Pi Durable's extensions and MCP servers, applied at each thread's next turn) and the Environment settings (what every Container gets, applied at its next start).</p></div><span class="chip">Revision <strong>${revision}</strong></span></header>
 <div id="result" class="notice" role="status" aria-live="polite" hidden><span class="notice-ico-ok">${icon("check")}</span><span class="notice-ico-err">${icon("alert")}</span><p class="msg"></p><button type="button" class="btn btn-ghost btn-sm" data-dismiss aria-label="Dismiss">${icon("x")}</button></div>
 ${input.openChanges === undefined ? "" : `${openChangesSection(input.openChanges)}\n`}${extensionsSection(input.resolved)}
 ${mcpSection(rows, input.ownerClients)}

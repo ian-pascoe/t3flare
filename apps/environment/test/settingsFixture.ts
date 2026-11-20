@@ -22,7 +22,7 @@ import { fakeGithub } from "./skillRepo.fixture.ts";
 
 export const NOW = Date.UTC(2026, 10, 14, 12, 0);
 export const HOST = "t3.example.dev";
-export const PANEL = `https://${HOST}/_t3flare/harness`;
+export const PANEL = `https://${HOST}/_t3flare/settings`;
 export const AUTHORIZATION_URL = "https://auth.example/authorize?state=s3cr3t-state";
 
 export const memory = () => {

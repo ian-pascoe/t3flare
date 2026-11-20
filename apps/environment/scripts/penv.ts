@@ -63,14 +63,14 @@ const harness = async (method: string, pathname: string, body?: unknown, headers
 };
 
 const setEnvironment = async (settings: Record<string, unknown>) => {
-  const answer = await harness("POST", "/_t3flare/harness/api/environment", { settings });
+  const answer = await harness("POST", "/_t3flare/settings/api/environment", { settings });
   if (answer.status !== 200) throw new Error(`environment change ${JSON.stringify(settings)} refused: ${answer.status} ${JSON.stringify(answer.json)}`);
   return answer.json as { revision: number; resolved: Record<string, unknown> };
 };
 
 const revisions = async () => ({
-  harness: (await harness("GET", "/_t3flare/harness/api/settings")).json?.revision as number,
-  environment: (await harness("GET", "/_t3flare/harness/api/environment")).json?.revision as number,
+  harness: (await harness("GET", "/_t3flare/settings/api/settings")).json?.revision as number,
+  environment: (await harness("GET", "/_t3flare/settings/api/environment")).json?.revision as number,
 });
 
 // ── The Workspace and its Container ─────────────────────────────────────────────────────────────────────────────
@@ -169,7 +169,7 @@ const fits = (size: keyof typeof EXPECTED, limits: Record<string, string>) => {
 
 /** On a deploy of main (before SPI-1149): one Harness change, so the audit log holds an entry written without `entity`. */
 const seedOld = async () => {
-  const answer = await harness("POST", "/_t3flare/harness/api/extensions", { extension: "codemode", settings: { inlineBudget: 2345 } });
+  const answer = await harness("POST", "/_t3flare/settings/api/extensions", { extension: "codemode", settings: { inlineBudget: 2345 } });
   console.log(`seed-old: ${answer.status} ${JSON.stringify(answer.json).slice(0, 200)}`);
 };
 
@@ -303,7 +303,7 @@ const budget = async () => {
 };
 
 /** The whole refusal a product surface must show (ADR-0032 §7): the budget, and where to change it. */
-const WHOLE_REFUSAL = "the Container cannot start: Container budget (1) reached: raise it at /_t3flare/harness#environment";
+const WHOLE_REFUSAL = "the Container cannot start: Container budget (1) reached: raise it at /_t3flare/settings#environment";
 
 /**
  * At a budget of 1 with another Workspace's Container busy, what the product shows when a start is refused: a Durable
@@ -424,18 +424,18 @@ const revisionsCase = async () => {
   await setEnvironment({ containerIdleMinutes: 4 });
   const afterEnvironment = await revisions();
   cases.push({ name: "an Environment change moves only the Environment revision", before, after: afterEnvironment, ok: afterEnvironment.environment === before.environment + 1 && afterEnvironment.harness === before.harness });
-  const harnessChange = await harness("POST", "/_t3flare/harness/api/extensions", { extension: "codemode", settings: { inlineBudget: 2100 } });
+  const harnessChange = await harness("POST", "/_t3flare/settings/api/extensions", { extension: "codemode", settings: { inlineBudget: 2100 } });
   const afterHarness = await revisions();
   cases.push({ name: "a Harness change moves only the Harness revision", status: harnessChange.status, before: afterEnvironment, after: afterHarness, ok: afterHarness.harness === afterEnvironment.harness + 1 && afterHarness.environment === afterEnvironment.environment });
-  const status = (await harness("GET", "/_t3flare/harness/api/status")).json;
+  const status = (await harness("GET", "/_t3flare/settings/api/status")).json;
   cases.push({ name: "Status shows both revisions and when a Workspace last took the Environment settings", status, ok: typeof status?.["Environment settings revision"] === "number" && typeof status?.["settings revision"] === "number" });
-  await harness("POST", "/_t3flare/harness/api/extensions", { extension: "codemode", settings: { inlineBudget: 2000 } });
+  await harness("POST", "/_t3flare/settings/api/extensions", { extension: "codemode", settings: { inlineBudget: 2000 } });
   await setEnvironment({ containerIdleMinutes: 2 });
   await writeEvidence("revisions.json", { cases, ok: cases.every((entry) => entry.ok) });
 };
 
 const audit = async () => {
-  const entries = ((await harness("GET", "/_t3flare/harness/api/audit")).json?.entries ?? []) as Array<any>;
+  const entries = ((await harness("GET", "/_t3flare/settings/api/audit")).json?.entries ?? []) as Array<any>;
   const environment = entries.filter((entry) => entry.entity === "environment");
   const old = entries.filter((entry) => entry.action === "extension.change" && entry.after?.settings?.inlineBudget === 2345);
   const cases: Array<Case> = [
@@ -453,24 +453,24 @@ const audit = async () => {
 const safety = async () => {
   const cases: Array<Case> = [];
   const url = (pathname: string) => new URL(pathname, T3);
-  const get = await harness("GET", "/_t3flare/harness/api/environment");
+  const get = await harness("GET", "/_t3flare/settings/api/environment");
   cases.push({ name: "service token + admin token reads the Environment settings", status: get.status, ok: get.status === 200 && typeof get.json?.revision === "number" });
   const before = get.json?.revision;
   const statuses = async (headers: Record<string, string>, post: boolean) =>
-    (await fetch(url("/_t3flare/harness/api/environment"), { method: post ? "POST" : "GET", headers: { ...headers, ...(post ? { "content-type": "application/json" } : {}) }, ...(post ? { body: JSON.stringify({ settings: { containerSize: "standard-4" } }) } : {}), redirect: "manual" })).status;
+    (await fetch(url("/_t3flare/settings/api/environment"), { method: post ? "POST" : "GET", headers: { ...headers, ...(post ? { "content-type": "application/json" } : {}) }, ...(post ? { body: JSON.stringify({ settings: { containerSize: "standard-4" } }) } : {}), redirect: "manual" })).status;
   const bare = [await statuses({}, false), await statuses({}, true)];
   cases.push({ name: "no Access credentials (GET and a change): refused at the edge", statuses: bare, ok: bare.every((status) => [302, 401, 403].includes(status)) });
   const forged = [await statuses({ "cf-access-jwt-assertion": "e30.e30.e30" }, false), await statuses({ "cf-access-jwt-assertion": "e30.e30.e30" }, true)];
   cases.push({ name: "a forged Access assertion alone: refused at the edge", statuses: forged, ok: forged.every((status) => [302, 401, 403].includes(status)) });
   const noToken = [await statuses(accessHeaders, false), await statuses(accessHeaders, true)];
   cases.push({ name: "the service token without the admin token: refused", statuses: noToken, ok: noToken.every((status) => status === 404) });
-  const crossOrigin = await harness("POST", "/_t3flare/harness/api/environment", { settings: { containerSize: "standard-4" } }, { origin: "https://evil.example" });
-  const crossSite = await harness("POST", "/_t3flare/harness/api/environment", { settings: { containerSize: "standard-4" } }, { origin: url("/").origin, "sec-fetch-site": "cross-site" });
-  const form = await harness("POST", "/_t3flare/harness/api/environment", "settings=standard-4", { "content-type": "application/x-www-form-urlencoded" });
+  const crossOrigin = await harness("POST", "/_t3flare/settings/api/environment", { settings: { containerSize: "standard-4" } }, { origin: "https://evil.example" });
+  const crossSite = await harness("POST", "/_t3flare/settings/api/environment", { settings: { containerSize: "standard-4" } }, { origin: url("/").origin, "sec-fetch-site": "cross-site" });
+  const form = await harness("POST", "/_t3flare/settings/api/environment", "settings=standard-4", { "content-type": "application/x-www-form-urlencoded" });
   cases.push({ name: "a wrong Origin, a cross-site fetch and a form-encoded body: refused", statuses: [crossOrigin.status, crossSite.status, form.status], answers: [crossOrigin.json, crossSite.json, form.json], ok: [crossOrigin, crossSite, form].every((answer) => answer.status === 403) });
-  const invalid = await harness("POST", "/_t3flare/harness/api/environment", { settings: { containerSize: "lite" } });
+  const invalid = await harness("POST", "/_t3flare/settings/api/environment", { settings: { containerSize: "lite" } });
   cases.push({ name: "a size not offered: refused with the setting named", status: invalid.status, answer: invalid.json, ok: invalid.status === 400 });
-  const after = (await harness("GET", "/_t3flare/harness/api/environment")).json?.revision;
+  const after = (await harness("GET", "/_t3flare/settings/api/environment")).json?.revision;
   cases.push({ name: "nothing refused was stored", before, after, ok: before === after });
   await writeEvidence("safety.json", {
     note: "The CSRF token binds the owner's Access subject; a script's service token needs none (ADR-0026 §2) and the owner's assertion cannot be made from a script. The CSRF refusals are the unit tests' (apps/environment/test/environmentSettings.test.ts), as for m3-panel-safety.json.",
@@ -513,7 +513,7 @@ const shoot = async () => {
   await ready();
   await call({ exec: { script: "true", timeoutMs: 180_000 } });
   fs.mkdirSync(OUT, { recursive: true });
-  const page = new URL("/_t3flare/harness", HARNESS).toString();
+  const page = new URL("/_t3flare/settings", HARNESS).toString();
   for (const scheme of ["light", "dark"]) {
     for (const [name, width, height, scale] of [["desktop", 1280, 1100, 1], ["phone", 390, 844, 2]] as const) {
       browser("--headers", JSON.stringify(scriptHeaders), "--color-scheme", scheme, "open", page);

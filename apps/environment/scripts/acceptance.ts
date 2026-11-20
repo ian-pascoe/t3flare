@@ -195,7 +195,7 @@ const cookie = paired.cookie;
 if (endpointModel !== undefined) {
   const { enablePiDurable, waitForTextGenerationSetting } = await import("./lib/client.ts");
   await enablePiDurable(cookie);
-  const listed = JSON.parse((await adminCall("GET", "/_t3flare/harness/api/endpoints")).text) as { revision: number; endpoints: Array<any> };
+  const listed = JSON.parse((await adminCall("GET", "/_t3flare/settings/api/endpoints")).text) as { revision: number; endpoints: Array<any> };
   const expected = defaultTextModel({ revision: listed.revision, endpoints: listed.endpoints });
   const seen = await waitForTextGenerationSetting(cookie, expected);
   report.textGeneration = { expected: expected ?? null, instanceId: seen?.instanceId ?? null, model: seen?.model ?? null };

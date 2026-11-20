@@ -184,8 +184,10 @@ describe("harness page", () => {
     for (const tag of tags) {
       expect(Object.keys(tag.attrs).filter((name) => name === "style" || /^on/i.test(name)), tag.name).toEqual([]);
       if (tag.name === "use") expect(tag.attrs.href).toMatch(/^#i-/);
-      expect(["img", "link", "iframe", "object", "embed"]).not.toContain(tag.name);
+      expect(["img", "iframe", "object", "embed"]).not.toContain(tag.name);
     }
+    // The one link is the favicon, a `data:` URL: the only source the CSP's `img-src` allows.
+    expect(tags.filter((tag) => tag.name === "link").map((tag) => [tag.attrs.rel, tag.attrs.href?.slice(0, 19)])).toEqual([["icon", "data:image/svg+xml,"]]);
   });
 
   it("escapes hostile strings in every server-supplied field", () => {
