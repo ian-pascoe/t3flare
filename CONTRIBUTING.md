@@ -46,7 +46,7 @@ people up most:
 - **The `t3code` submodule stays as pinned.** Change t3code's behaviour by Layer, then Shadow, then Patch
   ([ADR-0001](docs/adr/0001-t3code-is-a-pinned-submodule-changed-by-layer-then-shadow-then-patch.md)).
 - **Never edit `pnpm-workspace.yaml` or `pnpm-lock.yaml` by hand.** They are generated from t3code's: change them with
-  `pnpm run relock` ([ADR-0030](docs/adr/0030-pnpm-installs-node-runs-scripts-and-vite-plus-runs-the-checks.md)).
+  `node scripts/relock.ts` ([ADR-0030](docs/adr/0030-pnpm-installs-node-runs-scripts-and-vite-plus-runs-the-checks.md)).
 - **Test deploys go to a throwaway Stage of a Deployment of your own,** through
   [`apps/environment/scripts/stage.ts`](apps/environment/scripts/stage.ts). Deployment settings, and how to deploy, are in
   [`docs/deploy.md`](docs/deploy.md).

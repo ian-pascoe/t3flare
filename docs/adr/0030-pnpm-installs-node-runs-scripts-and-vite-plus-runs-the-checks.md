@@ -68,3 +68,12 @@ are gone: the lint scripts no longer set `OXLINT_TSGOLINT_PATH`, and `prepare` n
 which is deleted. An inherited `OXLINT_TSGOLINT_PATH` still overrides oxlint's choice, and the scripts no longer guard
 against it: unset a stale one (AGENTS.md). An editor bundling an oxlint older than 1.94.0 no longer gets tsrs-lint
 through the link.
+
+## Refinement (SPI-1272, 2026-11-20): relock runs as `node scripts/relock.ts`
+
+`verifyDepsBeforeRun: error` makes pnpm check, before any `pnpm run <script>`, that the install matches the manifests
+and the lock, and refuse with `ERR_PNPM_VERIFY_DEPS_BEFORE_RUN` when it doesn't. Relock is for exactly those states: a
+moved pin, an edited manifest, a fresh worktree. So `pnpm run relock` failed every time it was needed, while
+`node scripts/relock.ts` always works. The command is now `node scripts/relock.ts`, and `node scripts/relock.ts --refresh`
+where the text above says `pnpm run relock -- --refresh`; the root `package.json` has no `relock` script, since it could
+run only when nothing needed relocking. `verifyDepsBeforeRun` stays `error`: it protects every other script.

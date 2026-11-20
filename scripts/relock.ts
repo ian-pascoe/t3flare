@@ -1,8 +1,10 @@
 // Regenerates the workspace and the lock from the pinned t3code (ADR-0030), the one way to change either:
 //
-//   node scripts/relock.ts              (pnpm run relock): keep t3flare's own resolutions, move what t3 moved
-//   node scripts/relock.ts --refresh    (pnpm run relock -- --refresh): re-resolve t3flare's own dependencies too, the one
-//                                       way to refresh them (ADR-0030's in-app updates refinement); a bump never does
+//   node scripts/relock.ts              keep t3flare's own resolutions, move what t3 moved
+//   node scripts/relock.ts --refresh    re-resolve t3flare's own dependencies too, the one way to refresh them (ADR-0030's
+//                                       in-app updates refinement); a bump never does
+//
+// Run it with node, not through `pnpm run` (ADR-0030's SPI-1272 refinement).
 //
 //  1. gen-workspace.ts writes pnpm-workspace.yaml (t3's patches limited to what the current lock installs);
 //  2. seed-lock.ts seeds pnpm-lock.yaml from t3's lock;

@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "gen:workspace": "node scripts/gen-workspace.ts",
-    "relock": "node scripts/relock.ts",
     "build:web": "pnpm --filter @t3tools/web run build",
     "check": "vp run --log grouped --concurrency-limit 16 check:all",
     "bump": "node scripts/bump.ts",
