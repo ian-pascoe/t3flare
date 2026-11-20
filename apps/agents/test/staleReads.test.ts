@@ -26,12 +26,21 @@ const ENV = {
 };
 const git = (cwd: string, args: ReadonlyArray<string>) => execFileSync("git", args, { cwd, env: ENV }).toString("utf8");
 
+// t3's review diffs (`getReviewDiffPreview`): its `REVIEW_DIFF_ARGS`, then the stats read or the patch read.
+const REVIEW = ["-c", "diff.suppressBlankEmpty=false", "diff", "--find-renames", "--no-color", "--no-ext-diff", "--no-textconv", "--submodule=short", "--src-prefix=a/", "--dst-prefix=b/"];
+const STATS = [...REVIEW, "--raw", "--numstat", "-z"];
+const PATCH = [...REVIEW, "--patch"];
+const OTHERS = ["ls-files", "--others", "--exclude-standard", "-z", "--"];
+/** t3's pathspec for one file of the diff panel. */
+const one = (path: string) => `:(top,literal)${path}`;
+
 const SHAPES: ReadonlyArray<ReadonlyArray<string>> = [
   ["status", "--porcelain=2", "--branch", "-z", "--no-ahead-behind"],
+  ["status", "--porcelain=2", "--branch", "-z", "--untracked-files=normal"],
   ["diff-index", "-M", "--numstat", "-z", "HEAD", "--"],
-  ["ls-files", "--others", "--exclude-standard", "-z", "--"],
-  ["-c", "diff.suppressBlankEmpty=false", "diff", "--find-renames", "--no-color", "--no-ext-diff", "--no-textconv", "--submodule=short", "--src-prefix=a/", "--dst-prefix=b/", "HEAD", "--"],
-  ["-c", "diff.suppressBlankEmpty=false", "diff", "--find-renames", "--no-color", "--no-ext-diff", "--no-textconv", "--submodule=short", "--src-prefix=a/", "--dst-prefix=b/", "--minimal", "--numstat", "-z", "HEAD", "--"],
+  OTHERS,
+  [...PATCH, "HEAD", "--"],
+  [...STATS, "HEAD", "--"],
 ];
 
 const setup = (name: string) => {
@@ -45,18 +54,25 @@ const setup = (name: string) => {
   return { dir, put };
 };
 
-/** Answers before, `change` (which returns the paths it wrote), then each shape's patched answer against real git's. */
-const compare = async (dir: string, change: () => ReadonlyArray<string>) => {
-  // The review numstat against a merge base (a commit id), as t3's branch totals read it.
+/**
+ * Answers before, `change` (which returns the paths it wrote), then each shape's patched answer against real git's.
+ * `extra` adds shapes to t3's whole-repo reads (one file's reads), and `only` replaces them.
+ */
+const compare = async (
+  dir: string,
+  change: () => ReadonlyArray<string>,
+  options: { readonly extra?: ReadonlyArray<ReadonlyArray<string>>; readonly only?: ReadonlyArray<ReadonlyArray<string>> } = {},
+) => {
+  // The review reads against a merge base (a commit id), as t3's branch-range source reads them.
   const base = git(dir, ["rev-list", "--max-parents=0", "HEAD"]).trim();
-  const shapes = [...SHAPES, [...SHAPES[4]!.slice(0, -2), base, "--"]];
+  const shapes = options.only ?? [...SHAPES, [...PATCH, base, "--"], [...STATS, base, "--"], ...(options.extra ?? [])];
   const before = shapes.map((argv) => git(dir, argv));
   const journal = change();
   for (const [at, argv] of shapes.entries()) {
     const shape = kindOf(argv, undefined);
-    expect(shape).toBeDefined();
+    expect(shape, argv.join(" ")).toBeDefined();
     const facts = await repoFacts({ fs, dir, cache: {} }, shape!.base);
-    expect(await patchAnswer(shape!.kind, before[at]!, journal, facts), argv.join(" ")).toBe(git(dir, argv));
+    expect(await patchAnswer(shape!, before[at]!, journal, facts), argv.join(" ")).toBe(git(dir, argv));
   }
 };
 
@@ -85,6 +101,39 @@ describe("stale reads: last answer plus the journal match git", { timeout: GIT_T
       r.put("ignored/x.txt", "x\n");
       r.put("debug.log", "log\n");
       return ["src/a.txt", "src/b.txt", "new", "new/dir", "new/dir/file.txt", "top.txt", "ignored/x.txt", "debug.log"];
+    }, {
+      // One file's reads, as the diff panel sends them: a written file, a deleted one, one nothing wrote, a new one.
+      extra: [
+        ...["src/a.txt", "src/b.txt", "README.md"].flatMap((path) => [[...STATS, "HEAD", "--", one(path)], [...PATCH, "HEAD", "--", one(path)]]),
+        [...OTHERS, one("top.txt")],
+        [...OTHERS, one("src/a.txt")],
+      ],
+    });
+  });
+
+  it("a rename (git mv), a mode change and a staged edit: the review reads", async () => {
+    const r = setup("rename");
+    r.put("ren.txt", "r1\nr2\nr3\nr4\n");
+    r.put("run.sh", "echo\n");
+    r.put("staged.txt", "s\n");
+    git(r.dir, ["add", "-A"]);
+    git(r.dir, ["commit", "-q", "-m", "one"]);
+    const both = [one("moved.txt"), one("ren.txt")];
+    await compare(r.dir, () => {
+      git(r.dir, ["mv", "ren.txt", "moved.txt"]);
+      fs.chmodSync(join(r.dir, "run.sh"), 0o755);
+      r.put("staged.txt", "s2\n");
+      git(r.dir, ["add", "staged.txt"]);
+      return ["ren.txt", "moved.txt", "run.sh", "staged.txt"];
+    }, {
+      only: [
+        [...STATS, "HEAD", "--"],
+        [...PATCH, "HEAD", "--"],
+        [...STATS, "HEAD", "--", ...both],
+        [...PATCH, "HEAD", "--", ...both],
+        [...STATS, "HEAD", "--", one("moved.txt")],
+        [...PATCH, "HEAD", "--", one("run.sh")],
+      ],
     });
   });
 
@@ -194,11 +243,106 @@ describe("a passive read while the Container is stopped (staleRead)", { timeout:
     expect(await staleRead({ argv: STATUS, env: undefined }, sourcesOver(dir, new Map()))).toEqual({ found: false });
   });
 
+  it("with --untracked-files=normal, each status shape stands in for the other, never for a shape without it", async () => {
+    const dir = ahead("untracked-normal");
+    git(dir, ["config", "status.showUntrackedFiles", "no"]);
+    const withFlag = [...STATUS, "--untracked-files=normal"];
+    const withFlagNab = [...withFlag, "--no-ahead-behind"];
+    fs.writeFileSync(join(dir, "before.txt"), "b\n");
+    const answers = new Map([[withFlagNab.join(" "), git(dir, withFlagNab)]]);
+    fs.writeFileSync(join(dir, "after.txt"), "a\n");
+    const outcome = await staleRead({ argv: withFlag, env: undefined }, sourcesOver(dir, answers, ["after.txt"]));
+    expect(outcome).toEqual({ found: true, stale: "patched", answer: { exitCode: 0, stdout: git(dir, withFlagNab), stderr: "" } });
+    expect(await staleRead({ argv: STATUS, env: undefined }, sourcesOver(dir, answers, ["after.txt"]))).toEqual({ found: false });
+    expect(await staleRead({ argv: STATUS_NAB, env: undefined }, sourcesOver(dir, answers, ["after.txt"]))).toEqual({ found: false });
+  });
+
   it("more paths written than the DO patches: the last answer as it was", async () => {
     const dir = ahead("many");
     const before = git(dir, STATUS_NAB);
     const written = Array.from({ length: MAX_PATCHED_PATHS + 1 }, (_, at) => `gen/f${at}.txt`);
     const outcome = await staleRead({ argv: STATUS_NAB, env: undefined }, sourcesOver(dir, new Map([[STATUS_NAB.join(" "), before]]), written));
     expect(outcome).toEqual({ found: true, stale: "last-answer", why: `${MAX_PATCHED_PATHS + 1} paths written`, answer: { exitCode: 0, stdout: before, stderr: "" } });
+  });
+});
+
+describe("one file's review reads with no last answer are computed (SPI-1295)", { timeout: GIT_TEST_TIMEOUT_MS }, () => {
+  /** No read was answered before; `written` is the journal since the Container stopped. */
+  const noAnswers = (dir: string, written: ReadonlyArray<string>, within = true) => ({
+    last: () => Promise.resolve(undefined),
+    journalSince: () => written,
+    withinGuard: () => Promise.resolve(within),
+    facts: (base: string) => repoFacts({ fs, dir, cache: {} }, base),
+  });
+  /** A repo on a branch one commit past `main`, and that commit's merge base with `main`. */
+  const branched = (name: string) => {
+    const r = setup(name);
+    r.put("edited.txt", "one\ntwo\nthree\n");
+    r.put("before.txt", "b1\n");
+    r.put("gone.txt", "g\n");
+    r.put("src/kept.ts", "export const k = 1;\n");
+    r.put("ren.txt", "r1\nr2\nr3\nr4\n");
+    git(r.dir, ["add", "-A"]);
+    git(r.dir, ["commit", "-q", "-m", "one"]);
+    const base = git(r.dir, ["rev-parse", "HEAD"]).trim();
+    git(r.dir, ["checkout", "-q", "-b", "feature"]);
+    r.put("edited.txt", "one\ntwo\nthree\nfour\n");
+    git(r.dir, ["commit", "-q", "-am", "two"]);
+    return { ...r, base };
+  };
+  /** Each argv's computed answer, against real git's. */
+  const expectComputed = async (dir: string, argvs: ReadonlyArray<ReadonlyArray<string>>, written: ReadonlyArray<string>) => {
+    for (const argv of argvs) {
+      const outcome = await staleRead({ argv, env: undefined }, noAnswers(dir, written));
+      expect(outcome, argv.join(" ")).toEqual({ found: true, stale: "patched", answer: { exitCode: 0, stdout: git(dir, argv), stderr: "" } });
+    }
+  };
+  const reads = (path: string, base: string) => [[...OTHERS, one(path)], [...STATS, base, "--", one(path)], [...PATCH, base, "--", one(path)]];
+
+  it("a path written after the stop and one changed before it, against HEAD and the merge base", async () => {
+    const r = branched("one-file");
+    // Changed while the Container ran, before it stopped: not in the journal.
+    r.put("before.txt", "b2\n");
+    // Written after the stop.
+    r.put("edited.txt", "zero\none\ntwo\nthree\nfour\n");
+    fs.unlinkSync(join(r.dir, "gone.txt"));
+    r.put("src/kept.ts", "export const k = 2;\n");
+    git(r.dir, ["add", "src/kept.ts"]);
+    const written = ["edited.txt", "gone.txt", "src/kept.ts"];
+    const paths = ["edited.txt", "before.txt", "gone.txt", "src/kept.ts", "ren.txt"];
+    await expectComputed(r.dir, paths.flatMap((path) => [...reads(path, "HEAD"), ...reads(path, r.base)]), written);
+  });
+
+  it("an untracked file is listed, and has no review diff", async () => {
+    const r = branched("one-untracked");
+    r.put("fresh.txt", "f\n");
+    await expectComputed(r.dir, reads("fresh.txt", "HEAD"), ["fresh.txt"]);
+  });
+
+  it("an exact rename read with both paths pairs them, as git does", async () => {
+    const r = branched("one-rename");
+    git(r.dir, ["mv", "ren.txt", "moved.txt"]);
+    const both = [one("moved.txt"), one("ren.txt")];
+    await expectComputed(r.dir, [[...STATS, "HEAD", "--", ...both], [...PATCH, "HEAD", "--", ...both], [...STATS, r.base, "--", ...both]], ["ren.txt", "moved.txt"]);
+  });
+
+  it("refused: an inexact rename read with both paths, a directory, and any read above the guard", async () => {
+    const r = branched("one-refused");
+    git(r.dir, ["mv", "ren.txt", "moved.txt"]);
+    fs.writeFileSync(join(r.dir, "moved.txt"), "r1\nr2\nr3\nr4\nr5\n");
+    git(r.dir, ["add", "moved.txt"]);
+    const refused = async (argv: ReadonlyArray<string>, within = true) =>
+      expect(await staleRead({ argv, env: undefined }, noAnswers(r.dir, ["ren.txt", "moved.txt"], within)), argv.join(" ")).toEqual({ found: false });
+    // git pairs the two as a rename with a similarity index, which only git computes.
+    expect(git(r.dir, [...STATS, "HEAD", "--", one("moved.txt"), one("ren.txt")])).toContain("R0");
+    await refused([...STATS, "HEAD", "--", one("moved.txt"), one("ren.txt")]);
+    await refused([...PATCH, "HEAD", "--", one("moved.txt"), one("ren.txt")]);
+    await refused([...PATCH, "HEAD", "--", one("src")]);
+    await refused([...OTHERS, one("src")]);
+    await refused([...PATCH, "HEAD", "--", one("edited.txt")], false);
+    // A whole-diff read with no last answer still fails fast.
+    await refused([...PATCH, "HEAD", "--"]);
+    // So does one with untracked files staged in a temporary index.
+    expect(await staleRead({ argv: [...PATCH, "HEAD", "--", one("edited.txt")], env: { GIT_INDEX_FILE: "/tmp/x" } }, noAnswers(r.dir, []))).toEqual({ found: false });
   });
 });

@@ -172,6 +172,12 @@
       "entry": "U13"
     },
     {
+      "file": "apps/server/src/vcs/GitVcsDriverCore.ts",
+      "literal": "[input.file.path, ...(input.file.previousPath ? [input.file.previousPath] : [])].map((path) => `:(top,literal)${path}`)",
+      "ourFile": "apps/agents/src/workspace/staleReads.ts",
+      "entry": "U13"
+    },
+    {
       "file": "packages/source-control-github/src/server/GitHubSourceControlProvider.ts",
       "literal": "authArgs: [\"auth\", \"status\", \"--json\", \"hosts\"]",
       "ourFile": "apps/environment/src/agents/processRouter.ts",
