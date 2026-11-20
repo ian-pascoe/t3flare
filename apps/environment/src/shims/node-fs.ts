@@ -62,7 +62,10 @@ export class Stats {
     this.birthtimeMs = entry.birthtimeMs;
     this.atime = this.mtime = this.ctime = new Date(entry.mtimeMs);
     this.birthtime = new Date(entry.birthtimeMs);
+    this.mtimeNs = BigInt(Math.round(entry.mtimeMs * 1e6));
   }
+  /** As a `{ bigint: true }` stat has it: t3 keys an Environment theme's background on it. */
+  mtimeNs: bigint;
   isFile() { return this.#kind === "file"; }
   isDirectory() { return this.#kind === "dir"; }
   isSymbolicLink() { return this.#kind === "symlink"; }
@@ -222,23 +225,70 @@ export function accessSync(input: unknown): void {
   if (!existsSync(input)) throw new store.FsError("ENOENT", "access", String(input));
 }
 
-// File descriptors: t3 opens files for exclusive creation and lock files. A tiny table buffers
-// writes and commits them on close, in one write.
-const fds = new Map<number, { path: string; chunks: Array<Uint8Array>; append: boolean }>();
+// File descriptors: t3 opens files for exclusive creation and lock files, and reads its Environment themes through
+// one (`readThemeFileGuarded`). A tiny table buffers writes and commits them on close, in one write; reads see the
+// file as stored, not writes still buffered on the descriptor.
+const fds = new Map<number, { path: string; chunks: Array<Uint8Array>; position: number }>();
 let nextFd = 1000;
+
+/** What an open does, from Node's string flags (`r`, `r+`, `w`, `wx`, `a`, …) or numeric ones (`O_*`). */
+interface OpenMode {
+  readonly create: boolean;
+  readonly exclusive: boolean;
+  readonly truncate: boolean;
+  readonly nofollow: boolean;
+}
+
+// Linux's values, for a workerd whose `constants` lacks one: the numbers t3 passes come from the same `constants`.
+const O_CREAT = real.constants?.O_CREAT ?? 0o100;
+const O_EXCL = real.constants?.O_EXCL ?? 0o200;
+const O_TRUNC = real.constants?.O_TRUNC ?? 0o1000;
+const O_NOFOLLOW = real.constants?.O_NOFOLLOW ?? 0o400000;
+
+const openModeOf = (flags: string | number): OpenMode =>
+  typeof flags === "number"
+    ? { create: (flags & O_CREAT) !== 0, exclusive: (flags & O_EXCL) !== 0, truncate: (flags & O_TRUNC) !== 0, nofollow: (flags & O_NOFOLLOW) !== 0 }
+    : { create: !flags.startsWith("r"), exclusive: flags.includes("x"), truncate: flags.startsWith("w"), nofollow: false };
 
 export function openSync(input: unknown, flags: string | number = "r", mode?: number): number {
   const path = pathOf(input);
-  const flag = typeof flags === "number" ? "w" : flags;
-  const exists = store.resolve(path) !== undefined;
-  if (flag.includes("x") && exists) throw new store.FsError("EEXIST", "open", path);
-  if (flag.startsWith("r") && !exists) throw new store.FsError("ENOENT", "open", path);
-  if (!flag.startsWith("r")) {
-    store.writeFile(path, new Uint8Array(0), { append: flag.startsWith("a"), ...(mode === undefined ? {} : { mode }) });
-  }
+  const openMode = openModeOf(flags);
+  if (openMode.nofollow && store.get(path)?.kind === "symlink") throw new store.FsError("ELOOP", "open", path);
+  const entry = store.resolve(path);
+  const exists = entry !== undefined;
+  if (openMode.create && openMode.exclusive && exists) throw new store.FsError("EEXIST", "open", path);
+  // As Node: an open that would create or truncate a directory fails (other writes to one fail when they land).
+  if ((openMode.create || openMode.truncate) && entry?.kind === "dir") throw new store.FsError("EISDIR", "open", path);
+  if (!openMode.create && !exists) throw new store.FsError("ENOENT", "open", path);
+  if (openMode.truncate || !exists) store.writeFile(path, new Uint8Array(0), mode === undefined ? {} : { mode });
   const fd = nextFd++;
-  fds.set(fd, { path, chunks: [], append: true });
+  fds.set(fd, { path, chunks: [], position: 0 });
   return fd;
+}
+
+type ReadOptions = { offset?: number; length?: number; position?: number | bigint | null };
+
+/** Node's `readSync(fd, buffer, offset, length, position)` and `readSync(fd, buffer, options)`. */
+export function readSync(fd: number, buffer: ArrayBufferView, offsetOrOptions?: number | ReadOptions, length?: number, position?: number | bigint | null): number {
+  const file = fds.get(fd);
+  if (file === undefined) throw new store.FsError("EINVAL", "read", `fd ${fd}`);
+  const options: ReadOptions =
+    typeof offsetOrOptions === "object"
+      ? offsetOrOptions
+      : {
+          ...(offsetOrOptions === undefined ? {} : { offset: offsetOrOptions }),
+          ...(length === undefined ? {} : { length }),
+          position: position ?? null,
+        };
+  const target = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  const offset = options.offset ?? 0;
+  const count = Math.max(0, Math.min(options.length ?? target.byteLength - offset, target.byteLength - offset));
+  // No position (or -1) reads from, and advances, the descriptor's own; a given one leaves it as it was.
+  const atCurrent = options.position === undefined || options.position === null || Number(options.position) < 0;
+  const bytes = store.readRange(file.path, atCurrent ? file.position : Number(options.position), count);
+  target.set(bytes, offset);
+  if (atCurrent) file.position += bytes.byteLength;
+  return bytes.byteLength;
 }
 
 export function writeSync(fd: number, data: unknown): number {
@@ -299,6 +349,7 @@ export default {
   truncateSync,
   accessSync,
   openSync,
+  readSync,
   writeSync,
   closeSync,
   fsyncSync,

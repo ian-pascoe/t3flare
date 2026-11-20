@@ -23,7 +23,7 @@ export interface Entry {
   readonly birthtimeMs: number;
 }
 
-export type FsErrorCode = "ENOENT" | "EEXIST" | "ENOTDIR" | "EISDIR" | "ENOTEMPTY" | "EINVAL" | "ENOSYS";
+export type FsErrorCode = "ENOENT" | "EEXIST" | "ENOTDIR" | "EISDIR" | "ENOTEMPTY" | "EINVAL" | "ENOSYS" | "ELOOP";
 
 const ERRNO: Record<FsErrorCode, number> = {
   ENOENT: -2,
@@ -33,6 +33,7 @@ const ERRNO: Record<FsErrorCode, number> = {
   ENOTEMPTY: -39,
   EINVAL: -22,
   ENOSYS: -38,
+  ELOOP: -40,
 };
 
 /** A Node-style system error (`code`, `errno`, `syscall`, `path`), as t3's callers check them. */

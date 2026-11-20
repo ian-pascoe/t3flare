@@ -198,7 +198,7 @@ describe("the pinned t3code against the checked-in fingerprint", () => {
 
   it("covers the register entries T2 names", () => {
     const entries = new Set([...fingerprint.regions, ...fingerprint.literals].map((watched) => watched.entry));
-    expect([...entries].toSorted()).toEqual(["U1", "U12", "U13", "U15", "U4", "U45"]);
+    expect([...entries].toSorted()).toEqual(["U1", "U12", "U13", "U15", "U4", "U45", "U93"]);
   });
 
   it("records each watched file's blob id, for the land check", () => {
