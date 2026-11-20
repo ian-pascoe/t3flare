@@ -1,7 +1,8 @@
 // @effect-diagnostics nodeBuiltinImport:off
 // SPI-1170: the image's pi launcher and handle command (`apps/sandbox-image/image/t3flare-pi`, `t3flare-pi-handle`) are
 // shell, so what they restate is checked against its TypeScript sources here; what they do is `test:docker`'s
-// (`piRelay.docker.test.ts`) and the stage's (`scripts/p1170.ts`).
+// (`piRelay.docker.test.ts`) and the stage's (`scripts/p1170.ts`). That they name every program by its absolute path is
+// `launchPaths.test.ts`'s, with the rest of the launch path (SPI-1209).
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -38,21 +39,6 @@ describe("pi's launcher and handle command", () => {
     expect(run({ NO_PROXY: "*" })).toBe("*|*");
     expect(run({ no_proxy: "*", NO_PROXY: "b.example" })).toBe("*|b.example,computer.internal");
     expect(run({ no_proxy: "", NO_PROXY: "b.example" })).toBe("computer.internal|b.example,computer.internal");
-  });
-
-  it("names every program they run by its absolute path: every command is a builtin, a keyword, an assignment or an absolute path", () => {
-    const SHELL = new Set(["set", "fail", "exit", "echo", "printf", "case", "esac", "if", "then", "fi", "else", "while", "do", "done", "in", "[", "{", "}", "exec", "with_relay"]);
-    for (const name of ["t3flare-pi", "t3flare-pi-handle"]) {
-      const lines = read(name)
-        .split("\n")
-        .map((line) => line.replace(/^\s*#.*$/, "").trim())
-        .filter((line) => line !== "" && !/^[^\s()]*\)\s/.test(line) && !/^'[^']*'\)/.test(line) && !line.startsWith("*)"));
-      // Command positions: a line's start, and after `$(`, `|`, `;`, `&&`, `||`, `then`, `do`, `else`, `exec`.
-      const words = lines.flatMap((line) => [...line.matchAll(/(?<=^|\$\(|\|\|?\s|;\s|&&\s|\bthen\s|\bdo\s|\belse\s|^exec\s)([^\s;|)(]+)/g)].map((match) => match[1]!));
-      const odd = words.filter((word) => !SHELL.has(word) && !word.startsWith("/") && !/^[A-Za-z_][A-Za-z0-9_]*=/.test(word) && !/^[-'"*]/.test(word));
-      expect(odd, name).toEqual([]);
-    }
-    for (const tool of ["tr", "head", "sed", "cut", "grep"]) expect(read("t3flare-pi-handle")).toContain(`/usr/bin/${tool} `);
   });
 
   it("takes only a process marker's shape (`isProcessMarker`), so no newline can match another line", () => {

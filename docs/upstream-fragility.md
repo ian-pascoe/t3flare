@@ -1277,8 +1277,9 @@ holds it, and that it goes into no request but the relay's.
     `head`, `sed`, `cut`, `grep`); they need those paths in the image (merged `/usr`; Ubuntu's uutils and Debian's
     coreutils both have them). `test:docker` puts hostile ones first on PATH. The handle command takes only a process
     marker's shape (`isProcessMarker`), so a marker holding a newline cannot match another line of the holder's
-    environment. **Not covered**: the process command that starts every CLI process (`processCommand`) runs `setsid`,
-    `mkdir`, `grep` and others by name, with the handle in its environment (a follow-up, ADR-0016's SPI-1170 item 7).
+    environment. Since SPI-1209 the process command that starts every CLI process (`processCommand`) and its shell
+    (`PROCESS_SHELL`) name theirs by absolute path too, keeping setsid's name in argv (`exec -a setsid`), so the
+    holder's command line is still `setsid --wait /opt/t3flare/bin/pi …` (ADR-0016 item 7).
   - **t3's registry replaces a pi snapshot's models** (`ProviderRegistry.ts` `shouldRetainMissingProviderModels`, which
     patch 0006 makes false for `pi` since SPI-1176, U66; stock t3 keeps them while pi's auth is `unknown`, as in the
     setup state), so a model that left the endpoints leaves the picker.

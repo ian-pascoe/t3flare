@@ -125,8 +125,9 @@ describe("ProcessHost", () => {
     const h = harness({ running: false });
     const answer = await h.host.start(start("proc-a"));
     expect(answer).toEqual({ ok: true, epoch: 7 });
-    expect(h.spawned[0]!.argv[0]).toBe("bash");
-    expect(h.spawned[0]!.argv[2]).toContain("exec setsid --wait '/opt/t3flare/bin/codex' 'app-server'");
+    // The shell and setsid by absolute path: a project's mise shim of either name would get the model handle (SPI-1209).
+    expect(h.spawned[0]!.argv.slice(0, 2)).toEqual(["/usr/bin/bash", "-c"]);
+    expect(h.spawned[0]!.argv[2]).toContain("exec -a setsid /usr/bin/setsid --wait '/opt/t3flare/bin/codex' 'app-server'");
     expect(h.spawned[0]!.env).toMatchObject({ T3FLARE_EXEC: "proc-a", CODEX_HOME: "/var/lib/t3flare/cli/x/codex", PATH: "/usr/bin" });
     expect(h.remembered()).toEqual([{ key: "proc-a", environmentEpoch: 3, thread: "thread-1" }]);
   });
