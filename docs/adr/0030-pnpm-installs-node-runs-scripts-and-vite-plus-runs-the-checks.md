@@ -77,3 +77,17 @@ moved pin, an edited manifest, a fresh worktree. So `pnpm run relock` failed eve
 `node scripts/relock.ts` always works. The command is now `node scripts/relock.ts`, and `node scripts/relock.ts --refresh`
 where the text above says `pnpm run relock -- --refresh`; the root `package.json` has no `relock` script, since it could
 run only when nothing needed relocking. `verifyDepsBeforeRun` stays `error`: it protects every other script.
+
+## Refinement (SPI-1290, 2026-11-20): a guard refuses another checkout's workspace dir, and root scripts test on `node --test`
+
+The guards under **Nested workspace** set `NPM_CONFIG_WORKSPACE_DIR`, but mise sets it once, in the checkout a shell
+started in. A shell that then moves into a worktree keeps the main checkout's path, and pnpm installs and checks that
+checkout instead. So a third guard: `pnpm run check` first runs `scripts/workspace-guard.ts`, which exits 1 when
+`NPM_CONFIG_WORKSPACE_DIR` or `npm_config_workspace_dir` (resolved against the directory the command was typed in) is not
+the root of that checkout, inside `t3code/` its superproject's, and names the `export` that fixes it. Where it can't find
+a checkout, it allows the command and says so. No install hook runs it: pnpm runs the root `preinstall` in the target
+checkout, with `INIT_CWD`, `PWD` and the working directory all that checkout's root, so the typed-in directory is
+unknowable there. When the target checkout's install is stale, pnpm's `verifyDepsBeforeRun` refuses before the guard runs.
+
+The root has no Vitest dependency, so the tests of root `scripts/` run on `node --test` (`test:scripts` in `check:all`),
+beside Vitest for the packages.
