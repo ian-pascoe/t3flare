@@ -4,7 +4,7 @@
 //
 //   GET  /_t3flare/settings/api/endpoints            is it there already?
 //   POST /_t3flare/settings/api/endpoints/discover   its model list, when the spec names no models
-//   POST /_t3flare/settings/api/endpoints            { op: "save", endpoint, apiKey }: sealed and audited by the panel
+//   POST /_t3flare/settings/api/endpoints            { op: "save", endpoint, apiKey }: sealed and audited by the Settings page
 //
 // `stage.ts deploy` runs it after a deploy, and `acceptance.ts` before its turns. On prod (`overwrite: false`) an endpoint
 // already there is kept as the owner left it; a test stage saves it again. Text generation needs no call: while the owner

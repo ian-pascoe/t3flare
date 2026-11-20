@@ -1749,7 +1749,7 @@ const ownPage = async (label: string, tool: string, args: unknown, instructions:
     if (changeId === undefined) await sleep(1500);
   }
   if (changeId === undefined) banner([`${label}: no Open change for this thread (the call was answered without one); the script records its result.`]);
-  else banner([`OWNER, ${label}: open this Change page in the browser where you are signed in to the panel:`, "", `   ${T3}/_t3flare/settings/changes/${changeId}`, "", ...instructions.map((line) => `   ${line}`), "", "The script waits (up to the change's 10 minutes) and records what happens."]);
+  else banner([`OWNER, ${label}: open this Change page in the browser where you are signed in to the Settings page:`, "", `   ${T3}/_t3flare/settings/changes/${changeId}`, "", ...instructions.map((line) => `   ${line}`), "", "The script waits (up to the change's 10 minutes) and records what happens."]);
   if (changeId !== undefined) await options.afterOpen?.(changeId);
   const run = await running;
   const projection = projectionOf(await threadWindow(cookie, threadId));

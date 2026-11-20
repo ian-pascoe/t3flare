@@ -484,7 +484,7 @@ text(String(answer).slice(0, 300) + "\\n" + await pending.catch((e) => "bash: " 
 // The panel from outside
 
 const panel = async () => {
-  // Owner, 2026-11-12, back to stock: the panel is `/_t3flare/settings` on the t3 host, behind the `/_t3flare` Access
+  // Owner, 2026-11-12, back to stock: the Settings page is `/_t3flare/settings` on the t3 host, behind the `/_t3flare` Access
   // application; the OAuth callback and client document are public paths outside `/_t3flare`. Security case 2 (SPI-1078):
   // the panel from a Container, from a linked laptop's credential and from a Durable agent's script.
   const results: Array<Case> = [];

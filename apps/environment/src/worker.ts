@@ -86,8 +86,8 @@ export default {
       return env.ENVIRONMENT.getByName(ENVIRONMENT_NAME).settingsMcp(request, caller);
     }
     // The Settings page (ADR-0026) at `/_t3flare/settings`, behind the `/_t3flare` Access application (owner, 2026-11-12,
-    // back to stock: no admin host). The owner's own Access identity reaches the panel without the admin token; every
-    // other admin route still needs it. Its old `/_t3flare/harness` paths redirect there, past the same check.
+    // back to stock: no admin host). The owner's own Access identity reaches the Settings page without the admin token;
+    // every other admin route still needs it. Its old `/_t3flare/harness` paths redirect there, past the same check.
     const moved = movedSettingsPagePath(url.pathname);
     if (isSettingsPagePath(url.pathname) || moved !== undefined) {
       const config = guardConfig(env);

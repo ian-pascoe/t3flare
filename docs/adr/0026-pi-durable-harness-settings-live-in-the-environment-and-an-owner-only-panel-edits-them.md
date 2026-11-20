@@ -85,4 +85,5 @@ Contradicts §1's path, deliberately. The panel is now the **Settings page**, at
 ([ADR-0032](0032-environment-settings-and-harness-settings-are-separate-entities-edited-on-one-owner-page.md)). Everything
 else holds: the same `/_t3flare` Access application, §2's checks, and its Change pages below it. The old
 `/_t3flare/harness` paths answer a 308 to the same path under `/_t3flare/settings`, only after that same Access check, so
-bookmarks, refusals already shown and Change links already sent still land. The sections above keep the old name as written.
+bookmarks, refusals already shown and Change links already sent still land. The sections above keep the old name and
+path as written.

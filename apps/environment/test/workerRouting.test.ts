@@ -130,7 +130,7 @@ describe("the Owner-client endpoint's branch (worker.ts)", () => {
   });
 });
 
-describe("the panel's old path (worker.ts)", () => {
+describe("the Settings page's old path (worker.ts)", () => {
   it("redirects /_t3flare/harness and below to /_t3flare/settings, keeping the rest of the path and the query", async () => {
     const env = world();
     const owner = { "cf-access-jwt-assertion": await assertion(PANEL_AUD) };
