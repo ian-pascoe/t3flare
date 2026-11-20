@@ -15,7 +15,7 @@
 //   last turn ended (or the last input). Past that it no longer holds it, and t3's own idle release (Patch 0003, at the
 //   same 10 minutes) ends the session.
 import { MODEL_HANDLE_ENV } from "@t3flare/models/relay";
-import { processCommand, type ProcessFile } from "@t3flare/sandbox-image/process";
+import { PROCESS_SHELL, processCommand, type ProcessFile } from "@t3flare/sandbox-image/process";
 import type {
   ProcessAnswer,
   ProcessFrame,
@@ -289,7 +289,7 @@ export class ProcessHost {
     delete env[MODEL_HANDLE_ENV];
     if (proc.modelHandle !== undefined) env[MODEL_HANDLE_ENV] = proc.modelHandle;
     try {
-      const process = await this.#deps.spawn(["bash", "-c", command], env);
+      const process = await this.#deps.spawn([PROCESS_SHELL, "-c", command], env);
       proc.process = process;
       proc.writer = process.stdin?.getWriter() as WritableStreamDefaultWriter<Uint8Array> | undefined;
       const reads = Promise.all([this.#read(proc, process.stdout, "stdout"), this.#read(proc, process.stderr, "stderr")]);

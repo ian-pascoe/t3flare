@@ -1,6 +1,7 @@
 // A CLI process's launcher (step 4a; apps/sandbox-image/src/process.ts) on a real bash: in an Ubuntu container (the
 // image's base) with Docker, skipped without Docker. The CLI's stdout carries only the CLI's bytes; the home is fresh,
-// its files and links made; t3's path resolves to the repo; core dumps are off; old homes and old sessions go.
+// its files and links made; t3's path resolves to the repo; core dumps are off; old homes and old sessions go. With
+// hostile programs first on PATH, it runs none of them, and the holder is still `setsid --wait …` (SPI-1209).
 // @effect-diagnostics nodeBuiltinImport:off
 import { spawnSync } from "node:child_process";
 
@@ -35,6 +36,35 @@ echo "exit=$?"`;
       "cwd=/workspace/repo/sub core=0 cfg=a = \"it's\" link=/workspace/.t3flare/codex/sessions stale=proc-test1, old=new.jsonl,",
       "exit=0",
     ]);
+  }, 180_000);
+
+  it("runs no program from PATH while the model handle is in its environment, and setsid keeps its name (SPI-1209)", () => {
+    // Hostile programs first on PATH, as a project's mise shims would be: each notes that it ran and what handle it saw.
+    const SHIMMED = ["bash", "setsid", "mkdir", "mount", "mountpoint", "rmdir", "dirname", "ln", "basename", "grep", "rm", "base64", "chmod", "find"];
+    const launcher = processCommand({
+      marker: "proc-test2",
+      t3Path: "/w/demo",
+      cwd: "/w/demo",
+      // The CLI prints its parent's command line: the holder, setsid, which forks here (bash leads its own session).
+      argv: ["/bin/sh", "-c", "/usr/bin/tr '\\0' ' ' < /proc/$PPID/cmdline; echo"],
+      files: [{ path: "/var/lib/t3flare/cli/proc-test2/cfg.toml", text: "a = 1\n" }],
+      links: [{ path: "/var/lib/t3flare/cli/proc-test2/sessions", target: "/workspace/.t3flare/codex/sessions" }],
+      prune: [{ dir: "/workspace/.t3flare/pi/sessions", days: 60 }],
+    });
+    const script = `set -u
+mkdir -p /shims /workspace/repo /workspace/.t3flare/pi/sessions /var/lib/t3flare/cli/proc-gone
+for tool in ${SHIMMED.join(" ")}; do
+  printf '#!/bin/sh\\necho "%s handle=$T3FLARE_MODEL_HANDLE" >> /tmp/shims.txt\\nexec /usr/bin/%s "$@"\\n' "$tool" "$tool" > /shims/$tool
+  chmod 755 /shims/$tool
+done
+cat > /tmp/launcher.sh <<'T3FLARE_EOF'
+${launcher}
+T3FLARE_EOF
+PATH=/shims:/usr/bin:/bin T3FLARE_EXEC=proc-test2 T3FLARE_MODEL_HANDLE=handle-1 /usr/bin/setsid --wait /usr/bin/bash /tmp/launcher.sh 2>/tmp/err
+echo "exit=$?"
+echo "shims=$(cat /tmp/shims.txt 2>/dev/null | tr '\\n' ,)"`;
+    const result = spawnSync("docker", ["run", "--rm", "-i", IMAGE, "bash", "-s"], { input: script, encoding: "utf8", timeout: 120_000 });
+    expect(result.stdout.trim().split("\n"), result.stderr).toEqual(["setsid --wait /bin/sh -c /usr/bin/tr '\\0' ' ' < /proc/$PPID/cmdline; echo ", "exit=0", "shims="]);
   }, 180_000);
 
   it("refuses a file outside the process's home and the synced harness directory", () => {

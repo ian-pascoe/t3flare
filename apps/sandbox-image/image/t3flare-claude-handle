@@ -3,6 +3,9 @@
 # (claude-agent-acp) holds only in the environment it started with. Found by the process's marker: the launcher's pid
 # and start time in the process's home, then that pid's /proc environ, once the pid is checked to be that same
 # claude-agent-acp (its start time, and its command line). Writes no file and logs nothing; fails closed otherwise.
+# SPI-1209: every program is named by its absolute path (the rest are the shell's builtins): it reads the holder's
+# environment with Claude's PATH, which puts mise's shims first, and /workspace's mise configuration is trusted, so a
+# project could put a `tr` or a `sed` there.
 set -eu
 fail() {
   echo "t3flare: $1" >&2
@@ -12,12 +15,12 @@ home=/var/lib/t3flare/cli/${T3FLARE_EXEC:?}
 read -r pid started < "$home/acp.pid" || fail "this Claude Code process has no launcher record"
 case "$pid" in '' | *[!0-9]*) fail "this Claude Code process's launcher record is not a pid" ;; esac
 # The start time (/proc/<pid>/stat's 22nd field; the command name, field 2, may hold spaces and parentheses).
-now=$(sed 's/.*) //' "/proc/$pid/stat" 2> /dev/null | cut -d' ' -f20) || now=""
+now=$(/usr/bin/sed 's/.*) //' "/proc/$pid/stat" 2> /dev/null | /usr/bin/cut -d' ' -f20) || now=""
 [ -n "$now" ] && [ "$now" = "${started:-}" ] || fail "the launcher of this Claude Code process is gone"
-case "$(tr '\0' ' ' < "/proc/$pid/cmdline")" in
+case "$(/usr/bin/tr '\0' ' ' < "/proc/$pid/cmdline")" in
   *" --require /opt/t3flare/share/claude-handle-unset.cjs /opt/t3flare/claude/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js"*) ;;
   *) fail "the launcher record names another process" ;;
 esac
-handle=$(tr '\0' '\n' < "/proc/$pid/environ" | sed -n 's/^T3FLARE_MODEL_HANDLE=//p' | head -n 1)
+handle=$(/usr/bin/tr '\0' '\n' < "/proc/$pid/environ" | /usr/bin/sed -n 's/^T3FLARE_MODEL_HANDLE=//p' | /usr/bin/head -n 1)
 [ -n "$handle" ] || fail "this Claude Code process has no model handle"
 printf '%s\n' "$handle"

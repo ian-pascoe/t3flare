@@ -7,13 +7,16 @@
 # nor its Bash, hooks or helpers inherit it, and no file holds it. The handle helper (t3flare-claude-handle) reads it
 # from /proc/<this pid>/environ, by the pid and start time kept in the home. Any command of the same uid can do what
 # the helper does (ADR-0016's SPI-1168 refinement): this keeps the handle out of environments, not out of reach.
+# SPI-1209: every program is named by its absolute path (the rest are the shell's builtins): this script holds the
+# handle, the image puts mise's shims first on PATH and /workspace's mise configuration is trusted, so a project could
+# put a `sed` or a `mkdir` there.
 set -eu
 home=/var/lib/t3flare/cli/${T3FLARE_EXEC:?}
 umask 077
 # This shell's pid and start time: the pid execs claude-agent-acp below, and the handle helper checks both before
 # reading its environment.
-printf '%s %s\n' "$$" "$(sed 's/.*) //' /proc/$$/stat | cut -d' ' -f20)" > "$home/acp.pid"
-mkdir -p /etc/claude-code
-install -m 644 "$home/managed-settings.json" "/etc/claude-code/.managed-settings.$$"
-mv -f "/etc/claude-code/.managed-settings.$$" /etc/claude-code/managed-settings.json
+printf '%s %s\n' "$$" "$(/usr/bin/sed 's/.*) //' /proc/$$/stat | /usr/bin/cut -d' ' -f20)" > "$home/acp.pid"
+/usr/bin/mkdir -p /etc/claude-code
+/usr/bin/install -m 644 "$home/managed-settings.json" "/etc/claude-code/.managed-settings.$$"
+/usr/bin/mv -f "/etc/claude-code/.managed-settings.$$" /etc/claude-code/managed-settings.json
 exec /usr/local/share/mise/installs/node/26.13.0/bin/node --require /opt/t3flare/share/claude-handle-unset.cjs /opt/t3flare/claude/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js
