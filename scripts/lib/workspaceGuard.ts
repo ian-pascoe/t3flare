@@ -1,4 +1,4 @@
-// Whether a pnpm command may act on NPM_CONFIG_WORKSPACE_DIR (SPI-1290). mise exports it once, in the checkout a shell
+// Whether a pnpm command may act on NPM_CONFIG_WORKSPACE_DIR (ADR-0030's SPI-1290 refinement). mise exports it once, in the checkout a shell
 // started in; a shell that then cd's into a worktree keeps that path, and pnpm installs and checks the other checkout.
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
@@ -37,14 +37,13 @@ export const workspaceGuard = (workspaceDirs: ReadonlyArray<WorkspaceDir>, check
 };
 
 /**
- * The workspace dirs pnpm reads: NPM_CONFIG_WORKSPACE_DIR and its lowercase npm_config_workspace_dir, which pnpm
- * honours too, each non-empty one resolved against the directory the command was typed in, as pnpm resolves it.
+ * The workspace dir pnpm reads: NPM_CONFIG_WORKSPACE_DIR, else its lowercase npm_config_workspace_dir (pnpm ignores the
+ * lowercase one when the uppercase is set), resolved against the directory the command was typed in, as pnpm resolves it.
  */
-export const workspaceDirsOf = (env: Readonly<Record<string, string | undefined>>, typedIn: string): Array<WorkspaceDir> =>
-  ["NPM_CONFIG_WORKSPACE_DIR", "npm_config_workspace_dir"].flatMap((variable) => {
-    const value = env[variable];
-    return value ? [{ variable, dir: path.resolve(typedIn, value) }] : [];
-  });
+export const workspaceDirsOf = (env: Readonly<Record<string, string | undefined>>, typedIn: string): Array<WorkspaceDir> => {
+  const variable = ["NPM_CONFIG_WORKSPACE_DIR", "npm_config_workspace_dir"].find((name) => env[name]);
+  return variable === undefined ? [] : [{ variable, dir: path.resolve(typedIn, env[variable]!) }];
+};
 
 const gitRevParse = (dir: string, flag: string, git: string) => spawnSync(git, ["rev-parse", flag], { cwd: dir, encoding: "utf8" });
 

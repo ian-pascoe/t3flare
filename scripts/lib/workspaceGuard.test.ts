@@ -49,11 +49,12 @@ describe("workspaceGuard", () => {
 });
 
 describe("workspaceDirsOf", () => {
-  it("reads NPM_CONFIG_WORKSPACE_DIR and pnpm's lowercase npm_config_workspace_dir, ignoring empty values", () => {
+  it("reads NPM_CONFIG_WORKSPACE_DIR, else pnpm's lowercase npm_config_workspace_dir, ignoring empty values", () => {
     assert.deepEqual(workspaceDirsOf({}, "/w"), []);
     assert.deepEqual(workspaceDirsOf({ NPM_CONFIG_WORKSPACE_DIR: "" }, "/w"), []);
     assert.deepEqual(workspaceDirsOf({ npm_config_workspace_dir: "/src/t3flare" }, "/w"), [lower("/src/t3flare")]);
-    assert.deepEqual(workspaceDirsOf({ NPM_CONFIG_WORKSPACE_DIR: "/a", npm_config_workspace_dir: "/b" }, "/w"), [upper("/a"), lower("/b")]);
+    assert.deepEqual(workspaceDirsOf({ NPM_CONFIG_WORKSPACE_DIR: "/a", npm_config_workspace_dir: "/b" }, "/w"), [upper("/a")]);
+    assert.deepEqual(workspaceDirsOf({ NPM_CONFIG_WORKSPACE_DIR: "", npm_config_workspace_dir: "/b" }, "/w"), [lower("/b")]);
   });
 
   it("resolves a relative value against the directory the command was typed in, as pnpm does", () => {
