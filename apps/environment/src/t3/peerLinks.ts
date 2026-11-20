@@ -7,8 +7,12 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as PeerLinks from "t3/src/peer/PeerLinks.ts";
 
-/** A `PeerLinkError` without its `cause`: the reason and t3's own message, nothing else (review M6). */
-export const withoutCause = (error: PeerLinkError) => new PeerLinkError({ reason: error.reason, message: error.message });
+/**
+ * A `PeerLinkError` without its `cause`: the reason, t3's own message and the label of the environment that answered
+ * instead (`answeredAs`, which the message already names; clients tell "wrong environment" by it), nothing else (review M6).
+ */
+export const withoutCause = (error: PeerLinkError) =>
+  new PeerLinkError({ reason: error.reason, message: error.message, ...(error.answeredAs === undefined ? {} : { answeredAs: error.answeredAs }) });
 
 /** t3's `PeerLinks`, every method as t3 has it, with no error carrying a `cause`. */
 export const layerPeerLinksWithoutCause = Layer.effect(
@@ -18,6 +22,9 @@ export const layerPeerLinksWithoutCause = Layer.effect(
       ...real,
       link: Effect.fn("t3flare.PeerLinks.link")(function* (input) {
         return yield* real.link(input).pipe(Effect.mapError(withoutCause));
+      }),
+      linkUnlessLinked: Effect.fn("t3flare.PeerLinks.linkUnlessLinked")(function* (input) {
+        return yield* real.linkUnlessLinked(input).pipe(Effect.mapError(withoutCause));
       }),
       list: real.list.pipe(Effect.mapError(withoutCause)),
       get: Effect.fn("t3flare.PeerLinks.get")(function* (environmentId) {

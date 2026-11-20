@@ -45,17 +45,24 @@ it("links, lists, resolves and unlinks as stock t3 does, through our Layer", asy
   expect(result.sessions.length).toBe(1);
 });
 
-it("answers every error with t3's reason and message and no cause", async () => {
-  const leaky = new PeerLinkError({ reason: "unreachable", message: "t3's own words", cause: new Error("POST https://laptop/oauth/mcp/token Bearer secret-bearer code=PAIRCODE") });
+it("answers every error with t3's reason, message and answeredAs, and no cause", async () => {
+  const leaky = new PeerLinkError({
+    reason: "unreachable",
+    message: "t3's own words",
+    answeredAs: "Other",
+    cause: new Error("POST https://laptop/oauth/mcp/token Bearer secret-bearer code=PAIRCODE"),
+  });
   const fail = () => Effect.fail(leaky);
   const real = PeerLinks.PeerLinks.of({
     enabled: Effect.succeed(true),
     link: fail,
+    linkUnlessLinked: fail,
     list: fail(),
     get: fail,
     unlink: fail,
     resolve: fail,
     recordOutcome: () => Effect.void,
+    recordExpiry: () => Effect.void,
   });
   const errors = await Effect.runPromise(
     Effect.gen(function* () {
@@ -63,6 +70,7 @@ it("answers every error with t3's reason and message and no cause", async () => 
       const id = EnvironmentId.make("environment-laptop");
       return yield* Effect.all([
         Effect.flip(links.link({ url: "https://laptop.example", pairingCode: "PAIRCODE", access: "auto" })),
+        Effect.flip(links.linkUnlessLinked({ url: "https://laptop.example", pairingCode: "PAIRCODE", access: "auto" })),
         Effect.flip(links.list),
         Effect.flip(links.get(id)),
         Effect.flip(links.unlink(id)),
@@ -70,9 +78,9 @@ it("answers every error with t3's reason and message and no cause", async () => 
       ]);
     }).pipe(Effect.provide(layerPeerLinksWithoutCause.pipe(Layer.provide(Layer.succeed(PeerLinks.PeerLinks, real))))),
   );
-  expect(errors).toHaveLength(5);
+  expect(errors).toHaveLength(6);
   for (const error of errors) {
-    expect(error).toMatchObject({ _tag: "PeerLinkError", reason: "unreachable", message: "t3's own words" });
+    expect(error).toMatchObject({ _tag: "PeerLinkError", reason: "unreachable", message: "t3's own words", answeredAs: "Other" });
     expect(error.cause).toBeUndefined();
     expect(JSON.stringify(error)).not.toMatch(/secret-bearer|PAIRCODE/);
   }

@@ -1,10 +1,12 @@
 // Step 3+ (plan section 4.4, review findings 3 and 8): the publish recorder reads t3's AgentAwarenessRelay log events,
 // keeps each publish's outcome, holds the idle reset while a publish is still pending, and classifies a refusal.
 // The messages are the shapes `t3/src/relay/AgentAwarenessRelay.ts` logs (fragility U28).
+import * as fs from "node:fs";
+
 import { beforeEach, describe, expect, it } from "vitest";
 
 import * as Idle from "../src/host/idle.ts";
-import { makePublishRecorder } from "../src/connect/recorder.ts";
+import { MESSAGES, makePublishRecorder } from "../src/connect/recorder.ts";
 
 const memoryStore = () => {
   let value: unknown;
@@ -19,6 +21,11 @@ describe("publish recorder", () => {
   beforeEach(() => {
     Idle.holds.clear();
     Object.assign(Idle.activity, { sockets: 0, inFlight: 0, idleSince: at(0).getTime(), unreadableUntil: 0 });
+  });
+
+  it("matches messages t3's relay still logs: a renamed one would leave the recorder blind (U28)", () => {
+    const source = fs.readFileSync(new URL("../../../t3code/apps/server/src/relay/AgentAwarenessRelay.ts", import.meta.url), "utf8");
+    for (const message of Object.keys(MESSAGES)) expect(source, message).toContain(`"${message}"`);
   });
 
   it("records a publish from its start to the relay's answer, holding the reset until it lands", () => {
@@ -39,7 +46,7 @@ describe("publish recorder", () => {
     expect(Idle.activeHolds(at(5).getTime())).toEqual([`publish:${T1}`]);
     recorder.record(["agent activity publish failed", { threadId: T1, cause: "RelayRequestError: Service Unavailable (status 503)" }], at(7));
     expect(Idle.activeHolds(at(30).getTime())).toEqual([`publish:${T1}`]);
-    recorder.record(["agent activity publish retry budget exhausted", { threadId: T1 }], at(40));
+    recorder.record(["agent activity publish retry budget exhausted; retrying every minute", { threadId: T1 }], at(40));
     expect(Idle.activeHolds(at(41).getTime())).toEqual([]);
     expect(recorder.entries().map((entry) => entry.event)).toEqual(["deferred", "failed", "exhausted"]);
     expect(recorder.entries()[1]).toMatchObject({ status: 503, rejected: false });

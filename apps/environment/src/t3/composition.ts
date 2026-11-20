@@ -816,6 +816,7 @@ export const make = (options: CompositionOptions) => {
     Layer.provide(layerCommandReadiness),
     Layer.provide(ServerHttp.layerBrowserApiCors),
     // As t3's `server.ts`: no request log for signed URLs (webhooks, assets, attachment uploads), whose path carries a bearer.
+    // Moot while `HttpRouter.serve` runs with `disableLogger: true` (below); kept so turning the logger on cannot log one.
     Layer.provide(ServerHttp.layerUnloggedSignedRequests),
     // t3flare: no response compression in t3; Cloudflare's edge compresses, and workerd
     // would compress a body t3 already gzipped a second time.

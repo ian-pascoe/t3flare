@@ -53,7 +53,6 @@ describe("the CLI manifest", () => {
   });
 
   it("pins a version of each CLI that t3's compatibility policy marks supported: else bump the CLI in clis.ts", () => {
-    // Pi's minimum is a policy entry since v0.1.11-nightly.20261120.4979 (it was `MINIMUM_PI_VERSION` in provider-pi's status.ts).
     const pins = [
       ["codex", CLIS.codex.version],
       ["pi", CLIS.pi.version],
