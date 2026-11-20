@@ -29,7 +29,7 @@ const Elapsed: React.FC<{ readonly seconds: number }> = ({ seconds }) => {
 
 // Beat 6: the laptop's agent delegates a Remote task to the Cloud Environment over its Peer link and waits on it; the
 // child runs on t3flare while the Lineage panel follows it; then the phone gets T3 Connect's alert that it's done.
-const LaptopLinkInner: React.FC<Props> = ({ delegatedAt, doneAt }) => {
+const RemoteTaskInner: React.FC<Props> = ({ delegatedAt, doneAt }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const slide = Easing.bezier(0.65, 0, 0.35, 1);
@@ -64,7 +64,7 @@ const LaptopLinkInner: React.FC<Props> = ({ delegatedAt, doneAt }) => {
       <Scrim />
       <Caption
         name="Link caption"
-        eyebrow="LAPTOP LINK"
+        eyebrow="REMOTE TASK"
         headline="Delegate from your laptop."
         sub="Get pinged when it's done."
         style={{ left: 760 }}
@@ -84,8 +84,8 @@ const LaptopLinkInner: React.FC<Props> = ({ delegatedAt, doneAt }) => {
   );
 };
 
-export const LaptopLink = Interactive.create({
-  Component: LaptopLinkInner,
+export const RemoteTask = Interactive.create({
+  Component: RemoteTaskInner,
   layout: "absolute-fill",
   schema: {
     delegatedAt: { type: "number", default: 14.9, min: 0, step: 0.1, description: "Delegated at (s in clip)", hiddenFromList: false },

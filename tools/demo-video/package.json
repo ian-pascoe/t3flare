@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "@remotion/cli": "4.0.545",
-    "@remotion/effects": "4.0.545",
     "@remotion/google-fonts": "4.0.545",
     "@remotion/media": "4.0.545",
     "@remotion/studio": "4.0.545",

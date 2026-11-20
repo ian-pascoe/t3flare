@@ -7,7 +7,7 @@ import { Cost } from "./scenes/Cost";
 import { Cta } from "./scenes/Cta";
 import { Durable } from "./scenes/Durable";
 import { Hook } from "./scenes/Hook";
-import { LaptopLink } from "./scenes/LaptopLink";
+import { RemoteTask } from "./scenes/RemoteTask";
 import { Payoff } from "./scenes/Payoff";
 import { Turn } from "./scenes/Turn";
 
@@ -27,7 +27,7 @@ export const RemotionRoot = () => {
         <Composition id="Payoff" component={Payoff} durationInFrames={182} fps={30} width={1920} height={1080} defaultProps={{}} />
         <Composition id="Durable" component={Durable} durationInFrames={161} fps={30} width={1920} height={1080} defaultProps={{ restartAt: 47.2, noticeAt: 50, doneAt: 72.7 }} />
         <Composition id="CliAgents" component={CliAgents} durationInFrames={161} fps={30} width={1920} height={1080} defaultProps={{}} />
-        <Composition id="LaptopLink" component={LaptopLink} durationInFrames={161} fps={30} width={1920} height={1080} defaultProps={{ delegatedAt: 14.9, doneAt: 40.9 }} />
+        <Composition id="RemoteTask" component={RemoteTask} durationInFrames={161} fps={30} width={1920} height={1080} defaultProps={{ delegatedAt: 14.9, doneAt: 40.9 }} />
         <Composition
           id="Cost"
           component={Cost}

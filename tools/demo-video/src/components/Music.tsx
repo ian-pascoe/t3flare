@@ -4,7 +4,7 @@ import type React from "react";
 import { interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 
 type Props = {
-  // Seconds into the track the video starts at: set it so the track's lift lands on the lid closing, at 0:04.5.
+  // Seconds into the track the video starts at: set it so the track's drop lands on the cut out of the hook, at 0:04.5.
   readonly startAt: number;
   readonly volume: number;
 };

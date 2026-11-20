@@ -1,9 +1,9 @@
 // Records the launch video's footage from real T3 Code desktop, against a throwaway t3flare Stage (README.md).
 //
-//   pnpm capture launch            start the isolated instance (idempotent) and attach
-//   pnpm capture stop              quit it
-//   pnpm capture shot <name>       record one shot into public/footage/<name>.mp4
-//   pnpm capture all               record every shot
+//   mise exec -- pnpm capture launch         start the isolated instance (idempotent) and attach
+//   mise exec -- pnpm capture stop           quit it
+//   mise exec -- pnpm capture shot <name>    record one shot into public/footage/<name>.mp4
+//   mise exec -- pnpm capture all            record every shot
 import { attach } from "./ab.ts";
 import { floatWindow, launch, stop } from "./instance.ts";
 import { SHOTS, recordShot } from "./shots.ts";
