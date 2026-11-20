@@ -28,6 +28,15 @@ const fingerprint = JSON.parse(fs.readFileSync(fixturePath, "utf8")) as Fingerpr
 
 if (process.argv.includes("--update")) {
   const reviewedCommit = execFileSync("git", ["-C", t3Root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  // A branch switched to without `submodule.recurse` leaves t3code at the old pin: recording that would review nothing.
+  const stagedPin = execFileSync("git", ["-C", root, "rev-parse", ":t3code"], { encoding: "utf8" }).trim();
+  if (reviewedCommit !== stagedPin) {
+    console.error(
+      `upstream fingerprint: not updated: t3code is checked out at ${reviewedCommit.slice(0, 12)}, but the index pins ${stagedPin.slice(0, 12)}. ` +
+        `Run git submodule update --init t3code (or git add t3code, for a pin you moved by hand) first.`,
+    );
+    process.exit(1);
+  }
   let updated: Fingerprint;
   try {
     updated = updateFingerprint(fingerprint, read, blobOf, reviewedCommit);

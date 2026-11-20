@@ -209,14 +209,15 @@ describe("the pinned t3code against the checked-in fingerprint", () => {
   // holds the pin for a person at the land check instead (ADR-0037's SPI-1011 refinement).
   const reportOnly = process.env[REPORT_ONLY_ENV] === REPORT_ONLY;
 
+  // Under a full `pnpm run check` this parses t3's largest files on a loaded machine: well past vitest's 5 s default.
   it.skipIf(reportOnly)("matches: every watched region and literal is as last reviewed", () => {
     expect(checkFingerprint(fingerprint, readT3, gitBlobOf(fileURLToPath(T3)))).toEqual([]);
-  });
+  }, 30_000);
 
   // The land check refuses a pin whose watched files are not byte for byte these: the check fails on the same change.
   it.skipIf(reportOnly)("matches byte for byte: every watched file's blob id is the one the land check compares", () => {
     const blobOf = gitBlobOf(fileURLToPath(T3));
     const moved = watchedFiles(fingerprint).filter((file) => blobOf(file) !== fingerprint.files[file]);
     expect(moved, `watched t3 files changed since the last review: run ${UPDATE_COMMAND}`).toEqual([]);
-  });
+  }, 30_000);
 });

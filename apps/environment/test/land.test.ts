@@ -120,9 +120,9 @@ describe("a bump job's report, read by a trusted job", () => {
       "nope",
     ];
     const lines = [
-      "review apps/environment/src/t3/composition.ts (U1) for t3code/apps/server/src/server.ts (*)",
-      "review apps/agents/src/workspace/staleReads.ts (U13) for t3code/apps/server/src/vcs/GitVcsDriverCore.ts (a literal)",
-      "t3code/apps/server/src/terminal/Manager.ts changed outside the watched regions (nothing of ours to review)",
+      "review `apps/environment/src/t3/composition.ts` (U1) for `t3code/apps/server/src/server.ts` (`*`)",
+      "review `apps/agents/src/workspace/staleReads.ts` (U13) for `t3code/apps/server/src/vcs/GitVcsDriverCore.ts` (a literal)",
+      "`t3code/apps/server/src/terminal/Manager.ts` changed outside the watched regions (nothing of ours to review)",
     ];
     expect(bumpReportNotes(JSON.stringify({ upstreamFingerprint })).fingerprint).toEqual(lines);
     // The bump's commit message says the same, from the same function.

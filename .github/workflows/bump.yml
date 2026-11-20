@@ -272,7 +272,7 @@ jobs:
             body+=$'\n\n'"**New capability flags, stripped until classified** in \`apps/environment/src/t3/capabilities.ts\` (fragility U4): $UNCLASSIFIED"
           fi
           if [ -n "$FINGERPRINT" ]; then
-            body+=$'\n\n'"**This pin does not land by itself:** t3 files the upstream fingerprint watches changed since its last review (fragility T2, ADR-0037's SPI-1011 refinement), and the land check refuses it. Cut a branch of your own from this one (\`git switch -c <name> origin/$BRANCH\`: the hourly bump force-pushes \`$BRANCH\`), review each of our files named here against the change, run \`node apps/environment/scripts/upstream-fingerprint.ts --update\`, commit, open a pull request from your branch and merge it. Then close this pull request, which yours supersedes. Findings: $FINGERPRINT"
+            body+=$'\n\n'"**This pin does not land by itself:** t3 files the upstream fingerprint watches changed since its last review (fragility T2, ADR-0037's SPI-1011 refinement), and the land check refuses it. Cut a branch of your own from this one (\`git switch -c <name> origin/$BRANCH\`, then \`git submodule update --init t3code\`: the hourly bump force-pushes \`$BRANCH\`), review each of our files named here against the change, run \`node apps/environment/scripts/upstream-fingerprint.ts --update\`, commit, open a pull request from your branch and merge it. Then close this pull request, which yours supersedes. Findings: $FINGERPRINT"
           fi
           gh pr create --head "$BRANCH" --base main --title "chore: bump t3code to ${BRANCH#bump/}" --body "$body" \
             || echo "A pull request for $BRANCH already exists."

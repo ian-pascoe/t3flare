@@ -5,10 +5,13 @@ import { spawnSync } from "node:child_process";
 
 /** The fixture, from the repository root. */
 export const FIXTURE_PATH = "apps/environment/test/fixtures/upstream-fingerprint.json";
+/** The command that lists what changed since the last review, with our file to review for each. */
+export const LIST_COMMAND = "node apps/environment/scripts/upstream-fingerprint.ts";
 /** The command that records the pin's hashes once our files are reviewed. */
-export const UPDATE_COMMAND = "node apps/environment/scripts/upstream-fingerprint.ts --update";
+export const UPDATE_COMMAND = `${LIST_COMMAND} --update`;
 /** Set to REPORT_ONLY by `scripts/bump.ts` for its `pnpm run check`: the fingerprint test is skipped, and the bump reports changes instead. */
 export const REPORT_ONLY_ENV = "T3FLARE_UPSTREAM_FINGERPRINT";
+/** REPORT_ONLY_ENV's value that skips the fingerprint test; any other value, or none, runs it. */
 export const REPORT_ONLY = "report";
 
 export interface RegionSpec {
@@ -51,12 +54,14 @@ export const watchedFiles = (fingerprint: Pick<Fingerprint, "regions" | "literal
 
 /**
  * Each watched file's git blob id at HEAD of the t3code checkout `t3Dir` (`git rev-parse HEAD:<file>`), undefined when
- * the file is not there. The land check, `--update` and the test all read blob ids this way, so they agree.
+ * the file is not there. The land check, `--update` and the test all read blob ids this way, so they agree. Throws when
+ * git cannot be run.
  */
 export const gitBlobOf =
   (t3Dir: string) =>
   (file: string): string | undefined => {
     const result = spawnSync("git", ["-C", t3Dir, "rev-parse", "--verify", "--quiet", `HEAD:${file}`], { encoding: "utf8" });
+    if (result.error !== undefined) throw new Error(`upstream fingerprint: git could not be run: ${result.error.message}`);
     const id = result.stdout.trim();
     return result.status === 0 && /^[0-9a-f]{40}$/.test(id) ? id : undefined;
   };

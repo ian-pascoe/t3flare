@@ -208,6 +208,6 @@ can never carry that update, and the watched files change on most nightlies.
   through the Full gate as a pull request.
 - **A person lands it from a branch of their own.** The trusted planner is unchanged, and it force-pushes `bump/<tag>`
   (an hourly run, an Update press), which would drop a commit pushed there. So the person cuts their own branch from
-  it (`git switch -c <name> origin/bump/<tag>`), reviews the files the pull request names, runs `--update`, commits,
+  it (`git switch -c <name> origin/bump/<tag>`, then `git submodule update --init t3code`), reviews the files the pull request names, runs `--update`, commits,
   opens a pull request from that branch and merges it through the required `check`. The bump's own pull request is then
   superseded and can be closed.

@@ -41,10 +41,9 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { DETERMINISTIC_STEPS, findingSummary } from "../apps/environment/scripts/lib/land.ts";
+import { DETERMINISTIC_STEPS, findingSummary, HELD_BUMP_STEPS } from "../apps/environment/scripts/lib/land.ts";
 import { keptReportJson } from "../apps/environment/scripts/lib/modelEndpointSpec.ts";
-import type { Finding } from "../apps/environment/scripts/lib/upstreamFingerprint.ts";
-import { REPORT_ONLY, REPORT_ONLY_ENV, UPDATE_COMMAND } from "../apps/environment/scripts/lib/upstreamFingerprintFixture.ts";
+import { type Finding, REPORT_ONLY, REPORT_ONLY_ENV } from "../apps/environment/scripts/lib/upstreamFingerprintFixture.ts";
 import { T3_ERRORS_COUNT } from "../apps/environment/scripts/lib/typecheckFilter.ts";
 import { newestNightly, PINNED_FILES } from "../apps/environment/src/updates/pins.ts";
 
@@ -310,9 +309,9 @@ if (flag("commit") && to !== from) {
         : []),
       ...(upstreamFingerprint !== undefined && upstreamFingerprint.length > 0
         ? [
-            `t3 files the upstream fingerprint watches changed since its last review, so this pin does not land by itself (fragility T2): ${upstreamFingerprint
-              .flatMap((finding) => findingSummary(finding) ?? [])
-              .join("; ")}. Then run ${UPDATE_COMMAND} on a branch of your own (ADR-0037's SPI-1011 refinement).`,
+            ["t3 files the upstream fingerprint watches changed since its last review, so this pin does not land by itself (fragility T2)", upstreamFingerprint.flatMap((finding) => findingSummary(finding) ?? []).join("; ")]
+              .filter((part) => part.length > 0)
+              .join(": ") + `. To land it: ${HELD_BUMP_STEPS} (ADR-0037's SPI-1011 refinement).`,
           ]
         : []),
       ...(t3TypeErrors !== undefined && t3TypeErrors > 0 ? [`The typecheck passed over ${t3TypeErrors} type error(s) in t3's own files (fragility U10).`] : []),

@@ -214,16 +214,19 @@ export const checkFingerprint = (fingerprint: Fingerprint, read: Read, blobOf: B
 
 /**
  * The fingerprint with each region's current hash and each watched file's blob id, reviewed at `reviewedCommit`. A gone
- * region or a missing literal is the fixture's to fix by hand.
+ * region or a missing literal is the fixture's to fix by hand; a watched file git cannot read is refused, so an empty
+ * blob id is never recorded.
  */
 export const updateFingerprint = (fingerprint: Fingerprint, read: Read, blobOf: BlobOf, reviewedCommit: string): Fingerprint => {
   const { regions, blobs, findings } = evaluate(fingerprint, read, blobOf);
   const unfixable = findings.filter((finding) => finding.kind === "gone" || finding.kind === "missing");
   if (unfixable.length > 0) throw new Error(unfixable.map((finding) => findingMessage(finding, fingerprint.reviewedCommit)).join("\n"));
+  const unread = Object.entries(blobs).flatMap(([file, blob]) => (blob === undefined ? [file] : []));
+  if (unread.length > 0) throw new Error(`git has no blob at the t3code checkout's HEAD for: ${unread.join(", ")}`);
   return {
     reviewedCommit,
     regions: regions.map(({ region, hash }) => ({ ...region, hash: hash! })),
     literals: fingerprint.literals,
-    files: Object.fromEntries(Object.entries(blobs).map(([file, blob]) => [file, blob ?? ""])),
+    files: Object.fromEntries(Object.entries(blobs).map(([file, blob]) => [file, blob!])),
   };
 };

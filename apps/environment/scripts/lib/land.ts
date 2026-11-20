@@ -4,7 +4,7 @@
 // checks it. Dependency-free.
 import { bareKey, closure, DEPENDENCY_FIELDS, importerKey, type Json, nameOfKey } from "../../../../scripts/lockGraph.ts";
 import { compareVersions, CLI_PIN_FILES, EXACT_VERSION, NIGHTLY_TAG, type Pin, T3_PIN_FILES } from "../../src/updates/pins.ts";
-import { type Fingerprint, UPDATE_COMMAND, watchedFiles } from "./upstreamFingerprintFixture.ts";
+import { type Fingerprint, LIST_COMMAND, UPDATE_COMMAND, watchedFiles } from "./upstreamFingerprintFixture.ts";
 
 export const LAND_ALLOWLIST = { t3: T3_PIN_FILES, cli: CLI_PIN_FILES } as const;
 
@@ -434,23 +434,23 @@ const REGION_SYMBOL = /^(?:\*|[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_
 
 /**
  * One upstream fingerprint finding (`Finding`, from the untrusted report) in a line for a commit message or a pull
- * request: paths, a symbol and a register entry only, each checked for its shape, never upstream text. Undefined when
- * it is not shaped so.
+ * request: paths, a symbol and a register entry only, each checked for its shape, never upstream text; paths and the
+ * symbol go in backticks, so a path-shaped name is not linked. Undefined when it is not shaped so.
  */
 export const findingSummary = (finding: unknown): string | undefined => {
   if (typeof finding !== "object" || finding === null) return undefined;
   const { kind, file, symbol, ourFile, entry } = finding as Record<string, unknown>;
   if (typeof file !== "string" || !REPO_PATH.test(file)) return undefined;
-  if (kind === "moved") return `t3code/${file} changed outside the watched regions (nothing of ours to review)`;
+  if (kind === "moved") return `\`t3code/${file}\` changed outside the watched regions (nothing of ours to review)`;
   if (typeof ourFile !== "string" || !REPO_PATH.test(ourFile) || typeof entry !== "string" || !REGISTER_ENTRY.test(entry)) return undefined;
   const what = kind === "missing" ? "a literal" : (kind === "changed" || kind === "gone") && typeof symbol === "string" && symbol.length <= 100 && REGION_SYMBOL.test(symbol) ? symbol : undefined;
-  return what === undefined ? undefined : `review ${ourFile} (${entry}) for t3code/${file} (${what})`;
+  return what === undefined ? undefined : `review \`${ourFile}\` (${entry}) for \`t3code/${file}\` (${kind === "missing" ? what : `\`${what}\``})`;
 };
 
 /** What a person does with a bump the upstream fingerprint holds (ADR-0037's SPI-1011 refinement). */
 export const HELD_BUMP_STEPS =
-  `cut a branch of your own from it (git switch -c <name> origin/bump/<tag>; the hourly bump force-pushes bump/<tag>), ` +
-  `review each of our files the findings name (node apps/environment/scripts/upstream-fingerprint.ts lists them), run ${UPDATE_COMMAND}, ` +
+  `cut a branch of your own from it (git switch -c <name> origin/bump/<tag>, then git submodule update --init t3code; the hourly bump force-pushes bump/<tag>), ` +
+  `review each of our files the findings name (${LIST_COMMAND} lists them), run ${UPDATE_COMMAND}, ` +
   `commit, open a pull request from your branch and merge it; then close the bump's own pull request, which yours supersedes`;
 
 /**
