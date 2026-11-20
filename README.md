@@ -8,6 +8,8 @@
 A self-hosted [t3code](https://github.com/pingdotgg/t3code) Environment on Cloudflare: the stock T3 Code clients (web,
 desktop, mobile) attach to it like any other Environment, and run coding agents in the cloud beside your laptop.
 
+https://github.com/user-attachments/assets/5dbc7d46-0e75-45ba-b2b1-4526ab2d507d
+
 > **An independent project.** Not affiliated with, endorsed by, or supported by T3 Tools Inc. t3code is theirs;
 > t3flare is built on t3code by T3 Tools Inc. and runs it, pinned, as a submodule. Please don't take t3flare's issues
 > to the t3code project.
