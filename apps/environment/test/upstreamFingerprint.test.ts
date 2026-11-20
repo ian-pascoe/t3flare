@@ -6,17 +6,23 @@ import * as fs from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
-  type Fingerprint,
-  UPDATE_COMMAND,
+  blobId,
   checkFingerprint,
   extractRegion,
+  FIXTURE_PATH,
+  type Fingerprint,
+  fingerprintFindings,
   hashRegion,
   normalise,
+  REPORT_ONLY_ENV,
+  UPDATE_COMMAND,
   updateFingerprint,
+  watchedFiles,
 } from "../scripts/lib/upstreamFingerprint.ts";
 
-const FIXTURE = new URL("./fixtures/upstream-fingerprint.json", import.meta.url);
-const T3 = new URL("../../../t3code/", import.meta.url);
+const ROOT = new URL("../../../", import.meta.url);
+const FIXTURE = new URL(FIXTURE_PATH, ROOT);
+const T3 = new URL("t3code/", ROOT);
 const readT3 = (file: string) => fs.readFileSync(new URL(file, T3), "utf8");
 
 describe("normalise", () => {
@@ -95,7 +101,7 @@ describe("checkFingerprint", () => {
     return text;
   };
   const fingerprint: Fingerprint = {
-    pin: "0123456789abcdef0123456789abcdef01234567",
+    reviewedCommit: "0123456789abcdef0123456789abcdef01234567",
     regions: [
       {
         file: "apps/server/src/server.ts",
@@ -106,6 +112,7 @@ describe("checkFingerprint", () => {
       },
     ],
     literals: [{ file: "apps/server/src/git.ts", literal: '"status", "-z"', ourFile: "apps/agents/src/workspace/staleReads.ts", entry: "U13" }],
+    files: {},
   };
 
   it("passes when every region hashes as recorded and every literal still appears", () => {
@@ -120,6 +127,11 @@ describe("checkFingerprint", () => {
     expect(failure).toContain("t3code/apps/server/src/server.ts (*) changed: review apps/environment/src/t3/composition.ts (U1)");
     expect(failure).toContain("git -C t3code diff 0123456789ab -- apps/server/src/server.ts");
     expect(failure).toContain(UPDATE_COMMAND);
+    files["apps/server/src/server.ts"] = "const layerB = 1;";
+    expect(fingerprintFindings(fingerprint, read)).toEqual([
+      { kind: "changed", file: "apps/server/src/server.ts", symbol: "*", ourFile: "apps/environment/src/t3/composition.ts", entry: "U1" },
+    ]);
+    files["apps/server/src/server.ts"] = "const layerA = Layer.effect(A, makeA);";
   });
 
   it("fails on a region whose symbol or file is gone", () => {
@@ -140,15 +152,17 @@ describe("checkFingerprint", () => {
 describe("updateFingerprint", () => {
   const read = (file: string) => (file === "a.ts" ? "const a = 2;" : 'const b = ["x"];');
   const stale: Fingerprint = {
-    pin: "old",
+    reviewedCommit: "old",
     regions: [{ file: "a.ts", symbol: "a", hash: "stale", ourFile: "ours.ts", entry: "U1" }],
     literals: [{ file: "b.ts", literal: '["x"]', ourFile: "ours.ts", entry: "U13" }],
+    files: {},
   };
 
-  it("records each region's current hash and the pin it was reviewed at", () => {
+  it("records each region's current hash, each watched file's blob id, and the commit it was reviewed at", () => {
     const updated = updateFingerprint(stale, read, "new");
-    expect(updated.pin).toBe("new");
+    expect(updated.reviewedCommit).toBe("new");
     expect(updated.regions[0]!.hash).toBe(hashRegion("const a = 2;", { symbol: "a" }));
+    expect(updated.files).toEqual({ "a.ts": blobId("const a = 2;"), "b.ts": blobId('const b = ["x"];') });
     expect(checkFingerprint(updated, read)).toEqual([]);
   });
 
@@ -166,7 +180,13 @@ describe("the pinned t3code against the checked-in fingerprint", () => {
     expect([...entries].toSorted()).toEqual(["U1", "U12", "U13", "U15", "U4", "U45"]);
   });
 
-  it("matches: every watched region and literal is as last reviewed", () => {
+  it("records each watched file's blob id, for the land check", () => {
+    expect(Object.keys(fingerprint.files).toSorted()).toEqual(watchedFiles(fingerprint));
+  });
+
+  // scripts/bump.ts sets REPORT_ONLY_ENV for its `pnpm run check` and reports the findings in a step of its own: a change
+  // holds the pin for a person at the land check instead (ADR-0037's SPI-1011 refinement).
+  it.skipIf(process.env[REPORT_ONLY_ENV] === "report")("matches: every watched region and literal is as last reviewed", () => {
     expect(checkFingerprint(fingerprint, readT3)).toEqual([]);
   });
 });

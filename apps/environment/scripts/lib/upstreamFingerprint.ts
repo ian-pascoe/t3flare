@@ -3,7 +3,8 @@
 // cannot watch: composition.ts restates server.ts's layer graph, terminal/layer.ts restates TerminalManager.make, the
 // stale reads match t3's git argv, the gh emulation answers t3's auth schema. The fixture
 // (test/fixtures/upstream-fingerprint.json) ties each to a hash of t3's region, or to a literal that must still appear
-// in t3's source, so that a change upstream fails `pnpm run check` (and with it the bump) until our file is reviewed.
+// in t3's source, so that a change upstream fails `pnpm run check` until our file is reviewed. In the bump the check
+// only reports, and the land check refuses to land the pin by itself (ADR-0037's SPI-1011 refinement).
 //
 // A region is a file and a symbol: a top-level declaration's name, a dotted path into its body (`make.capabilities`
 // is the first `capabilities` declared or keyed anywhere inside `make`, shallowest first), or `*` for every top-level
@@ -12,41 +13,9 @@ import { createHash } from "node:crypto";
 
 import { parseSync } from "rolldown/utils";
 
-/** The command that rewrites the fixture's hashes once our files are reviewed. */
-export const UPDATE_COMMAND = "node apps/environment/scripts/upstream-fingerprint.ts --update";
-const FIXTURE_PATH = "apps/environment/test/fixtures/upstream-fingerprint.json";
+import { blobId, FIXTURE_PATH, type Fingerprint, type RegionSpec, UPDATE_COMMAND, type WatchedRegion, watchedFiles } from "./upstreamFingerprintFixture.ts";
 
-export interface RegionSpec {
-  readonly symbol: string;
-  /**
-   * Leave out the object's plain `key: true` properties. For the descriptor's capabilities: t3 adds flags every week,
-   * and a new flag is stripped until classified rather than failing the bump (fragility U4); a changed condition on
-   * a flag still changes the hash.
-   */
-  readonly omitTrueFlags?: boolean;
-}
-
-/** Paths are relative to `t3code/`, ours to the repository root; `entry` is the register entry in docs/upstream-fragility.md. */
-export interface WatchedRegion extends RegionSpec {
-  readonly file: string;
-  readonly hash: string;
-  readonly ourFile: string;
-  readonly entry: string;
-}
-
-export interface WatchedLiteral {
-  readonly file: string;
-  readonly literal: string;
-  readonly ourFile: string;
-  readonly entry: string;
-}
-
-export interface Fingerprint {
-  /** The t3code commit the fixture was last reviewed at. */
-  readonly pin: string;
-  readonly regions: ReadonlyArray<WatchedRegion>;
-  readonly literals: ReadonlyArray<WatchedLiteral>;
-}
+export * from "./upstreamFingerprintFixture.ts";
 
 type Node = { readonly type: string; readonly start: number; readonly end: number; readonly [key: string]: unknown };
 type Span = { readonly start: number; readonly end: number };
@@ -186,53 +155,67 @@ const tryRead = (read: (file: string) => string, file: string): string | undefin
   }
 };
 
-const diffHint = (pin: string, file: string) => `Diff since the last review: git -C t3code diff ${pin.slice(0, 12)} -- ${file}`;
+/** What changed since the last review: a region whose hash moved, a region that is gone, a literal t3 no longer has. */
+export type Finding =
+  | { readonly kind: "changed" | "gone"; readonly file: string; readonly symbol: string; readonly ourFile: string; readonly entry: string }
+  | { readonly kind: "missing"; readonly file: string; readonly literal: string; readonly ourFile: string; readonly entry: string };
 
-type Outcome = { readonly hashes: ReadonlyArray<string | undefined>; readonly gone: ReadonlyArray<string>; readonly missing: ReadonlyArray<string> };
+/** The one place each kind of finding is put in words. */
+export const findingMessage = (finding: Finding, reviewedCommit: string): string => {
+  const review = `review ${finding.ourFile} (${finding.entry})`;
+  const diff = `Diff since the last review: git -C t3code diff ${reviewedCommit.slice(0, 12)} -- ${finding.file}`;
+  switch (finding.kind) {
+    case "changed":
+      return `t3code/${finding.file} (${finding.symbol}) changed: ${review}, then run ${UPDATE_COMMAND}. ${diff}`;
+    case "gone":
+      return `t3code/${finding.file} (${finding.symbol}) is gone: ${review}, then point its region in ${FIXTURE_PATH} at where it went and run ${UPDATE_COMMAND}. ${diff}`;
+    case "missing":
+      return `t3code/${finding.file} no longer contains \`${finding.literal}\`: ${review}, then change the literal in ${FIXTURE_PATH} to what t3 sends now. ${diff}`;
+  }
+};
 
-const evaluate = (fingerprint: Fingerprint, read: (file: string) => string): Outcome => {
+const regionFinding = (kind: "changed" | "gone", { file, symbol, ourFile, entry }: WatchedRegion): Finding => ({ kind, file, symbol, ourFile, entry });
+
+/** Each region with its current hash (undefined when gone), and every finding. */
+const evaluate = (fingerprint: Fingerprint, read: (file: string) => string) => {
   const sources = new Map<string, string | undefined>();
   const sourceOf = (file: string) => {
     if (!sources.has(file)) sources.set(file, tryRead(read, file));
     return sources.get(file);
   };
-  const gone: Array<string> = [];
-  const hashes = fingerprint.regions.map((region) => {
+  const regions = fingerprint.regions.map((region) => {
     const source = sourceOf(region.file);
-    const hash = source === undefined ? undefined : hashRegion(source, region);
-    if (hash === undefined) {
-      gone.push(
-        `t3code/${region.file} (${region.symbol}) is gone: review ${region.ourFile} (${region.entry}), then point its region in ${FIXTURE_PATH} at where it went and run ${UPDATE_COMMAND}. ${diffHint(fingerprint.pin, region.file)}`,
-      );
-    }
-    return hash;
+    return { region, hash: source === undefined ? undefined : hashRegion(source, region) };
   });
-  const missing = fingerprint.literals.flatMap((watched) => {
-    const source = sourceOf(watched.file);
-    if (source !== undefined && searchableSource(source).includes(normalise(watched.literal))) return [];
-    return [
-      `t3code/${watched.file} no longer contains \`${watched.literal}\`: review ${watched.ourFile} (${watched.entry}), then change the literal in ${FIXTURE_PATH} to what t3 sends now. ${diffHint(fingerprint.pin, watched.file)}`,
-    ];
-  });
-  return { hashes, gone, missing };
+  const findings: Array<Finding> = [
+    ...regions.flatMap(({ region, hash }) => (hash === undefined ? [regionFinding("gone", region)] : hash === region.hash ? [] : [regionFinding("changed", region)])),
+    ...fingerprint.literals.flatMap(({ file, literal, ourFile, entry }): Array<Finding> => {
+      const source = sourceOf(file);
+      return source !== undefined && searchableSource(source).includes(normalise(literal)) ? [] : [{ kind: "missing", file, literal, ourFile, entry }];
+    }),
+  ];
+  return { regions, findings, sourceOf };
 };
 
-/** One message per watched region that changed or is gone, and per literal t3's source no longer contains. */
-export const checkFingerprint = (fingerprint: Fingerprint, read: (file: string) => string): Array<string> => {
-  const { hashes, gone, missing } = evaluate(fingerprint, read);
-  const changed = fingerprint.regions.flatMap((region, index) => {
-    const hash = hashes[index];
-    if (hash === undefined || hash === region.hash) return [];
-    return [
-      `t3code/${region.file} (${region.symbol}) changed: review ${region.ourFile} (${region.entry}), then run ${UPDATE_COMMAND}. ${diffHint(fingerprint.pin, region.file)}`,
-    ];
-  });
-  return [...changed, ...gone, ...missing];
-};
+/** Every watched region that changed or is gone, and every literal t3's source no longer contains. */
+export const fingerprintFindings = (fingerprint: Fingerprint, read: (file: string) => string): Array<Finding> => evaluate(fingerprint, read).findings;
 
-/** The fingerprint with each region's current hash, reviewed at `pin`. A gone region or literal is the fixture's to fix by hand. */
-export const updateFingerprint = (fingerprint: Fingerprint, read: (file: string) => string, pin: string): Fingerprint => {
-  const { hashes, gone, missing } = evaluate(fingerprint, read);
-  if (gone.length > 0 || missing.length > 0) throw new Error([...gone, ...missing].join("\n"));
-  return { ...fingerprint, pin, regions: fingerprint.regions.map((region, index) => ({ ...region, hash: hashes[index]! })) };
+/** One message per finding. */
+export const checkFingerprint = (fingerprint: Fingerprint, read: (file: string) => string): Array<string> =>
+  fingerprintFindings(fingerprint, read).map((finding) => findingMessage(finding, fingerprint.reviewedCommit));
+
+/**
+ * The fingerprint with each region's current hash and each watched file's blob id, reviewed at `reviewedCommit`. A gone
+ * region or a missing literal is the fixture's to fix by hand.
+ */
+export const updateFingerprint = (fingerprint: Fingerprint, read: (file: string) => string, reviewedCommit: string): Fingerprint => {
+  const { regions, findings, sourceOf } = evaluate(fingerprint, read);
+  const unfixable = findings.filter((finding) => finding.kind !== "changed");
+  if (unfixable.length > 0) throw new Error(unfixable.map((finding) => findingMessage(finding, fingerprint.reviewedCommit)).join("\n"));
+  return {
+    reviewedCommit,
+    regions: regions.map(({ region, hash }) => ({ ...region, hash: hash! })),
+    literals: fingerprint.literals,
+    files: Object.fromEntries(watchedFiles(fingerprint).map((file) => [file, blobId(sourceOf(file)!)])),
+  };
 };

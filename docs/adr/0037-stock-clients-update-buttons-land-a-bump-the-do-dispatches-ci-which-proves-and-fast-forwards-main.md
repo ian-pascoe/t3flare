@@ -184,3 +184,24 @@ CI, never by updating the Environment in place:
   the same line under Consequences) was written when the repository was a personal account's; it is now an
   organisation's. The deploy-key design stays: its push starts `deploy-prod.yml`, which a push with the workflow's own
   token would not, and the key lives in the `land` environment, apart from `prod`'s secrets.
+
+## Refinement (SPI-1011, 2026-11-20): an Update whose upstream fingerprint changed does not land by itself
+
+Some of our files restate or emulate t3 code that typecheck cannot watch (`composition.ts` restates `server.ts`, the
+stale reads match t3's git argv, and the rest in [fragility T2](../upstream-fragility.md#gaps-in-detection)). The
+upstream fingerprint ties each to a hash of t3's region, or a literal t3 must still contain
+(`apps/environment/test/fixtures/upstream-fingerprint.json`), and fails `pnpm run check` on a change until that file of
+ours is reviewed and the fixture updated (`node apps/environment/scripts/upstream-fingerprint.ts --update`). A bump
+commit may touch only its pin files, so it can never carry that update, and the watched files change on most nightlies.
+
+- **The bump still runs and proves the pin.** `scripts/bump.ts` runs `pnpm run check` with the fingerprint test in
+  report-only mode, then records what changed (`upstreamFingerprint` in the report, the pin's commit message and the
+  bump pull request's body, as `unclassifiedCapabilities` is carried). The bump is pushed, marked proven and proposed
+  as before.
+- **It does not land by itself.** `scripts/land-check.ts` refuses a t3 candidate in which any t3 file the fingerprint
+  watches differs from the one it was reviewed at. It compares git blob ids, because no parser is installed on the
+  trusted runner, so it is coarser than the test: a change outside the watched regions holds the pin too. The publish
+  job's check (`--propose`) only prints the result, so the pull request is still opened. An in-app Update of such a pin
+  fails at `land.yml`'s check; the hourly bump proposes it through the Full gate as a pull request.
+- **A person lands it.** They review the files the pull request names, run `--update` on its branch, push, and merge it
+  as any pull request, through the required `check`.

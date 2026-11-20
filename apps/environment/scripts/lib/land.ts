@@ -4,6 +4,7 @@
 // checks it. Dependency-free.
 import { bareKey, closure, DEPENDENCY_FIELDS, importerKey, type Json, nameOfKey } from "../../../../scripts/lockGraph.ts";
 import { compareVersions, CLI_PIN_FILES, EXACT_VERSION, NIGHTLY_TAG, type Pin, T3_PIN_FILES } from "../../src/updates/pins.ts";
+import { blobId, type Fingerprint, UPDATE_COMMAND, watchedFiles } from "./upstreamFingerprintFixture.ts";
 
 export const LAND_ALLOWLIST = { t3: T3_PIN_FILES, cli: CLI_PIN_FILES } as const;
 
@@ -410,17 +411,64 @@ const CAPABILITY_KEY = /^[A-Za-z][A-Za-z0-9]{0,63}$/;
 /**
  * What a t3 bump's pull request tells its reader beyond the pass (fragility U4, U18), from the untrusted report: the
  * capability flags stripped until classified (only names shaped as flags; anything else is dropped), whether the
- * acceptance test passed only on its second attempt, and how many type errors in t3's own files the typecheck passed
- * over (U10; a whole number, else 0). Never part of a decision to publish or land.
+ * acceptance test passed only on its second attempt, how many type errors in t3's own files the typecheck passed
+ * over (U10; a whole number, else 0), and the upstream fingerprint's findings (T2; path-, symbol- and entry-shaped only,
+ * a literal's text never). Never part of a decision to publish or land: the land check compares the files itself.
  */
-export const bumpReportNotes = (text: string): { readonly unclassified: ReadonlyArray<string>; readonly acceptanceRetried: boolean; readonly t3TypeErrors: number } => {
+export const bumpReportNotes = (
+  text: string,
+): { readonly unclassified: ReadonlyArray<string>; readonly acceptanceRetried: boolean; readonly t3TypeErrors: number; readonly fingerprint: ReadonlyArray<string> } => {
   const parsed = reportObject(text);
   const report = typeof parsed === "string" ? {} : parsed;
   const unclassified = Array.isArray(report.unclassifiedCapabilities)
     ? report.unclassifiedCapabilities.filter((key): key is string => typeof key === "string" && CAPABILITY_KEY.test(key)).slice(0, 50)
     : [];
   const t3TypeErrors = Number.isInteger(report.t3TypeErrors) && (report.t3TypeErrors as number) >= 0 && (report.t3TypeErrors as number) < 100_000 ? (report.t3TypeErrors as number) : 0;
-  return { unclassified, acceptanceRetried: report.acceptanceRetry !== undefined && report.acceptanceRetry !== null, t3TypeErrors };
+  const fingerprint = Array.isArray(report.upstreamFingerprint) ? report.upstreamFingerprint.flatMap(fingerprintNote).slice(0, 50) : [];
+  return { unclassified, acceptanceRetried: report.acceptanceRetry !== undefined && report.acceptanceRetry !== null, t3TypeErrors, fingerprint };
+};
+
+const REPO_PATH = /^[A-Za-z0-9_][A-Za-z0-9._/-]{0,199}$/;
+const REGISTER_ENTRY = /^U\d{1,4}$/;
+const REGION_SYMBOL = /^(?:\*|[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*)$/;
+
+/** One upstream fingerprint finding from the report, as "<our file> (<entry>) for t3code/<file> (<symbol>)", if shaped so. */
+const fingerprintNote = (finding: unknown): Array<string> => {
+  if (typeof finding !== "object" || finding === null) return [];
+  const { kind, file, symbol, ourFile, entry } = finding as Record<string, unknown>;
+  if (typeof file !== "string" || !REPO_PATH.test(file) || typeof ourFile !== "string" || !REPO_PATH.test(ourFile)) return [];
+  if (typeof entry !== "string" || !REGISTER_ENTRY.test(entry)) return [];
+  const what = kind === "missing" ? "a literal" : (kind === "changed" || kind === "gone") && typeof symbol === "string" && symbol.length <= 100 && REGION_SYMBOL.test(symbol) ? symbol : undefined;
+  return what === undefined ? [] : [`${ourFile} (${entry}) for t3code/${file} (${what})`];
+};
+
+/**
+ * Why a t3 pin may not land by itself for the upstream fingerprint (SPI-1011; ADR-0037's SPI-1011 refinement), or
+ * undefined. `fixtureText` is main's fixture (a bump may not change it); `read` gives the candidate's t3 file, undefined
+ * when gone. Without a parser on the trusted runner, the check is coarser than the test's: any byte of a watched file
+ * that moved since the review holds the pin for a person, even outside the watched regions.
+ */
+export const upstreamFingerprintRefusal = (fixtureText: string, read: (file: string) => string | undefined): string | undefined => {
+  let fingerprint: Fingerprint;
+  try {
+    fingerprint = JSON.parse(fixtureText) as Fingerprint;
+    if (!Array.isArray(fingerprint.regions) || !Array.isArray(fingerprint.literals) || typeof fingerprint.files !== "object" || fingerprint.files === null) throw new Error("shape");
+  } catch {
+    return "the upstream fingerprint's fixture was not read";
+  }
+  const files = watchedFiles(fingerprint);
+  const unrecorded = files.filter((file) => typeof fingerprint.files[file] !== "string");
+  if (unrecorded.length > 0) return `the upstream fingerprint's fixture does not record ${unrecorded.join(", ")}: run ${UPDATE_COMMAND}`;
+  const moved = files.filter((file) => {
+    const text = read(file);
+    return text === undefined || blobId(text) !== fingerprint.files[file];
+  });
+  if (moved.length === 0) return undefined;
+  return (
+    `t3 files the upstream fingerprint watches changed since its review at ${String(fingerprint.reviewedCommit).slice(0, 12)} (${moved.join(", ")}): ` +
+    `this bump needs a person. On its branch, run node apps/environment/scripts/upstream-fingerprint.ts to see which of our files to review, ` +
+    `review them, run ${UPDATE_COMMAND}, and merge its pull request (ADR-0037's SPI-1011 refinement)`
+  );
 };
 
 /**

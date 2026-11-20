@@ -1,5 +1,5 @@
 {
-  "pin": "59651c1761f6c63e9b6056839067066968e6a406",
+  "reviewedCommit": "59651c1761f6c63e9b6056839067066968e6a406",
   "regions": [
     {
       "file": "apps/server/src/server.ts",
@@ -127,6 +127,18 @@
       "entry": "U13"
     },
     {
+      "file": "apps/server/src/vcs/GitVcsDriverCore.ts",
+      "literal": "const args = [...diffArgs, \"--raw\", \"--numstat\", \"-z\"];",
+      "ourFile": "apps/agents/src/workspace/staleReads.ts",
+      "entry": "U13"
+    },
+    {
+      "file": "apps/server/src/vcs/GitVcsDriverCore.ts",
+      "literal": "[...diffArgs, \"--patch\", stat.ref, \"--\", ...pathArgs]",
+      "ourFile": "apps/agents/src/workspace/staleReads.ts",
+      "entry": "U13"
+    },
+    {
       "file": "packages/source-control-github/src/server/GitHubSourceControlProvider.ts",
       "literal": "authArgs: [\"auth\", \"status\", \"--json\", \"hosts\"]",
       "ourFile": "apps/environment/src/agents/processRouter.ts",
@@ -144,5 +156,18 @@
       "ourFile": "apps/environment/src/agents/processRouter.ts",
       "entry": "U15"
     }
-  ]
+  ],
+  "files": {
+    "apps/server/src/environment/ServerEnvironment.ts": "a9dfdcb6e60486290eee95367d1d56005a4c2443",
+    "apps/server/src/peer/PeerLinks.ts": "4fa159dd7033785744568a5c413b019f08e837bb",
+    "apps/server/src/server.ts": "35f63e9c44a60c70d8dc68ce087e92ebdc4df6ae",
+    "apps/server/src/sourceControl/SourceControlDiscovery.ts": "e69f0d3761e68b291b6e58b0710a09fcba9f9079",
+    "apps/server/src/terminal/Manager.ts": "a294ba7f1afe28eb83e0281e63221c9118589f20",
+    "apps/server/src/vcs/GitVcsDriverCore.ts": "b88ade886325903c12cf4666316092ca5ad659bd",
+    "packages/contracts/src/peerLink.ts": "0d72b978e26090bf4aad445c8eddf7f51fcf7b64",
+    "packages/source-control-github/src/server/GitHubCredentials.ts": "a490da112a28eeffc5b0d1eb8ec60ce257df8c21",
+    "packages/source-control-github/src/server/GitHubHttpClient.ts": "ed394d1d49c4a5cb515cc143065d6e4d2c057bbd",
+    "packages/source-control-github/src/server/GitHubSourceControlProvider.ts": "f69e06fedc663dbc2b4744654b1a83995e1bb985",
+    "packages/source-control-github/src/server/gitHubAuthStatus.ts": "2766d305a014d71607ce0bf5baa7d21c04de2e4e"
+  }
 }
