@@ -1,7 +1,9 @@
 // Deployment settings (docs/deploy.md): the Owner's own values a Deployment is made with, which the source never holds.
 // Each is read from the environment with no default, and a missing or malformed one fails closed with a message naming
 // it. Pure, so it is tested (test/deploymentSettings.test.ts); stage.ts, alchemy.run.ts, infra (ci:setup) and the stage
-// scripts (lib/scriptSettings.ts) all read the settings through it.
+// scripts (lib/scriptSettings.ts) all read the settings through it. Its one import is dependency-free too, so the trusted
+// CI jobs (scripts/updates-ci.ts) read settings through it with plain Node.
+import { T3_TRACKS } from "../../src/updates/pins.ts";
 
 /** The shapes a setting's value must have. */
 export type SettingShape = "email" | "accessTeamDomain" | "dnsLabel" | "repo" | "hostname" | "zoneId" | "t3Track";
@@ -15,7 +17,7 @@ const SHAPES: Readonly<Record<SettingShape, { readonly pattern: RegExp; readonly
   repo: { pattern: /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/, description: "a GitHub repository as owner/name" },
   hostname: { pattern: new RegExp(`^(?=.{1,253}$)${LABEL}(?:\\.${LABEL})+$`), description: "a hostname (such as t3.example.com)" },
   zoneId: { pattern: /^[0-9a-f]{32}$/, description: "a Cloudflare zone id (32 hexadecimal characters)" },
-  t3Track: { pattern: /^(?:stable|nightly)$/, description: "a t3 track: stable or nightly (ADR-0041)" },
+  t3Track: { pattern: new RegExp(`^(?:${T3_TRACKS.join("|")})$`), description: `a t3 track: ${T3_TRACKS.join(" or ")} (ADR-0041)` },
 };
 
 /** Every Deployment setting and the shape of its value. docs/deploy.md says when each is required and where it lives. */

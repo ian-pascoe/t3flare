@@ -125,7 +125,7 @@ See also [`pi-parity.md`](pi-parity.md) for the owner's pi harness. The checklis
 
 | Feature | Stock | t3flare | Evidence | Step |
 |---|---|---|---|---|
-| Server self-update | `ws.ts:2685`; `srv/cloud/selfUpdate.ts:161` | N/A: nightly bump and deploy | ADR-0017; `npmReleaseLookup` and the self-update flags stripped (SPI-994) | done |
+| Server self-update | `ws.ts:2685`; `srv/cloud/selfUpdate.ts:161` | N/A: t3 bump and deploy | ADR-0017; `npmReleaseLookup` and the self-update flags stripped (SPI-994) | done |
 | Product analytics | `srv/telemetry/AnalyticsService.ts:67-74` (on by default, `ingest.t3.codes`) | **Off** (D1): t3flare's managed policy sets `limits.telemetry: false` (SPI-995) | ADR-0023, README; `test/analytics.test.ts` (t3's service sends nothing under the policy); stage: `docs/steps/parity/spi-995-analytics.json` | done |
 | OTLP export | `con/settings.ts:1017`; proxy route `srv/http.ts:335` | W as stock: the traces, metrics and logs URLs the owner saves in t3's settings are read at the Environment's boot (a change applies after its next restart, as on a laptop) and t3's own exporters send from the Durable Object every 10 s; t3's browser-trace forwarder is mounted. No `T3CODE_OTLP_*`/`OTEL_*` variables | `env/t3/otlp.ts`, `composition.ts`; stage `pbatch2`: a throwaway receiver Worker got 4 trace exports (828 and 1,000 spans of `t3code-server`) and 3 metric exports within 25 s; with the URLs cleared, none (`docs/steps/parity-batch-2/otlp.json`, `otlp-off.json`) | done (parity batch 2) |
 | Import agent sessions | `srv/project/AgentSessionScanner.ts:217`, `:1196`; `ws.ts:3060` | R: no provider homes in the State directory | ADR-0024 | done (refusal) |

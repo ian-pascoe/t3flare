@@ -40,9 +40,21 @@ export const t3ServerVersion = (track: T3Track, root: string = T3_ROOT): ServerV
   return serverVersionOf(tags, track, manifest.version);
 };
 
-/** The Deployment's t3 track from the environment (`T3FLARE_T3_TRACK`); throws its setting's message when unset. */
-export const t3TrackSetting = (env: Readonly<Record<string, string | undefined>> = process.env): T3Track =>
-  t3TrackOf(requireSetting(env, "T3FLARE_T3_TRACK"))!;
+/**
+ * The Deployment's t3 track (`T3FLARE_T3_TRACK`): from the environment, else from ~/.config/t3flare/dev.env as
+ * `stage.ts` reads it (that one key, never printed), so a laptop's `pnpm run bump` or `node build.ts` finds it as a
+ * deploy does. Throws its setting's message when it is in neither.
+ */
+export const t3TrackSetting = (env: Readonly<Record<string, string | undefined>> = process.env): T3Track => {
+  const file = path.join(env.HOME ?? "", ".config/t3flare/dev.env");
+  const fromFile = () => {
+    if (!fs.existsSync(file)) return undefined;
+    const read = spawnSync("bash", ["-c", 'set -a; . "$1"; set +a; printf %s "${T3FLARE_T3_TRACK:-}"', "-", file], { encoding: "utf8" });
+    return read.status === 0 && read.stdout !== "" ? read.stdout : undefined;
+  };
+  const value = env.T3FLARE_T3_TRACK || fromFile();
+  return t3TrackOf(requireSetting({ T3FLARE_T3_TRACK: value }, "T3FLARE_T3_TRACK"))!;
+};
 
 /** t3's server manifest's text with `version` stamped in, as the bundle reads it. */
 export const stampedManifest = (text: string, version: string): string =>

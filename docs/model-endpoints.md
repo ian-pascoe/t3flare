@@ -249,7 +249,7 @@ T3FLARE_MODEL_ENDPOINT='{"id":"openai","label":"OpenAI","api":"openai-responses"
 ```
 
 One endpoint speaks one API, and each CLI agent needs its own (Claude Code: Anthropic Messages; Codex: OpenAI
-Responses; OpenCode and pi: either). For every agent, as the nightly bump runs them, give a list with one of each:
+Responses; OpenCode and pi: either). For every agent, as the t3 bump runs them, give a list with one of each:
 
 ```sh
 T3FLARE_MODEL_ENDPOINT='[{"id":"anth","api":"anthropic-messages","baseUrl":"https://<host>","apiKey":"<key>","models":["claude-sonnet-<version>","claude-haiku-<version>"]},{"id":"resp","api":"openai-responses","baseUrl":"https://<host>/v1","apiKey":"<key>","models":["claude-sonnet-<version>"]}]'

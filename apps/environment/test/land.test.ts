@@ -226,6 +226,12 @@ describe("what a bump.yml run does", () => {
     expect(stable({ event: "schedule", land: false, verify: false, newest: "v0.1.11", mainTag: "v0.1.12-nightly.20261120.4994" })).toMatchObject({ mode: "skip", reason: expect.stringMatching(/main pins v0\.1\.12-nightly\.20261120\.4994, at or above v0\.1\.11/) });
     expect(stable({ event: "schedule", land: false, verify: false, newest: "v0.1.12", mainTag: "v0.1.12-nightly.20261120.4994" })).toMatchObject({ mode: "bump", tag: "v0.1.12" });
     expect(stable({ event: "schedule", land: false, verify: false })).toMatchObject({ mode: "skip", reason: "no tag on the stable track" });
+    // A stable that does not contain the nightly pin fails the move (only forward), and the hourly job stops retrying it.
+    const notForward = { base: "a".repeat(40), to: "v0.1.12", failed: "move" as const };
+    expect(stable({ event: "schedule", land: false, verify: false, newest: "v0.1.12", mainTag: "v0.1.12-nightly.20261120.4994", mainSha: "a".repeat(40), attempts: [notForward, notForward] })).toMatchObject({
+      mode: "skip",
+      reason: expect.stringMatching(/failed its move step/),
+    });
     expect(stable({ event: "workflow_dispatch", land: true, verify: false, tag: "v0.1.12", mainTag: "v0.1.11" })).toMatchObject({ mode: "bump", tag: "v0.1.12" });
     expect(stable({ event: "workflow_dispatch", land: true, verify: false, tag: "v0.1.12-nightly.20261120.4994", mainTag: "v0.1.11" })).toMatch(/tag on the stable track/);
     expect(planT3({ track: "nightly", event: "workflow_dispatch", land: true, verify: false, tag: "v0.1.12", mainTag: TAG })).toMatch(/tag on the nightly track/);

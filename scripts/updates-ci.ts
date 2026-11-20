@@ -22,8 +22,8 @@ import * as path from "node:path";
 
 import { clisField } from "../apps/environment/scripts/lib/cliPins.ts";
 import { bumpAttemptOf, bumpReportNotes, DETERMINISTIC_FAILURES_TO_STOP, landBindingRefusal, landMode, planT3, readBumpReport } from "../apps/environment/scripts/lib/land.ts";
-import { requireSetting } from "../apps/environment/scripts/lib/deploymentSettings.ts";
-import { branchOf, COMMIT, landedBranches, newestOnTrack, parsePin, type Pin, pinOf, pinTagOf, pinText, T3_TAG, type T3Track, t3TrackOf } from "../apps/environment/src/updates/pins.ts";
+import { t3TrackSetting } from "../apps/environment/serverVersion.ts";
+import { branchOf, COMMIT, landedBranches, newestOnTrack, parsePin, type Pin, pinOf, pinTagOf, pinText, T3_TAG, type T3Track } from "../apps/environment/src/updates/pins.ts";
 import { branchTipOf, bumpBranches, git, optionOf, provenGateOf, recentBumpReports, setProven, t3TagsOf, thisRunUrl } from "./lib/updatesGit.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -60,7 +60,7 @@ const submoduleUrl = () => git(["config", "-f", ".gitmodules", "submodule.t3code
 /** The Deployment's t3 track (ADR-0041), from the repository variable the workflow passes. */
 const trackSetting = (): T3Track => {
   try {
-    return t3TrackOf(requireSetting(process.env, "T3FLARE_T3_TRACK"))!;
+    return t3TrackSetting();
   } catch (error) {
     return fail(error instanceof Error ? error.message : String(error));
   }

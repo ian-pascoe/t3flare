@@ -793,7 +793,7 @@ pick, each failure saying which.
   - the registry or the layer's scope changes shape: typecheck catches it.
 - **Detection**: `apps/environment/test/textGenerationDefault.test.ts` runs the sync on t3's own test settings service,
   including stock's default with `codex` registered, and the subscription. `apps/environment/scripts/p1163.ts` checks the setting on a
-  fresh stage, and so does every nightly bump's acceptance test once the `bump` environment has `T3FLARE_MODEL_ENDPOINT`
+  fresh stage, and so does every t3 bump's acceptance test once the `bump` environment has `T3FLARE_MODEL_ENDPOINT`
   (SPI-1175; before that it skips the check). A default no longer taken from the constant, with a still-registered instance, is **silent** outside that script.
 - **Blast radius**: generated titles and commit text run on t3's stock model, or fail (no such instance), instead of the
   endpoints' default.
@@ -941,7 +941,7 @@ cut, SPI-1176: a model from before it, a bare id, runs on the default model, the
 ### U72. The Owner-client endpoint: Access managed OAuth (beta) and the hand-written MCP versions (SPI-1200)
 
 - **Where**: `apps/environment/src/settings/endpointLayout.ts` (layout (B): `<host>/_t3flare/mcp`;
-  `OWNER_ENDPOINT_EXCLUDED_STAGES` keeps prod out of it until owner step 1 passes, and the nightly job's `bump` for
+  `OWNER_ENDPOINT_EXCLUDED_STAGES` keeps prod out of it until owner step 1 passes, and the t3 bump's `bump` for
   good, ADR-0036), the `SettingsAccess` application in `apps/environment/alchemy.run.ts` (`oauthConfiguration`,
   `pathCookieAttribute` on it and on `AdminAccess`, passed `as never` to alchemy's `Cloudflare.Access.Application`; on
   prod and `bump` neither), `worker.ts`'s branch for it (`verifySettingsRequest` against `T3FLARE_ACCESS_SETTINGS_AUD`;

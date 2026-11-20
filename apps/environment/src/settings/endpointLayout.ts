@@ -18,8 +18,8 @@
  * application exactly as before layout (B) (no path-cookie attribute), and no `T3FLARE_ACCESS_SETTINGS_AUD`, so
  * `/_t3flare/mcp` stays under the admin application and the Worker answers it 404 `not_configured` (src/access.ts).
  * Prod is here until the owner turns the endpoint on (owner step 1 passed and M5a's stage evidence is recorded,
- * `docs/steps/settings-mcp/m5a-stage-run.md` items 1-4); enabling prod is removing it from this list. `bump` is here for good (SPI-1195 review): the nightly
- * job deploys it with the CI token `t3flare-ci-bump`, which is not known to be allowed to create a managed-OAuth Access
+ * `docs/steps/settings-mcp/m5a-stage-run.md` items 1-4); enabling prod is removing it from this list. `bump` is here for good (SPI-1195 review): the t3
+ * bump deploys it with the CI token `t3flare-ci-bump`, which is not known to be allowed to create a managed-OAuth Access
  * application, and a failure there would break the t3 bump; its acceptance test never calls the endpoint.
  */
 export const OWNER_ENDPOINT_EXCLUDED_STAGES: ReadonlyArray<string> = ["prod", "bump"];

@@ -47,8 +47,8 @@ import { DETERMINISTIC_STEPS, findingSummary, HELD_BUMP_STEPS } from "../apps/en
 import { keptReportJson } from "../apps/environment/scripts/lib/modelEndpointSpec.ts";
 import { type Finding, REPORT_ONLY, REPORT_ONLY_ENV } from "../apps/environment/scripts/lib/upstreamFingerprintFixture.ts";
 import { T3_ERRORS_COUNT } from "../apps/environment/scripts/lib/typecheckFilter.ts";
-import { t3TrackSetting } from "../apps/environment/serverVersion.ts";
-import { newestOnTrack, NPM_DIST_TAG, PINNED_FILES, pinTagOf, type T3Track } from "../apps/environment/src/updates/pins.ts";
+import { t3ServerVersion, t3TrackSetting } from "../apps/environment/serverVersion.ts";
+import { newestOnTrack, NPM_DIST_TAG, PINNED_FILES, type T3Track } from "../apps/environment/src/updates/pins.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const t3 = path.join(root, "t3code");
@@ -132,10 +132,8 @@ let t3TypeErrors: number | undefined;
 /** The first acceptance attempt's result, when it failed and a second ran. */
 let acceptanceRetry: { readonly firstFailures: unknown; readonly firstDetail: string } | undefined;
 let rollbackResult: { ok: boolean; t3code: string; pinnedFiles: string; install: string } | undefined;
-/** The pin, named by its tag on the track (a stable's commit carries a nightly tag too), else by its commit. */
-const from =
-  pinTagOf(sh("git", ["tag", "--points-at", "HEAD"], t3, { quiet: true }).stdout.split("\n").map((t) => t.trim()), track) ??
-  sh("git", ["rev-parse", "HEAD"], t3, { quiet: true }).output.trim();
+/** The pin, named by its tag on the track as the Server version is (a stable's commit carries a nightly tag too), else by its commit. */
+const from = t3ServerVersion(track, t3).tag ?? sh("git", ["rev-parse", "HEAD"], t3, { quiet: true }).output.trim();
 const fromCommit = sh("git", ["rev-parse", "HEAD"], t3, { quiet: true }).output.trim();
 /** The commit of t3flare this run tested: the plan job skips an hourly retry of a failure nothing has changed since. */
 const base = sh("git", ["rev-parse", "HEAD"], root, { quiet: true }).output.trim();
@@ -155,7 +153,7 @@ const finish = (ok: boolean, note?: string) => {
     base,
     from,
     to: to ?? null,
-    changed: to !== undefined && to !== from,
+    changed: to !== undefined && toCommit !== fromCommit,
     note: note ?? null,
     at: new Date().toISOString(),
     steps,
@@ -178,7 +176,10 @@ const finish = (ok: boolean, note?: string) => {
 };
 
 if (to === undefined) finish(false);
-if (to === from && flag("skip-if-current")) {
+/** The commit the target tag names: a pin moves when the commit does, whichever track's tag names it. */
+const toCommit = sh("git", ["rev-parse", "--verify", "--quiet", `${to!}^{commit}`], t3, { quiet: true }).stdout.trim();
+const moves = toCommit !== fromCommit;
+if (!moves && flag("skip-if-current")) {
   console.log(`t3code is already at the newest ${track} tag, ${to}`);
   finish(true, `already at the newest ${track} tag; nothing deployed`);
 }
@@ -318,7 +319,7 @@ if (flag("destroy") && !flag("no-deploy")) {
   step(`destroy the ${stage} stage`, () => sh(process.execPath, ["scripts/stage.ts", "destroy", stage], environment));
 }
 
-if (flag("commit") && to !== from) {
+if (flag("commit") && moves) {
   step("commit the new pin", () => {
     const add = sh("git", ["add", "t3code", ...PINNED_FILES], root);
     const notes = [
@@ -339,4 +340,4 @@ if (flag("commit") && to !== from) {
     return { ok: add.ok && commit.ok, detail: commit.output };
   });
 }
-finish(true, to === from ? `already at the newest ${track} tag; re-proved${flag("no-deploy") ? " through the check" : ` on the ${stage} stage`}` : undefined);
+finish(true, !moves ? `already at the newest ${track} tag; re-proved${flag("no-deploy") ? " through the check" : ` on the ${stage} stage`}` : undefined);

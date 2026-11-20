@@ -17,7 +17,7 @@ export const serverUpdateRefusal = (input: ServerSelfUpdateInput, current: strin
   if (track === undefined) return "This Cloud Environment was built with no t3 track, so it takes no Update; deploy it again.";
   const target = input.targetVersion.trim();
   const targetTrack = trackOfVersion(target);
-  if (targetTrack === undefined) return `'${target}' is not an exact t3 release version.`;
+  if (targetTrack === undefined) return `'${target}' is not an exact t3 release.`;
   if (targetTrack !== track) {
     return `This Cloud Environment follows t3's ${track} releases (a Deployment setting); t3@${target} is a ${targetTrack} build. Put this client on the ${track} update track.`;
   }

@@ -127,7 +127,8 @@ export const checkPatches = (): Array<{ readonly patch: string; readonly ok: boo
     return { patch: file, ok: result.ok, detail: result.out };
   });
 
-const t3Version = () => git(["describe", "--tags", "--always"], T3_ROOT).out;
+/** The pin as the build report names it: its tag on the t3 track (ADR-0041), else what git describes. */
+const t3Version = (track: T3Track) => t3ServerVersion(track).tag ?? git(["describe", "--tags", "--always"], T3_ROOT).out;
 const ourCommit = () => git(["rev-parse", "--short=12", "HEAD"], here).out;
 
 /** Patches applied in memory: `load` returns the patched text of each file a Patch touches. */
@@ -359,7 +360,7 @@ export const buildWorker = async (options: { readonly track: T3Track; readonly q
   const applied: Array<string> = [];
   const shadowed = new Set<string>();
   const serverVersion = t3ServerVersion(options.track);
-  const identity = { t3: t3Version(), serverVersion: serverVersion.version, t3Track: options.track, commit: ourCommit(), builtAt: new Date().toISOString() };
+  const identity = { t3: t3Version(options.track), serverVersion: serverVersion.version, t3Track: options.track, commit: ourCommit(), builtAt: new Date().toISOString() };
   const bundle = await rolldown({
     input: path.join(here, "src/worker.ts"),
     cwd: here,

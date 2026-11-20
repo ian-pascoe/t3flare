@@ -29,7 +29,7 @@ describe("the server Update's target policy", () => {
     expect(serverUpdateRefusal({ targetVersion: "0.1.11" }, "0.1.12-nightly.20261120.4994", "stable")).toMatch(/not newer/);
     expect(serverUpdateRefusal({ targetVersion: "0.1.12" }, CURRENT, "nightly")).toMatch(/follows t3's nightly releases.*0\.1\.12 is a stable build.*nightly update track/);
     expect(serverUpdateRefusal({ targetVersion: NEXT }, "0.1.11", "stable")).toMatch(/follows t3's stable releases.*is a nightly build/);
-    expect(serverUpdateRefusal({ targetVersion: "nightly" }, CURRENT, "nightly")).toMatch(/not an exact t3 release/);
+    expect(serverUpdateRefusal({ targetVersion: "nightly" }, CURRENT, "nightly")).toMatch(/not an exact t3 release\./);
     expect(serverUpdateRefusal({ targetVersion: "0.1.10-preview.20261112.4593" }, "0.1.9", "stable")).toMatch(/not an exact t3 release/);
     expect(serverUpdateRefusal({ targetVersion: NEXT, channel: "nightly" } as never, CURRENT, "nightly")).toMatch(/update tracks/);
     expect(serverUpdateRefusal({ targetVersion: NEXT, stageOnly: true }, CURRENT, "nightly")).toMatch(/stage/);
