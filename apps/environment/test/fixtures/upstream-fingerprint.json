@@ -1,0 +1,148 @@
+{
+  "pin": "59651c1761f6c63e9b6056839067066968e6a406",
+  "regions": [
+    {
+      "file": "apps/server/src/server.ts",
+      "symbol": "*",
+      "hash": "8423502018c3ec73",
+      "ourFile": "apps/environment/src/t3/composition.ts",
+      "entry": "U1"
+    },
+    {
+      "file": "apps/server/src/environment/ServerEnvironment.ts",
+      "symbol": "make.capabilities",
+      "omitTrueFlags": true,
+      "hash": "3209db6b49dd4889",
+      "ourFile": "apps/environment/src/t3/capabilities.ts",
+      "entry": "U4"
+    },
+    {
+      "file": "apps/server/src/terminal/Manager.ts",
+      "symbol": "make",
+      "hash": "5df3cf19a29984b3",
+      "ourFile": "apps/environment/src/terminal/layer.ts",
+      "entry": "U12"
+    },
+    {
+      "file": "apps/server/src/terminal/Manager.ts",
+      "symbol": "TerminalManagerOptions",
+      "hash": "86fe04af4053c570",
+      "ourFile": "apps/environment/src/terminal/layer.ts",
+      "entry": "U12"
+    },
+    {
+      "file": "apps/server/src/vcs/GitVcsDriverCore.ts",
+      "symbol": "makeGitVcsDriverCore.readStatusDetailsLocal.statusArgs",
+      "hash": "f4cfc2baab65c74f",
+      "ourFile": "apps/agents/src/workspace/staleReads.ts",
+      "entry": "U13"
+    },
+    {
+      "file": "apps/server/src/vcs/GitVcsDriverCore.ts",
+      "symbol": "REVIEW_DIFF_ARGS",
+      "hash": "24eafefbc56f54bf",
+      "ourFile": "apps/agents/src/workspace/staleReads.ts",
+      "entry": "U13"
+    },
+    {
+      "file": "apps/server/src/vcs/GitVcsDriverCore.ts",
+      "symbol": "PATCH_RENDER_PREFIX_ARGS",
+      "hash": "23b1ff4617dd0b84",
+      "ourFile": "apps/agents/src/workspace/staleReads.ts",
+      "entry": "U13"
+    },
+    {
+      "file": "packages/source-control-github/src/server/GitHubSourceControlProvider.ts",
+      "symbol": "discovery",
+      "hash": "49bb145d4d019ed7",
+      "ourFile": "apps/environment/src/agents/processRouter.ts",
+      "entry": "U15"
+    },
+    {
+      "file": "packages/source-control-github/src/server/GitHubSourceControlProvider.ts",
+      "symbol": "parseGitHubAuth",
+      "hash": "f7f5ff7997cbf51d",
+      "ourFile": "apps/environment/src/agents/processRouter.ts",
+      "entry": "U15"
+    },
+    {
+      "file": "packages/source-control-github/src/server/gitHubAuthStatus.ts",
+      "symbol": "GitHubAuthStatusAccountSchema",
+      "hash": "a4d744a561eea9e9",
+      "ourFile": "apps/environment/src/agents/processRouter.ts",
+      "entry": "U15"
+    },
+    {
+      "file": "packages/source-control-github/src/server/gitHubAuthStatus.ts",
+      "symbol": "GitHubAuthStatusSchema",
+      "hash": "84dd7367723c9370",
+      "ourFile": "apps/environment/src/agents/processRouter.ts",
+      "entry": "U15"
+    },
+    {
+      "file": "packages/source-control-github/src/server/GitHubCredentials.ts",
+      "symbol": "make.fromGh",
+      "hash": "e6319483557fb237",
+      "ourFile": "apps/environment/src/agents/processRouter.ts",
+      "entry": "U15"
+    },
+    {
+      "file": "apps/server/src/peer/PeerLinks.ts",
+      "symbol": "PeerLinks",
+      "hash": "738b44724ed0fa7d",
+      "ourFile": "apps/environment/src/t3/peerLinks.ts",
+      "entry": "U45"
+    },
+    {
+      "file": "packages/contracts/src/peerLink.ts",
+      "symbol": "PeerLinkError",
+      "hash": "7567b32965e34a97",
+      "ourFile": "apps/environment/src/t3/peerLinks.ts",
+      "entry": "U45"
+    }
+  ],
+  "literals": [
+    {
+      "file": "apps/server/src/vcs/GitVcsDriverCore.ts",
+      "literal": "\"status\", \"--porcelain=2\", \"--branch\", \"-z\",",
+      "ourFile": "apps/agents/src/workspace/staleReads.ts",
+      "entry": "U13"
+    },
+    {
+      "file": "apps/server/src/vcs/GitVcsDriverCore.ts",
+      "literal": "[\"--no-ahead-behind\"]",
+      "ourFile": "apps/agents/src/workspace/staleReads.ts",
+      "entry": "U13"
+    },
+    {
+      "file": "apps/server/src/vcs/GitVcsDriverCore.ts",
+      "literal": "[\"diff-index\", \"-M\", \"--numstat\", \"-z\", \"HEAD\", \"--\"]",
+      "ourFile": "apps/agents/src/workspace/staleReads.ts",
+      "entry": "U13"
+    },
+    {
+      "file": "apps/server/src/vcs/GitVcsDriverCore.ts",
+      "literal": "[\"ls-files\", \"--others\", \"--exclude-standard\", \"-z\", \"--\",",
+      "ourFile": "apps/agents/src/workspace/staleReads.ts",
+      "entry": "U13"
+    },
+    {
+      "file": "packages/source-control-github/src/server/GitHubSourceControlProvider.ts",
+      "literal": "authArgs: [\"auth\", \"status\", \"--json\", \"hosts\"]",
+      "ourFile": "apps/environment/src/agents/processRouter.ts",
+      "entry": "U15"
+    },
+    {
+      "file": "packages/source-control-github/src/server/GitHubHttpClient.ts",
+      "literal": "args: [\"config\", \"get\", \"http_unix_socket\"]",
+      "ourFile": "apps/environment/src/agents/processRouter.ts",
+      "entry": "U15"
+    },
+    {
+      "file": "apps/server/src/sourceControl/SourceControlDiscovery.ts",
+      "literal": "firstNonEmptyLine(result.stdout)",
+      "ourFile": "apps/environment/src/agents/processRouter.ts",
+      "entry": "U15"
+    }
+  ]
+}
