@@ -1,4 +1,9 @@
-# t3flare
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/t3flare-logo-dark.png">
+    <img alt="t3flare" src="docs/assets/t3flare-logo-light.png" width="420">
+  </picture>
+</h1>
 
 A self-hosted [t3code](https://github.com/pingdotgg/t3code) Environment on Cloudflare: the stock T3 Code clients (web,
 desktop, mobile) attach to it like any other Environment, and run coding agents in the cloud beside your laptop.

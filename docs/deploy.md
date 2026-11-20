@@ -69,6 +69,8 @@ refuses to deploy `prod` without it, and refuses any other Stage with it, as `al
    and you add endpoints in its Harness panel.
 4. Run `pnpm --filter @t3flare/infra run github-app:setup`, which registers the GitHub App and writes its id and key
    into the same file. Install it on your fixture repository and on each repository the cloud should work on.
+   Optionally, upload [`assets/t3flare-app-icon.png`](assets/t3flare-app-icon.png) as its logo (the app's settings,
+   Display information): GitHub takes a logo only there, not from the registration.
 5. Deploy a test Stage: `pnpm --filter @t3flare/environment run deploy <stage>`
    ([`apps/environment/scripts/stage.ts`](../apps/environment/scripts/stage.ts); the Stages it accepts are listed
    there). It builds the web client (when it is missing, or with `--web`) and the two Workers, then runs alchemy, which

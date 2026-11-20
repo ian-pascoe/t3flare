@@ -1,0 +1,8 @@
+# The demo video is its own pnpm workspace, outside t3flare's generated one (tools/demo-video/AGENTS.md).
+# The root mise.toml points NPM_CONFIG_WORKSPACE_DIR at the repo root; here it points at this folder instead.
+[tools]
+node = "26.13.1"
+pnpm = "12.14.0"
+
+[env]
+NPM_CONFIG_WORKSPACE_DIR = "{{config_root}}"

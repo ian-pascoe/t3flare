@@ -1,0 +1,5 @@
+# Its own workspace: never part of t3flare's root workspace or lock (AGENTS.md here).
+packages:
+  - .
+allowBuilds:
+  esbuild: false
