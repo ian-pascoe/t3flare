@@ -50,8 +50,9 @@ export const MESSAGES: Record<string, PublishEvent> = {
 /**
  * How long each pending event holds the idle reset: a publish has a 10 s timeout; a deferral confirms after 5 s; a
  * failure is retried after at most 16 s, then has its own 10 s timeout. Every hold is also capped (Idle). Once t3's
- * budget is exhausted it retries every minute for as long as the process lives; those retries hold nothing, so a relay
- * that stays down cannot keep the DO resident, and an idle reset ends them (as t3 gave up there before it retried on).
+ * budget is exhausted it retries every minute for as long as the process lives (U28): `exhausted` releases the hold,
+ * but each later retry logs "publishing" and "failed" again and holds anew. Only `PUBLISH_HOLD_CAP_MS` ends those
+ * holds, 120 s after the last socket or request, so a relay that stays down cannot keep the DO resident.
  */
 const HOLD_MS: Partial<Record<PublishEvent, number>> = {
   publishing: 15_000,

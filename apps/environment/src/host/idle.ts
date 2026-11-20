@@ -27,7 +27,8 @@ export const activity = {
 
 /**
  * How long a capped hold (a publish to T3 Connect still pending, step 3+) keeps the Environment up after its last
- * request or socket: t3's worst case is five retries with 10 s timeouts (about 91 s), past the 60 s idle delay.
+ * request or socket: t3's budget is five retries with 10 s timeouts (about 91 s), past the 60 s idle delay. After it,
+ * t3 retries every minute for good (U28), and this cap is all that ends those retries' holds.
  */
 export const PUBLISH_HOLD_CAP_MS = 120_000;
 
