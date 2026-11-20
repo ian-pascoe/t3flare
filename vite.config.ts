@@ -4,6 +4,7 @@
 //   - check:patches: every t3 Patch applies to the pinned t3code (`git apply --check`)
 //   - check:workspace: pnpm-workspace.yaml, package.json and mise.toml match the pinned t3code
 //   - check:lock: t3's importers install exactly what t3's lock installs, one `effect`, patches, vendored links
+//   - test:scripts: the root scripts' own tests, on `node --test`
 //   - typecheck: `effect-tsgo tsrs` per package; lint: oxlint, type-aware through tsrs-lint, which oxlint finds by
 //     itself (ADR-0030); test: Vitest on Node
 import { defineConfig } from "vite-plus";
@@ -18,6 +19,7 @@ export default defineConfig({
       "check:workspace": "node scripts/gen-workspace.ts --check",
       "check:lock": "node scripts/verify-lock.ts",
       "lint:scripts": "oxlint scripts",
+      "test:scripts": "node --test 'scripts/**/*.test.ts'",
       // cloudpid's MCP core, vendored (vendor/cloudpid/README.md): typecheck without emitting into vendor/, and its
       // own tests but those about cloudpid's repository layout. Root tasks, so vendor/ stays unedited. Root tasks see only the root's
       // bins on PATH, so the package's own vitest is named by path.
@@ -33,6 +35,7 @@ export default defineConfig({
           "check:workspace",
           "check:lock",
           "lint:scripts",
+          "test:scripts",
           ...each("@t3flare/environment", "typecheck", "lint", "test"),
           ...each("@t3flare/infra", "typecheck", "lint", "test"),
           ...each("@t3flare/agents", "typecheck", "lint", "test"),
