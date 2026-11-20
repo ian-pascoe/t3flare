@@ -4,7 +4,7 @@
 //   node scripts/stage.ts deploy p1168
 //   node scripts/stage.ts run p1168 p1168 [--out ../../docs/steps/spi-1168/p1168.json]
 //
-// 1. Two Anthropic Messages Model endpoints saved through the Harness panel's API, both Commissary's Anthropic API with
+// 1. Two Anthropic Messages Model endpoints saved through the Settings page's API, both Commissary's Anthropic API with
 //    the proxy key (SPI-1162's approach): `comm` and `comm2`, each with its own model.
 // 2. Claude Code lists the endpoints' models by slug (and none of the proxy's); its managed settings point at the
 //    relay's model-routed URL with the handle helper, and its background model is the text-generation model.

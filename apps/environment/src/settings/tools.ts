@@ -33,7 +33,7 @@ export const SETTINGS_OWNER_INSTRUCTIONS =
 
 /**
  * What an Owner client is told besides, by its Elicitation mode (plan D12): the mode the owner set for this client on the
- * Harness panel, or the URL's `?elicitation_mode=` override (so the text does not say which).
+ * Settings page, or the URL's `?elicitation_mode=` override (so the text does not say which).
  */
 export const OWNER_MODE_INSTRUCTIONS = {
   browser: "",
@@ -99,7 +99,7 @@ export const SETTINGS_TOOLS: ReadonlyArray<SettingsTool> = [
   {
     name: "get_status",
     class: "read",
-    description: "The Harness panel's Status (which revisions Sessions and Workspaces took, skills), the Settings server's access switch, and this caller's open changes.",
+    description: "The Settings page's Status (which revisions Sessions and Workspaces took, skills), the Settings server's access switch, and this caller's open changes.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {

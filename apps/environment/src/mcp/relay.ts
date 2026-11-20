@@ -125,7 +125,7 @@ export const relayMessage = async (input: McpRelayInput, deps: RelayDeps): Promi
           askId: input.askId,
           title: cardText(`Allow ${input.server}: ${tool.upstream}?`, 200),
           summary: cardText(`${input.server}: ${tool.upstream}\n${JSON.stringify(args, null, 2)}`),
-          detail: `A ${tool.class} tool (${tool.class === tool.hinted ? "the tool's own hint" : "class set in the harness panel"}), called by ${input.cli}.`,
+          detail: `A ${tool.class} tool (${tool.class === tool.hinted ? "the tool's own hint" : "class set in the Settings page"}), called by ${input.cli}.`,
         });
         if (!answer.approved) {
           log("declined", { reason: answer.reason ?? null });

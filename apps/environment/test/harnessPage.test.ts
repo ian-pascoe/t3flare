@@ -1,4 +1,4 @@
-// The harness panel's page structure (SPI-1086): a snapshot of its markup from the fixture state, and checks over the
+// The Settings page's structure (SPI-1086): a snapshot of its markup from the fixture state, and checks over the
 // parsed tags (balanced, ids unique, every section in the navigation, every control named), every state it draws, the
 // CSP's limits (no inline style or handler, one script), and escaping of hostile strings in every server-supplied field.
 import { EMPTY_HARNESS, resolveHarness } from "@t3flare/harness-registry";

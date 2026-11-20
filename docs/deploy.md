@@ -67,7 +67,7 @@ refuses to deploy `prod` without it, and refuses any other Stage with it, as `al
 3. Copy [`dev.env.example`](../dev.env.example) to `~/.config/t3flare/dev.env` (mode 0600) and fill in the Deployment
    settings. Optionally add the Stages' Model endpoint as `T3FLARE_MODEL_ENDPOINT`
    ([model-endpoints.md](model-endpoints.md#the-stages-model-endpoints)); without it, a Stage deploys in the setup state,
-   and you add endpoints in its Harness panel.
+   and you add endpoints in its Settings page.
 4. Run `pnpm --filter @t3flare/infra run github-app:setup`, which registers the GitHub App and writes its id and key
    into the same file. Install it on your fixture repository and on each repository the cloud should work on.
    Optionally, upload [`assets/t3flare-app-icon.png`](assets/t3flare-app-icon.png) as its logo (the app's settings,
@@ -75,12 +75,12 @@ refuses to deploy `prod` without it, and refuses any other Stage with it, as `al
 5. Deploy a test Stage: `pnpm --filter @t3flare/environment run deploy <stage>`
    ([`apps/environment/scripts/stage.ts`](../apps/environment/scripts/stage.ts); the Stages it accepts are listed
    there). It builds the web client (when it is missing, or with `--web`) and the two Workers, then runs alchemy, which
-   builds and pushes the Container image, and then saves the Stage's Model endpoint through the Harness panel's API. A
+   builds and pushes the Container image, and then saves the Stage's Model endpoint through the Settings page's API. A
    Stage's secrets are kept in `apps/environment/.alchemy/stages/` (gitignored). A deploy replaces the Environment's code
    at once (connected clients reconnect), while Cloudflare lets the agents Worker's busy Durable Objects finish their
    work first, for up to five minutes.
 6. Deploy `prod` from a clean checkout of `main`: `T3FLARE_DOMAIN=t3.example.com pnpm --filter @t3flare/environment run deploy prod`.
-7. Pair your first client, then do the setup step in the Harness panel
+7. Pair your first client, then do the setup step in the Settings page
    ([model-endpoints.md](model-endpoints.md#the-setup-step)): from `apps/environment`,
    `node scripts/stage.ts run <stage> admin POST "/_t3flare/arm-bootstrap?minutes=15"`, then open
    `/pair#token=<T3_BOOTSTRAP_TOKEN>` on the Stage's URL (the token is in `.alchemy/stages/<stage>.env.json`).

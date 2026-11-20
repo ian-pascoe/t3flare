@@ -1,4 +1,4 @@
-// The Harness panel's Model endpoints routes (SPI-1162), answered after panel.ts has applied its guards (Access, then for
+// The Settings page's Model endpoints routes (SPI-1162), answered after panel.ts has applied its guards (Access, then for
 // a change JSON, Origin, Sec-Fetch-Site and the owner's CSRF token):
 //
 //   GET  /api/endpoints            the entity, each endpoint with its key's mark (never the key), the presets and APIs
@@ -261,7 +261,7 @@ export const endpointsSignIn = async (deps: EndpointsApiDeps, body: Record<strin
       const { title, terms } = SIGN_IN_KINDS[body.signIn];
       return {
         status: 400,
-        text: `acknowledge ${terms.vendor}'s terms first: complying with them when you sign in with ${title} is your responsibility (${terms.docs}). Tick the acknowledgement in the Harness panel, or send acknowledgedTerms: true`,
+        text: `acknowledge ${terms.vendor}'s terms first: complying with them when you sign in with ${title} is your responsibility (${terms.docs}). Tick the acknowledgement in the Settings page, or send acknowledgedTerms: true`,
       };
     }
     try {

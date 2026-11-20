@@ -214,7 +214,7 @@ export const relayTargetOf = (resolved: RelayResolved | undefined, endpointId: s
       ok: false,
       status: 503,
       message: resolved.unreadable
-        ? `the Model endpoint ${endpointId}'s API key can no longer be read: enter it again in the Harness panel`
+        ? `the Model endpoint ${endpointId}'s API key can no longer be read: enter it again in the Settings page`
         : `the Model endpoint ${endpointId} has no API key`,
     };
   }

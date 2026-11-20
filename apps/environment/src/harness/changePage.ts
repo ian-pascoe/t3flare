@@ -13,7 +13,7 @@ import { fileUrl } from "../skills/api.ts";
 import { CHANGE_SCRIPT } from "./changePageScript.ts";
 import { escapeHtml, time, visibleHtml } from "./page.ts";
 import { BRAND_MARK, FAVICON, WORDMARK } from "./pageBrand.ts";
-import { HARNESS_PATH, OPEN_CHANGES_PATH } from "./paths.ts";
+import { SETTINGS_PAGE_PATH, OPEN_CHANGES_PATH } from "./paths.ts";
 import { STYLE } from "./pageStyle.ts";
 
 /** A value as JSON text, safe. */
@@ -119,7 +119,7 @@ const head = (title: string, csrf: string) => `<!doctype html>
 <title>${visibleHtml(title)} · t3flare</title>${FAVICON}<style>${STYLE}</style></head>`;
 
 /** The brand above each page, back to the panel. */
-const brand = `<a class="brand" href="${HARNESS_PATH}">${BRAND_MARK}<div><strong>${WORDMARK}</strong><span>Settings</span></div></a>`;
+const brand = `<a class="brand" href="${SETTINGS_PAGE_PATH}">${BRAND_MARK}<div><strong>${WORDMARK}</strong><span>Settings</span></div></a>`;
 
 const foot = `<div id="result" class="notice" role="status" aria-live="polite" hidden></div></main>
 <script>${CHANGE_SCRIPT}</script>
@@ -127,7 +127,7 @@ const foot = `<div id="result" class="notice" role="status" aria-live="polite" h
 
 /** The page for an unknown id, or one pruned `CLOSED_KEPT_MS` after it closed. */
 export const renderGonePage = (csrf: string): string =>
-  `${head("Change", csrf)}<body><main class="change-main" id="main">${brand}<header class="page-head"><div><h1>This change is gone</h1><p>No change has this id: it closed over ${durationText(CLOSED_KEPT_MS)} ago, or never was. Nothing waits here.</p></div></header><p><a href="${OPEN_CHANGES_PATH}">The Harness panel's Open changes</a></p>${foot}`;
+  `${head("Change", csrf)}<body><main class="change-main" id="main">${brand}<header class="page-head"><div><h1>This change is gone</h1><p>No change has this id: it closed over ${durationText(CLOSED_KEPT_MS)} ago, or never was. Nothing waits here.</p></div></header><p><a href="${OPEN_CHANGES_PATH}">The Settings page's Open changes</a></p>${foot}`;
 
 /** The Change page for `record` (plan D10). `now` decides the time left. */
 export const renderChangePage = (record: ChangeRecord, input: { readonly csrf: string; readonly now: number }): string => {

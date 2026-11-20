@@ -1,4 +1,4 @@
-// The harness panel's icons (SPI-1086): one inline SVG sprite of simple 24-unit stroke shapes drawn here, referenced with
+// The Settings page's icons (SPI-1086): one inline SVG sprite of simple 24-unit stroke shapes drawn here, referenced with
 // `<use href="#i-…">` (same document, so the CSP's `img-src` and `default-src 'none'` do not apply). No icon font
 // or library, nothing fetched.
 const SYMBOLS: Record<string, string> = {

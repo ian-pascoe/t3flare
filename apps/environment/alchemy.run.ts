@@ -205,7 +205,7 @@ export default Alchemy.Stack(
       } as never)
       : undefined;
 
-    // Models are the owner's Model endpoints (ADR-0034), set in the Harness panel; no Worker holds a model setting. The GitHub App (ADR-0013) comes from
+    // Models are the owner's Model endpoints (ADR-0034), set in the Settings page; no Worker holds a model setting. The GitHub App (ADR-0013) comes from
     // ~/.config/t3flare/dev.env or CI's environment.
     // SPI-1162: the stage's credentials key, under which the Environment seals the Model endpoints' API keys. 256 random
     // bits made once per stage on its first deploy after this, kept in the stage's alchemy state (Cloudflare's, so CI and

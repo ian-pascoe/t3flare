@@ -1,4 +1,4 @@
-// The Harness panel's Environment skills API (SPI-1148, plan §5), through `handleHarness` with a fake GitHub: the
+// The Settings page's Environment skills API (SPI-1148, plan §5), through `handleHarness` with a fake GitHub: the
 // guards, preview (replaces, unchanged), install at the previewed commit, view, check and update, remove and enable.
 import { describe, expect, it } from "vitest";
 

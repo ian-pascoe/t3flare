@@ -32,7 +32,7 @@ the milestones done so far.
   with no vendor credential inside it.
 - **A laptop link.** Your laptop's T3 Code can delegate a task to a cloud agent and follow it, and a phone notification
   through T3 Connect tells you when a cloud run finishes or waits for you.
-- **A Harness panel.** Your Model endpoints, MCP servers and settings in one page, behind Cloudflare Access; agents get
+- **A Settings page.** Your Model endpoints, MCP servers and settings in one page, behind Cloudflare Access; agents get
   code mode, tool search and the MCP servers you add.
 
 ## How it works
@@ -56,7 +56,7 @@ proposes each new t3code release on the Deployment's t3 track, stable or nightly
    ([ADR-0013](docs/adr/0013-github-access-through-a-github-app-with-per-repo-tokens.md)). A setup script registers it
    under your account.
 3. **Model access**: an API key for a provider pi-ai speaks (Anthropic, OpenAI, Google, Mistral, or any
-   OpenAI-compatible API, including a model proxy you run). You add it as a Model endpoint in the Harness panel after
+   OpenAI-compatible API, including a model proxy you run). You add it as a Model endpoint in the Settings page after
    the first deploy; no deploy setting holds a model key. [`docs/model-endpoints.md`](docs/model-endpoints.md) is the
    guide.
 
@@ -68,7 +68,7 @@ cp dev.env.example ~/.config/t3flare/dev.env               # chmod 600, then fil
 pnpm --filter @t3flare/infra run github-app:setup          # registers your GitHub App
 pnpm --filter @t3flare/environment run deploy <stage>      # a throwaway test Stage first
 T3FLARE_DOMAIN=t3.example.com pnpm --filter @t3flare/environment run deploy prod
-# pair your first client, then add a Model endpoint in the Harness panel
+# pair your first client, then add a Model endpoint in the Settings page
 ```
 
 [`docs/deploy.md`](docs/deploy.md) is the full guide: every Deployment setting (the source holds none of yours, and

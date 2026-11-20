@@ -3,7 +3,7 @@
 // Durable thread uses each ported tool in real turns, and t3's own projection is read back for the items it shows.
 // Evidence goes to docs/steps/pi-ports-1/<file>.json, tokens and cookies redacted.
 //
-//   node scripts/stage.ts run ports ports settings   the harness panel's API: web search on, and the registry's entries
+//   node scripts/stage.ts run ports ports settings   the Settings page's API: web search on, and the registry's entries
 //   node scripts/stage.ts run ports ports turns      web, todo, notes across turns, a rollover and a turn after it
 import * as fs from "node:fs";
 import * as path from "node:path";

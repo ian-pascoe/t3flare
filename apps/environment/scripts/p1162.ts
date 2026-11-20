@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
-// SPI-1162's evidence on its stage: Model endpoints through the Harness panel's API (the stage's service token, as a
+// SPI-1162's evidence on its stage: Model endpoints through the Settings page's API (the stage's service token, as a
 // script), a Durable turn with tools on each, the picker grouped by endpoint, a changed model list reaching the picker
 // and a running thread, and a removed endpoint's model failing the turn with a clear message.
 //

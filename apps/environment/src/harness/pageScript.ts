@@ -1,4 +1,4 @@
-// The harness panel's one script (ADR-0026), allowed by its SHA-256 hash in the CSP, so it is a constant. It only turns
+// The Settings page's one script (ADR-0026), allowed by its SHA-256 hash in the CSP, so it is a constant. It only turns
 // the page's controls into calls to the panel's JSON API (with the CSRF token from the page's meta tag) and shows their
 // progress and outcome. It writes server answers with `textContent`, never as HTML. Without it the page still reads.
 import { ENDPOINTS_SCRIPT } from "./pageEndpoints.ts";

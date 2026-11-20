@@ -4,7 +4,7 @@
 //   node scripts/stage.ts deploy p1170
 //   node scripts/stage.ts run p1170 p1170 [--out ../../docs/steps/spi-1170/p1170.json]
 //
-// 1. Three Model endpoints saved through the Harness panel's API, all Commissary's with the proxy key (SPI-1162's
+// 1. Three Model endpoints saved through the Settings page's API, all Commissary's with the proxy key (SPI-1162's
 //    approach): `comm` (Anthropic Messages at <MODEL_PROXY_URL>), `oai` (OpenAI-compatible Chat Completions at
 //    <MODEL_PROXY_URL>/v1) and `resp` (OpenAI Responses at <MODEL_PROXY_URL>/v1).
 // 2. pi lists exactly the endpoints' models by slug, the first the default (none of the proxy's); its models.json has

@@ -1,4 +1,4 @@
-// The harness panel's seam (ADR-0026, plan §6.4, review H4): `handleHarness` over a store, as the admin entrypoint calls
+// The Settings page's seam (ADR-0026, plan §6.4, review H4): `handleHarness` over a store, as the admin entrypoint calls
 // it after Access. CSRF and Origin (missing, wrong origin, wrong token, the previous hour, a form-encoded body), the
 // script path without CSRF, validation, the audit log, escaping of hostile strings, and the CSP.
 import { describe, expect, it } from "vitest";
@@ -47,7 +47,7 @@ const ownerHeaders = async (store: ReturnType<typeof setup>["store"], at = NOW) 
   [CSRF_HEADER]: await csrfToken(store.csrfKey(), "owner-sub", at),
 });
 
-describe("harness panel", () => {
+describe("Settings page", () => {
   it("the owner's change with the page's token is stored, bumps the revision and is audited", async () => {
     const { store, deps } = setup();
     const response = await change(deps, { extension: "codemode", settings: { inlineBudget: 3000 } }, await ownerHeaders(store));

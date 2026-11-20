@@ -1391,9 +1391,9 @@ const m6 = async (item: string) => {
     });
     const refused = lines.filter((l) => l.reason === "opened-cap");
     const withdrawn = lines.filter((l) => /withdrawn/.test(JSON.stringify(l)));
-    const ok = runs.slice(0, 6).every((r) => r.cards === 1 && r.stopped) && runs[6].cards === 0 && /opened-cap|Harness panel/.test(runs[6].output);
+    const ok = runs.slice(0, 6).every((r) => r.cards === 1 && r.stopped) && runs[6].cards === 0 && /opened-cap|Settings page/.test(runs[6].output);
     await record(FILE, "1.4-own", {
-      name: "the opened cap, own door: a fresh Durable thread asks seven; six cards, each stopped (withdrawn, by stop); the seventh refused opened-cap with no card naming the Harness panel",
+      name: "the opened cap, own door: a fresh Durable thread asks seven; six cards, each stopped (withdrawn, by stop); the seventh refused opened-cap with no card naming the Settings page",
       threadId,
       firstOpenedAt: runs[0]?.at,
       runs,
@@ -1434,8 +1434,8 @@ const m6 = async (item: string) => {
         runs.push({ n, at: new Date().toISOString(), first: { status: first.status, resultType: first.json?.result?.resultType ?? null, structured: first.json?.result?.structuredContent ?? null, text: JSON.stringify(first.json?.result?.content ?? first.json?.error ?? null).slice(0, 600) }, retry: retry === null ? null : { status: retry.status, structured: structured(retry) ?? null } });
       }
     });
-    const ok = runs.slice(0, 6).every((r) => r.first.resultType === "input_required" && r.retry?.structured?.status === "withdrawn") && runs[6].first.resultType !== "input_required" && /opened-cap|Harness panel/.test(JSON.stringify(runs[6].first));
-    await record(FILE, "1.4-owner", { name: "the opened cap, Owner door (scripted client, service token, browser, 2026-07-28): six asked, each cancelled by its retry (withdrawn); the seventh refused opened-cap naming the Harness panel", runs, openedCapLines: lines.filter((l) => l.reason === "opened-cap"), settingsLines: lines, verdict: ok ? "pass" : "fail" });
+    const ok = runs.slice(0, 6).every((r) => r.first.resultType === "input_required" && r.retry?.structured?.status === "withdrawn") && runs[6].first.resultType !== "input_required" && /opened-cap|Settings page/.test(JSON.stringify(runs[6].first));
+    await record(FILE, "1.4-owner", { name: "the opened cap, Owner door (scripted client, service token, browser, 2026-07-28): six asked, each cancelled by its retry (withdrawn); the seventh refused opened-cap naming the Settings page", runs, openedCapLines: lines.filter((l) => l.reason === "opened-cap"), settingsLines: lines, verdict: ok ? "pass" : "fail" });
     return;
   }
   if (item === "2") {

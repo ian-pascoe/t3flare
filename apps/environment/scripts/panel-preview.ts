@@ -1,5 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off globalConsole:off
-// Writes the harness panel rendered from its fixture state (test/fixtures/harnessPage.ts) to a file, for a look in a
+// Writes the Settings page rendered from its fixture state (test/fixtures/harnessPage.ts) to a file, for a look in a
 // browser without a stage (SPI-1086). `empty` renders the first-run state: no MCP server and no audit entry.
 //
 //   node scripts/panel-preview.ts <out.html> [empty]

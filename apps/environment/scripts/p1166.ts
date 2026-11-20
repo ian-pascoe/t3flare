@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off globalFetch:off globalTimers:off
-// SPI-1166's evidence on its stage: the Harness panel's "Sign in with GitHub Copilot" (a Copilot plan, GitHub's device
+// SPI-1166's evidence on its stage: the Settings page's "Sign in with GitHub Copilot" (a Copilot plan, GitHub's device
 // flow) through the panel's own routes, as a script with the stage's service token, a Durable turn with tools on the
 // Copilot endpoint, and a sign-out.
 //

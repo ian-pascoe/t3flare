@@ -7,7 +7,7 @@
 //
 // 1. The setup state: every endpoint is removed (the deploy sets one up when dev.env has T3FLARE_MODEL_ENDPOINT). Every
 //    agent's provider (Pi Durable, Codex, Claude Code, OpenCode, pi) is `warning` with no model, its message pointing
-//    to the Harness panel; a Pi Durable turn fails saying to set an endpoint up; each CLI's spawn is refused, saying
+//    to the Settings page; a Pi Durable turn fails saying to set an endpoint up; each CLI's spawn is refused, saying
 //    which endpoint it needs.
 // 2. The owner's setup step, through the panel's API as the owner's form saves it: two API-key endpoints at the owner's
 //    Commissary, an ordinary endpoint now (`comm`, Anthropic Messages; `resp`, OpenAI Responses at its `/v1`). Every
@@ -96,7 +96,7 @@ const all = await tailing([`t3flare-agents-${stage}`, `t3flare-environment-${sta
   report.setupState = setup;
   for (const driver of DRIVERS) {
     const entry = setup[driver];
-    check(`${driver} needs setup with no endpoint: warning, no model, pointing to the Harness panel`, entry?.status === "warning" && entry.models.length === 0 && /Harness panel \(\/_t3flare\/settings\), under Model endpoints/.test(entry.message ?? ""), entry);
+    check(`${driver} needs setup with no endpoint: warning, no model, pointing to the Settings page`, entry?.status === "warning" && entry.models.length === 0 && /Settings page \(\/_t3flare\/settings\), under Model endpoints/.test(entry.message ?? ""), entry);
   }
   // A Pi Durable turn with no endpoint.
   const durable = await createProjectAndThread(cookie, { title: "setup state", workspaceRoot: `/w/p1176-setup-durable-${runId}` });
@@ -109,7 +109,7 @@ const all = await tailing([`t3flare-agents-${stage}`, `t3flare-environment-${sta
   }
   const durableFailures = itemsOf(durableProjection).filter((item: any) => item.type === "error").map((item: any) => ({ code: item.failure?.code ?? null, message: String(item.failure?.message ?? "") }));
   report.setupDurableTurn = clean({ runs: runsOf(durableProjection).map((run) => run.status), failures: durableFailures });
-  check("a Pi Durable turn with no endpoint fails, saying to set one up in the Harness panel", runsOf(durableProjection).at(-1)?.status === "failed" && durableFailures.some((entry) => /No Model endpoint is set up: add one in the Harness panel/.test(entry.message)), report.setupDurableTurn);
+  check("a Pi Durable turn with no endpoint fails, saying to set one up in the Settings page", runsOf(durableProjection).at(-1)?.status === "failed" && durableFailures.some((entry) => /No Model endpoint is set up: add one in the Settings page/.test(entry.message)), report.setupDurableTurn);
   // Each CLI's spawn, refused with what it needs.
   const setupWorkspace = `p1176-setup-${runId}`;
   const refusals: Record<string, unknown> = {};

@@ -12,12 +12,12 @@ export const credentialFailure = (endpoint: Pick<ModelEndpoint, "id" | "auth">, 
   if (signIn !== undefined) {
     const why = problem === undefined ? "" : ` (${problem})`;
     return signedOut === true
-      ? failure("signed_out", `${named} is not signed in to ${signIn.title}${why}: sign in with ${signIn.title} again in the Harness panel.`, false)
+      ? failure("signed_out", `${named} is not signed in to ${signIn.title}${why}: sign in with ${signIn.title} again in the Settings page.`, false)
       : failure("unavailable", `${named} could not get a ${signIn.title} token${why}: retry the turn.`, true);
   }
   return unreadable === true
-    ? failure("unreadable", `${named}'s API key can no longer be read (this Environment's credentials key changed): enter it again in the Harness panel.`, false)
-    : failure("no_key", `${named} has no API key: set one in the Harness panel.`, false);
+    ? failure("unreadable", `${named}'s API key can no longer be read (this Environment's credentials key changed): enter it again in the Settings page.`, false)
+    : failure("no_key", `${named} has no API key: set one in the Settings page.`, false);
 };
 
 /** Why the Environment gave no credential for an endpoint, as the turn (or the text generation) says it. */

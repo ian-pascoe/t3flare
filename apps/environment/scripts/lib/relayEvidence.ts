@@ -43,7 +43,7 @@ export const relayEvidence = (secrets: ReadonlyArray<string>) => {
   return { stage, report, handles, clean, check, leaks, finish, fail: (message: string) => failures.push(message) };
 };
 
-/** The Harness panel's API, a command in a Workspace's Container, and the leak check, through the admin routes. */
+/** The Settings page's API, a command in a Workspace's Container, and the leak check, through the admin routes. */
 export const panelApi = (method: string, pathname: string, body?: unknown) => admin(method, `/_t3flare/settings/api/${pathname}`, body);
 export const workspaceExec = async (workspace: string, script: string, timeoutMs = 60_000) =>
   ((await admin("POST", `/_t3flare/agents/workspace-call?id=${encodeURIComponent(workspace)}`, { exec: { script, timeoutMs } })).json as any)?.result ?? {};

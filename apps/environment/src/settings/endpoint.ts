@@ -5,7 +5,7 @@
 // calls it with the caller the Worker already verified; it never boots t3.
 //
 // Hand-written JSON-RPC, stateless but for the one row it records per client (clients.ts: the client's mode, set on the
-// Harness panel alone; the MCP SDK stays in the MCP Worker):
+// Settings page alone; the MCP SDK stays in the MCP Worker):
 //
 // - Versions 2026-07-28 (`server/discover`, capabilities and client info in each request's `_meta`, `resultType` on every
 //   result, questions as `input_required` with a signed `requestState`), 2025-11-25 and 2025-06-18 (capabilities from
@@ -16,7 +16,7 @@
 //   CORS header is ever sent; every answer is `no-store`. Any other query parameter is ignored (OpenCode adds
 //   `codemode=false`).
 // - The request's Elicitation mode (plan D12; ADR-0035's 2026-11-15 refinement): an explicit `?elicitation_mode=`, else
-//   the mode the owner set on the Harness panel for this caller's key and the client's `clientInfo.name` (clients.ts),
+//   the mode the owner set on the Settings page for this caller's key and the client's `clientInfo.name` (clients.ts),
 //   else `browser`; a request with no client name is `browser`. Every request with a client name records it as seen.
 //   Nothing here, and no tool, changes a client's mode: only the panel does.
 // - An asked change is an Open change (openChanges.ts) in the request's Elicitation mode (plan D12), after its fallbacks
@@ -316,7 +316,7 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
     return refuse(
       400,
       "elicitation-mode",
-      json(rpcError(null, -32602, "elicitation_mode is browser, native or model: once, in lowercase (absent means the client's mode on the Harness panel, browser until the owner sets it)."), 400),
+      json(rpcError(null, -32602, "elicitation_mode is browser, native or model: once, in lowercase (absent means the client's mode on the Settings page, browser until the owner sets it)."), 400),
     );
   }
   /**
@@ -360,7 +360,7 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
       const session = await verifyToken(tokenKey, request.headers.get("mcp-session-id"), { kind: "session", sub: key, now: now() });
       if (modeOf(session.ok ? objectOf(session.payload.client)?.name : undefined) !== "native") {
         const why = session.ok
-          ? "this client is in another now (its mode on the Harness panel, or ?elicitation_mode=)"
+          ? "this client is in another now (its mode on the Settings page, or ?elicitation_mode=)"
           : "this request carries no valid Mcp-Session-Id, so its client is unknown here and the mode is browser (send the answer on the session that was asked, or add ?elicitation_mode=native)";
         return refuse(400, "other-mode", json(rpcError(null, -32600, `This question was asked in the native Elicitation mode, and ${why}. Answer it on its Change page.`), 400));
       }
@@ -727,7 +727,7 @@ export const handleSettingsMcp = async (request: Request, caller: AccessCaller, 
       return reply(
         toolResult(
           refusedResult(
-            `Not changed: this change was asked in the ${record.mode ?? "card"} Elicitation mode, not ${mode} (the client's mode on the Harness panel, or ?elicitation_mode=, changed since). Answer it in that mode or on its Change page, or call ${name} again without requestState to ask in this one.`,
+            `Not changed: this change was asked in the ${record.mode ?? "card"} Elicitation mode, not ${mode} (the client's mode on the Settings page, or ?elicitation_mode=, changed since). Answer it in that mode or on its Change page, or call ${name} again without requestState to ask in this one.`,
           ),
         ),
       );

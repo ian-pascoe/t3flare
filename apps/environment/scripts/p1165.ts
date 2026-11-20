@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off globalFetch:off
-// SPI-1165's evidence on its stage: the Harness panel's "Sign in with Claude" (a Claude Pro or Max plan, Claude Code's
+// SPI-1165's evidence on its stage: the Settings page's "Sign in with Claude" (a Claude Pro or Max plan, Claude Code's
 // OAuth) through the panel's own routes, as a script with the stage's service token, a Durable turn with tools on the
 // Claude endpoint, and a sign-out.
 //

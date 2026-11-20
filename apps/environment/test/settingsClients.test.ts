@@ -1,6 +1,6 @@
 // @effect-diagnostics globalDate:off globalConsole:off
 // T-clients (ADR-0035's 2026-11-15 refinement, plan D12): an Owner client's Elicitation mode is the owner's setting on the
-// Harness panel, by caller key and `clientInfo.name`, since Claude Code's OAuth discovery does not survive a query on the
+// Settings page, by caller key and `clientInfo.name`, since Claude Code's OAuth discovery does not survive a query on the
 // endpoint's URL. The kept mode decides when the URL names none; `?elicitation_mode=` still overrides; an unknown client
 // and a request with no client name are `browser`. Keys are isolated; the table is capped per key and `lastSeen` is
 // throttled. Only the panel's CSRF-guarded POST changes a mode: no MCP door, no Settings tool, no other panel route.
@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { csrfToken } from "../src/harness/csrf.ts";
-import { HARNESS_PATH } from "../src/harness/paths.ts";
+import { SETTINGS_PAGE_PATH } from "../src/harness/paths.ts";
 import { CLIENTS_API_PATH, handleHarness } from "../src/harness/panel.ts";
 import { CLIENT_NAME_MAX, CLIENTS_PER_KEY, SEEN_EVERY_MS } from "../src/settings/clients.ts";
 import { readAudit } from "../src/harness/ops.ts";
@@ -86,7 +86,7 @@ describe("the kept mode decides when the URL names none", () => {
     const discovered = await bodyOf(await endpoint(modern("server/discover")));
     expect(discovered.result?.instructions).toContain(OWNER_MODE_INSTRUCTIONS.model);
     // The mode may come from the panel or from the query, so the text does not say which.
-    expect(OWNER_MODE_INSTRUCTIONS.model).not.toContain("Harness panel");
+    expect(OWNER_MODE_INSTRUCTIONS.model).not.toContain("Settings page");
     expect(OWNER_MODE_INSTRUCTIONS.native).not.toContain("elicitation_mode");
   });
 
@@ -301,7 +301,7 @@ describe("only the panel's CSRF-guarded POST changes a mode", () => {
     for (const tool of SETTINGS_TOOLS) await f.call(f.durable(), tool.name, attempt);
     // Every other panel POST route, with the same body.
     for (const route of ["/api/extensions", "/api/environment", "/api/mcp", "/api/mcp/test", "/api/mcp/servers", "/api/mcp/oauth", "/api/mcp/secret", "/api/skills/enable", "/api/changes/x"]) {
-      await panelPost(f, attempt, undefined, `${HARNESS_PATH}${route}`);
+      await panelPost(f, attempt, undefined, `${SETTINGS_PAGE_PATH}${route}`);
     }
     expect(setModeSpy).not.toHaveBeenCalled();
     expect(removeSpy).not.toHaveBeenCalled();
@@ -316,7 +316,7 @@ describe("only the panel's CSRF-guarded POST changes a mode", () => {
     await listedBy(endpoint, { name: `<script>alert(1)</script>\u202E`, version: "1" });
     await endpoint(modern("ping"));
     await setMode(f, "native");
-    const html = await (await handleHarness(new Request(`https://${HOST}${HARNESS_PATH}`), f.panel())).text();
+    const html = await (await handleHarness(new Request(`https://${HOST}${SETTINGS_PAGE_PATH}`), f.panel())).text();
     expect(html).toContain(`<code>https://${HOST}/_t3flare/mcp</code>`);
     expect(html).not.toContain("/_t3flare/mcp?");
     expect(html).not.toContain("<script>alert(1)");
@@ -434,7 +434,7 @@ describe("read_audit never carries the owner's Access subject (plan D14)", () =>
 describe("the excluded-stage panel (no Owner-client endpoint)", () => {
   it("renders the not-deployed line alone: no URL, no mode meanings, no query note", async () => {
     const f = world();
-    const html = await (await handleHarness(new Request(`https://${HOST}${HARNESS_PATH}`), f.panel(undefined, { ownerEndpoint: false }))).text();
+    const html = await (await handleHarness(new Request(`https://${HOST}${SETTINGS_PAGE_PATH}`), f.panel(undefined, { ownerEndpoint: false }))).text();
     const block = /<details class="tools" open data-owner-clients>[\s\S]*?<\/details>/.exec(html)?.[0] ?? "";
     expect(block).toContain("The Owner-client endpoint is not deployed on this Environment.");
     expect(html).not.toContain("/_t3flare/mcp");

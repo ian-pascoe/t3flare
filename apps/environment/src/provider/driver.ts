@@ -1,6 +1,6 @@
 // The Durable agent provider (step 2a): a t3 ProviderDriver whose agents run on pi-durable in Session DOs of the agents
 // Worker, with models through the owner's Model endpoints (ADR-0034). Registered through the `builtInDrivers.ts` Shadow.
-// With no endpoint that lists a model it needs setup (SPI-1176): its status says so and points to the Harness panel.
+// With no endpoint that lists a model it needs setup (SPI-1176): its status says so and points to the Settings page.
 import type { ServerProvider, ServerProviderModel } from "@t3tools/contracts";
 import {
   defaultProviderContinuationIdentity,

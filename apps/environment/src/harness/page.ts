@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off
-// The harness panel's page (ADR-0026): server-rendered HTML, no framework, no third-party script or font. Every string
+// The Settings page (ADR-0026): server-rendered HTML, no framework, no third-party script or font. Every string
 // that is not a literal here is HTML-escaped (review H4: tool names, descriptions, errors and settings may be hostile).
 // The one script (pageScript.ts) and the one stylesheet (pageStyle.ts) are constants, allowed by their SHA-256 hashes in
 // the CSP, never by `'self'`; the icons are an inline SVG sprite (pageIcons.ts). The script only turns the controls into

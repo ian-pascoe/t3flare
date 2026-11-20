@@ -360,7 +360,7 @@ describe("the Settings server's access switch", () => {
     // Nothing reached the server: it cannot turn itself back on.
     expect(reached).toBe(0);
     expect(run.store.load().revision).toBe(1);
-    expect(OFF_MESSAGE).toContain("only the Harness panel");
+    expect(OFF_MESSAGE).toContain("only the Settings page");
   });
 
   it("read-only: write tools are not listed and a write call is refused; reads run", async () => {

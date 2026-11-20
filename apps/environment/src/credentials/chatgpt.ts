@@ -5,7 +5,7 @@
 // `dynamic_agent_client` and OpenAI's redirect names the issued `client_id` (`oaiapp_…`), which later sign-ins reuse.
 //
 // The redirect is the loopback `http://127.0.0.1:1455/auth/callback`, which nothing serves here: the browser lands on a
-// page that does not load, and the owner pastes its address into the Harness panel (the spike, SPI-1161 Q2). So the
+// page that does not load, and the owner pastes its address into the Settings page (the spike, SPI-1161 Q2). So the
 // attempt's state, nonce and PKCE verifier are kept durably (sealed, by the broker) between the start and the paste, never
 // in an isolate's memory.
 //

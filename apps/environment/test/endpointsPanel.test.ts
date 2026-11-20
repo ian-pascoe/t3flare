@@ -1,4 +1,4 @@
-// The Harness panel's Model endpoints routes (SPI-1162): their own entity and revision, write-only keys (the answer and
+// The Settings page's Model endpoints routes (SPI-1162): their own entity and revision, write-only keys (the answer and
 // the audit log carry the key's mark, never the key), the page's model-list read with the stored key, and the panel's
 // guards (CSRF, Origin, JSON) as on its other routes.
 import { describe, expect, it } from "vitest";
@@ -62,7 +62,7 @@ const post = async (deps: HarnessDeps, path: string, body: unknown, headers: Rec
 
 const ENDPOINT = { id: "openai", label: "OpenAI", api: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api-key", headers: { "OpenAI-Organization": "org-1" }, models: ["gpt-5-mini"] };
 
-describe("Model endpoints on the Harness panel", () => {
+describe("Model endpoints on the Settings page", () => {
   it("saves an endpoint with its key sealed: its own revision, audited with the key's mark only, listed without the key", async () => {
     const { store, endpoints, deps, changes } = setup();
     const response = await post(deps, "endpoints", { op: "save", endpoint: ENDPOINT, apiKey: SECRET }, await headersOf(store));

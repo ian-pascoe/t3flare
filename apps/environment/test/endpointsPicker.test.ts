@@ -1,6 +1,6 @@
 // The Pi Durable picker with Model endpoints (SPI-1162): every endpoint's models as `<endpointId>/<modelId>`, grouped by
 // endpoint, a reasoning model with the thinking picker. They are its only models (SPI-1176): with none, the provider
-// needs setup and points to the Harness panel, and an old selection falls back to the default model.
+// needs setup and points to the Settings page, and an old selection falls back to the default model.
 import type { ModelSelection } from "@t3tools/contracts";
 import { type ModelEndpoints, NO_ENDPOINT_MESSAGE } from "@t3flare/models/endpoints";
 import { describe, expect, it } from "vitest";
@@ -50,13 +50,13 @@ describe("snapshotModels with Model endpoints", () => {
 });
 
 describe("the setup state (SPI-1176)", () => {
-  it("needs setup with no model, its message pointing to the Harness panel; ready with one", () => {
+  it("needs setup with no model, its message pointing to the Settings page; ready with one", () => {
     expect(readinessOf(snapshotModels(), null, NO_ENDPOINT_MESSAGE)).toEqual({
       installed: true,
       version: null,
       status: "warning",
       auth: { status: "unknown" },
-      message: "No Model endpoint is set up: add one in the Harness panel (/_t3flare/settings), under Model endpoints.",
+      message: "No Model endpoint is set up: add one in the Settings page (/_t3flare/settings), under Model endpoints.",
     });
     expect(readinessOf(snapshotModels(ENDPOINTS), null, NO_ENDPOINT_MESSAGE)).toEqual({ installed: true, version: null, status: "ready", auth: { status: "authenticated" } });
     expect(readinessOf(snapshotModels(ENDPOINTS), "1.0", "setup", "a note")).toMatchObject({ status: "ready", message: "a note" });

@@ -6,8 +6,8 @@ import { OAUTH_PUBLIC_PATHS } from "./harness/oauth.ts";
 import * as Access from "./access.ts";
 import type { EnvironmentEnv } from "./environmentDO.ts";
 import type { AccessCaller } from "./access.ts";
-import { isHarnessPath } from "./harness/panel.ts";
-import { movedHarnessPath } from "./harness/paths.ts";
+import { isSettingsPagePath } from "./harness/panel.ts";
+import { movedSettingsPagePath } from "./harness/paths.ts";
 import { isSettingsMcpPath, SETTINGS_MCP_PATH } from "./settings/endpointLayout.ts";
 
 export { EnvironmentDO } from "./environmentDO.ts";
@@ -85,11 +85,11 @@ export default {
       const caller: AccessCaller = !local && verdict.caller.kind === "owner" ? { kind: "owner", subject: verdict.caller.subject ?? "" } : { kind: "service-token" };
       return env.ENVIRONMENT.getByName(ENVIRONMENT_NAME).settingsMcp(request, caller);
     }
-    // The harness panel (ADR-0026) at `/_t3flare/settings`, behind the `/_t3flare` Access application (owner, 2026-11-12,
+    // The Settings page (ADR-0026) at `/_t3flare/settings`, behind the `/_t3flare` Access application (owner, 2026-11-12,
     // back to stock: no admin host). The owner's own Access identity reaches the panel without the admin token; every
     // other admin route still needs it. Its old `/_t3flare/harness` paths redirect there, past the same check.
-    const moved = movedHarnessPath(url.pathname);
-    if (isHarnessPath(url.pathname) || moved !== undefined) {
+    const moved = movedSettingsPagePath(url.pathname);
+    if (isSettingsPagePath(url.pathname) || moved !== undefined) {
       const config = guardConfig(env);
       const verdict = await Access.verifyHarnessRequest(request, config, keysFor(config.teamDomain ?? ""));
       if (!verdict.admitted) {

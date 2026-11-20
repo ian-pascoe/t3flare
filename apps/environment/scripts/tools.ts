@@ -1,6 +1,6 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
 // The tools step's stage harness (docs/steps/tools-plan.md §7): code mode on a Durable thread, its probes, the hostile
-// scripts, and the harness panel's API and safety. Each case writes its evidence to docs/steps/tools/<file>.json, with
+// scripts, and the Settings page's API and safety. Each case writes its evidence to docs/steps/tools/<file>.json, with
 // tokens, cookies and handles redacted.
 //
 //   node scripts/stage.ts run tools tools m1            a script that reads, greps, edits and runs a test (m1-codemode.json)

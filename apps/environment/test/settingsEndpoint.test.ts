@@ -230,7 +230,7 @@ describe("T-endpoint: versions and methods", () => {
     for (const name of ["get_status", "change_environment"]) {
       const result = (await bodyOf(await endpoint(modern("tools/call", { name, arguments: FREE })))).result;
       expect(result).toMatchObject({ isError: true, structuredContent: { status: "refused" } });
-      expect(JSON.stringify(result?.content)).toMatch(/Harness panel/);
+      expect(JSON.stringify(result?.content)).toMatch(/Settings page/);
     }
   });
 

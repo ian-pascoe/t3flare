@@ -138,10 +138,10 @@ export type WriteStatus = "applied" | "unchanged" | "waiting" | "declined" | "wi
 
 type Entity = "harness" | "environment";
 
-export const LINKED_REFUSAL = "This thread is Linked work; the owner changes settings from his own thread, the Harness panel, or an Owner client.";
-export const UNKNOWN_REFUSAL = "t3flare cannot establish where this thread comes from, so it may read settings and change none. The owner changes them from his own thread or the Harness panel.";
+export const LINKED_REFUSAL = "This thread is Linked work; the owner changes settings from his own thread, the Settings page, or an Owner client.";
+export const UNKNOWN_REFUSAL = "t3flare cannot establish where this thread comes from, so it may read settings and change none. The owner changes them from his own thread or the Settings page.";
 export const NO_MODES_REFUSAL = "t3flare has no record of this thread's modes (the Environment restarted during the turn), so it changes no settings now. Try again in the thread's next turn.";
-export const READ_ONLY_REFUSAL = "The owner made the Settings server read-only; its write tools are refused. Only the Harness panel changes that.";
+export const READ_ONLY_REFUSAL = "The owner made the Settings server read-only; its write tools are refused. Only the Settings page changes that.";
 
 /** When a change applies, by what it changed (plan D17). */
 export const APPLIES_AT = {
@@ -201,7 +201,7 @@ export const hiddenTools = (deps: Pick<SettingsServerDeps, "ops">): ((tool: stri
 
 /** Why an Open change is not applied when the owner hid its tool after it opened (SPI-1195 review): it names the panel. */
 export const HIDDEN_SINCE_REFUSAL = (tool: string): string =>
-  `the owner hid ${tool} on the Settings server after this change was asked; only the Harness panel shows it again.`;
+  `the owner hid ${tool} on the Settings server after this change was asked; only the Settings page shows it again.`;
 
 /** Why the access switch refuses a write now (off or read-only), or undefined when it is on. */
 const accessBar = (deps: Pick<SettingsServerDeps, "ops">): { readonly reason: string; readonly text: string } | undefined => {
@@ -690,7 +690,7 @@ const askedText = (view: ChangeView, input: SettingsCallInput, url: string | und
 /** The owner-only approval card for an asked change (plan D9); never a field, so no agent can answer it. */
 export const askedCard = (view: ChangeView, input: SettingsCallInput, url: string | undefined, needsPage: PageReason | undefined): McpQuestionCard => {
   const full = askedText(view, input, url);
-  const where = url === undefined ? "the Change page (its link is on the Harness panel's Open changes list)" : `the Change page: ${url}`;
+  const where = url === undefined ? "the Change page (its link is on the Settings page's Open changes list)" : `the Change page: ${url}`;
   const prompt =
     needsPage === "oversize"
       ? [
@@ -1350,7 +1350,7 @@ export const ownerPause = (record: Pick<ChangeRecord, "id" | "expiresAt" | "crea
 
 /** The "waiting" result `W` (plan D12): the change waits for the owner at its page. `note` adds a fallback's reason. */
 export const ownerWaiting = (record: Pick<ChangeRecord, "id">, url: string | undefined, note?: string): McpCallAnswer => {
-  const where = url ?? "the Change page (its link is on the Harness panel's Open changes list)";
+  const where = url ?? "the Change page (its link is on the Settings page's Open changes list)";
   return written(
     "waiting",
     `Waiting for the owner at ${where}. It applies when he approves it there. Do not repeat this call; read the settings to check.${note === undefined ? "" : ` ${note}`}`,

@@ -36,7 +36,7 @@ Test only against a Deployment you own. Never test against the Maintainer's Depl
 In scope, as t3flare builds and configures them:
 
 - the public endpoint and the t3 auth routes t3flare mounts ([ADR-0010](docs/adr/0010-the-endpoint-is-public-behind-t3s-own-auth.md));
-- the Access-guarded `/_t3flare` routes: the admin routes, the Harness panel and the Settings server;
+- the Access-guarded `/_t3flare` routes: the admin routes, the Settings page and the Settings server;
 - Container isolation, and the rule that no vendor credential enters a Container
   ([ADR-0016](docs/adr/0016-no-vendor-credential-enters-a-container-and-cli-agents-reach-the-model-proxy.md));
 - the GitHub App's tokens and their scoping ([ADR-0013](docs/adr/0013-github-access-through-a-github-app-with-per-repo-tokens.md));

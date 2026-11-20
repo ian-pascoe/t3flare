@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off
-// The harness panel's CSRF token (ADR-0026, plan §6.4 with the review's LOW item): an HMAC, under a key only the
+// The Settings page's CSRF token (ADR-0026, plan §6.4 with the review's LOW item): an HMAC, under a key only the
 // Environment DO holds, of the owner's Access subject and the hour. Bound to the owner's Access session, useless to
 // another origin (which cannot read the page to learn it), and accepted for the current and the previous hour so a page
 // left open across the hour still works.

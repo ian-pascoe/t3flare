@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off globalConsole:off
-// The harness panel's routes (ADR-0026, plan §6): the page and its JSON API at `/_t3flare/settings` on the t3 host, behind
+// The Settings page's routes (ADR-0026, plan §6): the page and its JSON API at `/_t3flare/settings` on the t3 host, behind
 // the `/_t3flare` Access application (worker.ts verifies it before this runs; owner, 2026-11-12, back to stock: no admin
 // host). Pure over its deps, so the safety rules are tested without a Worker:
 //
@@ -49,7 +49,7 @@ import { clientNameOf, isOwnerMode, type OwnerClients } from "../settings/client
 import { type Answerer, type ChangesApi, openChangeSummary } from "../settings/openChanges.ts";
 import { renderChangePage, renderGonePage } from "./changePage.ts";
 import { CHANGE_SCRIPT } from "./changePageScript.ts";
-import { CHANGES_API_PATH, CHANGES_PATH, changePagePath, HARNESS_PATH } from "./paths.ts";
+import { CHANGES_API_PATH, CHANGES_PATH, changePagePath, SETTINGS_PAGE_PATH } from "./paths.ts";
 import { pageCsp, renderPage } from "./page.ts";
 import type { AuditActor, HarnessStore } from "./store.ts";
 
@@ -82,7 +82,7 @@ export interface HarnessDeps {
   readonly ownerEndpoint?: string;
 }
 
-export const CLIENTS_API_PATH = `${HARNESS_PATH}/api/mcp/clients`;
+export const CLIENTS_API_PATH = `${SETTINGS_PAGE_PATH}/api/mcp/clients`;
 
 /** The Containers running now, by their Workspaces (a holder's DO id when its Workspace is unknown); null without the budget. */
 export const runningContainers = async (deps: Pick<HarnessDeps, "budget">): Promise<{ readonly count: number; readonly holders: ReadonlyArray<string> } | null> => {
@@ -119,7 +119,7 @@ export const mcpOverview = async (deps: HarnessDeps) => {
   return rows;
 };
 
-export const isHarnessPath = (pathname: string) => pathname === HARNESS_PATH || pathname.startsWith(`${HARNESS_PATH}/`);
+export const isSettingsPagePath = (pathname: string) => pathname === SETTINGS_PAGE_PATH || pathname.startsWith(`${SETTINGS_PAGE_PATH}/`);
 
 const SECURITY_HEADERS = {
   "cache-control": "no-store",
@@ -190,7 +190,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
   const url = new URL(request.url);
   const path = url.pathname;
   if (request.method === "GET") {
-    if (path === HARNESS_PATH || path === `${HARNESS_PATH}/`) {
+    if (path === SETTINGS_PAGE_PATH || path === `${SETTINGS_PAGE_PATH}/`) {
       const subject = deps.caller.kind === "owner" ? deps.caller.subject : "";
       const csrf = subject === "" ? "" : await csrfToken(deps.store.csrfKey(), subject, deps.now?.() ?? Date.now());
       const environment = resolveEnvironment(deps.store.loadEnvironment());
@@ -226,28 +226,28 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     if (path === CHANGES_API_PATH && deps.changes !== undefined) {
       return json({ changes: deps.changes.list().map((record) => openChangeSummary(record, `https://${deps.host}${changePagePath(record.id)}`)) });
     }
-    if (path === `${HARNESS_PATH}/api/settings`) {
+    if (path === `${SETTINGS_PAGE_PATH}/api/settings`) {
       const stored = deps.store.load();
       return json({ revision: stored.revision, resolved: resolveHarness(stored), registry: EXTENSIONS, stored });
     }
-    if (path === `${HARNESS_PATH}/api/environment`) {
+    if (path === `${SETTINGS_PAGE_PATH}/api/environment`) {
       const stored = deps.store.loadEnvironment();
       const resolved = resolveEnvironment(stored);
       return json({ revision: stored.revision, resolved, schema: ENVIRONMENT_SETTINGS, costs: containerCostTable(resolved.containerBudget), running: await runningContainers(deps), stored });
     }
-    if (path === `${HARNESS_PATH}/api/status`) return json(harnessStatus(deps));
-    if (path === `${HARNESS_PATH}/api/mcp`) return json({ servers: await mcpOverview(deps) });
-    if (path === `${HARNESS_PATH}/api/audit`) return json({ entries: deps.store.auditLog(50) });
+    if (path === `${SETTINGS_PAGE_PATH}/api/status`) return json(harnessStatus(deps));
+    if (path === `${SETTINGS_PAGE_PATH}/api/mcp`) return json({ servers: await mcpOverview(deps) });
+    if (path === `${SETTINGS_PAGE_PATH}/api/audit`) return json({ entries: deps.store.auditLog(50) });
     if (path === CLIENTS_API_PATH && deps.clients !== undefined) return json({ clients: deps.clients.list() });
-    if (path === `${HARNESS_PATH}/api/skills` && deps.skills !== undefined) return json(skillsOverview(deps.skills));
-    if (path === `${HARNESS_PATH}/api/skills/view` && deps.skills !== undefined) return skillsResponse(viewSkill(deps.skills, url.searchParams.get("name") ?? ""));
-    if (path === `${HARNESS_PATH}${ENDPOINTS_PATHS.list}` && deps.endpoints !== undefined) return json(await endpointsOverview(deps.endpoints));
+    if (path === `${SETTINGS_PAGE_PATH}/api/skills` && deps.skills !== undefined) return json(skillsOverview(deps.skills));
+    if (path === `${SETTINGS_PAGE_PATH}/api/skills/view` && deps.skills !== undefined) return skillsResponse(viewSkill(deps.skills, url.searchParams.get("name") ?? ""));
+    if (path === `${SETTINGS_PAGE_PATH}${ENDPOINTS_PATHS.list}` && deps.endpoints !== undefined) return json(await endpointsOverview(deps.endpoints));
     return refused(404, "Not found");
   }
   if (request.method !== "POST") return refused(405, "Method not allowed");
-  const routes = [`${HARNESS_PATH}/api/extensions`, `${HARNESS_PATH}/api/environment`, `${HARNESS_PATH}/api/mcp`, `${HARNESS_PATH}/api/mcp/test`, `${HARNESS_PATH}/api/mcp/servers`, `${HARNESS_PATH}/api/mcp/oauth`, `${HARNESS_PATH}/api/mcp/secret`];
-  const skillsRoute = SKILLS_WRITE_ROUTES.find((route) => path === `${HARNESS_PATH}/api/skills${route}`);
-  const endpointsRoute = deps.endpoints === undefined ? undefined : Object.values(ENDPOINTS_PATHS).find((route) => path === `${HARNESS_PATH}${route}`);
+  const routes = [`${SETTINGS_PAGE_PATH}/api/extensions`, `${SETTINGS_PAGE_PATH}/api/environment`, `${SETTINGS_PAGE_PATH}/api/mcp`, `${SETTINGS_PAGE_PATH}/api/mcp/test`, `${SETTINGS_PAGE_PATH}/api/mcp/servers`, `${SETTINGS_PAGE_PATH}/api/mcp/oauth`, `${SETTINGS_PAGE_PATH}/api/mcp/secret`];
+  const skillsRoute = SKILLS_WRITE_ROUTES.find((route) => path === `${SETTINGS_PAGE_PATH}/api/skills${route}`);
+  const endpointsRoute = deps.endpoints === undefined ? undefined : Object.values(ENDPOINTS_PATHS).find((route) => path === `${SETTINGS_PAGE_PATH}${route}`);
   const changeRoute = path.startsWith(`${CHANGES_API_PATH}/`) && deps.changes !== undefined ? path.slice(`${CHANGES_API_PATH}/`.length) : undefined;
   const clientsRoute = path === CLIENTS_API_PATH && deps.clients !== undefined;
   if (!routes.includes(path) && (skillsRoute === undefined || deps.skills === undefined) && endpointsRoute === undefined && changeRoute === undefined && !clientsRoute) return refused(404, "Not found");
@@ -282,23 +282,23 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
   const body = await bodyOf(request);
   const options = body === undefined ? { actor: actorOf(deps) } : optionsOf(deps, body);
   if (options === undefined) return refused(400, EXPECTED_REVISION);
-  if (path === `${HARNESS_PATH}/api/environment`) {
+  if (path === `${SETTINGS_PAGE_PATH}/api/environment`) {
     const settings = body?.settings;
     if (settings === null || typeof settings !== "object" || Array.isArray(settings)) return refused(400, "the body is one change: { settings: { … } }");
     return answer(await changeEnvironment(ops, settings as Record<string, unknown>, options));
   }
-  if (path === `${HARNESS_PATH}/api/mcp/test`) {
+  if (path === `${SETTINGS_PAGE_PATH}/api/mcp/test`) {
     // The test's answer has no `ok`, as before the ops moved out.
     const tested = await testMcpServer(ops, typeof body?.server === "string" ? body.server : "", options);
     if (!tested.ok) return refused(tested.status, tested.error);
     const { ok: _ok, ...shown } = tested;
     return json(shown);
   }
-  if (path === `${HARNESS_PATH}/api/mcp`) {
+  if (path === `${SETTINGS_PAGE_PATH}/api/mcp`) {
     if (body === undefined || typeof body.op !== "string" || typeof body.server !== "string") return refused(400, "the body is one change: { op, server, … }");
     return answer(changeMcp(ops, changeOf(body) as unknown as McpChange, options));
   }
-  if (path === `${HARNESS_PATH}/api/mcp/servers`) {
+  if (path === `${SETTINGS_PAGE_PATH}/api/mcp/servers`) {
     return answer(
       await addMcpServer(
         ops,
@@ -312,8 +312,8 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
       ),
     );
   }
-  if (path === `${HARNESS_PATH}/api/mcp/oauth`) return answer(await beginMcpSignIn(ops, typeof body?.server === "string" ? body.server : "", options));
-  if (path === `${HARNESS_PATH}/api/mcp/secret`) return answer(await setMcpHeader(ops, { server: typeof body?.server === "string" ? body.server : "", value: body?.value }, options));
+  if (path === `${SETTINGS_PAGE_PATH}/api/mcp/oauth`) return answer(await beginMcpSignIn(ops, typeof body?.server === "string" ? body.server : "", options));
+  if (path === `${SETTINGS_PAGE_PATH}/api/mcp/secret`) return answer(await setMcpHeader(ops, { server: typeof body?.server === "string" ? body.server : "", value: body?.value }, options));
   if (body === undefined || typeof body.extension !== "string") return refused(400, "the body is one change: { extension, enabled?, settings? }");
   return answer(changeExtension(ops, changeOf(body) as unknown as HarnessChange, options));
 };

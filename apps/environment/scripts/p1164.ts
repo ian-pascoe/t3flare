@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off globalFetch:off
-// SPI-1164's evidence on its stage: the Harness panel's "Sign in with ChatGPT" (ChatGPT plan usage) through the panel's
+// SPI-1164's evidence on its stage: the Settings page's "Sign in with ChatGPT" (ChatGPT plan usage) through the panel's
 // own routes, as a script with the stage's service token, and a Durable turn with tools on the stage's API-key endpoint
 // through the same Session code a sign-in's turn uses (the provider, the credential request, the turn).
 //

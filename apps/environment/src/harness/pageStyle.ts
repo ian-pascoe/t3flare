@@ -1,4 +1,4 @@
-// The harness panel's one stylesheet (ADR-0026), allowed by its SHA-256 hash in the CSP, so it is a constant: no
+// The Settings page's one stylesheet (ADR-0026), allowed by its SHA-256 hash in the CSP, so it is a constant: no
 // interpolation, and no `style` attribute anywhere on the page (the CSP would refuse it).
 //
 // It echoes T3 Code's web client (SPI-1086) without importing it: t3's colour tokens (its zinc light theme and true-black

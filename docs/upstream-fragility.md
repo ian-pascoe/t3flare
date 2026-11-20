@@ -1635,7 +1635,7 @@ fails for it.
 - **Where**:
   - **The setup state** is t3's own provider status: every driver's snapshot is `buildServerProvider`'s with the probe
     `provider/readiness.ts` `readinessOf` gives, `status: "warning"`, `auth: { status: "unknown" }` and a message
-    pointing to the Harness panel, while it has no model (Pi Durable with no endpoint that lists one; each CLI with none
+    pointing to the Settings page, while it has no model (Pi Durable with no endpoint that lists one; each CLI with none
     of its API). t3's web client shows such a provider as "Needs attention" with the message
     (`apps/web/src/components/settings/providerStatus.ts` `getProviderSummary`) and a banner on its threads
     (`chat/ProviderStatusBanner.tsx`, keyed by status, auth and message). t3's registry would keep a provider's earlier

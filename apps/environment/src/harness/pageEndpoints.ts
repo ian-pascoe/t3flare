@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off
-// The Harness panel's Model endpoints section (SPI-1162): each endpoint with its API, base URL, key mark and models, and
+// The Settings page's Model endpoints section (SPI-1162): each endpoint with its API, base URL, key mark and models, and
 // one form that adds or edits an endpoint, filled from a preset or from the endpoint being edited. Every string is
 // escaped (page.ts's rule). Its behaviour is ENDPOINTS_SCRIPT, part of the page's one script.
 //

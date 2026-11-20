@@ -1,5 +1,5 @@
 // @effect-diagnostics globalConsole:off
-// The harness panel's two entities and its audit log in the Environment DO's storage: the Harness settings (ADR-0026) and
+// The Settings page's two entities and its audit log in the Environment DO's storage: the Harness settings (ADR-0026) and
 // the Environment settings (ADR-0032), each under its own key with its own revision, so a change to one never makes the
 // other's readers take it again. Sessions take a new Harness revision at a turn's start; Workspace DOs take a new
 // Environment revision before a Container start. One audit log for both, append-only, 1 000 entries kept, each with its

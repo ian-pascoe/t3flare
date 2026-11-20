@@ -1,5 +1,5 @@
 // @effect-diagnostics globalFetch:off globalDate:off globalTimers:off
-// SPI-1175: sets up a stage's Model endpoint (modelEndpointSpec.ts) through the Harness panel's own API, the way a script
+// SPI-1175: sets up a stage's Model endpoint (modelEndpointSpec.ts) through the Settings page's own API, the way a script
 // reaches it (the stage's Access service token plus its admin token, so no CSRF token and no new route):
 //
 //   GET  /_t3flare/settings/api/endpoints            is it there already?
@@ -74,7 +74,7 @@ export const ensureModelEndpoint = async (admin: AdminCall, spec: ModelEndpointS
       const answer = await admin("GET", `${PANEL}/endpoints`).catch((error: unknown) => ({ status: 0, text: String(error) }));
       const json = answer.status === 200 ? parsed(answer.text) : undefined;
       if (Array.isArray(json?.endpoints)) return { endpoints: json.endpoints };
-      if (now() >= deadline) return { error: `the Harness panel did not answer GET ${PANEL}/endpoints (${answer.status === 0 ? clean(answer.text) : `HTTP ${answer.status}`})` };
+      if (now() >= deadline) return { error: `the Settings page did not answer GET ${PANEL}/endpoints (${answer.status === 0 ? clean(answer.text) : `HTTP ${answer.status}`})` };
       await sleep(RETRY_MS);
     }
   };
@@ -100,7 +100,7 @@ export const ensureModelEndpoint = async (admin: AdminCall, spec: ModelEndpointS
 
   const saved = await admin("POST", `${PANEL}/endpoints`, { op: "save", endpoint: { ...endpoint, models }, apiKey: spec.apiKey });
   const json = saved.status === 200 ? parsed(saved.text) : undefined;
-  if (json?.ok !== true || json.endpoint === undefined) return fail(`the Harness panel refused the Model endpoint "${spec.id}" (HTTP ${saved.status}): ${saved.text}`);
+  if (json?.ok !== true || json.endpoint === undefined) return fail(`the Settings page refused the Model endpoint "${spec.id}" (HTTP ${saved.status}): ${saved.text}`);
   const result: ModelEndpoint = json.endpoint;
   return { ok: true, outcome: existing === undefined ? "created" : "updated", id: spec.id, models: result.models.length, turnModel: turnModelOf(result) };
 };

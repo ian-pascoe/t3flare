@@ -1,6 +1,6 @@
 // @effect-diagnostics globalDate:off
 // One Environment's Settings server for M4's tests (SPI-1199): the stores in memory and Node's SQLite, the MCP host with
-// its settings branch, a fake GitHub for skills, a fake OAuth, an asker that records cards, and the Harness panel's deps
+// its settings branch, a fake GitHub for skills, a fake OAuth, an asker that records cards, and the Settings page's deps
 // with the Change page's API, all over the same storage as the Environment DO wires them.
 import type { StoredHarness } from "@t3flare/harness-registry";
 import type { McpAsker, McpQuestionAnswer, McpQuestionCard } from "@t3flare/session-protocol";

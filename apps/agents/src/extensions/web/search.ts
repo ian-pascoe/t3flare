@@ -44,7 +44,7 @@ export const searchChoice = (
   const slug = modelSettingSlug(setting, usable);
   if (slug === undefined) return { error: `no Anthropic Messages Model endpoint with an API key or no auth lists a model to search with: ${SETUP_HINT}` };
   const found = findEndpointModel(usable, slug);
-  if (found === undefined) return { error: `the search model ${slug} is not a model of an Anthropic Messages Model endpoint with an API key or no auth (the Harness panel's Web tools)` };
+  if (found === undefined) return { error: `the search model ${slug} is not a model of an Anthropic Messages Model endpoint with an API key or no auth (the Settings page's Web tools)` };
   return { ...found, slug };
 };
 

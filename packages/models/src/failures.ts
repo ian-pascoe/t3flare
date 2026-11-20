@@ -379,11 +379,11 @@ export const modelFailureMessage = (failure: ModelFailure, endpoint: Pick<Failed
     case "rate_limited":
       return `${name} is rate-limited${http}.`;
     case "key_refused":
-      return `${name} refused its API key${http}: check it in the Harness panel.`;
+      return `${name} refused its API key${http}: check it in the Settings page.`;
     case "sign_in_refused":
-      return signIn === undefined ? `${name} refused its sign-in${http}: sign in again in the Harness panel.` : `${name} refused its ${signIn.title} sign-in${http}: ${signIn.refused}`;
+      return signIn === undefined ? `${name} refused its sign-in${http}: sign in again in the Settings page.` : `${name} refused its ${signIn.title} sign-in${http}: ${signIn.refused}`;
     case "credential_needed":
-      return `${name} refused the request without a credential${http}: check its auth in the Harness panel.`;
+      return `${name} refused the request without a credential${http}: check its auth in the Settings page.`;
     case "plan_not_eligible":
       return signIn === undefined
         ? `${name}'s account or plan cannot be used for this request${http}.`

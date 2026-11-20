@@ -325,7 +325,7 @@ describe("D16's caps", () => {
     expect(refusal).toMatchObject({ reason: "opened-cap" });
     expect(refusal!.changeId).toBeUndefined();
     expect(refusal!.text).toBe(
-      `Not changed: you asked for ${OPENED_CAP} changes in the last hour, answered or not, the most t3flare allows. Make the change on the Harness panel (https://h/_t3flare/settings#changes), or try again later.`,
+      `Not changed: you asked for ${OPENED_CAP} changes in the last hour, answered or not, the most t3flare allows. Make the change on the Settings page (https://h/_t3flare/settings#changes), or try again later.`,
     );
     // Per caller and per door: another sub, and an own thread whose key is this sub, are not capped.
     expect(capRefusal(w.deps().changes, { ...OWNER, key: "sub-2" }, "hash-new", w.now())).toBeUndefined();

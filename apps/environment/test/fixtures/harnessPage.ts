@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off
-// The harness panel's fixture state (SPI-1086): what the page snapshot test renders and `scripts/panel-preview.ts` writes
+// The Settings page's fixture state (SPI-1086): what the page snapshot test renders and `scripts/panel-preview.ts` writes
 // for a local look. Four MCP servers in every state the page draws: Commissary (added by hand with its `x-api-key`
 // header, SPI-1160) listed with no tools, a direct server listed with tools (one class set by the owner, one tool refused), one whose listing failed, and an OAuth server never
 // signed in. Fixed times, so the render is stable.

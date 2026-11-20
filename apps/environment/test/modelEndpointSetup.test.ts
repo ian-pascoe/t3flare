@@ -288,7 +288,7 @@ describe("ensureModelEndpoint", () => {
       now: () => clock,
       sleep: async (ms) => void (clock += ms),
     });
-    expect(result).toEqual({ ok: false, error: "the Harness panel did not answer GET /_t3flare/settings/api/endpoints (HTTP 302)" });
+    expect(result).toEqual({ ok: false, error: "the Settings page did not answer GET /_t3flare/settings/api/endpoints (HTTP 302)" });
   });
 
   it("fails when the list has no model `match` keeps, saving nothing", async () => {
@@ -311,7 +311,7 @@ describe("ensureModelEndpoint", () => {
     const result = await ensureModelEndpoint(refusing, { ...COMMISSARY, models: ["claude-haiku-5-5"] }, { overwrite: true, ...noWait });
     expect(result.ok).toBe(false);
     expect(JSON.stringify(result)).not.toContain(KEY);
-    expect(result).toEqual({ ok: false, error: "the Harness panel refused the Model endpoint \"commissary\" (HTTP 400): refused /_t3flare/settings/api/endpoints with [redacted]" });
+    expect(result).toEqual({ ok: false, error: "the Settings page refused the Model endpoint \"commissary\" (HTTP 400): refused /_t3flare/settings/api/endpoints with [redacted]" });
   });
 
   it("scrubs a header's value from a refusal too", async () => {
@@ -326,6 +326,6 @@ describe("ensureModelEndpoint", () => {
     const panel = stagePanel();
     const result = await ensureModelEndpoint(panel.admin, { ...COMMISSARY, baseUrl: "http://llm.example.com", models: ["claude-haiku-5-5"] }, { overwrite: true, ...noWait });
     expect(result.ok).toBe(false);
-    expect(result.ok === false && result.error).toMatch(/^the Harness panel refused the Model endpoint "commissary" \(HTTP 400\): .*https/);
+    expect(result.ok === false && result.error).toMatch(/^the Settings page refused the Model endpoint "commissary" \(HTTP 400\): .*https/);
   });
 });

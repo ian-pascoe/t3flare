@@ -1,6 +1,6 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
 // SPI-1160's stage evidence: Commissary's MCP endpoint added by hand as an ordinary direct server, signed in with an
-// `x-api-key` header, through the Harness panel's admin API; then a Durable agent and a Codex agent each run a write
+// `x-api-key` header, through the Settings page's admin API; then a Durable agent and a Codex agent each run a write
 // (with its card) and a read through it. Commissary's client API host and an API key with its `sandbox` toolkit come from
 // the shell (`T3FLARE_MCP_API_URL`, `T3FLARE_MCP_KEY`, exported inline): the key goes into the add request and nowhere else, and no evidence file is written that holds it.
 //

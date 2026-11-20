@@ -9,7 +9,7 @@ declare module "cloudflare:workers" {
     fetch?(request: Request): Response | Promise<Response>;
     alarm?(): void | Promise<void>;
   }
-  /** A named entrypoint other Workers reach over a service binding (the harness panel's, ADR-0026). */
+  /** A named entrypoint other Workers reach over a service binding (the Settings page's, ADR-0026). */
   export abstract class WorkerEntrypoint<Env = unknown, Props = unknown> {
     protected env: Env;
     /** The entrypoint's context; `props` are what `ctx.exports.<Name>({ props })` made it with (G11's previews). */
