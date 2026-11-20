@@ -3,9 +3,9 @@
 // must be named by its absolute path; this finds the ones that are not. A small lexer, not a full shell parser: it
 // knows what the launch path's scripts use (simple commands, pipelines, lists, `$(…)` in and out of double quotes,
 // `$((…))`, subshells, functions, if/while/for/case, redirections, `exec [-a name]`, `env -u`, `setsid`), and its own
-// test pins that. It fails closed: anything it does not follow (backticks, heredocs, a substitution inside `${…}`,
-// unterminated quoting, a word that runs a string or another program it cannot see) throws, rather than passing a
-// command it never saw.
+// test pins that. What it knows it does not follow throws rather than passing a command it never saw: backticks,
+// heredocs, a substitution inside `${…}` or `$((…))`, unterminated quoting, and the words and arguments in `UNFOLLOWED`
+// and `UNFOLLOWED_ARGUMENTS` (a runner missing from those lists, `ionice` say, would still pass: add it there).
 
 /** Builtins of both dash and bash, and the reserved words: neither is looked up on PATH. */
 const SHELL = new Set([
@@ -21,7 +21,7 @@ const REDIRECTION = /^[0-9]*(?:>>|>&|<&|<>|>\||>|<)/;
  */
 const RUNS_NEXT = new Map<string, ReadonlySet<string>>([
   ["exec", new Set(["-a"])],
-  ["env", new Set(["-u", "--unset"])],
+  ["env", new Set(["-u", "--unset", "-C", "--chdir", "-a", "--argv0"])],
   ["setsid", new Set()],
 ]);
 /** Words that run a string, a file or another program this lexer does not follow: a script using one is refused. */
@@ -79,18 +79,16 @@ export const commandWords = (script: string): ReadonlyArray<string> => {
   };
 
   /** Skips a `${…}` from its `$`, refusing one with a substitution inside (its `}` may not be the first one). */
-  const parameter = (from: number): number => {
-    const end = past("}", from);
-    const body = script.slice(from + 2, end);
-    if (body.includes("$(") || body.includes("`")) unfollowed("a substitution inside `${…}`");
-    return end;
-  };
+  const parameter = (from: number): number => expansion(from, "${", "}");
 
   /** Skips a `$((…))` from its `$`, refusing one with a substitution inside. */
-  const arithmetic = (from: number): number => {
-    const end = past("))", from);
-    const body = script.slice(from + 3, end);
-    if (body.includes("$(") || body.includes("`")) unfollowed("a substitution inside `$((…))`");
+  const arithmetic = (from: number): number => expansion(from, "$((", "))");
+
+  /** Skips an expansion from its `open` to its `close`, refusing one with a substitution inside. */
+  const expansion = (from: number, open: string, close: string): number => {
+    const end = past(close, from);
+    const body = script.slice(from + open.length, end);
+    if (body.includes("$(") || body.includes("`")) unfollowed(`a substitution inside \`${open}…${close}\``);
     return end;
   };
 
@@ -165,10 +163,8 @@ export const commandWords = (script: string): ReadonlyArray<string> => {
           }
           continue;
         }
-        if (!command) {
-          if (UNFOLLOWED_ARGUMENTS.has(w)) unfollowed(`\`${w}\``);
-          continue;
-        }
+        if (UNFOLLOWED_ARGUMENTS.has(w)) unfollowed(`\`${w}\``);
+        if (!command) continue;
         // A function definition: `name() {`.
         if (/^\s*\(\s*\)/.test(script.slice(i))) {
           functions.add(w);
@@ -191,7 +187,6 @@ export const commandWords = (script: string): ReadonlyArray<string> => {
           command = true;
         } else if (runsNext !== undefined && w.startsWith("-")) {
           // An option of `exec` or of a program that runs the next word; `exec -a name` names argv[0], not a program.
-          if (UNFOLLOWED_ARGUMENTS.has(w)) unfollowed(`\`${w}\``);
           if (runsNext.has(w)) {
             while (script[i] === " ") i++;
             word();

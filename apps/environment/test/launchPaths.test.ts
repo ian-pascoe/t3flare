@@ -32,12 +32,13 @@ describe("the CLI launch path", () => {
       "for d in /a/*; do [ -d \"$d\" ] || continue; k=$(basename \"$d\"); done",
       "n=$((n+1)); while kill -0 1; do sleep 1; done",
       "env -u X /usr/bin/true </dev/null >/dev/null &",
+      "/usr/bin/env -C /tmp sed a",
       "exec 3>&1 1>&2",
       "exec -a setsid /usr/bin/setsid --wait '/opt/x' 'y'",
       "exec setsid --wait /opt/x",
     ].join("\n");
-    expect(commandWords(script)).toEqual(["set", "echo", "exit", "sed", "/usr/bin/head", "tr", "cut", "mountpoint", "[", "rmdir", "mkdir", "dirname", "[", "continue", "basename", "kill", "sleep", "env", "/usr/bin/true", "/usr/bin/setsid", "/opt/x", "setsid", "/opt/x"]);
-    expect(bareCommands(script)).toEqual(["sed", "tr", "cut", "mountpoint", "rmdir", "mkdir", "dirname", "basename", "sleep", "env", "setsid"]);
+    expect(commandWords(script)).toEqual(["set", "echo", "exit", "sed", "/usr/bin/head", "tr", "cut", "mountpoint", "[", "rmdir", "mkdir", "dirname", "[", "continue", "basename", "kill", "sleep", "env", "/usr/bin/true", "/usr/bin/env", "sed", "/usr/bin/setsid", "/opt/x", "setsid", "/opt/x"]);
+    expect(bareCommands(script)).toEqual(["sed", "tr", "cut", "mountpoint", "rmdir", "mkdir", "dirname", "basename", "sleep", "env", "sed", "setsid"]);
   });
 
   it.each([

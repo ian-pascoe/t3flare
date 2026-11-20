@@ -24,6 +24,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import type { EndpointApi, EndpointModel, ModelEndpoint } from "@t3flare/models/endpoints";
+import { PROCESS_SHELL } from "@t3flare/sandbox-image/process";
 import { expect, it } from "vitest";
 
 import { PI_T3_MCP_EXTENSION_SOURCE } from "../../../../t3code/packages/provider-pi/src/server/mcpExtensionSource.ts";
@@ -261,7 +262,7 @@ it("the handle command prints the handle only to its own pi launch chain: not wi
       drive(
         "pi-rpc.mjs",
         { commands: [{ type: "bash", command: probe }], timeoutMs: 120_000 },
-        ["docker", "run", "--rm", "-i", "--network", "none", "-e", "T3FLARE_EXEC=proc-own", "-e", `T3FLARE_MODEL_HANDLE=${handle}`, "-e", "PI_OFFLINE=1", IMAGE, "bash", "-c", launch],
+        ["docker", "run", "--rm", "-i", "--network", "none", "-e", "T3FLARE_EXEC=proc-own", "-e", `T3FLARE_MODEL_HANDLE=${handle}`, "-e", "PI_OFFLINE=1", IMAGE, PROCESS_SHELL, "-c", launch],
       );
     const outputOf = (result: any): string => String((result.responses ?? []).find((entry: { command: string }) => entry.command === "bash")?.data?.output ?? JSON.stringify(result).slice(0, 1500));
     // As the process command starts it: `exec setsid --wait` from a process-group leader (here PID 1), so setsid forks.
@@ -269,7 +270,7 @@ it("the handle command prints the handle only to its own pi launch chain: not wi
     // setsid run by a process that is not a group leader calls setsid() and execs in place: no process holds the handle.
     const inPlace = outputOf(pi("setsid --wait /opt/t3flare/bin/pi --mode rpc --no-session; exit $?"));
     // Outside any pi launch chain, with the handle in its own environment and the right marker.
-    const outside = docker(["run", "--rm", "--network", "none", "-e", "T3FLARE_EXEC=proc-own", "-e", `T3FLARE_MODEL_HANDLE=${handle}`, IMAGE, "bash", "-c", "echo outside=$(/opt/t3flare/bin/t3flare-pi-handle 2>/dev/null | wc -c)"]).stdout;
+    const outside = docker(["run", "--rm", "--network", "none", "-e", "T3FLARE_EXEC=proc-own", "-e", `T3FLARE_MODEL_HANDLE=${handle}`, IMAGE, PROCESS_SHELL, "-c", "echo outside=$(/opt/t3flare/bin/t3flare-pi-handle 2>/dev/null | wc -c)"]).stdout;
     const text = JSON.stringify({ forked, inPlace, outside });
     expect(text.includes(handle), "the handle reached the report").toBe(false);
     // 64 hex digits and a newline to its own chain; nothing to a forged marker; pi itself inherits nothing.
