@@ -60,7 +60,7 @@ export const commandWords = (script: string): ReadonlyArray<string> => {
           if (i >= script.length) unfollowed('an unterminated `"`');
           if (script[i] === "\\") i += 2;
           else if (script[i] === "`") unfollowed("a backtick substitution");
-          else if (script.startsWith("$((", i)) i = past("))", i);
+          else if (script.startsWith("$((", i)) i = arithmetic(i);
           else if (script.startsWith("$(", i)) {
             i += 2;
             list(")");
@@ -68,7 +68,7 @@ export const commandWords = (script: string): ReadonlyArray<string> => {
           else i++;
         }
         i++;
-      } else if (script.startsWith("$((", i)) i = past("))", i);
+      } else if (script.startsWith("$((", i)) i = arithmetic(i);
       else if (script.startsWith("$(", i)) {
         i += 2;
         list(")");
@@ -83,6 +83,14 @@ export const commandWords = (script: string): ReadonlyArray<string> => {
     const end = past("}", from);
     const body = script.slice(from + 2, end);
     if (body.includes("$(") || body.includes("`")) unfollowed("a substitution inside `${…}`");
+    return end;
+  };
+
+  /** Skips a `$((…))` from its `$`, refusing one with a substitution inside. */
+  const arithmetic = (from: number): number => {
+    const end = past("))", from);
+    const body = script.slice(from + 3, end);
+    if (body.includes("$(") || body.includes("`")) unfollowed("a substitution inside `$((…))`");
     return end;
   };
 

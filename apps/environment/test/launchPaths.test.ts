@@ -43,6 +43,7 @@ describe("the CLI launch path", () => {
   it.each([
     ["a backtick substitution", "x=`sed a`"],
     ["a substitution inside ${…}", "y=${A:-$(sed a)}"],
+    ["a substitution inside $((…))", "x=$(( $(sed a) + 1 ))"],
     ["a heredoc", "cat <<EOF\nsed\nEOF"],
     ["an unterminated quote", "echo 'oops"],
     ["an unterminated substitution", "x=$(sed a"],

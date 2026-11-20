@@ -304,9 +304,10 @@ Report: [`docs/steps/spi-1170.md`](../steps/spi-1170.md); evidence: `docs/steps/
    its absolute path (`PROCESS_SHELL`). The process command names `setsid`, `mkdir`, `grep` and the rest by theirs,
    keeping setsid's name in argv (`exec -a setsid`), since the holders are found by the command line `setsid --wait
    <launcher> …`. So do Claude Code's launcher and handle helper and OpenCode's launcher, `env -u` included.
-   `launchPaths.test.ts` fails on a bare program name in any of them. `processWrapper.test.ts` and `test:docker`'s pi
-   case run them with hostile shims first on PATH. Nothing on the launch path runs a program from PATH while the handle
-   is reachable; the commands an agent runs itself remain as the SPI-1168 refinement states.
+   `launchPaths.test.ts` fails on a bare program name in any of them. The wrapper and pi's launcher and handle command
+   also run with hostile shims first on PATH (`processWrapper.test.ts`, `test:docker`'s pi case); Claude Code's and
+   OpenCode's are checked by the unit test only. Nothing on the launch path runs a program from PATH while the handle is
+   reachable; the commands an agent runs itself remain as the SPI-1168 refinement states.
 
 ## Refinement (SPI-1171, 2026-11-16): subscription sign-ins through the model relay
 

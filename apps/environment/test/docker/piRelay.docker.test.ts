@@ -86,11 +86,12 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
     fs.writeFileSync(path.join(workspace, "watch.sh"), `${watcher}\n`);
     // Hostile programs first on PATH (as a project's mise shims would be): each notes who ran it, then runs the real one.
     // The process wrapper, the launcher and the handle command name theirs by absolute path, so none is run by any of
-    // them; the watcher runs some (so they are on PATH: the check is not vacuous). The setup before the wrapper, in the
-    // same shell, names its own by absolute path too, so a run from that shell is the wrapper's.
+    // them; the watcher runs some (so they are on PATH: the check is not vacuous). A shim notes whether the handle is in
+    // its environment (never the handle itself): the wrapper and the launcher hold it, the watcher does not, and the
+    // setup before the wrapper, in the same shell, names its own programs by absolute path.
     fs.mkdirSync(path.join(workspace, "shims"));
     for (const tool of SHIMMED) {
-      fs.writeFileSync(path.join(workspace, "shims", tool), `#!/bin/sh\necho "${tool}|$(/usr/bin/tr '\\0\\n' '  ' < /proc/$PPID/cmdline | /usr/bin/cut -c1-80)" >> /workspace/shims.txt\nexec /usr/bin/${tool} "$@"\n`, { mode: 0o755 });
+      fs.writeFileSync(path.join(workspace, "shims", tool), `#!/bin/sh\necho "${tool}|\${T3FLARE_MODEL_HANDLE:+with-handle}|$(/usr/bin/tr '\\0\\n' '  ' < /proc/$PPID/cmdline | /usr/bin/cut -c1-80)" >> /workspace/shims.txt\nexec /usr/bin/${tool} "$@"\n`, { mode: 0o755 });
     }
     const shims = ["/usr/bin/cp /workspace/shims/* /usr/local/sbin/", "/usr/bin/chmod 755 /usr/local/sbin/*"];
     const rawLines = path.join(workspace, "pi-raw.jsonl");
@@ -204,10 +205,10 @@ it("pi reaches each endpoint's provider at the model relay with its handle, whic
     expect(shellEnv.split("\n").filter((line) => /^no_proxy=|^NO_PROXY=/.test(line)).sort(), text).toEqual(["NO_PROXY=example.org,computer.internal", "no_proxy=example.org,computer.internal"]);
     expect(shellEnv.includes("HTTP_PROXY=http://computer.internal:3128"), text).toBe(true);
     expect(tunnels, text).toEqual([]);
-    // No hostile program on PATH was run by the process wrapper (the launch's shell), the launcher (setsid's child) or
-    // the handle command; some were run.
+    // No hostile program on PATH was run with the handle in its environment (by the process wrapper, setsid or the
+    // launcher), by setsid's child or by the handle command; some were run.
     expect(shimRuns.length, text).toBeGreaterThan(0);
-    expect(shimRuns.filter((line) => /\|bash -c \/usr\/bin\/cp \/workspace\/shims\/|\|setsid |t3flare-pi-handle/.test(line)), text).toEqual([]);
+    expect(shimRuns.filter((line) => /\|with-handle\||\|setsid |t3flare-pi-handle/.test(line)), text).toEqual([]);
     // pi's real RPC lines, mapped as the channel maps them: each model's provider is its endpoint's id.
     const ids = new Set(ENDPOINTS.map((entry) => entry.id));
     const modelLines = read("pi-raw.jsonl").split("\n").filter((line) => /"type":"(response|message_end)"/.test(line) && line.includes("t3flare-endpoint-"));

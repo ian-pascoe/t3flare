@@ -9,7 +9,7 @@ import * as path from "node:path";
 
 import type { EndpointModel } from "@t3flare/models/endpoints";
 import { CLIS } from "@t3flare/sandbox-image/clis";
-import { processCommand } from "@t3flare/sandbox-image/process";
+import { PROCESS_SHELL, processCommand } from "@t3flare/sandbox-image/process";
 
 import { PI_T3_MCP_EXTENSION_SOURCE } from "../../../../t3code/packages/provider-pi/src/server/mcpExtensionSource.ts";
 import { type Launch, type LaunchInput, profileLaunch } from "../../src/agents/cliProfiles.ts";
@@ -142,7 +142,7 @@ export const runCommand = (input: RunInput): Array<string> => {
     "docker", "run", "--rm", "-i", "--name", `${input.name}-${input.marker}`, "--network", input.harness.network, "--dns", input.harness.keyhostIp,
     "-v", `${input.workspace}:/workspace`, ...(input.dockerArgs ?? []),
     ...Object.entries(env).flatMap(([name, value]) => ["-e", `${name}=${value}`]),
-    IMAGE, "bash", "-c", `${input.setup ?? ""}\n${command}`,
+    IMAGE, PROCESS_SHELL, "-c", `${input.setup ?? ""}\n${command}`,
   ];
 };
 
