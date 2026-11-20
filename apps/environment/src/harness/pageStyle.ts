@@ -4,11 +4,12 @@
 // It echoes T3 Code's web client (SPI-1086) without importing it: t3's colour tokens (its zinc light theme and true-black
 // dark theme), its radii (0.5rem controls, 0.75rem groups), its settings layout (a quiet sidebar, 16px semibold section
 // titles over grouped, divided rows with 14px titles and 12px descriptions) and its system font stack. Light and dark
-// follow `prefers-color-scheme`. The primary is t3flare's flare orange, with dark ink on it (white on that orange is too
-// faint); its two colours repeat pageBrand.ts's FLARE_FROM and FLARE_TO, since this constant cannot import them.
+// follow `prefers-color-scheme`. The primary is t3flare's flare orange (pageBrand.ts's FLARE_FROM) on dark, and a deeper
+// orange on light, where the flare's is under 3:1 on white; dark ink on either (white on them is too faint). The brand's
+// colours repeat pageBrand.ts's FLARE_FROM and FLARE_TO, since this constant cannot import them.
 export const STYLE = `:root{color-scheme:light dark;
 --bg:#fcfcfc;--fg:#18181b;--card:#fff;--sidebar:#fafafa;--muted:#f4f4f5;--muted-fg:#71717a;--border:#e4e4e7;--row-border:#ececee;--input:#d4d4d8;
---hover:#f4f4f5;--selected:#fff;--primary:#FF7A1A;--primary-fg:#18181b;--primary-soft:color-mix(in oklab,var(--primary) 10%,transparent);--ring:#EA580C;
+--hover:#f4f4f5;--selected:#fff;--primary:#EA580C;--primary-fg:#18181b;--primary-soft:color-mix(in oklab,var(--primary) 10%,transparent);--ring:var(--primary);
 --ok:#047857;--ok-dot:#10b981;--ok-soft:color-mix(in oklab,#10b981 12%,transparent);
 --err:#b91c1c;--err-dot:#ef4444;--err-soft:color-mix(in oklab,#ef4444 8%,transparent);--err-line:color-mix(in oklab,#ef4444 28%,transparent);
 --warn:#b45309;--warn-dot:#f59e0b;--warn-soft:color-mix(in oklab,#f59e0b 10%,transparent);--warn-line:color-mix(in oklab,#f59e0b 32%,transparent);
@@ -17,7 +18,7 @@ export const STYLE = `:root{color-scheme:light dark;
 --side-w:15rem;--content-w:50rem}
 @media (prefers-color-scheme:dark){:root{
 --bg:#000;--fg:#f5f5f5;--card:#121212;--sidebar:#0b0b0b;--muted:rgb(255 255 255/4%);--muted-fg:#a3a3a3;--border:rgb(255 255 255/9%);--row-border:rgb(255 255 255/6%);--input:rgb(255 255 255/14%);
---hover:rgb(255 255 255/5%);--selected:rgb(255 255 255/8%);--primary-soft:color-mix(in oklab,var(--primary) 18%,transparent);--ring:#FFB547;
+--hover:rgb(255 255 255/5%);--selected:rgb(255 255 255/8%);--primary:#FF7A1A;--primary-soft:color-mix(in oklab,var(--primary) 18%,transparent);--ring:#FFB547;
 --ok:#34d399;--ok-soft:color-mix(in oklab,#10b981 16%,transparent);--err:#f87171;--err-soft:color-mix(in oklab,#ef4444 13%,transparent);--err-line:color-mix(in oklab,#ef4444 34%,transparent);
 --warn:#fbbf24;--warn-soft:color-mix(in oklab,#f59e0b 14%,transparent);--warn-line:color-mix(in oklab,#f59e0b 34%,transparent);--shadow:0 14px 32px -18px rgb(0 0 0/75%)}}
 *,*::before,*::after{box-sizing:border-box}
@@ -40,7 +41,7 @@ svg.i{width:1rem;height:1rem;flex:none;fill:none;stroke:currentColor;stroke-widt
 .brand{display:flex;align-items:center;gap:.625rem;padding:.25rem .5rem}
 .brand-mark{display:grid;place-items:center;width:1.75rem;height:1.75rem;flex:none;border-radius:var(--radius);background:radial-gradient(60% 60% at 50% 50%,rgb(255 122 26/28%),transparent 70%),#000;box-shadow:inset 0 0 0 1px rgb(255 255 255/8%)}
 .brand-mark svg.flare{width:1.25rem;height:1.25rem;filter:drop-shadow(0 0 3px rgb(255 140 40/75%))}
-.brand strong{display:block;font-size:.9375rem;font-weight:600;line-height:1.25;letter-spacing:-.02em}
+.brand strong{display:block;font-size:.9375rem;font-weight:600;line-height:1.25;letter-spacing:-.03em}
 .brand div>span{display:block;font-size:.75rem;color:var(--muted-fg);line-height:1.25}
 .wordmark-flare{background:linear-gradient(90deg,#FF7A1A,#FFB547);-webkit-background-clip:text;background-clip:text;color:transparent}
 a.brand{align-self:flex-start;padding:0;color:inherit;text-decoration:none}
