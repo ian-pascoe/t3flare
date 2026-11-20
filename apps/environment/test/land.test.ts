@@ -7,6 +7,7 @@ import {
   bumpAttemptOf,
   DETERMINISTIC_STEPS,
   bumpReportNotes,
+  findingSummary,
   landBindingRefusal,
   landMode,
   landRefusal,
@@ -19,7 +20,7 @@ import {
   type LandFacts,
   type T3LockInput,
 } from "../scripts/lib/land.ts";
-import { blobId, UPDATE_COMMAND } from "../scripts/lib/upstreamFingerprintFixture.ts";
+import { UPDATE_COMMAND } from "../scripts/lib/upstreamFingerprintFixture.ts";
 
 const SHA = "cd9c39fe3c25ad71657cc0b8631b6de76775261e";
 const TAG = "v0.1.11-nightly.20261117.4825";
@@ -114,12 +115,18 @@ describe("a bump job's report, read by a trusted job", () => {
       { kind: "changed", file: "a.ts\n## injected", symbol: "x", ourFile: "b.ts", entry: "U1" },
       { kind: "changed", file: "a.ts", symbol: "$(rm -rf)", ourFile: "b.ts", entry: "U1" },
       { kind: "changed", file: "a.ts", symbol: "x", ourFile: "b.ts", entry: "U1; rm" },
+      { kind: "moved", file: "apps/server/src/terminal/Manager.ts" },
+      { kind: "moved", file: "$(rm -rf)" },
       "nope",
     ];
-    expect(bumpReportNotes(JSON.stringify({ upstreamFingerprint })).fingerprint).toEqual([
-      "apps/environment/src/t3/composition.ts (U1) for t3code/apps/server/src/server.ts (*)",
-      "apps/agents/src/workspace/staleReads.ts (U13) for t3code/apps/server/src/vcs/GitVcsDriverCore.ts (a literal)",
-    ]);
+    const lines = [
+      "review apps/environment/src/t3/composition.ts (U1) for t3code/apps/server/src/server.ts (*)",
+      "review apps/agents/src/workspace/staleReads.ts (U13) for t3code/apps/server/src/vcs/GitVcsDriverCore.ts (a literal)",
+      "t3code/apps/server/src/terminal/Manager.ts changed outside the watched regions (nothing of ours to review)",
+    ];
+    expect(bumpReportNotes(JSON.stringify({ upstreamFingerprint })).fingerprint).toEqual(lines);
+    // The bump's commit message says the same, from the same function.
+    expect(upstreamFingerprint.flatMap((finding) => findingSummary(finding) ?? [])).toEqual(lines);
   });
 
   it("records the gate the run was asked for: a report claiming another is refused (A8)", () => {
@@ -337,7 +344,7 @@ describe("land.yml's binding to the proven commit (B1)", () => {
 });
 
 describe("upstreamFingerprintRefusal (SPI-1011): a pin whose watched t3 files changed since the fingerprint's review lands only by a person", () => {
-  const sources: Record<string, string> = { "apps/server/src/server.ts": "const a = 1;\n", "apps/server/src/git.ts": "const b = 2;\n" };
+  const blobs: Record<string, string> = { "apps/server/src/server.ts": "a".repeat(40), "apps/server/src/git.ts": "b".repeat(40) };
   const fixture = (files: Record<string, string>) =>
     JSON.stringify({
       reviewedCommit: SHA,
@@ -345,26 +352,22 @@ describe("upstreamFingerprintRefusal (SPI-1011): a pin whose watched t3 files ch
       literals: [{ file: "apps/server/src/git.ts", literal: "b", ourFile: "apps/agents/src/workspace/staleReads.ts", entry: "U13" }],
       files,
     });
-  const reviewed = { "apps/server/src/server.ts": blobId(sources["apps/server/src/server.ts"]!), "apps/server/src/git.ts": blobId(sources["apps/server/src/git.ts"]!) };
-  const read = (file: string) => sources[file];
+  const blobOf = (file: string) => blobs[file];
 
-  it("computes git's blob id", () => {
-    expect(blobId("hello\n")).toBe("ce013625030ba8dba906f756967f9e9ca394464a");
+  it("lets a pin land whose watched files are the reviewed blobs", () => {
+    expect(upstreamFingerprintRefusal(fixture(blobs), blobOf)).toBeUndefined();
   });
 
-  it("lets a pin land whose watched files are byte for byte the reviewed ones", () => {
-    expect(upstreamFingerprintRefusal(fixture(reviewed), read)).toBeUndefined();
-  });
-
-  it("refuses a changed or gone watched file, naming it and what a person does", () => {
-    const refusal = upstreamFingerprintRefusal(fixture(reviewed), (file) => (file === "apps/server/src/git.ts" ? "const b = 3;\n" : undefined));
+  it("refuses a changed or gone watched file, naming it and what a person does on a branch of their own", () => {
+    const refusal = upstreamFingerprintRefusal(fixture(blobs), (file) => (file === "apps/server/src/git.ts" ? "c".repeat(40) : undefined));
     expect(refusal).toContain("apps/server/src/git.ts, apps/server/src/server.ts");
     expect(refusal).toContain("needs a person");
+    expect(refusal).toContain("git switch -c <name> origin/bump/<tag>");
     expect(refusal).toContain(UPDATE_COMMAND);
   });
 
   it("refuses a fixture that does not record every watched file, or is not one", () => {
-    expect(upstreamFingerprintRefusal(fixture({ "apps/server/src/server.ts": reviewed["apps/server/src/server.ts"] }), read)).toMatch(/does not record apps\/server\/src\/git\.ts/);
-    expect(upstreamFingerprintRefusal("nope", read)).toMatch(/not read/);
+    expect(upstreamFingerprintRefusal(fixture({ "apps/server/src/server.ts": blobs["apps/server/src/server.ts"]! }), blobOf)).toMatch(/does not record apps\/server\/src\/git\.ts/);
+    expect(upstreamFingerprintRefusal("nope", blobOf)).toMatch(/not read/);
   });
 });

@@ -41,9 +41,10 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { DETERMINISTIC_STEPS } from "../apps/environment/scripts/lib/land.ts";
+import { DETERMINISTIC_STEPS, findingSummary } from "../apps/environment/scripts/lib/land.ts";
 import { keptReportJson } from "../apps/environment/scripts/lib/modelEndpointSpec.ts";
-import { REPORT_ONLY_ENV } from "../apps/environment/scripts/lib/upstreamFingerprintFixture.ts";
+import type { Finding } from "../apps/environment/scripts/lib/upstreamFingerprint.ts";
+import { REPORT_ONLY, REPORT_ONLY_ENV, UPDATE_COMMAND } from "../apps/environment/scripts/lib/upstreamFingerprintFixture.ts";
 import { T3_ERRORS_COUNT } from "../apps/environment/scripts/lib/typecheckFilter.ts";
 import { newestNightly, PINNED_FILES } from "../apps/environment/src/updates/pins.ts";
 
@@ -92,7 +93,7 @@ const sh = (command: string, commandArgs: Array<string>, cwd: string, options: {
   });
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
   if (!options.quiet) process.stdout.write(output);
-  return { ok: result.status === 0, output };
+  return { ok: result.status === 0, output, stdout: result.stdout ?? "" };
 };
 
 const step = (name: string, run: () => { ok: boolean; detail?: string }, detailChars = DETAIL_CHARS): boolean => {
@@ -116,7 +117,7 @@ let lockLine: string | undefined;
 /** The descriptor flags the new pin has and `capabilities.ts` does not classify: stripped until classified (U4). */
 let unclassifiedCapabilities: Array<string> | undefined;
 /** The upstream fingerprint's findings (SPI-1011, fragility T2): t3 code we restate that changed since its review. */
-let upstreamFingerprint: Array<{ readonly kind: string; readonly file: string; readonly symbol?: string; readonly ourFile: string; readonly entry: string }> | undefined;
+let upstreamFingerprint: Array<Finding> | undefined;
 /** Type errors in t3's own files the typecheck passed over (U10): not ours to fix, but a new one is worth a look. */
 let t3TypeErrors: number | undefined;
 /** The first acceptance attempt's result, when it failed and a second ran. */
@@ -206,7 +207,7 @@ const ok =
   }) &&
   // The whole check, as prod's deploy runs it (D9; closes U27): the patches apply, typecheck, lint, tests.
   step(DETERMINISTIC_STEPS.check, () => {
-    const result = sh("pnpm", ["run", "check"], root, { env: { [REPORT_ONLY_ENV]: "report" } });
+    const result = sh("pnpm", ["run", "check"], root, { env: { [REPORT_ONLY_ENV]: REPORT_ONLY } });
     const t3Errors = T3_ERRORS_COUNT.exec(result.output)?.[1];
     if (t3Errors !== undefined) t3TypeErrors = Number(t3Errors);
     return { ok: result.ok, detail: result.output };
@@ -227,8 +228,8 @@ const ok =
   step("t3 code we restate, changed since its last review (holds the land for a person)", () => {
     const result = sh(process.execPath, ["scripts/upstream-fingerprint.ts", "--json"], environment, { quiet: true });
     try {
-      const parsed: unknown = JSON.parse(result.output.trim().split("\n").at(-1) ?? "");
-      if (Array.isArray(parsed)) upstreamFingerprint = parsed as NonNullable<typeof upstreamFingerprint>;
+      const parsed: unknown = JSON.parse(result.stdout.trim().split("\n").at(-1) ?? "");
+      if (Array.isArray(parsed)) upstreamFingerprint = parsed as Array<Finding>;
     } catch {
       // Unread: the report says null, and the bump goes on; the land check still compares the files.
     }
@@ -309,9 +310,9 @@ if (flag("commit") && to !== from) {
         : []),
       ...(upstreamFingerprint !== undefined && upstreamFingerprint.length > 0
         ? [
-            `t3 code we restate changed since its last review, so this pin does not land by itself (fragility T2): ${upstreamFingerprint
-              .map((finding) => `review ${finding.ourFile} (${finding.entry}) for ${finding.file} (${finding.kind === "missing" ? "a literal" : finding.symbol})`)
-              .join("; ")}; then run node apps/environment/scripts/upstream-fingerprint.ts --update.`,
+            `t3 files the upstream fingerprint watches changed since its last review, so this pin does not land by itself (fragility T2): ${upstreamFingerprint
+              .flatMap((finding) => findingSummary(finding) ?? [])
+              .join("; ")}. Then run ${UPDATE_COMMAND} on a branch of your own (ADR-0037's SPI-1011 refinement).`,
           ]
         : []),
       ...(t3TypeErrors !== undefined && t3TypeErrors > 0 ? [`The typecheck passed over ${t3TypeErrors} type error(s) in t3's own files (fragility U10).`] : []),

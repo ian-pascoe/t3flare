@@ -459,6 +459,10 @@ _Avoid_: app version, t3 version
 Moving the t3 pin to another nightly tag and proving it on the `bump` stage.
 _Avoid_: upgrade, sync
 
+**Upstream fingerprint**:
+The hashes of the t3 code our files restate or emulate, the literals t3 must still contain, and the watched files' blob ids, each recorded at the t3 commit last reviewed. A change holds a t3 bump for a person to review our named files: it does not land by itself.
+_Avoid_: snapshot, upstream hash
+
 **CLI pin**:
 A CLI agent's version in the Workspace image.
 _Avoid_: CLI version

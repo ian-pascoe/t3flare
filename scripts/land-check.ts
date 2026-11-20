@@ -19,7 +19,7 @@
 //       holds. The lock is not regenerated: the land runs hours after the proof, and the registry moves.
 //     - t3 bump, the upstream fingerprint (SPI-1011; ADR-0037's SPI-1011 refinement): every t3 file main's
 //       `apps/environment/test/fixtures/upstream-fingerprint.json` watches is, byte for byte, the one it was reviewed
-//       at (`upstreamFingerprintRefusal`; git blob ids, as no parser is installed here). Otherwise the pin needs a
+//       at (`upstreamFingerprintRefusal`; git blob ids of the gitlink's tree, as no parser is installed here). Otherwise the pin needs a
 //       person and does not land by itself. `--propose` (the publish job's check, `updates-ci.ts check-proposal`) only
 //       prints it: the bump is still pushed and proposed, so a person can review it in its pull request.
 import { spawnSync } from "node:child_process";
@@ -30,7 +30,7 @@ import * as path from "node:path";
 
 import { applyCliPin, CLI_PIN_FILES, cliPinRefusal, type PinFiles } from "../apps/environment/scripts/lib/cliPins.ts";
 import { landRefusal, lockProvenance, t3LockRefusal, t3ManifestRefusal, upstreamFingerprintRefusal } from "../apps/environment/scripts/lib/land.ts";
-import { FIXTURE_PATH } from "../apps/environment/scripts/lib/upstreamFingerprintFixture.ts";
+import { FIXTURE_PATH, gitBlobOf } from "../apps/environment/scripts/lib/upstreamFingerprintFixture.ts";
 import { COMMIT, parsePin, type Pin } from "../apps/environment/src/updates/pins.ts";
 import { git as gitIn, optionOf, tagCommitOf } from "./lib/updatesGit.ts";
 
@@ -132,11 +132,7 @@ if (pin.kind === "cli") {
       if (published !== entry.integrity) refuse(`${entry.name}@${entry.version}'s integrity is not the npm registry's (${String(published)})`);
     }
     console.log(JSON.stringify({ lockFromRegistry: provenance.registry.map((entry) => `${entry.name}@${entry.version}`) }));
-    const readT3 = (file: string) => {
-      const full = path.join(tree, "t3code", file);
-      return fs.existsSync(full) ? fs.readFileSync(full, "utf8") : undefined;
-    };
-    const fingerprint = upstreamFingerprintRefusal(show(base, FIXTURE_PATH), readT3);
+    const fingerprint = upstreamFingerprintRefusal(show(base, FIXTURE_PATH), gitBlobOf(path.join(tree, "t3code")));
     console.log(JSON.stringify({ upstreamFingerprint: fingerprint ?? "as reviewed" }));
     if (fingerprint !== undefined && !args.includes("--propose")) refuse(fingerprint);
   }

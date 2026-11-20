@@ -2,18 +2,20 @@
 // are tied to hashes of t3's regions and to literals that must still appear in t3's source. A change to either fails
 // here, naming our file to review and its register entry, until the fixture is updated after that review.
 import * as fs from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
 import {
-  blobId,
   checkFingerprint,
   extractRegion,
   FIXTURE_PATH,
   type Fingerprint,
   fingerprintFindings,
+  gitBlobOf,
   hashRegion,
   normalise,
+  REPORT_ONLY,
   REPORT_ONLY_ENV,
   UPDATE_COMMAND,
   updateFingerprint,
@@ -24,6 +26,11 @@ const ROOT = new URL("../../../", import.meta.url);
 const FIXTURE = new URL(FIXTURE_PATH, ROOT);
 const T3 = new URL("t3code/", ROOT);
 const readT3 = (file: string) => fs.readFileSync(new URL(file, T3), "utf8");
+/** A stand-in for git's blob id in the inline cases: any function of the bytes will do. */
+const fakeBlobOf = (sources: (file: string) => string | undefined) => (file: string) => {
+  const text = sources(file);
+  return text === undefined ? undefined : `blob:${text}`;
+};
 
 describe("normalise", () => {
   it("ignores layout: line breaks, indentation and the trailing commas a reflow adds", () => {
@@ -74,6 +81,8 @@ describe("extractRegion", () => {
     const region = { symbol: "make.capabilities", omitTrueFlags: true };
     expect(extractRegion(source, region)).toBe("capabilities: {b: flag === 1,...(c ? { c: true } : {})}");
     expect(hashRegion(withNewFlag, region)).toBe(hashRegion(source, region));
+    // A new conditional flag is a host condition: it changes the hash (fragility U4).
+    expect(hashRegion(source.replace("a: true,", "a: true, ...(onMac ? { d: true } : {}),"), region)).not.toBe(hashRegion(source, region));
     expect(hashRegion(source.replace("flag === 1", "flag === 2"), region)).not.toBe(hashRegion(source, region));
   });
 
@@ -112,23 +121,24 @@ describe("checkFingerprint", () => {
       },
     ],
     literals: [{ file: "apps/server/src/git.ts", literal: '"status", "-z"', ourFile: "apps/agents/src/workspace/staleReads.ts", entry: "U13" }],
-    files: {},
+    files: Object.fromEntries(Object.entries(files).map(([file, text]) => [file, `blob:${text}`])),
   };
+  const blobOf = fakeBlobOf((file) => files[file]);
 
   it("passes when every region hashes as recorded and every literal still appears", () => {
-    expect(checkFingerprint(fingerprint, read)).toEqual([]);
+    expect(checkFingerprint(fingerprint, read, blobOf)).toEqual([]);
   });
 
   it("names our file, its register entry, the diff to read and the update command when a region changed", () => {
     files["apps/server/src/server.ts"] = "const layerA = Layer.effect(A, makeA);\nconst layerReactor = Layer.effectDiscard(start);";
-    const [failure, ...rest] = checkFingerprint(fingerprint, read);
+    const [failure, ...rest] = checkFingerprint(fingerprint, read, blobOf);
     files["apps/server/src/server.ts"] = "const layerA = Layer.effect(A, makeA);";
     expect(rest).toEqual([]);
     expect(failure).toContain("t3code/apps/server/src/server.ts (*) changed: review apps/environment/src/t3/composition.ts (U1)");
     expect(failure).toContain("git -C t3code diff 0123456789ab -- apps/server/src/server.ts");
     expect(failure).toContain(UPDATE_COMMAND);
     files["apps/server/src/server.ts"] = "const layerB = 1;";
-    expect(fingerprintFindings(fingerprint, read)).toEqual([
+    expect(fingerprintFindings(fingerprint, read, blobOf)).toEqual([
       { kind: "changed", file: "apps/server/src/server.ts", symbol: "*", ourFile: "apps/environment/src/t3/composition.ts", entry: "U1" },
     ]);
     files["apps/server/src/server.ts"] = "const layerA = Layer.effect(A, makeA);";
@@ -136,7 +146,7 @@ describe("checkFingerprint", () => {
 
   it("fails on a region whose symbol or file is gone", () => {
     const gone = { ...fingerprint, regions: [{ ...fingerprint.regions[0]!, symbol: "layerB" }, { ...fingerprint.regions[0]!, file: "apps/server/src/gone.ts" }] };
-    const failures = checkFingerprint(gone, read);
+    const failures = checkFingerprint(gone, read, blobOf);
     expect(failures).toHaveLength(2);
     expect(failures[0]).toContain("t3code/apps/server/src/server.ts (layerB) is gone: review apps/environment/src/t3/composition.ts (U1)");
     expect(failures[1]).toContain("t3code/apps/server/src/gone.ts (*) is gone");
@@ -144,13 +154,24 @@ describe("checkFingerprint", () => {
 
   it("fails on a literal t3's source no longer contains, however t3 lays it out", () => {
     const moved = { ...fingerprint, literals: [{ ...fingerprint.literals[0]!, literal: '"status", "--porcelain=2"' }] };
-    const [failure] = checkFingerprint(moved, read);
+    const [failure] = checkFingerprint(moved, read, blobOf);
     expect(failure).toContain('t3code/apps/server/src/git.ts no longer contains `"status", "--porcelain=2"`: review apps/agents/src/workspace/staleReads.ts (U13)');
+  });
+
+  it("fails on a watched file whose bytes moved outside the watched regions: the land check compares whole files", () => {
+    files["apps/server/src/git.ts"] = 'const args = [\n  "status",\n  "-z",\n];\n// a comment';
+    const findings = fingerprintFindings(fingerprint, read, blobOf);
+    const [failure] = checkFingerprint(fingerprint, read, blobOf);
+    files["apps/server/src/git.ts"] = 'const args = [\n  "status",\n  "-z",\n];';
+    expect(findings).toEqual([{ kind: "moved", file: "apps/server/src/git.ts" }]);
+    expect(failure).toContain("t3code/apps/server/src/git.ts changed outside the watched regions");
+    expect(failure).toContain(UPDATE_COMMAND);
   });
 });
 
 describe("updateFingerprint", () => {
   const read = (file: string) => (file === "a.ts" ? "const a = 2;" : 'const b = ["x"];');
+  const blobOf = fakeBlobOf(read);
   const stale: Fingerprint = {
     reviewedCommit: "old",
     regions: [{ file: "a.ts", symbol: "a", hash: "stale", ourFile: "ours.ts", entry: "U1" }],
@@ -159,16 +180,16 @@ describe("updateFingerprint", () => {
   };
 
   it("records each region's current hash, each watched file's blob id, and the commit it was reviewed at", () => {
-    const updated = updateFingerprint(stale, read, "new");
+    const updated = updateFingerprint(stale, read, blobOf, "new");
     expect(updated.reviewedCommit).toBe("new");
     expect(updated.regions[0]!.hash).toBe(hashRegion("const a = 2;", { symbol: "a" }));
-    expect(updated.files).toEqual({ "a.ts": blobId("const a = 2;"), "b.ts": blobId('const b = ["x"];') });
-    expect(checkFingerprint(updated, read)).toEqual([]);
+    expect(updated.files).toEqual({ "a.ts": "blob:const a = 2;", "b.ts": 'blob:const b = ["x"];' });
+    expect(checkFingerprint(updated, read, blobOf)).toEqual([]);
   });
 
   it("refuses a gone region or literal: the fixture names those by hand", () => {
-    expect(() => updateFingerprint({ ...stale, regions: [{ ...stale.regions[0]!, symbol: "gone" }] }, read, "new")).toThrow(/a\.ts \(gone\) is gone/);
-    expect(() => updateFingerprint({ ...stale, literals: [{ ...stale.literals[0]!, literal: '["y"]' }] }, read, "new")).toThrow(/no longer contains/);
+    expect(() => updateFingerprint({ ...stale, regions: [{ ...stale.regions[0]!, symbol: "gone" }] }, read, blobOf, "new")).toThrow(/a\.ts \(gone\) is gone/);
+    expect(() => updateFingerprint({ ...stale, literals: [{ ...stale.literals[0]!, literal: '["y"]' }] }, read, blobOf, "new")).toThrow(/no longer contains/);
   });
 });
 
@@ -186,7 +207,16 @@ describe("the pinned t3code against the checked-in fingerprint", () => {
 
   // scripts/bump.ts sets REPORT_ONLY_ENV for its `pnpm run check` and reports the findings in a step of its own: a change
   // holds the pin for a person at the land check instead (ADR-0037's SPI-1011 refinement).
-  it.skipIf(process.env[REPORT_ONLY_ENV] === "report")("matches: every watched region and literal is as last reviewed", () => {
-    expect(checkFingerprint(fingerprint, readT3)).toEqual([]);
+  const reportOnly = process.env[REPORT_ONLY_ENV] === REPORT_ONLY;
+
+  it.skipIf(reportOnly)("matches: every watched region and literal is as last reviewed", () => {
+    expect(checkFingerprint(fingerprint, readT3, gitBlobOf(fileURLToPath(T3)))).toEqual([]);
+  });
+
+  // The land check refuses a pin whose watched files are not byte for byte these: the check fails on the same change.
+  it.skipIf(reportOnly)("matches byte for byte: every watched file's blob id is the one the land check compares", () => {
+    const blobOf = gitBlobOf(fileURLToPath(T3));
+    const moved = watchedFiles(fingerprint).filter((file) => blobOf(file) !== fingerprint.files[file]);
+    expect(moved, `watched t3 files changed since the last review: run ${UPDATE_COMMAND}`).toEqual([]);
   });
 });

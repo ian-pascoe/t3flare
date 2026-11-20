@@ -13,7 +13,7 @@ import { createHash } from "node:crypto";
 
 import { parseSync } from "rolldown/utils";
 
-import { blobId, FIXTURE_PATH, type Fingerprint, type RegionSpec, UPDATE_COMMAND, type WatchedRegion, watchedFiles } from "./upstreamFingerprintFixture.ts";
+import { FIXTURE_PATH, type Finding, type Fingerprint, type RegionSpec, UPDATE_COMMAND, type WatchedRegion, watchedFiles } from "./upstreamFingerprintFixture.ts";
 
 export * from "./upstreamFingerprintFixture.ts";
 
@@ -155,15 +155,18 @@ const tryRead = (read: (file: string) => string, file: string): string | undefin
   }
 };
 
-/** What changed since the last review: a region whose hash moved, a region that is gone, a literal t3 no longer has. */
-export type Finding =
-  | { readonly kind: "changed" | "gone"; readonly file: string; readonly symbol: string; readonly ourFile: string; readonly entry: string }
-  | { readonly kind: "missing"; readonly file: string; readonly literal: string; readonly ourFile: string; readonly entry: string };
+/** A t3 file's text, by path under `t3code/`. */
+type Read = (file: string) => string;
+/** A t3 file's git blob id at the pin (`gitBlobOf`), undefined when it is not there. */
+type BlobOf = (file: string) => string | undefined;
 
 /** The one place each kind of finding is put in words. */
 export const findingMessage = (finding: Finding, reviewedCommit: string): string => {
-  const review = `review ${finding.ourFile} (${finding.entry})`;
   const diff = `Diff since the last review: git -C t3code diff ${reviewedCommit.slice(0, 12)} -- ${finding.file}`;
+  if (finding.kind === "moved") {
+    return `t3code/${finding.file} changed outside the watched regions: nothing of ours to review there, but the land check compares whole files, so run ${UPDATE_COMMAND}. ${diff}`;
+  }
+  const review = `review ${finding.ourFile} (${finding.entry})`;
   switch (finding.kind) {
     case "changed":
       return `t3code/${finding.file} (${finding.symbol}) changed: ${review}, then run ${UPDATE_COMMAND}. ${diff}`;
@@ -176,8 +179,8 @@ export const findingMessage = (finding: Finding, reviewedCommit: string): string
 
 const regionFinding = (kind: "changed" | "gone", { file, symbol, ourFile, entry }: WatchedRegion): Finding => ({ kind, file, symbol, ourFile, entry });
 
-/** Each region with its current hash (undefined when gone), and every finding. */
-const evaluate = (fingerprint: Fingerprint, read: (file: string) => string) => {
+/** Each region with its current hash (undefined when gone), each watched file's blob id, and every finding. */
+const evaluate = (fingerprint: Fingerprint, read: Read, blobOf: BlobOf) => {
   const sources = new Map<string, string | undefined>();
   const sourceOf = (file: string) => {
     if (!sources.has(file)) sources.set(file, tryRead(read, file));
@@ -194,28 +197,33 @@ const evaluate = (fingerprint: Fingerprint, read: (file: string) => string) => {
       return source !== undefined && searchableSource(source).includes(normalise(literal)) ? [] : [{ kind: "missing", file, literal, ourFile, entry }];
     }),
   ];
-  return { regions, findings, sourceOf };
+  const blobs = Object.fromEntries(watchedFiles(fingerprint).map((file) => [file, blobOf(file)]));
+  const named = new Set(findings.map((finding) => finding.file));
+  for (const [file, blob] of Object.entries(blobs)) {
+    if (!named.has(file) && blob !== fingerprint.files[file]) findings.push({ kind: "moved", file });
+  }
+  return { regions, blobs, findings };
 };
 
-/** Every watched region that changed or is gone, and every literal t3's source no longer contains. */
-export const fingerprintFindings = (fingerprint: Fingerprint, read: (file: string) => string): Array<Finding> => evaluate(fingerprint, read).findings;
+/** Every watched region that changed or is gone, every literal t3's source no longer contains, and every other watched file whose bytes moved. */
+export const fingerprintFindings = (fingerprint: Fingerprint, read: Read, blobOf: BlobOf): Array<Finding> => evaluate(fingerprint, read, blobOf).findings;
 
 /** One message per finding. */
-export const checkFingerprint = (fingerprint: Fingerprint, read: (file: string) => string): Array<string> =>
-  fingerprintFindings(fingerprint, read).map((finding) => findingMessage(finding, fingerprint.reviewedCommit));
+export const checkFingerprint = (fingerprint: Fingerprint, read: Read, blobOf: BlobOf): Array<string> =>
+  fingerprintFindings(fingerprint, read, blobOf).map((finding) => findingMessage(finding, fingerprint.reviewedCommit));
 
 /**
  * The fingerprint with each region's current hash and each watched file's blob id, reviewed at `reviewedCommit`. A gone
  * region or a missing literal is the fixture's to fix by hand.
  */
-export const updateFingerprint = (fingerprint: Fingerprint, read: (file: string) => string, reviewedCommit: string): Fingerprint => {
-  const { regions, findings, sourceOf } = evaluate(fingerprint, read);
-  const unfixable = findings.filter((finding) => finding.kind !== "changed");
+export const updateFingerprint = (fingerprint: Fingerprint, read: Read, blobOf: BlobOf, reviewedCommit: string): Fingerprint => {
+  const { regions, blobs, findings } = evaluate(fingerprint, read, blobOf);
+  const unfixable = findings.filter((finding) => finding.kind === "gone" || finding.kind === "missing");
   if (unfixable.length > 0) throw new Error(unfixable.map((finding) => findingMessage(finding, fingerprint.reviewedCommit)).join("\n"));
   return {
     reviewedCommit,
     regions: regions.map(({ region, hash }) => ({ ...region, hash: hash! })),
     literals: fingerprint.literals,
-    files: Object.fromEntries(watchedFiles(fingerprint).map((file) => [file, blobId(sourceOf(file)!)])),
+    files: Object.fromEntries(Object.entries(blobs).map(([file, blob]) => [file, blob ?? ""])),
   };
 };

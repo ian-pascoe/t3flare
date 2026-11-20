@@ -80,6 +80,20 @@
       "entry": "U15"
     },
     {
+      "file": "packages/source-control-github/src/server/gitHubAuthStatus.ts",
+      "symbol": "ENVIRONMENT_TOKEN_SOURCE",
+      "hash": "bbc404cd696de616",
+      "ourFile": "apps/environment/src/agents/processRouter.ts",
+      "entry": "U15"
+    },
+    {
+      "file": "packages/source-control-github/src/server/gitHubAuthStatus.ts",
+      "symbol": "parseGitHubAuthStatus",
+      "hash": "ad1dcb8a6f914766",
+      "ourFile": "apps/environment/src/agents/processRouter.ts",
+      "entry": "U15"
+    },
+    {
       "file": "packages/source-control-github/src/server/GitHubCredentials.ts",
       "symbol": "make.fromGh",
       "hash": "e6319483557fb237",
@@ -128,7 +142,19 @@
     },
     {
       "file": "apps/server/src/vcs/GitVcsDriverCore.ts",
+      "literal": "const diffArgs = [...REVIEW_DIFF_ARGS, ...(input.ignoreWhitespace ? [\"--ignore-all-space\"] : [])];",
+      "ourFile": "apps/agents/src/workspace/staleReads.ts",
+      "entry": "U13"
+    },
+    {
+      "file": "apps/server/src/vcs/GitVcsDriverCore.ts",
       "literal": "const args = [...diffArgs, \"--raw\", \"--numstat\", \"-z\"];",
+      "ourFile": "apps/agents/src/workspace/staleReads.ts",
+      "entry": "U13"
+    },
+    {
+      "file": "apps/server/src/vcs/GitVcsDriverCore.ts",
+      "literal": "[...args, ref, \"--\", ...pathArgs]",
       "ourFile": "apps/agents/src/workspace/staleReads.ts",
       "entry": "U13"
     },
