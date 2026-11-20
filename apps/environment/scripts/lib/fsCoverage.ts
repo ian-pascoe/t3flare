@@ -40,10 +40,18 @@ export interface ShimSurface {
 /** Members allowed to come from workerd's own module, each with the reason it is safe there. */
 export type FsAllowances = Readonly<Record<FsModule, Readonly<Record<string, string>>>>;
 
+/** One aliased module's node:fs reads. */
+export interface FsModuleUsage {
+  readonly importer: string;
+  readonly usage: FsUsage;
+}
+
 export interface FsCoverage {
   readonly uncovered: ReadonlyArray<{ readonly module: FsModule; readonly member: string; readonly importers: ReadonlyArray<string> }>;
   /** `importer: description` for each opaque use. */
   readonly opaque: ReadonlyArray<string>;
+  /** Allowances some bundled module uses, as `module.member`. */
+  readonly allowed: ReadonlyArray<string>;
   /** Allowances no bundled module uses any more: stale, to delete. */
   readonly unusedAllowances: ReadonlyArray<string>;
 }
@@ -78,13 +86,17 @@ const nameOf = (node: unknown): string | undefined => {
 };
 
 const label = (module: FsModule) => `node:${module}`;
+const keyOf = (module: FsModule, member: string) => `${module}.${member}`;
+
+/** A source of members: a namespace or default binding, node:fs's `promises`, or an awaited dynamic import. */
+type Source = { readonly module: FsModule; readonly via: FsUse["via"]; readonly name: string };
 
 /** The `node:fs` members a module reads, from its AST (as `this.parse` or `parseAst` give it). */
 export const fsUsageOf = (program: Program): FsUsage => {
   const uses: Array<FsUse> = [];
   const opaque: Array<string> = [];
-  /** Local name → the module its namespace or default import binds, and how. */
-  const bindings = new Map<string, { readonly module: FsModule; readonly via: FsUse["via"] }>();
+  /** Local name → the module its namespace, default or `promises` import binds, and how. */
+  const bindings = new Map<string, Omit<Source, "name">>();
 
   for (const statement of program.body as unknown as ReadonlyArray<Node>) {
     const specifier = sourceOf(statement);
@@ -95,18 +107,74 @@ export const fsUsageOf = (program: Program): FsUsage => {
       for (const spec of statement.specifiers as ReadonlyArray<Node>) {
         const local = nameOf(spec.local)!;
         if (spec.type === "ImportSpecifier") {
-          if (spec.importKind !== "type") uses.push({ module, member: nameOf(spec.imported)!, via: "named" });
+          if (spec.importKind === "type") continue;
+          const member = nameOf(spec.imported)!;
+          uses.push({ module, member, via: "named" });
+          // `import { promises as fsp } from "node:fs"`: fsp's members are node:fs/promises's.
+          if (module === "fs" && member === "promises") bindings.set(local, { module: "fs/promises", via: "named" });
         } else bindings.set(local, { module, via: spec.type === "ImportDefaultSpecifier" ? "default" : "named" });
       }
     } else if (statement.type === "ExportNamedDeclaration" && statement.exportKind !== "type") {
-      for (const spec of statement.specifiers as ReadonlyArray<Node>) uses.push({ module, member: nameOf(spec.local)!, via: "named" });
+      for (const spec of statement.specifiers as ReadonlyArray<Node>) {
+        const member = nameOf(spec.local)!;
+        uses.push({ module, member, via: "named" });
+        if (module === "fs" && member === "promises") opaque.push(`export { promises } from "${specifier}"`);
+      }
     } else if (statement.type === "ExportAllDeclaration") {
       opaque.push(`export * from "${specifier}"`);
     }
   }
 
+  /** Records a read of `member` from `source`; node:fs's `promises` is itself a source, of node:fs/promises. */
+  const read = (source: Source, member: string): Source | undefined => {
+    uses.push({ module: source.module, member, via: source.via });
+    return source.module === "fs" && member === "promises" ? { module: "fs/promises", via: "named", name: `${source.name}.promises` } : undefined;
+  };
+
+  /** `const { a, b: c, promises: { d } } = source`: each key is a member read. */
+  const destructure = (source: Source, pattern: Node): void => {
+    for (const property of pattern.properties as ReadonlyArray<Node>) {
+      const member = property.type === "Property" && !property.computed ? nameOf(property.key) : undefined;
+      if (member === undefined) {
+        opaque.push(`${source.name} (${label(source.module)}) destructured with ${property.type === "RestElement" ? "a rest element" : "a computed key"}`);
+        continue;
+      }
+      const inner = read(source, member);
+      if (inner !== undefined && isNode(property.value) && property.value.type === "ObjectPattern") destructure(inner, property.value);
+    }
+  };
+
+  /** The source an expression names, if it names one: a binding, `binding.promises`, or `await import("node:fs")`. */
+  const sourceAt = (node: Node): { readonly source: Source; readonly read?: string } | undefined => {
+    if (node.type === "Identifier") {
+      const binding = bindings.get(node.name as string);
+      return binding === undefined ? undefined : { source: { ...binding, name: node.name as string } };
+    }
+    if (node.type === "MemberExpression" && !node.computed && isNode(node.object) && node.object.type === "Identifier") {
+      const binding = bindings.get(node.object.name as string);
+      const member = nameOf(node.property);
+      if (binding === undefined || binding.module !== "fs" || member !== "promises") return undefined;
+      return { source: { ...binding, name: node.object.name as string }, read: member };
+    }
+    if (node.type === "AwaitExpression" && isNode(node.argument) && node.argument.type === "ImportExpression") {
+      const specifier = sourceOf(node.argument);
+      const module = specifier === undefined ? undefined : FS_MODULE_OF[specifier];
+      return module === undefined ? undefined : { source: { module, via: "named", name: `import("${specifier}")` } };
+    }
+    return undefined;
+  };
+
   const visit = (node: Node, parent: Node | undefined, key: string | undefined): void => {
     if (TYPE_NODES.has(node.type) || node.type === "ImportDeclaration") return;
+    if (node.type === "VariableDeclarator" && isNode(node.id) && node.id.type === "ObjectPattern" && isNode(node.init)) {
+      const found = sourceAt(node.init);
+      if (found !== undefined) {
+        const source = found.read === undefined ? found.source : read(found.source, found.read)!;
+        destructure(source, node.id);
+        visit(node.id, node, "id");
+        return;
+      }
+    }
     if (node.type === "ImportExpression") {
       const specifier = sourceOf(node);
       if (specifier !== undefined && FS_MODULE_OF[specifier] !== undefined) opaque.push(`import("${specifier}")`);
@@ -114,15 +182,17 @@ export const fsUsageOf = (program: Program): FsUsage => {
     if (node.type === "MemberExpression" && isNode(node.object) && node.object.type === "Identifier") {
       const binding = bindings.get(node.object.name as string);
       if (binding !== undefined) {
+        const source = { ...binding, name: node.object.name as string };
         const member = node.computed ? undefined : nameOf(node.property);
         if (member === undefined) {
-          opaque.push(`${node.object.name as string} (${label(binding.module)}) read with a computed member`);
+          opaque.push(`${source.name} (${label(source.module)}) read with a computed member`);
         } else {
-          uses.push({ module: binding.module, member, via: binding.via });
-          // `NodeFS.promises.readFile`: a member of node:fs/promises, reached through node:fs.
-          if (binding.module === "fs" && member === "promises" && parent?.type === "MemberExpression" && key === "object" && !parent.computed) {
-            const inner = nameOf(parent.property);
-            if (inner !== undefined) uses.push({ module: "fs/promises", member: inner, via: "named" });
+          const inner = read(source, member);
+          // `NodeFS.promises.readFile` reads node:fs/promises's readFile; `NodeFS.promises` anywhere else is opaque.
+          if (inner !== undefined) {
+            const innerMember = parent?.type === "MemberExpression" && key === "object" && !parent.computed ? nameOf(parent.property) : undefined;
+            if (innerMember === undefined) opaque.push(`${inner.name} (${label(inner.module)}) used as a value`);
+            else read(inner, innerMember);
           }
         }
         return;
@@ -171,22 +241,18 @@ export const shimSurfaceOf = (program: Program): ShimSurface => {
 };
 
 /** Each use no shim implements and no allowance explains, by member, with the modules that read it. */
-export const fsCoverage = (
-  modules: ReadonlyArray<{ readonly importer: string; readonly usage: FsUsage }>,
-  surfaces: Readonly<Record<FsModule, ShimSurface>>,
-  allowances: FsAllowances,
-): FsCoverage => {
+export const fsCoverage = (modules: ReadonlyArray<FsModuleUsage>, surfaces: Readonly<Record<FsModule, ShimSurface>>, allowances: FsAllowances): FsCoverage => {
   const uncovered = new Map<string, { module: FsModule; member: string; importers: Set<string> }>();
-  const allowedAndUsed = new Set<string>();
+  const allowed = new Set<string>();
   const opaque: Array<string> = [];
   for (const { importer, usage } of modules) {
     for (const description of usage.opaque) opaque.push(`${importer}: ${description}`);
     for (const { module, member, via } of usage.uses) {
       const surface = surfaces[module];
       if ((via === "default" ? surface.defaultKeys : surface.named).has(member)) continue;
-      const key = `${module}.${member}`;
+      const key = keyOf(module, member);
       if (Object.hasOwn(allowances[module], member)) {
-        allowedAndUsed.add(key);
+        allowed.add(key);
         continue;
       }
       const entry = uncovered.get(key) ?? { module, member, importers: new Set<string>() };
@@ -200,9 +266,29 @@ export const fsCoverage = (
       .toSorted(([a], [b]) => byKey(a, b))
       .map(([, { module, member, importers }]) => ({ module, member, importers: [...importers].toSorted(byKey) })),
     opaque,
+    allowed: [...allowed].toSorted(byKey),
     unusedAllowances: (Object.entries(allowances) as Array<[FsModule, Readonly<Record<string, string>>]>)
-      .flatMap(([module, members]) => Object.keys(members).map((member) => `${module}.${member}`))
-      .filter((key) => !allowedAndUsed.has(key))
+      .flatMap(([module, members]) => Object.keys(members).map((member) => keyOf(module, member)))
+      .filter((key) => !allowed.has(key))
       .toSorted(byKey),
   };
+};
+
+/** The coverage check's failure, naming what to do, or undefined when every read is implemented or allowed. */
+export const fsCoverageFailure = (coverage: FsCoverage): string | undefined => {
+  if (coverage.uncovered.length === 0 && coverage.opaque.length === 0) return undefined;
+  const lines = ["t3flare: t3 reads node:fs members the State directory's shims may not implement, so they would reach workerd's own file system (SPI-1301):"];
+  if (coverage.uncovered.length > 0) {
+    lines.push(
+      ...coverage.uncovered.map(({ module, member, importers }) => `  ${label(module)}.${member}, read by ${importers.join(", ")}`),
+      "Implement each in src/shims/node-fs.ts or node-fs-promises.ts, or allow it in build.ts's FS_ALLOWANCES with the reason it is safe.",
+    );
+  }
+  if (coverage.opaque.length > 0) {
+    lines.push(
+      ...coverage.opaque.map((description) => `  ${description}`),
+      "Their members cannot be read statically: rewrite each (a Patch, ADR-0001) to read members by name (a namespace or named import, member reads, destructuring), or teach scripts/lib/fsCoverage.ts the form.",
+    );
+  }
+  return lines.join("\n");
 };

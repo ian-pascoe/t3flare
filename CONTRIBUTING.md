@@ -55,8 +55,8 @@ people up most:
 
 ## Checks
 
-`pnpm run check` runs the patch, workspace and lock checks, the typechecks, lint and tests. It must pass before you open
-a pull request.
+`pnpm run check` runs the patch, workspace and lock checks, the `node:fs` coverage check (`check:fs`), the typechecks,
+lint and tests. It must pass before you open a pull request.
 
 Every pull request runs [`ci.yml`](.github/workflows/ci.yml): `check` (that same command, required to merge) and
 `secrets` (a gitleaks scan of the PR's commits). CI gets no secrets and a read-only token, so it never deploys anything

@@ -25,7 +25,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { Plugin } from "rolldown";
 
-import { type FsAllowances, type FsCoverage, type FsUsage, FS_MODULE_OF, fsCoverage, fsUsageOf, shimSurfaceOf } from "./scripts/lib/fsCoverage.ts";
+import { type FsAllowances, type FsCoverage, type FsModuleUsage, type FsUsage, FS_MODULE_OF, fsCoverage, fsCoverageFailure, fsUsageOf, shimSurfaceOf } from "./scripts/lib/fsCoverage.ts";
 import { stampedManifest, t3ServerVersion, t3TrackSetting } from "./serverVersion.ts";
 import type { T3Track } from "./src/updates/pins.ts";
 import { T3_CONNECT_DEFINES } from "./src/t3/connectPublicConfig.ts";
@@ -108,8 +108,8 @@ export interface BuildReport {
       readonly rewritten: number;
       readonly importers: number;
       readonly skippedDependencyImports: number;
-      /** The node:fs members t3's modules read that no shim implements (SPI-1301): empty, or the build fails. */
-      readonly coverage: FsCoverage & { readonly allowed: ReadonlyArray<string> };
+      /** The node:fs members t3's modules read that no shim implements (SPI-1301): `uncovered` and `opaque` are empty, or the build fails. */
+      readonly coverage: FsCoverage;
     };
     readonly builtinStubs: ReadonlyArray<string>;
     readonly dependencyStubs: ReadonlyArray<string>;
@@ -193,7 +193,7 @@ type FsAliasReport = {
   importers: Set<string>;
   skippedDependencyImports: number;
   /** Each aliased module's node:fs reads, for the coverage check (SPI-1301). */
-  usages: Array<{ readonly importer: string; readonly usage: FsUsage }>;
+  usages: Array<FsModuleUsage>;
 };
 
 const t3NodeFsAlias = (report: FsAliasReport): Plugin => {
@@ -244,36 +244,19 @@ const t3NodeFsAlias = (report: FsAliasReport): Plugin => {
  * with the reason that is safe. Any other member a shim does not implement fails the build: implement it in the shim,
  * or allow it here with its reason. An allowance no module reads any more is listed in the report, to delete.
  */
-export const FS_ALLOWANCES: FsAllowances = {
+const FS_ALLOWANCES: FsAllowances = {
   fs: {
     write:
-      "resourceTelemetry/DesktopTelemetryReceiver.ts writes to the desktop app's control descriptor, which the Cloud Environment never has: composition.ts sets desktopTelemetryControlFd undefined, and sendControlMessage returns first",
+      "resourceTelemetry/DesktopTelemetryReceiver.ts's writeAllToFileDescriptor writes to the desktop app's control descriptors, which the Cloud Environment never has: composition.ts sets desktopTelemetryControlFd and desktopBrowserControlFd undefined, so DesktopTelemetryReceiver's sendControlMessage and preview/DesktopBrowserChannel.ts's make return before either writes",
   },
   "fs/promises": {},
 };
 
 /** The coverage of the State directory's shims over `usages`, as the report keeps it. */
-const checkFsCoverage = async (usages: FsAliasReport["usages"]): Promise<FsCoverage & { readonly allowed: ReadonlyArray<string> }> => {
+const checkFsCoverage = async (usages: ReadonlyArray<FsModuleUsage>): Promise<FsCoverage> => {
   const { parseAst } = await import("rolldown/parseAst");
   const surface = (name: string) => shimSurfaceOf(parseAst(fs.readFileSync(shim(name), "utf8"), { lang: "ts" }, shim(name)));
-  const coverage = fsCoverage(usages, { fs: surface("node-fs.ts"), "fs/promises": surface("node-fs-promises.ts") }, FS_ALLOWANCES);
-  const allowed = (Object.entries(FS_ALLOWANCES) as Array<[string, Record<string, string>]>)
-    .flatMap(([module, members]) => Object.keys(members).map((member) => `${module}.${member}`))
-    .filter((key) => !coverage.unusedAllowances.includes(key));
-  return { ...coverage, allowed };
-};
-
-/** The coverage check's failure, or undefined when every read is implemented or allowed. */
-export const fsCoverageFailure = (coverage: FsCoverage): string | undefined => {
-  if (coverage.uncovered.length === 0 && coverage.opaque.length === 0) return undefined;
-  const lines = [
-    ...coverage.uncovered.map(({ module, member, importers }) => `  node:${module}.${member}, read by ${importers.join(", ")}`),
-    ...coverage.opaque.map((description) => `  ${description} (its members cannot be read statically)`),
-  ];
-  return (
-    `t3flare: t3 reads node:fs members the State directory's shims do not implement, so they would reach workerd's own file system (SPI-1301):\n${lines.join("\n")}\n` +
-    `Implement each in src/shims/node-fs.ts or node-fs-promises.ts, or allow it in build.ts's FS_ALLOWANCES with the reason it is safe.`
-  );
+  return fsCoverage(usages, { fs: surface("node-fs.ts"), "fs/promises": surface("node-fs-promises.ts") }, FS_ALLOWANCES);
 };
 
 /** Redirects every import that resolves to a shadowed t3 module to its Shadow. */

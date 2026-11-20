@@ -3,7 +3,7 @@
 import { parseAst } from "rolldown/parseAst";
 import { describe, expect, it } from "vitest";
 
-import { fsCoverage, fsUsageOf, shimSurfaceOf } from "../scripts/lib/fsCoverage.ts";
+import { fsCoverage, fsCoverageFailure, fsUsageOf, shimSurfaceOf } from "../scripts/lib/fsCoverage.ts";
 
 const usage = (code: string) => fsUsageOf(parseAst(code, { lang: "ts" }));
 const uses = (code: string) => usage(code).uses.map(({ module, member, via }) => `${module}.${member} (${via})`);
@@ -53,6 +53,46 @@ describe("fsUsageOf", () => {
 
   it("calls a dynamic import opaque", () => {
     expect(usage('const fs = await import("node:fs");').opaque).toEqual(['import("node:fs")']);
+  });
+
+  it("reads destructured members, of a binding, its `promises` or an awaited dynamic import", () => {
+    const result = usage(`import * as NodeFS from "node:fs";
+      import fsd from "fs";
+      const { watch, readSync: read } = NodeFS;
+      const { open } = fsd;
+      const { opendir } = NodeFS.promises;
+      const { rm, promises: { cp } } = await import("node:fs");`);
+    expect(result.uses.map(({ module, member, via }) => `${module}.${member} (${via})`)).toEqual([
+      "fs.watch (named)",
+      "fs.readSync (named)",
+      "fs.open (default)",
+      "fs.promises (named)",
+      "fs/promises.opendir (named)",
+      "fs.rm (named)",
+      "fs.promises (named)",
+      "fs/promises.cp (named)",
+    ]);
+    expect(result.opaque).toEqual([]);
+  });
+
+  it("calls a destructuring rest, or a computed key, opaque", () => {
+    expect(usage('import * as F from "node:fs"; const { a, ...rest } = F; const { [k]: b } = F;').opaque).toEqual([
+      "F (node:fs) destructured with a rest element",
+      "F (node:fs) destructured with a computed key",
+    ]);
+  });
+
+  it("follows node:fs's `promises` through a named import, and calls it opaque anywhere else", () => {
+    const result = usage(`import * as NodeFS from "node:fs";
+      import { promises as fsp } from "node:fs";
+      await fsp.opendir(p);
+      const q = NodeFS.promises; q.watch(p);`);
+    expect(result.uses.map(({ module, member }) => `${module}.${member}`)).toEqual(["fs.promises", "fs/promises.opendir", "fs.promises"]);
+    expect(result.opaque).toEqual(["NodeFS.promises (node:fs/promises) used as a value"]);
+  });
+
+  it("calls a re-export of node:fs's `promises` opaque", () => {
+    expect(usage('export { promises } from "node:fs";').opaque).toEqual(['export { promises } from "node:fs"']);
   });
 });
 
@@ -112,6 +152,7 @@ describe("fsCoverage", () => {
       { fs: { createReadStream: "reason", watch: "reason" }, "fs/promises": {} },
     );
     expect(result.uncovered).toEqual([]);
+    expect(result.allowed).toEqual(["fs.createReadStream"]);
     expect(result.unusedAllowances).toEqual(["fs.watch"]);
   });
 
@@ -122,5 +163,24 @@ describe("fsCoverage", () => {
       { fs: {}, "fs/promises": {} },
     );
     expect(result.opaque).toEqual(["x.ts: F (node:fs) used as a value"]);
+  });
+});
+
+describe("fsCoverageFailure", () => {
+  it("passes coverage with nothing uncovered or opaque", () => {
+    expect(fsCoverageFailure({ uncovered: [], opaque: [], allowed: ["fs.write"], unusedAllowances: ["fs.watch"] })).toBeUndefined();
+  });
+
+  it("names each uncovered member with its readers, and each opaque use, with what to do about each", () => {
+    const failure = fsCoverageFailure({
+      uncovered: [{ module: "fs", member: "readSync", importers: ["a.ts", "b.ts"] }],
+      opaque: ["c.ts: F (node:fs) used as a value"],
+      allowed: [],
+      unusedAllowances: [],
+    });
+    expect(failure).toContain("node:fs.readSync, read by a.ts, b.ts");
+    expect(failure).toContain("FS_ALLOWANCES");
+    expect(failure).toContain("c.ts: F (node:fs) used as a value");
+    expect(failure).toContain("rewrite");
   });
 });

@@ -201,7 +201,7 @@ realpathSync.native = realpathSync;
 type Callback<T> = (error: Error | null, value?: T) => void;
 
 /** Node's callback form of a sync call: the callback runs on a later microtask, with the error or the value. */
-const answer = <T>(run: () => T, callback: Callback<T>): void => {
+const toCallback = <T>(run: () => T, callback: Callback<T>): void => {
   let value: T;
   try {
     value = run();
@@ -218,12 +218,12 @@ const callbackOf = <T>(optionsOrCallback: unknown, callback: Callback<T> | undef
 // The callback forms t3 calls on State directory paths (SPI-1301's check lists them): `realpath` in
 // `assets/MediaFile.ts`, `stat` in `usage/usageTranscriptReader.ts`.
 export function realpath(input: unknown, optionsOrCallback: unknown, callback?: Callback<string>): void {
-  answer(() => realpathSync(input), callbackOf(optionsOrCallback, callback));
+  toCallback(() => realpathSync(input), callbackOf(optionsOrCallback, callback));
 }
 realpath.native = realpath;
 
 export function stat(input: unknown, optionsOrCallback: unknown, callback?: Callback<any>): void {
-  answer(() => statSync(input), callbackOf(optionsOrCallback, callback));
+  toCallback(() => statSync(input), callbackOf(optionsOrCallback, callback));
 }
 
 /** workerd's own: the same numbers `openSync` decodes. */
