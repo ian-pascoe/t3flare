@@ -137,7 +137,7 @@ describe("a Session on a sign-in endpoint", () => {
     const session = sessionWith(() => ({ apiKey: null, signedOut: true, problem: "ChatGPT refused to renew the sign-in (invalid_grant): it is signed out" }));
     await session.endpoints.take();
     const error = await session.request();
-    expect(error).toMatch(/The Model endpoint "chatgpt" is not signed in to ChatGPT \(ChatGPT refused to renew the sign-in \(invalid_grant\): it is signed out\): sign in with ChatGPT again in the Settings page\./);
+    expect(error).toMatch(/The Model endpoint "chatgpt" is not signed in to ChatGPT \(ChatGPT refused to renew the sign-in \(invalid_grant\): it is signed out\): sign in with ChatGPT again on the Settings page\./);
     expect(session.sent).toEqual([]);
     const transient = sessionWith(() => ({ apiKey: null, problem: "its ChatGPT sign-in could not be renewed yet: retry the turn" }));
     await transient.endpoints.take();

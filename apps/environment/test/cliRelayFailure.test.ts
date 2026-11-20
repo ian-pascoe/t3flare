@@ -66,7 +66,7 @@ const KEY_REFUSED: EndpointFailureRecord = {
   endpointId: "commissary",
   class: "permission_error",
   code: "key_refused",
-  message: 'The Model endpoint "commissary" refused its API key (HTTP 401): check it in the Settings page.',
+  message: 'The Model endpoint "commissary" refused its API key (HTTP 401): check it on the Settings page.',
   retryable: false,
   stop: true,
   at: NOW,

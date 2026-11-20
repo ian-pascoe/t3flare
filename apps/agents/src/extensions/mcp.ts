@@ -96,7 +96,7 @@ const toolOf = (server: McpView["servers"][number], tool: McpView["servers"][num
             kind: "mcp-tool",
             definition: tool.hash,
             summary: cardText(`${server.name}: ${tool.upstream}\n${JSON.stringify(args, null, 2)}`),
-            detail: `A ${tool.class} tool (${tool.hinted === undefined || tool.hinted === tool.class ? "the tool's own hint" : "class set in the Settings page"}).`,
+            detail: `A ${tool.class} tool (${tool.hinted === undefined || tool.hinted === tool.class ? "the tool's own hint" : "class set on the Settings page"}).`,
           },
           api,
           context,

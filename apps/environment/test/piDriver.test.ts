@@ -46,7 +46,7 @@ describe("pi's driver snapshot", () => {
     const setup = {
       models: [],
       status: "warning",
-      message: "Pi has no Model endpoint to run on: it needs one that lists a model; add one in the Settings page (/_t3flare/settings), under Model endpoints.",
+      message: "Pi has no Model endpoint to run on: it needs one that lists a model; add one on the Settings page (/_t3flare/settings), under Model endpoints.",
     };
     expect(await settle([])).toEqual(setup);
     endpoints = { revision: 2, endpoints: [endpoint("comm", "anthropic-messages", ["c"]), endpoint("gem", "google-generative-ai", ["g"])] };

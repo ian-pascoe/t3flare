@@ -2,9 +2,10 @@
 // interpolation, and no `style` attribute anywhere on the page (the CSP would refuse it).
 //
 // It echoes T3 Code's web client (SPI-1086) without importing it: t3's colour tokens (its zinc light theme and true-black
-// dark theme), with t3flare's flare orange as the primary (dark ink on it: white on that orange is too faint), its radii (0.5rem controls, 0.75rem groups), its settings layout (a quiet sidebar,
-// 16px semibold section titles over grouped, divided rows with 14px titles and 12px descriptions) and its system font
-// stack. Light and dark follow `prefers-color-scheme`.
+// dark theme), its radii (0.5rem controls, 0.75rem groups), its settings layout (a quiet sidebar, 16px semibold section
+// titles over grouped, divided rows with 14px titles and 12px descriptions) and its system font stack. Light and dark
+// follow `prefers-color-scheme`. The primary is t3flare's flare orange, with dark ink on it (white on that orange is too
+// faint); its two colours repeat pageBrand.ts's FLARE_FROM and FLARE_TO, since this constant cannot import them.
 export const STYLE = `:root{color-scheme:light dark;
 --bg:#fcfcfc;--fg:#18181b;--card:#fff;--sidebar:#fafafa;--muted:#f4f4f5;--muted-fg:#71717a;--border:#e4e4e7;--row-border:#ececee;--input:#d4d4d8;
 --hover:#f4f4f5;--selected:#fff;--primary:#FF7A1A;--primary-fg:#18181b;--primary-soft:color-mix(in oklab,var(--primary) 10%,transparent);--ring:#EA580C;

@@ -1,13 +1,13 @@
 # Model endpoints
 
-**Every model call t3flare makes goes to a Model endpoint you set up in the Settings page.** An endpoint is one of your
+**Every model call t3flare makes goes to a Model endpoint you set up on the Settings page.** An endpoint is one of your
 own ways to reach models: an API pi-ai speaks, at a base URL, with an API key, a subscription sign-in or no auth, and the
 models it serves ([ADR-0034](adr/0034-model-endpoints-are-the-owners-set-in-the-harness-panel.md)). t3flare has no
 other way to reach a model: no Model proxy, no key of its own in a Worker setting (the hard cut, SPI-1176; until then a
 Model proxy, Commissary, served every model, [ADR-0012](adr/0012-all-model-access-goes-through-the-model-proxy.md)).
 
 A new Environment has no endpoint, so it starts in the **setup state**: every agent's provider shows **Needs attention**
-with "No Model endpoint is set up: add one in the Settings page (/_t3flare/settings), under Model endpoints." (each CLI
+with "No Model endpoint is set up: add one on the Settings page (/_t3flare/settings), under Model endpoints." (each CLI
 agent names the API it needs), and a CLI agent's thread is refused at its start, saying so. Do the setup step below once.
 
 ## The setup step
@@ -198,7 +198,7 @@ own SDK.
 A failed answer is classified by its endpoint's API and auth, from what the vendor documents as machine-readable (the
 status, the error's type and code, the reset headers), never its prose (ADR-0034 §8). A usage limit pauses the thread
 until its reset ("Usage limit reached", auto-resume when the client has it on); a refused key or sign-in names the
-endpoint and says what to do in the Settings page; overload and 5xx are retried. Nothing falls back to another endpoint.
+endpoint and says what to do on the Settings page; overload and 5xx are retried. Nothing falls back to another endpoint.
 
 ## Usage and limits (t3's Usage page and limit meters)
 

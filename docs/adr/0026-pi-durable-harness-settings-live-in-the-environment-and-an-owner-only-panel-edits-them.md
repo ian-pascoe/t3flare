@@ -77,3 +77,12 @@ that narrower path, and the Worker verifies its audience apart from the panel's.
 [ADR-0036](0036-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md)
 records the layout, the conditions it rests on (one still pending the owner's sign-in), and its fallback, a Worker on a
 host of its own. The back-to-stock reasons (no forwarder, no admin host) still hold for the panel.
+
+## Refinement: the Settings page at `/_t3flare/settings` (owner, 2026-11-20)
+
+Contradicts §1's path, deliberately. The panel is now the **Settings page**, at `/_t3flare/settings` on the t3 host:
+"Harness" named only half of what it edits since the Environment settings joined it
+([ADR-0032](0032-environment-settings-and-harness-settings-are-separate-entities-edited-on-one-owner-page.md)). Everything
+else holds: the same `/_t3flare` Access application, §2's checks, and its Change pages below it. The old
+`/_t3flare/harness` paths answer a 308 to the same path under `/_t3flare/settings`, only after that same Access check, so
+bookmarks, refusals already shown and Change links already sent still land. The sections above keep the old name as written.

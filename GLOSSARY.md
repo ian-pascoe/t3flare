@@ -243,7 +243,7 @@ _Avoid_: scripting, eval
 An MCP endpoint whose tools t3flare's agents may call: a Direct server, or the Settings server.
 
 **Direct server**:
-A remote MCP server added to the MCP server set by the Owner in the Settings page, or at an agent's asking, with its
+A remote MCP server added to the MCP server set by the Owner on the Settings page, or at an agent's asking, with its
 own sign-in kept by t3flare.
 _Avoid_: custom server, Route B (the plan's word)
 
@@ -384,7 +384,7 @@ _Avoid_: prompt, snippet, MCP prompt
 One configured way to reach an agent or model provider, with its own credentials. Used in t3's sense.
 
 **Model endpoint**:
-One of the Owner's own ways to reach models: where to send requests, with an API key, a sign-in or none, and the models it serves. Every model call t3flare makes goes to one. Set up in the Settings page.
+One of the Owner's own ways to reach models: where to send requests, with an API key, a sign-in or none, and the models it serves. Every model call t3flare makes goes to one. Set up on the Settings page.
 _Avoid_: provider (that is t3's or pi-ai's), connection, backend
 
 **Model relay**:
@@ -404,7 +404,7 @@ The usage windows one Model endpoint answer reported in its vendor's rate-limit 
 _Avoid_: quota report, usage record (that counts tokens)
 
 **Subscription**:
-An Owner's own paid plan with a model vendor (ChatGPT, Claude Pro or Max, GitHub Copilot), signed in to as a Model endpoint in the Settings page, as opposed to an API key. It belongs to one Owner and one Deployment and is never shared.
+An Owner's own paid plan with a model vendor (ChatGPT, Claude Pro or Max, GitHub Copilot), signed in to as a Model endpoint on the Settings page, as opposed to an API key. It belongs to one Owner and one Deployment and is never shared.
 _Avoid_: Subscription login, OAuth, account
 
 **Credential broker**:

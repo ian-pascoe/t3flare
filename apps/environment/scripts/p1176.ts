@@ -109,7 +109,7 @@ const all = await tailing([`t3flare-agents-${stage}`, `t3flare-environment-${sta
   }
   const durableFailures = itemsOf(durableProjection).filter((item: any) => item.type === "error").map((item: any) => ({ code: item.failure?.code ?? null, message: String(item.failure?.message ?? "") }));
   report.setupDurableTurn = clean({ runs: runsOf(durableProjection).map((run) => run.status), failures: durableFailures });
-  check("a Pi Durable turn with no endpoint fails, saying to set one up in the Settings page", runsOf(durableProjection).at(-1)?.status === "failed" && durableFailures.some((entry) => /No Model endpoint is set up: add one in the Settings page/.test(entry.message)), report.setupDurableTurn);
+  check("a Pi Durable turn with no endpoint fails, saying to set one up on the Settings page", runsOf(durableProjection).at(-1)?.status === "failed" && durableFailures.some((entry) => /No Model endpoint is set up: add one on the Settings page/.test(entry.message)), report.setupDurableTurn);
   // Each CLI's spawn, refused with what it needs.
   const setupWorkspace = `p1176-setup-${runId}`;
   const refusals: Record<string, unknown> = {};

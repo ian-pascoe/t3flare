@@ -74,8 +74,8 @@ describe("runText on Model endpoints", () => {
   });
 
   it("passes the agents Worker's failure on, naming the endpoint", async () => {
-    bind(() => ({ ok: false, error: 'The Model endpoint "openai" refused its API key (HTTP 401): check it in the Settings page.' }));
-    expect(detailOf(await run("openai/gpt-5-mini"))).toBe('The Model endpoint "openai" refused its API key (HTTP 401): check it in the Settings page.');
+    bind(() => ({ ok: false, error: 'The Model endpoint "openai" refused its API key (HTTP 401): check it on the Settings page.' }));
+    expect(detailOf(await run("openai/gpt-5-mini"))).toBe('The Model endpoint "openai" refused its API key (HTTP 401): check it on the Settings page.');
   });
 
   it("names the endpoint and its model when the reply is not the JSON asked for", async () => {
@@ -119,7 +119,7 @@ describe("runText on Model endpoints", () => {
     expect(calls.map((call) => `${call.endpointId}/${call.modelId}`)).toEqual(["big/gpt-5.4"]);
     bindEnvironmentServices({ agents: {}, modelEndpoints: () => ({ revision: 2, endpoints: [] }) } as unknown as EnvironmentServices);
     for (const old of ["default", "anthropic/claude-haiku-5-5"]) {
-      expect(detailOf(await run(old)), old).toBe("No Model endpoint is set up: add one in the Settings page (/_t3flare/settings), under Model endpoints.");
+      expect(detailOf(await run(old)), old).toBe("No Model endpoint is set up: add one on the Settings page (/_t3flare/settings), under Model endpoints.");
     }
   });
 

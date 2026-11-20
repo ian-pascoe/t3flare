@@ -80,7 +80,7 @@ refuses to deploy `prod` without it, and refuses any other Stage with it, as `al
    at once (connected clients reconnect), while Cloudflare lets the agents Worker's busy Durable Objects finish their
    work first, for up to five minutes.
 6. Deploy `prod` from a clean checkout of `main`: `T3FLARE_DOMAIN=t3.example.com pnpm --filter @t3flare/environment run deploy prod`.
-7. Pair your first client, then do the setup step in the Settings page
+7. Pair your first client, then do the setup step on the Settings page
    ([model-endpoints.md](model-endpoints.md#the-setup-step)): from `apps/environment`,
    `node scripts/stage.ts run <stage> admin POST "/_t3flare/arm-bootstrap?minutes=15"`, then open
    `/pair#token=<T3_BOOTSTRAP_TOKEN>` on the Stage's URL (the token is in `.alchemy/stages/<stage>.env.json`).

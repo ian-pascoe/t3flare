@@ -110,7 +110,7 @@ describe("Codex's profile", () => {
     for (const without of [withoutEndpoints, { ...context, endpoints: [] }]) {
       const answer = profileLaunch({ cli: "codex", args: ["app-server"], key: "proc-1", cwd: "/w/demo", env: {}, allowProbe: false }, without);
       expect(answer).toEqual({
-        refused: "Codex has no Model endpoint to run on: it needs one that speaks OpenAI Responses and that lists a model; add one in the Settings page (/_t3flare/settings), under Model endpoints",
+        refused: "Codex has no Model endpoint to run on: it needs one that speaks OpenAI Responses and that lists a model; add one on the Settings page (/_t3flare/settings), under Model endpoints",
       });
     }
   });
@@ -309,7 +309,7 @@ describe("pi's profile", () => {
     it("is refused without an endpoint that lists a model, saying so and where to add one (SPI-1176)", () => {
       const { piRelay: _none, ...withoutRelay } = context;
       const answer = profileLaunch({ cli: "pi", args: rpc, key: "proc-1", cwd: "/w/demo", env: { T3_PI_RUNTIME_MODE: "approval-required" }, allowProbe: false }, withoutRelay);
-      expect(answer).toEqual({ refused: "Pi has no Model endpoint to run on: it needs one that lists a model; add one in the Settings page (/_t3flare/settings), under Model endpoints" });
+      expect(answer).toEqual({ refused: "Pi has no Model endpoint to run on: it needs one that lists a model; add one on the Settings page (/_t3flare/settings), under Model endpoints" });
     });
   });
 

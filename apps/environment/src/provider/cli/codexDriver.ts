@@ -156,7 +156,7 @@ export const snapshotOf = (enabled: boolean, setupMode: string | undefined) =>
             version: CLIS.codex.version,
             status: "error",
             auth: { status: "unauthenticated" },
-            message: "Codex's own ChatGPT sign-in is not offered here; sign in to ChatGPT as a Model endpoint in the Settings page instead (and set Codex's setup mode back).",
+            message: "Codex's own ChatGPT sign-in is not offered here; sign in to ChatGPT as a Model endpoint on the Settings page instead (and set Codex's setup mode back).",
           }
         : readinessOf(models, CLIS.codex.version, `${noEndpointFor("Codex", "OpenAI Responses")}.`),
     });

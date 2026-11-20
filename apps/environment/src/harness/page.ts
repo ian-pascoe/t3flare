@@ -29,7 +29,7 @@ import type { PageReason } from "../settings/types.ts";
 import { type AskedBy, askedByText, sizeText } from "../settings/render.ts";
 import type { AuditEntry } from "./store.ts";
 
-import { BRAND_MARK, FAVICON, WORDMARK } from "./pageBrand.ts";
+import { brand, FAVICON } from "./pageBrand.ts";
 import { ICON_SPRITE, icon, type IconName } from "./pageIcons.ts";
 import { changePagePath } from "./paths.ts";
 import { SCRIPT } from "./pageScript.ts";
@@ -625,7 +625,7 @@ export const renderPage = (input: PageInput): string => {
 <a class="skip" href="#main">Skip to content</a>
 <div class="shell">
 <aside class="side">
-<div class="brand">${BRAND_MARK}<div><strong>${WORDMARK}</strong><span>Settings</span></div></div>
+${brand()}
 <nav class="nav" aria-label="Sections">
 ${input.openChanges === undefined ? "" : `${navItem("changes", "Open changes", "alert", `<span class="count">${input.openChanges.length}</span>`)}\n`}${navItem("extensions", "Extensions", "extensions", `<span class="count">${EXTENSIONS.length}</span>`)}
 ${navItem("mcp", "MCP servers", "server", failing > 0 ? `<span class="flag" role="img" aria-label="${plural(failing, "server", "servers")} failing"></span>` : `<span class="count">${rows.length}</span>`)}

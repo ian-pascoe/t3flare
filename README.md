@@ -56,7 +56,7 @@ proposes each new t3code release on the Deployment's t3 track, stable or nightly
    ([ADR-0013](docs/adr/0013-github-access-through-a-github-app-with-per-repo-tokens.md)). A setup script registers it
    under your account.
 3. **Model access**: an API key for a provider pi-ai speaks (Anthropic, OpenAI, Google, Mistral, or any
-   OpenAI-compatible API, including a model proxy you run). You add it as a Model endpoint in the Settings page after
+   OpenAI-compatible API, including a model proxy you run). You add it as a Model endpoint on the Settings page after
    the first deploy; no deploy setting holds a model key. [`docs/model-endpoints.md`](docs/model-endpoints.md) is the
    guide.
 
@@ -68,7 +68,7 @@ cp dev.env.example ~/.config/t3flare/dev.env               # chmod 600, then fil
 pnpm --filter @t3flare/infra run github-app:setup          # registers your GitHub App
 pnpm --filter @t3flare/environment run deploy <stage>      # a throwaway test Stage first
 T3FLARE_DOMAIN=t3.example.com pnpm --filter @t3flare/environment run deploy prod
-# pair your first client, then add a Model endpoint in the Settings page
+# pair your first client, then add a Model endpoint on the Settings page
 ```
 
 [`docs/deploy.md`](docs/deploy.md) is the full guide: every Deployment setting (the source holds none of yours, and

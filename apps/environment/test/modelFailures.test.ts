@@ -209,7 +209,7 @@ describe("modelFailureMessage", () => {
   it("names the endpoint, never repeats the vendor's body", () => {
     const key = classify("openaiKeyRefused")!;
     const message = modelFailureMessage(key, { id: "openai", auth: "api-key" }, 401);
-    expect(message).toBe('The Model endpoint "openai" refused its API key (HTTP 401): check it in the Settings page.');
+    expect(message).toBe('The Model endpoint "openai" refused its API key (HTTP 401): check it on the Settings page.');
     expect(modelFailureMessage(classify("planUsageLimit")!, { id: "chatgpt", auth: "chatgpt" }, 429)).toContain('The Model endpoint "chatgpt" reached its ChatGPT usage limit');
     expect(modelFailureMessage(classify("anthropicSubscriptionLimit")!, { id: "claude", auth: "api-key" }, 429)).toBe('The Model endpoint "claude" reached its usage limit.');
     for (const name of Object.keys(fixtures.answers) as Array<Name>) {

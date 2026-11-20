@@ -34,7 +34,7 @@ describe("searchChoice", () => {
   it("says so, pointing to the Settings page, when no usable endpoint lists a model (sign-ins only, or another API)", () => {
     const signInsOnly = of(endpoint("plan", "anthropic-messages", "claude", ["claude-haiku-5-5"]), endpoint("resp", "openai-responses", "api-key", ["gpt-mini"]));
     expect(searchChoice("default", signInsOnly)).toEqual({
-      error: "no Anthropic Messages Model endpoint with an API key or no auth lists a model to search with: add one in the Settings page (/_t3flare/settings), under Model endpoints",
+      error: "no Anthropic Messages Model endpoint with an API key or no auth lists a model to search with: add one on the Settings page (/_t3flare/settings), under Model endpoints",
     });
   });
 });

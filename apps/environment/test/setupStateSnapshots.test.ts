@@ -27,7 +27,7 @@ const acp = (cli: "claude" | "opencode") => acpSnapshotOf({ cli, driver: Provide
 describe("the setup state in the drivers' snapshots", () => {
   it("Pi Durable: needs setup with no endpoint's model, ready with one", async () => {
     const empty = view(await Effect.runPromise(durableSnapshotOf({ enabled: true, models: snapshotModels(bind()) })));
-    expect(empty).toEqual({ status: "warning", message: "No Model endpoint is set up: add one in the Settings page (/_t3flare/settings), under Model endpoints.", models: [] });
+    expect(empty).toEqual({ status: "warning", message: "No Model endpoint is set up: add one on the Settings page (/_t3flare/settings), under Model endpoints.", models: [] });
     const ready = view(await Effect.runPromise(durableSnapshotOf({ enabled: true, models: snapshotModels(bind(endpoint("comm", "anthropic-messages", ["c"]))) })));
     expect(ready).toMatchObject({ status: "ready", models: ["comm/c"] });
   });

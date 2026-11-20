@@ -74,10 +74,10 @@ const statusProblem = (endpoint: ModelEndpoint, modelId: string, status: number)
   const signIn = signInOf(endpoint.auth);
   if (status === 401 || status === 403) {
     return endpoint.auth === "none"
-      ? `${named} refused the request without a credential (HTTP ${status}): check its auth in the Settings page.`
+      ? `${named} refused the request without a credential (HTTP ${status}): check its auth on the Settings page.`
       : signIn !== undefined
         ? `${named} refused its ${signIn.title} sign-in (HTTP ${status}): ${signIn.refused}`
-        : `${named} refused its API key (HTTP ${status}): check it in the Settings page.`;
+        : `${named} refused its API key (HTTP ${status}): check it on the Settings page.`;
   }
   if (status === 404) return `${named} does not serve the model ${modelId} (HTTP 404).`;
   if (status === 429) return `${named} is rate- or usage-limited (HTTP 429): try again later.`;

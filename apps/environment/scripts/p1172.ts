@@ -190,7 +190,7 @@ switch (step) {
     check("one model request", turn.proxy?.requests === 1, turn.proxy);
     check(
       "a refused key whose error names the endpoint",
-      failure.class === "permission_error" && failure.code === "key_refused" && failure.message === `The Model endpoint "${ENDPOINT}" refused its API key (HTTP 401): check it in the Settings page.`,
+      failure.class === "permission_error" && failure.code === "key_refused" && failure.message === `The Model endpoint "${ENDPOINT}" refused its API key (HTTP 401): check it on the Settings page.`,
       failure,
     );
     check("no pause: no reset", (failure.resetAt ?? null) === null, failure);

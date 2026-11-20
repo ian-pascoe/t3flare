@@ -261,7 +261,7 @@ export const endpointsSignIn = async (deps: EndpointsApiDeps, body: Record<strin
       const { title, terms } = SIGN_IN_KINDS[body.signIn];
       return {
         status: 400,
-        text: `acknowledge ${terms.vendor}'s terms first: complying with them when you sign in with ${title} is your responsibility (${terms.docs}). Tick the acknowledgement in the Settings page, or send acknowledgedTerms: true`,
+        text: `acknowledge ${terms.vendor}'s terms first: complying with them when you sign in with ${title} is your responsibility (${terms.docs}). Tick the acknowledgement on the Settings page, or send acknowledgedTerms: true`,
       };
     }
     try {

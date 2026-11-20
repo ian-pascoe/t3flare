@@ -1,6 +1,6 @@
 // @effect-diagnostics globalDate:off globalConsole:off asyncFunction:off
 // OAuth sign-ins for direct MCP servers (review M4, ADR-0010's and ADR-0012's refinements; cloudpid ADR-0034's model):
-// the owner starts one in the Settings page, the server's authorization server sends the browser back to a public exact
+// the owner starts one on the Settings page, the server's authorization server sends the browser back to a public exact
 // path on the t3 host, outside `/_t3flare` (with the client metadata document; owner, 2026-11-12, back to stock), and the
 // Environment DO keeps the client and the tokens write-only in its secret store. Every outbound request (discovery,
 // registration, the token exchange, each refresh) is the MCP Worker's (`McpOAuth`, review M5).
