@@ -38,18 +38,21 @@ export interface PublishEntry {
 }
 
 /** t3's log messages (`t3/src/relay/AgentAwarenessRelay.ts`), by the event each means. */
-const MESSAGES: Record<string, PublishEvent> = {
+export const MESSAGES: Record<string, PublishEvent> = {
   "publishing agent activity for thread": "publishing",
   "agent activity publish deferred pending confirmation": "deferred",
   "agent activity deferred publish confirmed": "confirmed",
   "agent activity publish completed": "completed",
   "agent activity publish failed": "failed",
-  "agent activity publish retry budget exhausted": "exhausted",
+  "agent activity publish retry budget exhausted; retrying every minute": "exhausted",
 };
 
 /**
  * How long each pending event holds the idle reset: a publish has a 10 s timeout; a deferral confirms after 5 s; a
- * failure is retried after at most 16 s, then has its own 10 s timeout. Every hold is also capped (Idle).
+ * failure is retried after at most 16 s, then has its own 10 s timeout. Every hold is also capped (Idle). Once t3's
+ * budget is exhausted it retries every minute for as long as the process lives (U28): `exhausted` releases the hold,
+ * but each later retry logs "publishing" and "failed" again and holds anew. Only `PUBLISH_HOLD_CAP_MS` ends those
+ * holds, 120 s after the last socket or request, so a relay that stays down cannot keep the DO resident.
  */
 const HOLD_MS: Partial<Record<PublishEvent, number>> = {
   publishing: 15_000,

@@ -175,6 +175,7 @@ import * as AntigravityUsage from "t3/src/provider/Drivers/AntigravityUsage.ts";
 import * as UsageService from "t3/src/usage/UsageService.ts";
 import * as CodexUsageHistory from "t3/src/usage/CodexUsageHistory.ts";
 import * as RuntimeLayer from "t3/src/orchestration-v2/runtimeLayer.ts";
+import * as ThreadViewers from "t3/src/orchestration-v2/ThreadViewers.ts";
 import * as ProjectStore from "t3/src/orchestration-v2/ProjectStore.ts";
 import * as ThreadSearch from "t3/src/orchestration-v2/ThreadSearch.ts";
 import * as ThreadSettlementService from "t3/src/orchestration-v2/ThreadSettlementService.ts";
@@ -733,6 +734,9 @@ export const make = (options: CompositionOptions) => {
   const layerRuntimeDependencies = layerRuntimeCoreDependencies.pipe(
     Layer.provideMerge(layerUsage),
     Layer.provideMerge(layerBackground),
+    // As t3's `server.ts`: the same layer the event sink uses (`RuntimeLayer.layerEventSink`); memoized, `/ws` thread
+    // subscriptions and the sink's batch ranking share one registry of viewed threads.
+    Layer.provideMerge(ThreadViewers.layer),
     Layer.provideMerge(layerResourceDiagnostics),
     Layer.provideMerge(TraceDiagnostics.layer),
     Layer.provideMerge(TriageService.layer.pipe(Layer.provide(GitVcsDriver.layer))),
@@ -811,6 +815,9 @@ export const make = (options: CompositionOptions) => {
     Layer.provide(CloudSelfUpdate.layer),
     Layer.provide(layerCommandReadiness),
     Layer.provide(ServerHttp.layerBrowserApiCors),
+    // As t3's `server.ts`: no request log for signed URLs (webhooks, assets, attachment uploads), whose path carries a bearer.
+    // Moot while `HttpRouter.serve` runs with `disableLogger: true` (below); kept so turning the logger on cannot log one.
+    Layer.provide(ServerHttp.layerUnloggedSignedRequests),
     // t3flare: no response compression in t3; Cloudflare's edge compresses, and workerd
     // would compress a body t3 already gzipped a second time.
   );

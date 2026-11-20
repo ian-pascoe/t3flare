@@ -119,6 +119,8 @@ export const CAPABILITIES = {
   linkedThreadRefreshes: keep,
   // `issues.linkedThreads`: t3's own `/ws` read over its own SQL, through the ported ThreadIssueService.
   issueLinkedThreads: keep,
+  // The managed policy keeps the tunnel itself off (fragility U4).
+  previewTunnelSetting: strip("the preview tunnel reaches the host's loopback ports, where nothing listens in the DO (host-bound)"),
 } as const satisfies { readonly [K in keyof ExecutionEnvironmentCapabilities]?: Classification };
 
 /** The flags of t3's descriptor (`fields`, its schema's keys) that are not classified here: each is stripped. */
