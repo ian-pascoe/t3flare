@@ -2,6 +2,8 @@
 // on must pass before a push to main. The tasks run at once, as check.ts ran them, and nothing is cached (plan D5).
 //
 //   - check:patches: every t3 Patch applies to the pinned t3code (`git apply --check`)
+//   - check:fs: every node:fs member t3's bundled modules read is implemented by a State directory shim, or allowed
+//     with its reason (SPI-1301; `build.ts --check-fs`, a bundle kept in memory)
 //   - check:workspace: pnpm-workspace.yaml, package.json and mise.toml match the pinned t3code
 //   - check:lock: t3's importers install exactly what t3's lock installs, one `effect`, patches, vendored links
 //   - test:scripts: the root scripts' own tests, on `node --test`
@@ -16,6 +18,7 @@ export default defineConfig({
     cache: false,
     tasks: {
       "check:patches": { command: "node build.ts --check", cwd: "apps/environment" },
+      "check:fs": { command: "node build.ts --check-fs", cwd: "apps/environment" },
       "check:workspace": "node scripts/gen-workspace.ts --check",
       "check:lock": "node scripts/verify-lock.ts",
       "lint:scripts": "oxlint scripts",
@@ -32,6 +35,7 @@ export default defineConfig({
         command: "node -e \"console.log('check passed')\"",
         dependsOn: [
           "check:patches",
+          "check:fs",
           "check:workspace",
           "check:lock",
           "lint:scripts",

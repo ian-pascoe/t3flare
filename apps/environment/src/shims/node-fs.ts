@@ -198,6 +198,37 @@ export function realpathSync(input: unknown): string {
 }
 realpathSync.native = realpathSync;
 
+type Callback<T> = (error: Error | null, value?: T) => void;
+
+/** Node's callback form of a sync call: the callback runs on a later microtask, with the error or the value. */
+const toCallback = <T>(run: () => T, callback: Callback<T>): void => {
+  let value: T;
+  try {
+    value = run();
+  } catch (error) {
+    queueMicrotask(() => callback(error as Error));
+    return;
+  }
+  queueMicrotask(() => callback(null, value));
+};
+
+const callbackOf = <T>(optionsOrCallback: unknown, callback: Callback<T> | undefined): Callback<T> =>
+  (typeof optionsOrCallback === "function" ? optionsOrCallback : callback) as Callback<T>;
+
+// The callback forms t3 calls on State directory paths (SPI-1301's check lists them): `realpath` in
+// `assets/MediaFile.ts`, `stat` in `usage/usageTranscriptReader.ts`.
+export function realpath(input: unknown, optionsOrCallback: unknown, callback?: Callback<string>): void {
+  toCallback(() => realpathSync(input), callbackOf(optionsOrCallback, callback));
+}
+realpath.native = realpath;
+
+export function stat(input: unknown, optionsOrCallback: unknown, callback?: Callback<any>): void {
+  toCallback(() => statSync(input), callbackOf(optionsOrCallback, callback));
+}
+
+/** workerd's own: the same numbers `openSync` decodes. */
+export const constants = real.constants;
+
 export function symlinkSync(target: string, input: unknown): void {
   store.symlink(target, pathOf(input));
 }
@@ -342,6 +373,9 @@ export default {
   renameSync,
   copyFileSync,
   realpathSync,
+  realpath,
+  stat,
+  constants,
   symlinkSync,
   readlinkSync,
   chmodSync,
