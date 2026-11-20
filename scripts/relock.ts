@@ -4,8 +4,7 @@
 //   node scripts/relock.ts --refresh    re-resolve t3flare's own dependencies too, the one way to refresh them (ADR-0030's
 //                                       in-app updates refinement); a bump never does
 //
-// Run it with node, never through `pnpm run`: verifyDepsBeforeRun refuses any script while the install is out of step
-// with the manifests or the lock, which is every state relock is for (ADR-0030's 2026-11-20 refinement).
+// Run it with node, not through `pnpm run` (ADR-0030's SPI-1272 refinement).
 //
 //  1. gen-workspace.ts writes pnpm-workspace.yaml (t3's patches limited to what the current lock installs);
 //  2. seed-lock.ts seeds pnpm-lock.yaml from t3's lock;
