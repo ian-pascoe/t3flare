@@ -78,6 +78,7 @@ describe("node:fs shim descriptors", () => {
       expect(fs.readFileSync("/t3/w/f", "utf8")).toBe("");
       expect(() => fs.openSync("/t3/w", "a")).toThrow(/EISDIR/);
       expect(() => fs.openSync("/t3/w", O_WRONLY | O_CREAT)).toThrow(/EISDIR/);
+      expect(() => fs.openSync("/t3/w", "wx")).toThrow(/EEXIST/);
     });
   });
 

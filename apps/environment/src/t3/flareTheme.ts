@@ -172,8 +172,8 @@ export const FLARE_THEME_JSON = `${JSON.stringify(FLARE_THEME, null, 2)}\n`;
 const FLARE_THEME_SEEDED = "t3flare:seeded/default-theme";
 
 /**
- * Publishes the t3flare theme at each boot, and makes it the default theme once per Environment, while the owner has
- * set none. Above `EnvironmentTheme.layer` in the composition, which provides the service it publishes through.
+ * Publishes the t3flare theme at each boot, and makes it the default theme once per Environment, while no Environment
+ * default was ever set (`defaultThemeSetAt`). Above `EnvironmentTheme.layer` in the composition, which provides the service it publishes through.
  */
 export const layerFlareTheme = Layer.effectDiscard(
   Effect.gen(function* () {

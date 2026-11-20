@@ -256,9 +256,9 @@ export function openSync(input: unknown, flags: string | number = "r", mode?: nu
   if (openMode.nofollow && store.get(path)?.kind === "symlink") throw new store.FsError("ELOOP", "open", path);
   const entry = store.resolve(path);
   const exists = entry !== undefined;
-  // As Node: a directory opens for reading only.
-  if ((openMode.create || openMode.truncate) && entry?.kind === "dir") throw new store.FsError("EISDIR", "open", path);
   if (openMode.create && openMode.exclusive && exists) throw new store.FsError("EEXIST", "open", path);
+  // As Node: an open that would create or truncate a directory fails (other writes to one fail when they land).
+  if ((openMode.create || openMode.truncate) && entry?.kind === "dir") throw new store.FsError("EISDIR", "open", path);
   if (!openMode.create && !exists) throw new store.FsError("ENOENT", "open", path);
   if (openMode.truncate || !exists) store.writeFile(path, new Uint8Array(0), mode === undefined ? {} : { mode });
   const fd = nextFd++;
