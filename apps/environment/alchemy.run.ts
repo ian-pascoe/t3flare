@@ -23,7 +23,7 @@
 // token (for the acceptance test and the bump job). The Worker verifies the assertion itself against the application's
 // `aud` (src/access.ts), and also requires the admin token. `<host>/_t3flare/mcp`, the Settings server's Owner-client
 // endpoint (ADR-0035), has an application of its own with managed OAuth (`SettingsAccess` below) on every stage but
-// prod, which stays out of layout (B) until the owner turns it on, and `bump`, the nightly job's (ADR-0036;
+// prod, which stays out of layout (B) until the owner turns it on, and `bump`, the t3 bump's (ADR-0036;
 // `ownerEndpointOn`).
 //
 // A stage with a domain also rate-limits t3's credential-presenting auth routes on that host (ADR-0010), as the
@@ -150,7 +150,7 @@ export default Alchemy.Stack(
     // A test stage's way to replace the codemode sandbox's code (its objects reset), for the sandbox-loss probe (M0 P14).
     const sandboxGeneration = yield* Config.String("T3FLARE_SANDBOX_GEN").pipe(Config.withDefault(""));
 
-    // The Owner-client endpoint (layout (B), ADR-0036) on this stage: every stage but prod (until the owner turns it on) and `bump` (the nightly job's CI token); one switch, `OWNER_ENDPOINT_EXCLUDED_STAGES` in src/settings/endpointLayout.ts.
+    // The Owner-client endpoint (layout (B), ADR-0036) on this stage: every stage but prod (until the owner turns it on) and `bump` (the t3 bump's CI token); one switch, `OWNER_ENDPOINT_EXCLUDED_STAGES` in src/settings/endpointLayout.ts.
     const ownerEndpoint = ownerEndpointOn(stage);
 
     const serviceToken = yield* Cloudflare.Access.ServiceToken("AdminServiceToken", {

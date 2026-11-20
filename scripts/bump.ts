@@ -1,4 +1,5 @@
-// `pnpm run bump`: move t3code to its newest nightly tag and prove it on a deployed stage (ADR-0017).
+// `pnpm run bump`: move t3code to the newest tag on the Deployment's t3 track and prove it on a deployed stage (ADR-0017,
+// ADR-0041). The track is the T3FLARE_T3_TRACK Deployment setting: `stable` (`v<x.y.z>`) or `nightly`.
 //
 //   pnpm run bump [--tag <tag>] [--skip-if-current] [--commit] [--destroy] [--report <file>]
 //                 [--gate full|update]   which gate proves the pin (ADR-0037; default full)
@@ -6,8 +7,9 @@
 //                 [--no-deploy]          stop after the check: no Docker, deploy or acceptance (no secrets needed)
 //                 [--fail-at <step>]     fail the step whose name starts so, to prove the rollback
 //
-//  1. Find the newest `v*-nightly.<yyyymmdd>.<run>` tag on t3code's origin (or take --tag).
-//  2. Move the submodule to it.
+//  1. Find the newest tag on the track on t3code's origin (or take --tag).
+//  2. Move the submodule to it, only forward: its commit must descend from the pin's, so t3's migrations never go back
+//     (after a switch to stable, the bump waits for a stable that contains the nightly pin).
 //  3. Regenerate the workspace and the lock from t3's pnpm-workspace.yaml and pnpm-lock.yaml (scripts/relock.ts), and
 //     check that t3's importers install exactly what t3's lock installs, with a single `effect` (ADR-0030).
 //  4. `pnpm run check`, the whole of it: every Patch applies (`git apply --check`), typecheck, lint, tests. The upstream
@@ -23,14 +25,14 @@
 //     `--terminal --worktree` (step 2b): a terminal, a worktree thread's setup script, its removal, the sweep's dry run;
 //     `--peer` (step 3): a Peer link from the harness, a forwarded launch, the link fence F1–F12; `--codex --pi`
 //     (step 4a): a Codex and a Pi turn with approvals, resumed after their Containers stopped), then a stock t3
-//     from npm at its newest nightly as the laptop: it links to the stage and forwards a launch (version skew, review C6).
+//     from npm at the track's dist-tag as the laptop: it links to the stage and forwards a launch (version skew, review C6).
 //     On the Full gate a failed acceptance test runs once more; a pass on the second attempt still passes, and the report's
 //     `acceptanceRetry` keeps the first attempt's failures (a pass that may be luck: the PR says so, U18).
 //
 // The Update gate (`--gate update`, in-app updates plan D4; about 5 minutes): what a stock client's Update waits on. It
 // keeps steps 3, 4 and 6 with the acceptance test's core (pairing, /ws, the SQL adapter, the heavy queries, the boot
 // twice in one isolate, migrations on the stage's database) and `--real-turn`'s one Durable agent turn, and drops
-// test:docker, the CLI turns, terminal and worktree, the Peer link and its fence, and the stock npm nightly's link. The
+// test:docker, the CLI turns, terminal and worktree, the Peer link and its fence, and the stock npm t3's link. The
 // Full gate (the default) is all of it; a landed Update gets the Full gate afterwards as its verify run (D18).
 //
 //  7. Report. On any failure the submodule and PINNED_FILES go back to the last good pin and a frozen install
@@ -45,7 +47,8 @@ import { DETERMINISTIC_STEPS, findingSummary, HELD_BUMP_STEPS } from "../apps/en
 import { keptReportJson } from "../apps/environment/scripts/lib/modelEndpointSpec.ts";
 import { type Finding, REPORT_ONLY, REPORT_ONLY_ENV } from "../apps/environment/scripts/lib/upstreamFingerprintFixture.ts";
 import { T3_ERRORS_COUNT } from "../apps/environment/scripts/lib/typecheckFilter.ts";
-import { newestNightly, PINNED_FILES } from "../apps/environment/src/updates/pins.ts";
+import { t3ServerVersion, t3TrackSetting } from "../apps/environment/serverVersion.ts";
+import { newestOnTrack, NPM_DIST_TAG, PINNED_FILES, type T3Track } from "../apps/environment/src/updates/pins.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const t3 = path.join(root, "t3code");
@@ -62,6 +65,13 @@ if (gate !== "full" && gate !== "update") {
   process.exit(2);
 }
 const fullGate = gate === "full";
+let track: T3Track;
+try {
+  track = t3TrackSetting();
+} catch (error) {
+  console.error(`bump: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(2);
+}
 /** The acceptance test's arguments for the gate: the Update gate keeps the core and one Durable agent turn. */
 const ACCEPTANCE_ARGS = {
   full: ["--threads", "12", "--runs", "4", "--real-turn", "--terminal", "--worktree", "--peer", "--codex", "--pi", "--claude", "--opencode"],
@@ -122,17 +132,18 @@ let t3TypeErrors: number | undefined;
 /** The first acceptance attempt's result, when it failed and a second ran. */
 let acceptanceRetry: { readonly firstFailures: unknown; readonly firstDetail: string } | undefined;
 let rollbackResult: { ok: boolean; t3code: string; pinnedFiles: string; install: string } | undefined;
-const from = sh("git", ["describe", "--tags", "--exact-match", "HEAD"], t3, { quiet: true }).output.trim() || sh("git", ["rev-parse", "HEAD"], t3, { quiet: true }).output.trim();
+/** The pin, named by its tag on the track as the Server version is (a stable's commit carries a nightly tag too), else by its commit. */
+const from = t3ServerVersion(track, t3).tag ?? sh("git", ["rev-parse", "HEAD"], t3, { quiet: true }).output.trim();
 const fromCommit = sh("git", ["rev-parse", "HEAD"], t3, { quiet: true }).output.trim();
 /** The commit of t3flare this run tested: the plan job skips an hourly retry of a failure nothing has changed since. */
 const base = sh("git", ["rev-parse", "HEAD"], root, { quiet: true }).output.trim();
 
 let to: string | undefined;
-step("find the newest nightly tag", () => {
+step(`find the newest ${track} tag`, () => {
   const fetched = sh("git", ["fetch", "--tags", "--force", "--quiet", "origin"], t3, { quiet: true });
   if (!fetched.ok) return { ok: false, detail: fetched.output };
-  to = option("tag") ?? newestNightly(sh("git", ["tag", "-l", "v*-nightly.*"], t3, { quiet: true }).output.split("\n").map((t) => t.trim()));
-  return to === undefined ? { ok: false, detail: "no nightly tag" } : { ok: true, detail: `${from} → ${to}` };
+  to = option("tag") ?? newestOnTrack(sh("git", ["tag", "-l", "v*"], t3, { quiet: true }).stdout.split("\n").map((t) => t.trim()), track);
+  return to === undefined ? { ok: false, detail: `no tag on the ${track} track` } : { ok: true, detail: `${from} → ${to}` };
 });
 
 const finish = (ok: boolean, note?: string) => {
@@ -142,7 +153,7 @@ const finish = (ok: boolean, note?: string) => {
     base,
     from,
     to: to ?? null,
-    changed: to !== undefined && to !== from,
+    changed: to !== undefined && toCommit !== fromCommit,
     note: note ?? null,
     at: new Date().toISOString(),
     steps,
@@ -165,9 +176,12 @@ const finish = (ok: boolean, note?: string) => {
 };
 
 if (to === undefined) finish(false);
-if (to === from && flag("skip-if-current")) {
-  console.log(`t3code is already at the newest nightly, ${to}`);
-  finish(true, "already at the newest nightly; nothing deployed");
+/** The commit the target tag names: a pin moves when the commit does, whichever track's tag names it. */
+const toCommit = sh("git", ["rev-parse", "--verify", "--quiet", `${to!}^{commit}`], t3, { quiet: true }).stdout.trim();
+const moves = toCommit !== fromCommit;
+if (!moves && flag("skip-if-current")) {
+  console.log(`t3code is already at the newest ${track} tag, ${to}`);
+  finish(true, `already at the newest ${track} tag; nothing deployed`);
 }
 
 const rollback = () => {
@@ -190,6 +204,10 @@ const rollback = () => {
 
 const ok =
   step(`${DETERMINISTIC_STEPS.move} ${to}`, () => {
+    // Only forward (ADR-0041): t3's migrations never go back, and a tag newer by version need not contain the pin (a
+    // stable promotes an older nightly than a nightly pin may be). The plan's retry stop covers a refusal here.
+    const forward = sh("git", ["merge-base", "--is-ancestor", fromCommit, `${to!}^{commit}`], t3, { quiet: true });
+    if (!forward.ok) return { ok: false, detail: `${to} does not contain the pin ${from} (${fromCommit}): t3code moves only forward\n${forward.output}` };
     const result = sh("git", ["checkout", "--quiet", to!], t3);
     return { ok: result.ok, detail: result.output };
   }) &&
@@ -282,12 +300,14 @@ const ok =
     const health = result.ok ? "" : `\n${sh(process.execPath, ["scripts/stage.ts", "run", stage, "health", "bootRecord,safeMode,runtime"], environment, { quiet: true }).output}`;
     return { ok: result.ok, detail: `${fs.existsSync(out) ? fs.readFileSync(out, "utf8") : result.output}${health}` };
   }, LONG_DETAIL_CHARS) &&
-  (!fullGate || step(`a stock t3 nightly from npm links to the ${stage} stage and forwards a launch`, () => {
-    // stdout alone, outside the workspace (npm warns about workspaces on stderr there).
-    const nightly = (spawnSync("npm", ["view", "t3", "dist-tags.nightly"], { cwd: os.tmpdir(), encoding: "utf8" }).stdout ?? "").trim();
-    if (nightly === "") return { ok: false, detail: "npm has no nightly t3" };
-    const result = sh(process.execPath, ["scripts/stage.ts", "run", stage, "peer-laptop", "--version", nightly, "--skip-repo", "--out", path.join(environment, "dist/bump-peer-laptop.json")], environment, { quiet: true });
-    return { ok: result.ok, detail: `t3@${nightly}\n${result.output.slice(-3000)}` };
+  (!fullGate || step(`a stock t3 from npm (${NPM_DIST_TAG[track]}) links to the ${stage} stage and forwards a launch`, () => {
+    // The track's newest release on npm, as the Owner's laptop runs it. stdout alone, outside the workspace (npm warns
+    // about workspaces on stderr there).
+    const distTag = NPM_DIST_TAG[track];
+    const version = (spawnSync("npm", ["view", "t3", `dist-tags.${distTag}`], { cwd: os.tmpdir(), encoding: "utf8" }).stdout ?? "").trim();
+    if (version === "") return { ok: false, detail: `npm has no t3 at ${distTag}` };
+    const result = sh(process.execPath, ["scripts/stage.ts", "run", stage, "peer-laptop", "--version", version, "--skip-repo", "--out", path.join(environment, "dist/bump-peer-laptop.json")], environment, { quiet: true });
+    return { ok: result.ok, detail: `t3@${version}\n${result.output.slice(-3000)}` };
   })));
 
 if (!ok) {
@@ -299,7 +319,7 @@ if (flag("destroy") && !flag("no-deploy")) {
   step(`destroy the ${stage} stage`, () => sh(process.execPath, ["scripts/stage.ts", "destroy", stage], environment));
 }
 
-if (flag("commit") && to !== from) {
+if (flag("commit") && moves) {
   step("commit the new pin", () => {
     const add = sh("git", ["add", "t3code", ...PINNED_FILES], root);
     const notes = [
@@ -320,4 +340,4 @@ if (flag("commit") && to !== from) {
     return { ok: add.ok && commit.ok, detail: commit.output };
   });
 }
-finish(true, to === from ? `already at the newest nightly; re-proved${flag("no-deploy") ? " through the check" : ` on the ${stage} stage`}` : undefined);
+finish(true, !moves ? `already at the newest ${track} tag; re-proved${flag("no-deploy") ? " through the check" : ` on the ${stage} stage`}` : undefined);

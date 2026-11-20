@@ -6,7 +6,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { COMMIT, NIGHTLY_TAG, type Gate, PROVEN_CONTEXT, proofRunRefusal, provenDescription, provenStatus } from "../../apps/environment/src/updates/pins.ts";
+import { COMMIT, type Gate, PROVEN_CONTEXT, proofRunRefusal, provenDescription, provenStatus, T3_TAG } from "../../apps/environment/src/updates/pins.ts";
 
 /** `--name value` from `args` (every update script's one parser). */
 export const optionOf =
@@ -29,12 +29,12 @@ const lsRemote = (args: ReadonlyArray<string>): Array<[string, string]> =>
     .filter((line) => line !== "")
     .map((line) => line.split("\t") as [string, string]);
 
-/** Every nightly tag on `url` with its commit, peeled when annotated. */
-export const nightlyTagsOf = (url: string): Map<string, string> => {
+/** Every t3 release tag on `url` (either t3 track) with its commit, peeled when annotated. */
+export const t3TagsOf = (url: string): Map<string, string> => {
   const tags = new Map<string, string>();
-  for (const [sha, ref] of lsRemote(["--tags", url, "v*-nightly.*"])) {
+  for (const [sha, ref] of lsRemote(["--tags", url, "v*"])) {
     const match = /^refs\/tags\/(.+?)(\^\{\})?$/.exec(ref);
-    if (match === null || !NIGHTLY_TAG.test(match[1]!) || !COMMIT.test(sha)) continue;
+    if (match === null || !T3_TAG.test(match[1]!) || !COMMIT.test(sha)) continue;
     if (match[2] !== undefined || !tags.has(match[1]!)) tags.set(match[1]!, sha);
   }
   return tags;

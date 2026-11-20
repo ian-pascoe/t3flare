@@ -10,7 +10,7 @@
 - The workspace and the lock are generated from t3code's: change them with `node scripts/relock.ts`, never by hand ([ADR-0030](docs/adr/0030-pnpm-installs-node-runs-scripts-and-vite-plus-runs-the-checks.md)). Relock keeps t3flare's own resolutions; `node scripts/relock.ts --refresh` is the one way to re-resolve them.
 - oxlint's type-aware backend is tsrs's `tsrs-lint`, which oxlint finds by itself. An `OXLINT_TSGOLINT_PATH` in your environment overrides it, so unset a stale one ([ADR-0030](docs/adr/0030-pnpm-installs-node-runs-scripts-and-vite-plus-runs-the-checks.md)).
 - The `t3code` submodule tree stays as pinned. Change t3code behaviour by Layer, then Shadow, then Patch ([ADR-0001](docs/adr/0001-t3code-is-a-pinned-submodule-changed-by-layer-then-shadow-then-patch.md)).
-- A failed nightly bump, or a change to code that leans on t3's internals: read [`docs/upstream-fragility.md`](docs/upstream-fragility.md) first.
+- A failed t3 bump, or a change to code that leans on t3's internals: read [`docs/upstream-fragility.md`](docs/upstream-fragility.md) first.
 
 ## Maintainer
 

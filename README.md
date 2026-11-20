@@ -18,7 +18,7 @@ https://github.com/user-attachments/assets/5dbc7d46-0e75-45ba-b2b1-4526ab2d507d
 
 Experimental. t3flare is one Maintainer's working Deployment, published so others can run their own. It is maintained
 on a best-effort basis, with no stability guarantee: `main` is the only supported version, and there are no releases,
-tags or changelog. The commit log and the nightly bump pull requests are the record. [`docs/plan.md`](docs/plan.md) has
+tags or changelog. The commit log and the t3 bump pull requests are the record. [`docs/plan.md`](docs/plan.md) has
 the milestones done so far.
 
 ## What you get
@@ -43,8 +43,9 @@ in one Durable Object, the Environment DO, which the clients reach over a plain 
 agents Worker holds the Sessions and Workspaces: each Workspace is a Durable Object with a Container it starts on
 demand. Every model call goes to a Model endpoint you add, with its key held by the Environment, never by a Container.
 t3code is a pinned submodule, changed only by Layers, then Shadows, then Patches
-([ADR-0001](docs/adr/0001-t3code-is-a-pinned-submodule-changed-by-layer-then-shadow-then-patch.md)), and a nightly job
-proposes each new t3code nightly once it passes on a test Stage.
+([ADR-0001](docs/adr/0001-t3code-is-a-pinned-submodule-changed-by-layer-then-shadow-then-patch.md)), and an hourly job
+proposes each new t3code release on the Deployment's t3 track, stable or nightly, once it passes on a test Stage
+([ADR-0041](docs/adr/0041-a-deployment-follows-one-t3-track-set-as-a-deployment-setting.md)).
 
 ## Requirements
 

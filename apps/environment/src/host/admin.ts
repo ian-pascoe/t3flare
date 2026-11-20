@@ -61,8 +61,8 @@ import * as StateStore from "../platform/stateStore.ts";
 const json = (value: unknown, status = 200) =>
   new Response(JSON.stringify(value, null, 2), { status, headers: { "content-type": "application/json" } });
 
-/** Declared by the build (build.ts `define`): which t3 nightly and which commit of ours this bundle is. */
-declare const __T3FLARE_BUILD__: { readonly t3: string; readonly serverVersion?: string; readonly commit: string; readonly builtAt: string } | undefined;
+/** Declared by the build (build.ts `define`): which t3 pin, on which t3 track, and which commit of ours this bundle is. */
+declare const __T3FLARE_BUILD__: { readonly t3: string; readonly serverVersion?: string; readonly t3Track?: string; readonly commit: string; readonly builtAt: string } | undefined;
 const build = typeof __T3FLARE_BUILD__ === "undefined" ? null : __T3FLARE_BUILD__;
 
 class ReadOnlyRollback extends Error {}

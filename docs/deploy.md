@@ -27,6 +27,7 @@ on the command line (`T3FLARE_OWNER_EMAIL=you@example.com node scripts/stage.ts 
 | --- | --- | --- | --- | --- | --- |
 | `T3FLARE_ACCESS_TEAM_DOMAIN` | every deploy | `dev.env` | repository variable | `<team>.cloudflareaccess.com` | The Access team of the account. The Worker checks admin requests against its keys. |
 | `T3FLARE_OWNER_EMAIL` | every deploy | `dev.env` | repository **secret** | an email address | The one person Access admits to the admin routes. A secret in CI because Actions logs are public and a variable prints unmasked. |
+| `T3FLARE_T3_TRACK` | every deploy, the bump and the land | `dev.env` | repository variable | `stable` or `nightly` | The t3 track: which of t3's releases the Deployment follows ([ADR-0041](adr/0041-a-deployment-follows-one-t3-track-set-as-a-deployment-setting.md)). It names the pin's Server version, the bump takes the newest tag on it (only forward: after a switch to stable, it waits for a stable that contains the nightly pin), and an in-app Update takes only its releases. Keep your stock clients on the same update track. |
 | `T3FLARE_WORKERS_DEV_SUBDOMAIN` | every deploy | `dev.env` | repository variable | a DNS label | The account's workers.dev subdomain (the `<x>` in `<x>.workers.dev`): a Stage without a domain is served at `t3flare-environment-<stage>.<x>.workers.dev`. |
 | `T3FLARE_DOMAIN` | `prod` only | the shell, for a `prod` deploy | `prod` environment variable | a hostname | `prod`'s custom domain, in a Cloudflare zone of the account. Any other Stage is refused while it is set. `ci:setup` needs it too. |
 | `T3FLARE_DOMAIN_ZONE_ID` | `ci:setup` only | `dev.env` | not needed | 32 hex characters | The id of `T3FLARE_DOMAIN`'s zone: `prod`'s CI token gets that zone's permissions. |
@@ -87,8 +88,9 @@ refuses to deploy `prod` without it, and refuses any other Stage with it, as `al
      → Sharing & access.
    - Don't reuse the bootstrap token for later devices: a second pairing with it signs the first bearer client out
      ([ADR-0010](adr/0010-the-endpoint-is-public-behind-t3s-own-auth.md)).
-   - The mobile and desktop apps must speak the orchestration protocol of the t3code nightly t3flare is pinned to
-     (`t3code/`). The web client is served by the Stage itself, so it always matches.
+   - The mobile and desktop apps must speak the orchestration protocol of the t3code release t3flare is pinned to
+     (`t3code/`): keep them on the Deployment's t3 track (Settings → About → Update track: Stable for `stable`,
+     Nightly for `nightly`). The web client is served by the Stage itself, so it always matches.
 
 ### CI (optional)
 
@@ -96,9 +98,9 @@ From the Deployment repository, after a first `prod` deploy from the laptop, run
 `T3FLARE_DOMAIN=t3.example.com pnpm --filter @t3flare/infra run ci:setup` ([`infra/github.ts`](../infra/github.ts)). It
 reads `dev.env` and sets up:
 
-- the repository variables `T3FLARE_ACCESS_TEAM_DOMAIN` and `T3FLARE_WORKERS_DEV_SUBDOMAIN`, and the repository secret
-  `T3FLARE_OWNER_EMAIL`;
-- the `bump` GitHub environment, for the nightly bump of t3code's pin (ADR-0017): its Cloudflare token, the account id,
+- the repository variables `T3FLARE_ACCESS_TEAM_DOMAIN`, `T3FLARE_WORKERS_DEV_SUBDOMAIN` and `T3FLARE_T3_TRACK`, and
+  the repository secret `T3FLARE_OWNER_EMAIL`;
+- the `bump` GitHub environment, for the t3 bump of t3code's pin (ADR-0017, ADR-0041): its Cloudflare token, the account id,
   `T3FLARE_FIXTURE_REPO`, and the secret `T3FLARE_MODEL_ENDPOINT`, the Model endpoints the job's Stage and acceptance
   test set up (one per API, an Anthropic Messages and an OpenAI Responses one, so every CLI agent runs; without it the
   bump's real turn has no model);

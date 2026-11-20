@@ -6,7 +6,9 @@ Status: accepted (owner, 2026-11-17, after a four-round design interview). Plan:
 [ADR-0017](0017-upstream-is-tracked-by-nightly-tag-with-an-automated-bump.md) (the bump can land),
 [ADR-0023](0023-the-cloud-environment-tells-clients-only-what-it-does.md) (a third classification),
 [ADR-0024](0024-host-bound-features-are-refused.md) (provider update is no longer refused on prod) and
-[ADR-0013](0013-github-access-through-a-github-app-with-per-repo-tokens.md) (a fourth permission list).
+[ADR-0013](0013-github-access-through-a-github-app-with-per-repo-tokens.md) (a fourth permission list). Refined by
+[ADR-0041](0041-a-deployment-follows-one-t3-track-set-as-a-deployment-setting.md): the server Update's target is an
+exact release on the Deployment's t3 track, stable or nightly, where this record says "an exact nightly".
 
 The owner's stock clients run t3's nightly track; the Cloud Environment is pinned. Until now the clients said the cloud
 was out of date even when it was not (our build never stamped t3's version: the manifest said `0.1.10`), offered only a

@@ -90,6 +90,8 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           PIN: ${{ inputs.pin }}
           SHA: ${{ inputs.sha }}
+          # The Deployment's t3 track (ADR-0041), which names main's pin when its commit carries a tag on each track.
+          T3FLARE_T3_TRACK: ${{ vars.T3FLARE_T3_TRACK }}
 
       # No token here: the land check runs git and npm on the branch's commit.
       - name: Check the branch

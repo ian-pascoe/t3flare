@@ -4,7 +4,7 @@ t3flare is published by Spirit-Led Software LLC and maintained by one person, on
 
 ## Supported versions
 
-Only the tip of `main` is supported. t3flare has no releases: `main` follows t3code's nightly tags and deploys
+Only the tip of `main` is supported. t3flare has no releases: `main` follows t3code's stable releases and deploys
 continuously, so a fix lands on `main` and nowhere else.
 
 ## Reporting a vulnerability

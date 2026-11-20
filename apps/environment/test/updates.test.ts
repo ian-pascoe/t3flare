@@ -13,19 +13,30 @@ const CURRENT = "0.1.11-nightly.20261117.4825";
 const NEXT = "0.1.11-nightly.20261118.4830";
 
 describe("the server Update's target policy", () => {
-  it("accepts an exact nightly newer than the running one", () => {
-    expect(serverUpdateRefusal({ targetVersion: NEXT }, CURRENT)).toBeUndefined();
-    expect(serverUpdateRefusal({ targetVersion: "0.1.12-nightly.20261101.1" }, CURRENT)).toBeUndefined();
+  it("accepts an exact release on the Environment's t3 track, newer than the running one", () => {
+    expect(serverUpdateRefusal({ targetVersion: NEXT }, CURRENT, "nightly")).toBeUndefined();
+    expect(serverUpdateRefusal({ targetVersion: "0.1.12-nightly.20261101.1" }, CURRENT, "nightly")).toBeUndefined();
+    expect(serverUpdateRefusal({ targetVersion: "0.1.12" }, "0.1.11", "stable")).toBeUndefined();
+    // A Deployment that switched to stable leaves its nightly pin for the first stable past it.
+    expect(serverUpdateRefusal({ targetVersion: "0.1.12" }, "0.1.12-nightly.20261120.4994", "stable")).toBeUndefined();
     expect(tagOf(NEXT)).toBe(`v${NEXT}`);
+    expect(tagOf("0.1.12")).toBe("v0.1.12");
   });
 
-  it("refuses the same or an older version, a non-nightly, a track switch and a staged update", () => {
-    expect(serverUpdateRefusal({ targetVersion: CURRENT }, CURRENT)).toMatch(/not newer/);
-    expect(serverUpdateRefusal({ targetVersion: "0.1.11-nightly.20261117.4824" }, CURRENT)).toMatch(/not newer/);
-    expect(serverUpdateRefusal({ targetVersion: "0.1.12" }, CURRENT)).toMatch(/not an exact t3 nightly/);
-    expect(serverUpdateRefusal({ targetVersion: "nightly" }, CURRENT)).toMatch(/not an exact t3 nightly/);
-    expect(serverUpdateRefusal({ targetVersion: NEXT, channel: "nightly" } as never, CURRENT)).toMatch(/update tracks/);
-    expect(serverUpdateRefusal({ targetVersion: NEXT, stageOnly: true }, CURRENT)).toMatch(/stage/);
+  it("refuses the same or an older version, another track's build, a track switch and a staged update", () => {
+    expect(serverUpdateRefusal({ targetVersion: CURRENT }, CURRENT, "nightly")).toMatch(/not newer/);
+    expect(serverUpdateRefusal({ targetVersion: "0.1.11-nightly.20261117.4824" }, CURRENT, "nightly")).toMatch(/not newer/);
+    expect(serverUpdateRefusal({ targetVersion: "0.1.11" }, "0.1.12-nightly.20261120.4994", "stable")).toMatch(/not newer/);
+    expect(serverUpdateRefusal({ targetVersion: "0.1.12" }, CURRENT, "nightly")).toMatch(/follows t3's nightly releases.*0\.1\.12 is a stable build.*nightly update track/);
+    expect(serverUpdateRefusal({ targetVersion: NEXT }, "0.1.11", "stable")).toMatch(/follows t3's stable releases.*is a nightly build/);
+    expect(serverUpdateRefusal({ targetVersion: "nightly" }, CURRENT, "nightly")).toMatch(/not an exact t3 release\./);
+    expect(serverUpdateRefusal({ targetVersion: "0.1.10-preview.20261112.4593" }, "0.1.9", "stable")).toMatch(/not an exact t3 release/);
+    expect(serverUpdateRefusal({ targetVersion: NEXT, channel: "nightly" } as never, CURRENT, "nightly")).toMatch(/update tracks/);
+    expect(serverUpdateRefusal({ targetVersion: NEXT, stageOnly: true }, CURRENT, "nightly")).toMatch(/stage/);
+  });
+
+  it("refuses every target in a build that names no t3 track", () => {
+    expect(serverUpdateRefusal({ targetVersion: NEXT }, CURRENT, undefined)).toMatch(/no t3 track/);
   });
 });
 
@@ -246,8 +257,8 @@ describe("GitHub Actions through a fake dispatch and runs endpoint", () => {
       if (pathname.endsWith("/runs")) {
         return Response.json({
           workflow_runs: [
-            { id: 7, html_url: "https://github.com/ian-pascoe/t3flare/actions/runs/7", status: "queued", conclusion: null, name: "Nightly bump", display_title: "Update other" },
-            { id: 8, html_url: "https://github.com/ian-pascoe/t3flare/actions/runs/8", status: "in_progress", conclusion: null, name: "Nightly bump", display_title: "Update u1" },
+            { id: 7, html_url: "https://github.com/ian-pascoe/t3flare/actions/runs/7", status: "queued", conclusion: null, name: "t3 bump", display_title: "Update other" },
+            { id: 8, html_url: "https://github.com/ian-pascoe/t3flare/actions/runs/8", status: "in_progress", conclusion: null, name: "t3 bump", display_title: "Update u1" },
           ],
         });
       }

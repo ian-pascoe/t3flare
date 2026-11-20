@@ -19,6 +19,8 @@ name: Deploy prod
 # on the repository:
 #   vars.T3FLARE_ACCESS_TEAM_DOMAIN     the Access team (<team>.cloudflareaccess.com)
 #   vars.T3FLARE_WORKERS_DEV_SUBDOMAIN  the account's workers.dev subdomain (also this job's environment URL)
+#   vars.T3FLARE_T3_TRACK               the t3 track the Deployment follows (stable or nightly, ADR-0041): it names the
+#                                       pin's Server version and is the only track the Environment takes Updates on
 #   secrets.T3FLARE_OWNER_EMAIL         the Owner, whom Access admits (a secret: a variable prints unmasked in the logs)
 # On the GitHub environment `prod` (main only):
 #   secrets.CLOUDFLARE_API_TOKEN   the account token `t3flare-ci-prod`
@@ -78,6 +80,7 @@ jobs:
       # The Deployment settings that are variables (docs/deploy.md); the Owner's email is a secret, passed to Deploy and Smoke only.
       T3FLARE_ACCESS_TEAM_DOMAIN: ${{ vars.T3FLARE_ACCESS_TEAM_DOMAIN }}
       T3FLARE_WORKERS_DEV_SUBDOMAIN: ${{ vars.T3FLARE_WORKERS_DEV_SUBDOMAIN }}
+      T3FLARE_T3_TRACK: ${{ vars.T3FLARE_T3_TRACK }}
       # The Workspace sweep's real purge (SPI-974): `1` on prod once the owner turned it on.
       T3FLARE_SWEEP_PURGE: ${{ vars.T3FLARE_SWEEP_PURGE }}
       NPM_CONFIG_WORKSPACE_DIR: ${{ github.workspace }}
@@ -100,15 +103,16 @@ jobs:
 
       - run: git submodule update --init t3code
 
-      # The Server version the smoke check expects: the pin's tag without its `v` (stage.ts refuses prod off a tag).
-      - name: Server version
-        id: version
-        run: echo "server=$(git -C t3code describe --tags --exact-match HEAD | sed 's/^v//')" >> "$GITHUB_OUTPUT"
-
       # Node, pnpm and Vite+ at package.json's versions, then a frozen install (ADR-0030). The store cache on prod only.
       - uses: ./.github/actions/setup
         with:
           cache: ${{ (inputs.stage || 'prod') == 'prod' && 'true' || 'false' }}
+
+      # The Server version the smoke check expects: the pin's tag on the t3 track without its `v` (ADR-0041; stage.ts
+      # refuses prod off a tag). Node on our own script, which imports nothing installed.
+      - name: Server version
+        id: version
+        run: echo "server=$(node apps/environment/serverVersion.ts version)" >> "$GITHUB_OUTPUT"
 
       # SPI-1175: GitHub masks only the whole secret, so its key and header values are masked each on its own, before any
       # step that could print one. The commands go to the runner's log only, never a file.
