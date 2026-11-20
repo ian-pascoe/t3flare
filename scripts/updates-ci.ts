@@ -7,7 +7,7 @@
 //   plan-t3 --event <e> [--tag <t>] [--land true] [--verify <what>]   bump.yml: skip, bump or land (mode, tag, pin, sha)
 //   check-proposal --kind t3|cli --dir <artifact dir> (--gate <g> [--tag <t>] | --cli <c> [--running <v>])
 //                       no token: the report read and the bundled commit checked (changed, pin, sha, gate, call_land;
-//                       and for the PR's body: unclassified, retried, t3_type_errors)
+//                       and for the PR's body: unclassified, retried, t3_type_errors, fingerprint)
 //   publish-proposal --pin <pin> --sha <sha> --gate <g>      token: push `bump/*`, mark the commit proven
 //   land-plan --pin <pin> [--sha <sha>]   land.yml: land (the branch's tip is `sha`, proven) or deploy-only
 //                                         (mode, branch, sha, verify)
@@ -121,11 +121,11 @@ switch (command) {
       if (!git(["bundle", "verify", bundle], root).ok) fail("the pin's bundle does not verify");
       if (!git(["fetch", "--quiet", bundle, "HEAD:refs/remotes/candidate"], root).ok) fail("could not fetch the pin's bundle");
       sha = git(["rev-parse", "refs/remotes/candidate"], root).out;
-      const checked = spawnSync(process.execPath, ["scripts/land-check.ts", "--ref", "refs/remotes/candidate", "--pin", pinText(pin as Pin)], { cwd: root, stdio: "inherit" });
+      const checked = spawnSync(process.execPath, ["scripts/land-check.ts", "--ref", "refs/remotes/candidate", "--pin", pinText(pin as Pin), "--propose"], { cwd: root, stdio: "inherit" });
       if (checked.status !== 0) fail("the land check refused the proposed pin");
     }
     // For the pull request's body only (U4, U18): validated names and a boolean, never part of a decision.
-    const notes = kind === "t3" ? bumpReportNotes(text) : { unclassified: [], acceptanceRetried: false, t3TypeErrors: 0 };
+    const notes = kind === "t3" ? bumpReportNotes(text) : { unclassified: [], acceptanceRetried: false, t3TypeErrors: 0, fingerprint: [] };
     output({
       changed: String(report.changed),
       pin: pinText(pin as Pin),
@@ -135,6 +135,7 @@ switch (command) {
       unclassified: notes.unclassified.join(", "),
       retried: String(notes.acceptanceRetried),
       t3_type_errors: String(notes.t3TypeErrors),
+      fingerprint: notes.fingerprint.join("; "),
     });
     break;
   }

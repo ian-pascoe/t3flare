@@ -10,7 +10,10 @@
 //  2. Move the submodule to it.
 //  3. Regenerate the workspace and the lock from t3's pnpm-workspace.yaml and pnpm-lock.yaml (scripts/relock.ts), and
 //     check that t3's importers install exactly what t3's lock installs, with a single `effect` (ADR-0030).
-//  4. `pnpm run check`, the whole of it: every Patch applies (`git apply --check`), typecheck, lint, tests.
+//  4. `pnpm run check`, the whole of it: every Patch applies (`git apply --check`), typecheck, lint, tests. The upstream
+//     fingerprint test only reports here (SPI-1011): its own step records the t3 code we restate that changed since its
+//     last review (`upstreamFingerprint` in the report, the commit message and the PR's body). It never fails the bump;
+//     the land check holds such a pin for a person (ADR-0037's SPI-1011 refinement).
 //  5. `test:docker` (step 4a): the pinned CLIs in Docker, launched by our profiles against the new t3, on a stand-in
 //     model relay (the real-model turns are the acceptance test's, on the stage's Model endpoint).
 //  6. Build the Worker and the web client, deploy the `bump` stage, turn its safe mode off (a new build starts fresh),
@@ -38,8 +41,9 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { DETERMINISTIC_STEPS } from "../apps/environment/scripts/lib/land.ts";
+import { DETERMINISTIC_STEPS, findingSummary, HELD_BUMP_STEPS } from "../apps/environment/scripts/lib/land.ts";
 import { keptReportJson } from "../apps/environment/scripts/lib/modelEndpointSpec.ts";
+import { type Finding, REPORT_ONLY, REPORT_ONLY_ENV } from "../apps/environment/scripts/lib/upstreamFingerprintFixture.ts";
 import { T3_ERRORS_COUNT } from "../apps/environment/scripts/lib/typecheckFilter.ts";
 import { newestNightly, PINNED_FILES } from "../apps/environment/src/updates/pins.ts";
 
@@ -88,7 +92,7 @@ const sh = (command: string, commandArgs: Array<string>, cwd: string, options: {
   });
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
   if (!options.quiet) process.stdout.write(output);
-  return { ok: result.status === 0, output };
+  return { ok: result.status === 0, output, stdout: result.stdout ?? "" };
 };
 
 const step = (name: string, run: () => { ok: boolean; detail?: string }, detailChars = DETAIL_CHARS): boolean => {
@@ -111,6 +115,8 @@ const step = (name: string, run: () => { ok: boolean; detail?: string }, detailC
 let lockLine: string | undefined;
 /** The descriptor flags the new pin has and `capabilities.ts` does not classify: stripped until classified (U4). */
 let unclassifiedCapabilities: Array<string> | undefined;
+/** The upstream fingerprint's findings (SPI-1011, fragility T2): t3 code we restate that changed since its review. */
+let upstreamFingerprint: Array<Finding> | undefined;
 /** Type errors in t3's own files the typecheck passed over (U10): not ours to fix, but a new one is worth a look. */
 let t3TypeErrors: number | undefined;
 /** The first acceptance attempt's result, when it failed and a second ran. */
@@ -145,6 +151,7 @@ const finish = (ok: boolean, note?: string) => {
       : null,
     lock: lockLine ?? null,
     unclassifiedCapabilities: unclassifiedCapabilities ?? null,
+    upstreamFingerprint: upstreamFingerprint ?? null,
     t3TypeErrors: t3TypeErrors ?? 0,
     acceptanceRetry: acceptanceRetry ?? null,
     rollback: rollbackResult ?? null,
@@ -199,7 +206,7 @@ const ok =
   }) &&
   // The whole check, as prod's deploy runs it (D9; closes U27): the patches apply, typecheck, lint, tests.
   step(DETERMINISTIC_STEPS.check, () => {
-    const result = sh("pnpm", ["run", "check"], root);
+    const result = sh("pnpm", ["run", "check"], root, { env: { [REPORT_ONLY_ENV]: REPORT_ONLY } });
     const t3Errors = T3_ERRORS_COUNT.exec(result.output)?.[1];
     if (t3Errors !== undefined) t3TypeErrors = Number(t3Errors);
     return { ok: result.ok, detail: result.output };
@@ -214,6 +221,18 @@ const ok =
       // Unread: the report says null, and the bump goes on.
     }
     return { ok: true, detail: unclassifiedCapabilities === undefined ? `unread: ${result.output.slice(-1000)}` : JSON.stringify(unclassifiedCapabilities) };
+  }) &&
+  // Never fails the bump: a change holds the pin for a person at the land check (SPI-1011). The report and the PR name
+  // each finding with our file to review.
+  step("t3 code we restate, changed since its last review (holds the land for a person)", () => {
+    const result = sh(process.execPath, ["scripts/upstream-fingerprint.ts", "--json"], environment, { quiet: true });
+    try {
+      const parsed: unknown = JSON.parse(result.stdout.trim().split("\n").at(-1) ?? "");
+      if (Array.isArray(parsed)) upstreamFingerprint = parsed as Array<Finding>;
+    } catch {
+      // Unread: the report says null, and the bump goes on; the land check still compares the files.
+    }
+    return { ok: true, detail: upstreamFingerprint === undefined ? `unread: ${result.output.slice(-1000)}` : JSON.stringify(upstreamFingerprint) };
   }) &&
   (flag("no-deploy") ||
   (!fullGate || step("the CLI agents in Docker (test:docker: the pinned Codex and pi, launched as the Workspace launches them)", () => {
@@ -287,6 +306,13 @@ if (flag("commit") && to !== from) {
       `Proven by the ${gate} gate${acceptanceRetry === undefined ? "" : ", the acceptance test passing on its second attempt"}.`,
       ...(unclassifiedCapabilities !== undefined && unclassifiedCapabilities.length > 0
         ? [`Capability flags stripped until classified in apps/environment/src/t3/capabilities.ts: ${unclassifiedCapabilities.join(", ")}.`]
+        : []),
+      ...(upstreamFingerprint !== undefined && upstreamFingerprint.length > 0
+        ? [
+            ["t3 files the upstream fingerprint watches changed since its last review, so this pin does not land by itself (fragility T2)", upstreamFingerprint.flatMap((finding) => findingSummary(finding) ?? []).join("; ")]
+              .filter((part) => part.length > 0)
+              .join(": ") + `. To land it: ${HELD_BUMP_STEPS} (ADR-0037's SPI-1011 refinement).`,
+          ]
         : []),
       ...(t3TypeErrors !== undefined && t3TypeErrors > 0 ? [`The typecheck passed over ${t3TypeErrors} type error(s) in t3's own files (fragility U10).`] : []),
     ];

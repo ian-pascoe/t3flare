@@ -7,6 +7,7 @@ import {
   bumpAttemptOf,
   DETERMINISTIC_STEPS,
   bumpReportNotes,
+  findingSummary,
   landBindingRefusal,
   landMode,
   landRefusal,
@@ -15,9 +16,11 @@ import {
   readBumpReport,
   t3LockRefusal,
   t3ManifestRefusal,
+  upstreamFingerprintRefusal,
   type LandFacts,
   type T3LockInput,
 } from "../scripts/lib/land.ts";
+import { UPDATE_COMMAND } from "../scripts/lib/upstreamFingerprintFixture.ts";
 
 const SHA = "cd9c39fe3c25ad71657cc0b8631b6de76775261e";
 const TAG = "v0.1.11-nightly.20261117.4825";
@@ -98,10 +101,32 @@ describe("a bump job's report, read by a trusted job", () => {
       unclassified: ["newFlag"],
       acceptanceRetried: true,
       t3TypeErrors: 2,
+      fingerprint: [],
     });
-    expect(bumpReportNotes(JSON.stringify({ unclassifiedCapabilities: null, acceptanceRetry: null, t3TypeErrors: "2\n::x" }))).toEqual({ unclassified: [], acceptanceRetried: false, t3TypeErrors: 0 });
+    expect(bumpReportNotes(JSON.stringify({ unclassifiedCapabilities: null, acceptanceRetry: null, t3TypeErrors: "2\n::x" }))).toEqual({ unclassified: [], acceptanceRetried: false, t3TypeErrors: 0, fingerprint: [] });
     expect(bumpReportNotes(JSON.stringify({ t3TypeErrors: 1.5 }))).toMatchObject({ t3TypeErrors: 0 });
-    expect(bumpReportNotes("nope")).toEqual({ unclassified: [], acceptanceRetried: false, t3TypeErrors: 0 });
+    expect(bumpReportNotes("nope")).toEqual({ unclassified: [], acceptanceRetried: false, t3TypeErrors: 0, fingerprint: [] });
+  });
+
+  it("tells the pull request which of our files to review for the upstream fingerprint, path- and entry-shaped only (T2)", () => {
+    const upstreamFingerprint = [
+      { kind: "changed", file: "apps/server/src/server.ts", symbol: "*", ourFile: "apps/environment/src/t3/composition.ts", entry: "U1" },
+      { kind: "missing", file: "apps/server/src/vcs/GitVcsDriverCore.ts", literal: '"x"`; rm -rf', ourFile: "apps/agents/src/workspace/staleReads.ts", entry: "U13" },
+      { kind: "changed", file: "a.ts\n## injected", symbol: "x", ourFile: "b.ts", entry: "U1" },
+      { kind: "changed", file: "a.ts", symbol: "$(rm -rf)", ourFile: "b.ts", entry: "U1" },
+      { kind: "changed", file: "a.ts", symbol: "x", ourFile: "b.ts", entry: "U1; rm" },
+      { kind: "moved", file: "apps/server/src/terminal/Manager.ts" },
+      { kind: "moved", file: "$(rm -rf)" },
+      "nope",
+    ];
+    const lines = [
+      "review `apps/environment/src/t3/composition.ts` (U1) for `t3code/apps/server/src/server.ts` (`*`)",
+      "review `apps/agents/src/workspace/staleReads.ts` (U13) for `t3code/apps/server/src/vcs/GitVcsDriverCore.ts` (a literal)",
+      "`t3code/apps/server/src/terminal/Manager.ts` changed outside the watched regions (nothing of ours to review)",
+    ];
+    expect(bumpReportNotes(JSON.stringify({ upstreamFingerprint })).fingerprint).toEqual(lines);
+    // The bump's commit message says the same, from the same function.
+    expect(upstreamFingerprint.flatMap((finding) => findingSummary(finding) ?? [])).toEqual(lines);
   });
 
   it("records the gate the run was asked for: a report claiming another is refused (A8)", () => {
@@ -315,5 +340,34 @@ describe("land.yml's binding to the proven commit (B1)", () => {
     expect(landBindingRefusal({ branch, sha, tip: undefined, proof: { gate: "full" } })).toMatch(/is at nothing/);
     expect(landBindingRefusal({ branch, sha, tip: sha, proof: { gate: undefined, reason: "its run is on agent/x, not main" } })).toBe("its run is on agent/x, not main");
     expect(landBindingRefusal({ branch, sha, tip: sha, proof: undefined })).toMatch(/proof was not read/);
+  });
+});
+
+describe("upstreamFingerprintRefusal (SPI-1011): a pin whose watched t3 files changed since the fingerprint's review lands only by a person", () => {
+  const blobs: Record<string, string> = { "apps/server/src/server.ts": "a".repeat(40), "apps/server/src/git.ts": "b".repeat(40) };
+  const fixture = (files: Record<string, string>) =>
+    JSON.stringify({
+      reviewedCommit: SHA,
+      regions: [{ file: "apps/server/src/server.ts", symbol: "*", hash: "h", ourFile: "apps/environment/src/t3/composition.ts", entry: "U1" }],
+      literals: [{ file: "apps/server/src/git.ts", literal: "b", ourFile: "apps/agents/src/workspace/staleReads.ts", entry: "U13" }],
+      files,
+    });
+  const blobOf = (file: string) => blobs[file];
+
+  it("lets a pin land whose watched files are the reviewed blobs", () => {
+    expect(upstreamFingerprintRefusal(fixture(blobs), blobOf)).toBeUndefined();
+  });
+
+  it("refuses a changed or gone watched file, naming it and what a person does on a branch of their own", () => {
+    const refusal = upstreamFingerprintRefusal(fixture(blobs), (file) => (file === "apps/server/src/git.ts" ? "c".repeat(40) : undefined));
+    expect(refusal).toContain("apps/server/src/git.ts, apps/server/src/server.ts");
+    expect(refusal).toContain("needs a person");
+    expect(refusal).toContain("git switch -c <name> origin/bump/<tag>");
+    expect(refusal).toContain(UPDATE_COMMAND);
+  });
+
+  it("refuses a fixture that does not record every watched file, or is not one", () => {
+    expect(upstreamFingerprintRefusal(fixture({ "apps/server/src/server.ts": blobs["apps/server/src/server.ts"]! }), blobOf)).toMatch(/does not record apps\/server\/src\/git\.ts/);
+    expect(upstreamFingerprintRefusal("nope", blobOf)).toMatch(/not read/);
   });
 });

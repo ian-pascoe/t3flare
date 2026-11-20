@@ -184,3 +184,30 @@ CI, never by updating the Environment in place:
   the same line under Consequences) was written when the repository was a personal account's; it is now an
   organisation's. The deploy-key design stays: its push starts `deploy-prod.yml`, which a push with the workflow's own
   token would not, and the key lives in the `land` environment, apart from `prod`'s secrets.
+
+## Refinement (SPI-1011, 2026-11-20): an Update whose upstream fingerprint changed does not land by itself
+
+Some of our files restate or emulate t3 code that typecheck cannot watch (`composition.ts` restates `server.ts`, the
+stale reads match t3's git argv, and the rest in [fragility T2](../upstream-fragility.md#gaps-in-detection)). The
+upstream fingerprint (GLOSSARY) ties each to a hash of t3's region, or a literal t3 must still contain, and records each
+watched file's git blob id (`apps/environment/test/fixtures/upstream-fingerprint.json`). `pnpm run check` fails on a
+change to any of them until that file of ours is reviewed and the fixture updated
+(`node apps/environment/scripts/upstream-fingerprint.ts --update`). A bump commit may touch only its pin files, so it
+can never carry that update, and the watched files change on most nightlies.
+
+- **The bump still runs and proves the pin.** `scripts/bump.ts` runs `pnpm run check` with the fingerprint test in
+  report-only mode, then records what changed (`upstreamFingerprint` in the report, the pin's commit message and the
+  bump pull request's body, as `unclassifiedCapabilities` is carried): each changed region or missing literal with our
+  file to review, and each watched file whose bytes moved outside the watched regions. The bump is pushed, marked proven
+  and proposed as before.
+- **It does not land by itself.** `scripts/land-check.ts` refuses a t3 candidate in which any t3 file the fingerprint
+  watches is not the blob it was reviewed at (`git rev-parse HEAD:<file>` in the candidate's t3code). Blob ids need no
+  parser on the trusted runner; they are coarser than the regions, so a change outside the watched regions holds the pin
+  too, and the check and the bump's report say so. The publish job's check (`--propose`) only prints the result, so the
+  pull request is still opened. An in-app Update of such a pin fails at `land.yml`'s check; the hourly bump proposes it
+  through the Full gate as a pull request.
+- **A person lands it from a branch of their own.** The trusted planner is unchanged, and it force-pushes `bump/<tag>`
+  (an hourly run, an Update press), which would drop a commit pushed there. So the person cuts their own branch from
+  it (`git switch -c <name> origin/bump/<tag>`, then `git submodule update --init t3code`), reviews the files the pull request names, runs `--update`, commits,
+  opens a pull request from that branch and merges it through the required `check`. The bump's own pull request is then
+  superseded and can be closed.

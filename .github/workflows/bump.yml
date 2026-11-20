@@ -188,7 +188,7 @@ jobs:
             {
               echo "## t3code bump"
               echo '```json'
-              jq '{ok, gate, base, from, to, changed, note, steps: [.steps[] | {name, ok, seconds}], unclassifiedCapabilities, t3TypeErrors, acceptanceRetry: (.acceptanceRetry | if . then {firstFailures} else null end), acceptance: (.acceptance | if . then {ok, failures, serverVersion, modelEndpoint, textGeneration, sqlAdapter, threadWindow, search, realTurn: (.realTurn | if . then {ok, failures, clone, turn, checkpointOps} else null end)} else null end), lock, rollback}' bump-report.json
+              jq '{ok, gate, base, from, to, changed, note, steps: [.steps[] | {name, ok, seconds}], unclassifiedCapabilities, upstreamFingerprint, t3TypeErrors, acceptanceRetry: (.acceptanceRetry | if . then {firstFailures} else null end), acceptance: (.acceptance | if . then {ok, failures, serverVersion, modelEndpoint, textGeneration, sqlAdapter, threadWindow, search, realTurn: (.realTurn | if . then {ok, failures, clone, turn, checkpointOps} else null end)} else null end), lock, rollback}' bump-report.json
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -257,9 +257,9 @@ jobs:
       # Not an Update: a pull request for the owner, which closes the older bump pull requests it supersedes.
       - name: Propose it
         if: steps.check.outputs.changed == 'true' && inputs.dry_run != true && inputs.land != true
-        # UNCLASSIFIED, RETRIED and T3_TYPE_ERRORS come from the report through check-proposal, which passes only
-        # flag-shaped names, a boolean and a whole number (bumpReportNotes); they go into the body as data, never into a
-        # command.
+        # UNCLASSIFIED, RETRIED, T3_TYPE_ERRORS and FINGERPRINT come from the report through check-proposal, which passes
+        # only flag-shaped names, a boolean, a whole number and path- and entry-shaped notes (bumpReportNotes); they go
+        # into the body as data, never into a command.
         run: |
           body="Pinned by the nightly bump job; the $GATE gate passed on the \`bump\` stage. See the run's report: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           if [ "$RETRIED" = "true" ]; then
@@ -270,6 +270,9 @@ jobs:
           fi
           if [ -n "$UNCLASSIFIED" ]; then
             body+=$'\n\n'"**New capability flags, stripped until classified** in \`apps/environment/src/t3/capabilities.ts\` (fragility U4): $UNCLASSIFIED"
+          fi
+          if [ -n "$FINGERPRINT" ]; then
+            body+=$'\n\n'"**This pin does not land by itself:** t3 files the upstream fingerprint watches changed since its last review (fragility T2, ADR-0037's SPI-1011 refinement), and the land check refuses it. Cut a branch of your own from this one (\`git switch -c <name> origin/$BRANCH\`, then \`git submodule update --init t3code\`: the hourly bump force-pushes \`$BRANCH\`), review each of our files named here against the change, run \`node apps/environment/scripts/upstream-fingerprint.ts --update\`, commit, open a pull request from your branch and merge it. Then close this pull request, which yours supersedes. Findings: $FINGERPRINT"
           fi
           gh pr create --head "$BRANCH" --base main --title "chore: bump t3code to ${BRANCH#bump/}" --body "$body" \
             || echo "A pull request for $BRANCH already exists."
@@ -282,6 +285,7 @@ jobs:
           UNCLASSIFIED: ${{ steps.check.outputs.unclassified }}
           RETRIED: ${{ steps.check.outputs.retried }}
           T3_TYPE_ERRORS: ${{ steps.check.outputs.t3_type_errors }}
+          FINGERPRINT: ${{ steps.check.outputs.fingerprint }}
 
   # D18, review A3: a verify run that does not pass, for any reason (a failure, a timeout, a cancellation), opens an
   # issue (GitHub Issues sync to Linear). No automatic revert: migrations only go forward.
