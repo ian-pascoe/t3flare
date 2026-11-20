@@ -41,6 +41,7 @@ describe("the shapes", () => {
     ["T3FLARE_DOMAIN", ["t3.example.com", "example.dev"], ["example", "https://t3.example.com", "t3.example.com/", "t3..example.com", "t3_x.example.com"]],
     ["T3FLARE_STANDIN_ZONE", ["example.dev"], ["example"]],
     ["T3FLARE_DOMAIN_ZONE_ID", ["0123456789abcdef0123456789abcdef"], ["0123456789ABCDEF0123456789ABCDEF", "0123456789abcdef", "0123456789abcdef0123456789abcdeg"]],
+    ["T3FLARE_T3_TRACK", ["stable", "nightly"], ["Stable", "preview", "latest", "stable ", "stable\nnightly"]],
   ];
 
   it("covers every setting", () => {

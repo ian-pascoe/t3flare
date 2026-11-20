@@ -89,7 +89,7 @@ describe("a t3 bump's content", () => {
 describe("a bump job's report, read by a trusted job", () => {
   it("takes only strictly shaped fields, and the requested tag", () => {
     expect(readBumpReport(JSON.stringify({ ok: true, changed: true, to: NEXT, gate: "update" }), { kind: "t3", gate: "update", tag: NEXT })).toEqual({ changed: true, to: NEXT, gate: "update", callLand: true });
-    expect(readBumpReport(JSON.stringify({ ok: true, changed: true, to: `${NEXT}\nsha=evil`, gate: "update" }), { kind: "t3", gate: "update" })).toMatch(/not a nightly tag/);
+    expect(readBumpReport(JSON.stringify({ ok: true, changed: true, to: `${NEXT}\nsha=evil`, gate: "update" }), { kind: "t3", gate: "update" })).toMatch(/not a t3 release tag/);
     expect(readBumpReport(JSON.stringify({ ok: true, changed: true, to: NEXT, gate: "update" }), { kind: "t3", gate: "update", tag: TAG })).toMatch(/not the requested/);
     expect(readBumpReport(JSON.stringify({ ok: true, changed: "yes", to: NEXT, gate: "full" }), { kind: "t3", gate: "full" })).toMatch(/boolean/);
     expect(readBumpReport(JSON.stringify({ ok: false }), { kind: "t3", gate: "full" })).toMatch(/not a pass/);
@@ -148,6 +148,9 @@ describe("landing or only deploying (F2)", () => {
     expect(landMode({ kind: "t3", tag: TAG }, { tag: NEXT })).toBe("deploy-only");
     expect(landMode({ kind: "t3", tag: NEXT }, { tag: TAG })).toBe("land");
     expect(landMode({ kind: "t3", tag: NEXT }, {})).toBe("land");
+    // A stable is above its own nightlies (ADR-0041).
+    expect(landMode({ kind: "t3", tag: "v0.1.11" }, { tag: "v0.1.11-nightly.20261120.4979" })).toBe("land");
+    expect(landMode({ kind: "t3", tag: "v0.1.11-nightly.20261120.4979" }, { tag: "v0.1.11" })).toBe("deploy-only");
     expect(landMode({ kind: "cli", cli: "codex", version: "0.169.0" }, { cliVersion: "0.169.0" })).toBe("deploy-only");
     expect(landMode({ kind: "cli", cli: "codex", version: "0.169.0" }, { cliVersion: "0.167.2" })).toBe("land");
   });
@@ -157,33 +160,33 @@ describe("what a bump.yml run does", () => {
   const branch = (gate: "update" | "full" | undefined, mainIsAncestor = true, commits = 1) => ({ gate, mainIsAncestor, commits });
 
   it("hourly: skips a pinned nightly or one proposed through the Full gate, and bumps one only the Update gate proved (A1)", () => {
-    expect(planT3({ event: "schedule", land: false, verify: false, newest: NEXT, mainTag: NEXT })).toMatchObject({ mode: "skip" });
-    expect(planT3({ event: "schedule", land: false, verify: false, newest: NEXT, mainTag: TAG, branch: branch("full") })).toMatchObject({ mode: "skip" });
-    expect(planT3({ event: "schedule", land: false, verify: false, newest: NEXT, mainTag: TAG, branch: branch("update") })).toMatchObject({ mode: "bump", tag: NEXT });
+    expect(planT3({ track: "nightly", event: "schedule", land: false, verify: false, newest: NEXT, mainTag: NEXT })).toMatchObject({ mode: "skip" });
+    expect(planT3({ track: "nightly", event: "schedule", land: false, verify: false, newest: NEXT, mainTag: TAG, branch: branch("full") })).toMatchObject({ mode: "skip" });
+    expect(planT3({ track: "nightly", event: "schedule", land: false, verify: false, newest: NEXT, mainTag: TAG, branch: branch("update") })).toMatchObject({ mode: "bump", tag: NEXT });
     // A forged branch (no proof) does not hide a nightly.
-    expect(planT3({ event: "schedule", land: false, verify: false, newest: NEXT, mainTag: TAG, branch: branch(undefined) })).toMatchObject({ mode: "bump", tag: NEXT });
+    expect(planT3({ track: "nightly", event: "schedule", land: false, verify: false, newest: NEXT, mainTag: TAG, branch: branch(undefined) })).toMatchObject({ mode: "bump", tag: NEXT });
   });
 
   it("an Update: lands when main pins the tag (a retry after a failed deploy) or a proven branch sits on main; else bumps", () => {
-    expect(planT3({ event: "workflow_dispatch", land: true, verify: false, tag: NEXT, mainTag: NEXT })).toMatchObject({ mode: "land" });
-    expect(planT3({ event: "workflow_dispatch", land: true, verify: false, tag: NEXT, mainTag: NEXT })).not.toHaveProperty("proven");
+    expect(planT3({ track: "nightly", event: "workflow_dispatch", land: true, verify: false, tag: NEXT, mainTag: NEXT })).toMatchObject({ mode: "land" });
+    expect(planT3({ track: "nightly", event: "workflow_dispatch", land: true, verify: false, tag: NEXT, mainTag: NEXT })).not.toHaveProperty("proven");
     // Only a proven branch's tip is handed to land.yml (review B1).
-    expect(planT3({ event: "workflow_dispatch", land: true, verify: false, tag: NEXT, mainTag: TAG, branch: branch("update") })).toMatchObject({ mode: "land", proven: true });
-    expect(planT3({ event: "workflow_dispatch", land: true, verify: false, tag: NEXT, mainTag: TAG, branch: branch(undefined) })).toMatchObject({ mode: "bump" });
-    expect(planT3({ event: "workflow_dispatch", land: true, verify: false, tag: NEXT, mainTag: TAG, branch: branch("full", false) })).toMatchObject({ mode: "bump" });
-    expect(planT3({ event: "workflow_dispatch", land: true, verify: false, tag: NEXT, mainTag: TAG })).toMatchObject({ mode: "bump", tag: NEXT });
-    expect(planT3({ event: "workflow_dispatch", land: true, verify: false, tag: "main" })).toMatch(/nightly tag/);
+    expect(planT3({ track: "nightly", event: "workflow_dispatch", land: true, verify: false, tag: NEXT, mainTag: TAG, branch: branch("update") })).toMatchObject({ mode: "land", proven: true });
+    expect(planT3({ track: "nightly", event: "workflow_dispatch", land: true, verify: false, tag: NEXT, mainTag: TAG, branch: branch(undefined) })).toMatchObject({ mode: "bump" });
+    expect(planT3({ track: "nightly", event: "workflow_dispatch", land: true, verify: false, tag: NEXT, mainTag: TAG, branch: branch("full", false) })).toMatchObject({ mode: "bump" });
+    expect(planT3({ track: "nightly", event: "workflow_dispatch", land: true, verify: false, tag: NEXT, mainTag: TAG })).toMatchObject({ mode: "bump", tag: NEXT });
+    expect(planT3({ track: "nightly", event: "workflow_dispatch", land: true, verify: false, tag: "main" })).toMatch(/tag on the nightly track/);
   });
 
   it("refuses an Update to a tag older than what main already pins, saying why (D6, A11)", () => {
-    expect(planT3({ event: "workflow_dispatch", land: true, verify: false, tag: TAG, mainTag: NEXT })).toMatch(/prod is moving to v0\.1\.11-nightly\.20261117\.4851, newer than/);
+    expect(planT3({ track: "nightly", event: "workflow_dispatch", land: true, verify: false, tag: TAG, mainTag: NEXT })).toMatch(/prod is moving to v0\.1\.11-nightly\.20261117\.4851, newer than/);
   });
 
   it("hourly: stops retrying a tag that failed a deterministic step twice on this main, until main, the nightly or a hand moves", () => {
     const MAIN = "a".repeat(40);
     const failed = (step: "move" | "lock" | "check" | "other", to = NEXT, base = MAIN) => ({ base, to, failed: step });
     const hourly = (attempts: Parameters<typeof planT3>[0]["attempts"], mainSha = MAIN) =>
-      planT3({ event: "schedule", land: false, verify: false, newest: NEXT, mainTag: TAG, mainSha, attempts });
+      planT3({ track: "nightly", event: "schedule", land: false, verify: false, newest: NEXT, mainTag: TAG, mainSha, attempts });
     const check = "check";
     expect(hourly([failed(check), failed(check)])).toMatchObject({ mode: "skip", reason: expect.stringMatching(/failed its check step/) });
     expect(hourly([failed("lock"), failed(check)])).toMatchObject({ mode: "skip" });
@@ -198,7 +201,7 @@ describe("what a bump.yml run does", () => {
     expect(hourly([failed(check), undefined])).toMatchObject({ mode: "bump" });
     expect(hourly(undefined)).toMatchObject({ mode: "bump" });
     // A run by hand is never stopped.
-    expect(planT3({ event: "workflow_dispatch", land: false, verify: false, tag: NEXT, mainSha: MAIN, attempts: [failed(check), failed(check)] })).toMatchObject({ mode: "bump" });
+    expect(planT3({ track: "nightly", event: "workflow_dispatch", land: false, verify: false, tag: NEXT, mainSha: MAIN, attempts: [failed(check), failed(check)] })).toMatchObject({ mode: "bump" });
   });
 
   it("reads an attempt only from a strictly shaped report, keeping a fixed label for its failed step, never its text", () => {
@@ -216,9 +219,21 @@ describe("what a bump.yml run does", () => {
     expect(bumpAttemptOf("not json")).toBeUndefined();
   });
 
+  it("on the stable track: bumps to a newer stable, waits on a nightly pin until a stable passes it, refuses an Update to a nightly (ADR-0041)", () => {
+    const stable = (input: Omit<Parameters<typeof planT3>[0], "track">) => planT3({ track: "stable", ...input });
+    expect(stable({ event: "schedule", land: false, verify: false, newest: "v0.1.12", mainTag: "v0.1.11" })).toMatchObject({ mode: "bump", tag: "v0.1.12" });
+    expect(stable({ event: "schedule", land: false, verify: false, newest: "v0.1.11", mainTag: "v0.1.11" })).toMatchObject({ mode: "skip" });
+    expect(stable({ event: "schedule", land: false, verify: false, newest: "v0.1.11", mainTag: "v0.1.12-nightly.20261120.4994" })).toMatchObject({ mode: "skip", reason: expect.stringMatching(/main pins v0\.1\.12-nightly\.20261120\.4994, at or above v0\.1\.11/) });
+    expect(stable({ event: "schedule", land: false, verify: false, newest: "v0.1.12", mainTag: "v0.1.12-nightly.20261120.4994" })).toMatchObject({ mode: "bump", tag: "v0.1.12" });
+    expect(stable({ event: "schedule", land: false, verify: false })).toMatchObject({ mode: "skip", reason: "no tag on the stable track" });
+    expect(stable({ event: "workflow_dispatch", land: true, verify: false, tag: "v0.1.12", mainTag: "v0.1.11" })).toMatchObject({ mode: "bump", tag: "v0.1.12" });
+    expect(stable({ event: "workflow_dispatch", land: true, verify: false, tag: "v0.1.12-nightly.20261120.4994", mainTag: "v0.1.11" })).toMatch(/tag on the stable track/);
+    expect(planT3({ track: "nightly", event: "workflow_dispatch", land: true, verify: false, tag: "v0.1.12", mainTag: TAG })).toMatch(/tag on the nightly track/);
+  });
+
   it("verify and by-hand runs bump", () => {
-    expect(planT3({ event: "workflow_dispatch", land: false, verify: true })).toMatchObject({ mode: "bump", tag: "" });
-    expect(planT3({ event: "workflow_dispatch", land: false, verify: false, tag: NEXT })).toMatchObject({ mode: "bump", tag: NEXT });
+    expect(planT3({ track: "nightly", event: "workflow_dispatch", land: false, verify: true })).toMatchObject({ mode: "bump", tag: "" });
+    expect(planT3({ track: "nightly", event: "workflow_dispatch", land: false, verify: false, tag: NEXT })).toMatchObject({ mode: "bump", tag: NEXT });
   });
 });
 

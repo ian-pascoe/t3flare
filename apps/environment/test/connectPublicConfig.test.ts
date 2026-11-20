@@ -1,5 +1,5 @@
 // Step 3+ (P1, review finding 7): T3 Connect's public values match what t3 ships, and t3's own config reads them.
-// Run by the nightly bump (its test step), so a change upstream fails the bump instead of silently breaking the link.
+// Run by the t3 bump (its test step), so a change upstream fails the bump instead of silently breaking the link.
 import * as fs from "node:fs";
 import * as path from "node:path";
 

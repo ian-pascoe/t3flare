@@ -32,7 +32,7 @@ const IMAGE = "t3flare-mise-test";
 const NET = "t3flare-mise-test-net";
 const PROXY = "t3flare-mise-test-proxy";
 const out = process.env.T3FLARE_MISE_M0_OUT;
-/** The logging proxy, pinned (this test gates the nightly bump). */
+/** The logging proxy, pinned (this test gates the t3 bump). */
 const MITMPROXY = "mitmproxy/mitmproxy:12.3.1@sha256:2711066c855659b5af8b1dbb84494ed3eff69b42ece439c60b4fe09a2db829d4";
 
 /** The base mise.toml in the image (`BASE_MISE_CONFIG`, apps/sandbox-image/src/env.ts). */

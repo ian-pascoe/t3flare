@@ -4,7 +4,9 @@ Status: accepted (2026-11-19, the open-source release's design interview). Refin
 [ADR-0010](0010-the-endpoint-is-public-behind-t3s-own-auth.md) (the Owner's email and the Access team),
 [ADR-0017](0017-upstream-is-tracked-by-nightly-tag-with-an-automated-bump.md) (the scheduled bump) and
 [ADR-0037](0037-stock-clients-update-buttons-land-a-bump-the-do-dispatches-ci-which-proves-and-fast-forwards-main.md)
-(the update target and ruleset `main`). Settings and the deploy steps: [`docs/deploy.md`](../deploy.md).
+(the update target and ruleset `main`). Settings and the deploy steps: [`docs/deploy.md`](../deploy.md). Refined by
+[ADR-0041](0041-a-deployment-follows-one-t3-track-set-as-a-deployment-setting.md), which adds the required
+`T3FLARE_T3_TRACK`.
 
 t3flare was written as one person's deployment: the Access team, the Owner's email, the workers.dev subdomain, `prod`'s
 domain and zone, the update target, the infra scripts' repository and the fixture repository were constants or

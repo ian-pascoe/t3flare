@@ -1,5 +1,6 @@
-// `node scripts/updates-ci.ts <command> …`: the steps of the update workflows that decide, check or publish (ADR-0037;
-// review F1, F2, A1, A3, A5, A12, B1). They run in trusted jobs, on runners where no upstream or dependency code ran,
+// `node scripts/updates-ci.ts <command> …`: the steps of the update workflows that decide, check or publish (ADR-0037,
+// ADR-0041; review F1, F2, A1, A3, A5, A12, B1). `plan-t3` and `land-plan` read the Deployment's t3 track from
+// T3FLARE_T3_TRACK (a repository variable). They run in trusted jobs, on runners where no upstream or dependency code ran,
 // with plain Node and nothing installed but main's locked `yaml` (`install-yaml`). Every value from a bump job's report
 // or a workflow input is validated against `apps/environment/src/updates/pins.ts`'s patterns before it is used. Outputs
 // go to $GITHUB_OUTPUT as `name=value` lines. A pin travels as one string (`t3:<tag>`, `cli:<cli>:<version>`).
@@ -21,8 +22,9 @@ import * as path from "node:path";
 
 import { clisField } from "../apps/environment/scripts/lib/cliPins.ts";
 import { bumpAttemptOf, bumpReportNotes, DETERMINISTIC_FAILURES_TO_STOP, landBindingRefusal, landMode, planT3, readBumpReport } from "../apps/environment/scripts/lib/land.ts";
-import { branchOf, COMMIT, landedBranches, newestNightly, NIGHTLY_TAG, parsePin, type Pin, pinOf, pinText } from "../apps/environment/src/updates/pins.ts";
-import { branchTipOf, bumpBranches, git, nightlyTagsOf, optionOf, provenGateOf, recentBumpReports, setProven, thisRunUrl } from "./lib/updatesGit.ts";
+import { requireSetting } from "../apps/environment/scripts/lib/deploymentSettings.ts";
+import { branchOf, COMMIT, landedBranches, newestOnTrack, parsePin, type Pin, pinOf, pinTagOf, pinText, T3_TAG, type T3Track, t3TrackOf } from "../apps/environment/src/updates/pins.ts";
+import { branchTipOf, bumpBranches, git, optionOf, provenGateOf, recentBumpReports, setProven, t3TagsOf, thisRunUrl } from "./lib/updatesGit.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const [command, ...args] = process.argv.slice(2);
@@ -55,21 +57,31 @@ const gateArg = (): "update" | "full" => {
 
 const submoduleUrl = () => git(["config", "-f", ".gitmodules", "submodule.t3code.url"], root).out;
 
-/** The nightly tag `ref`'s t3code gitlink is, if any. */
-const tagOfGitlink = (ref: string, tags: ReadonlyMap<string, string>): string | undefined => {
+/** The Deployment's t3 track (ADR-0041), from the repository variable the workflow passes. */
+const trackSetting = (): T3Track => {
+  try {
+    return t3TrackOf(requireSetting(process.env, "T3FLARE_T3_TRACK"))!;
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : String(error));
+  }
+};
+
+/** The tag that names `ref`'s t3code gitlink on `track` (`pinTagOf`), if it carries one. */
+const tagOfGitlink = (ref: string, tags: ReadonlyMap<string, string>, track: T3Track): string | undefined => {
   const gitlink = /^160000 commit ([0-9a-f]{40})\tt3code$/m.exec(git(["ls-tree", ref, "t3code"], root).out)?.[1];
-  return gitlink === undefined ? undefined : newestNightly([...tags].filter(([, sha]) => sha === gitlink).map(([tag]) => tag));
+  return gitlink === undefined ? undefined : pinTagOf([...tags].filter(([, sha]) => sha === gitlink).map(([tag]) => tag), track);
 };
 
 switch (command) {
   case "plan-t3": {
     const event = option("event");
     if (event !== "schedule" && event !== "workflow_dispatch") fail(`not an event this plans: ${String(event)}`);
-    const tags = nightlyTagsOf(submoduleUrl());
-    const newest = newestNightly([...tags.keys()]);
-    const mainTag = tagOfGitlink("HEAD", tags);
+    const track = trackSetting();
+    const tags = t3TagsOf(submoduleUrl());
+    const newest = newestOnTrack([...tags.keys()], track);
+    const mainTag = tagOfGitlink("HEAD", tags, track);
     const tagInput = option("tag") || undefined;
-    if (tagInput !== undefined && !NIGHTLY_TAG.test(tagInput)) fail(`not a nightly tag: ${JSON.stringify(tagInput)}`);
+    if (tagInput !== undefined && !T3_TAG.test(tagInput)) fail(`not a t3 release tag: ${JSON.stringify(tagInput)}`);
     const target = event === "schedule" ? newest : tagInput;
     let branch;
     const tip = target === undefined ? undefined : branchTipOf(`bump/${target}`);
@@ -94,7 +106,7 @@ switch (command) {
       }
     }
     const mainSha = git(["rev-parse", "HEAD"], root).out;
-    const plan = planT3({ event: event as "schedule" | "workflow_dispatch", tag: tagInput, land: option("land") === "true", verify: (option("verify") ?? "") !== "", newest, mainTag, branch, mainSha, attempts });
+    const plan = planT3({ track, event: event as "schedule" | "workflow_dispatch", tag: tagInput, land: option("land") === "true", verify: (option("verify") ?? "") !== "", newest, mainTag, branch, mainSha, attempts });
     if (typeof plan === "string") fail(plan);
     const decided = plan as Exclude<typeof plan, string>;
     console.error(`plan: ${decided.mode}: ${decided.reason}`);
@@ -154,7 +166,7 @@ switch (command) {
     const pin = pinArg();
     let mode;
     if (pin.kind === "t3") {
-      mode = landMode(pin, { tag: tagOfGitlink("origin/main", nightlyTagsOf(submoduleUrl())) });
+      mode = landMode(pin, { tag: tagOfGitlink("origin/main", t3TagsOf(submoduleUrl()), trackSetting()) });
     } else {
       const clis = git(["show", "origin/main:apps/sandbox-image/src/clis.ts"], root);
       if (!clis.ok) fail("main has no clis.ts");

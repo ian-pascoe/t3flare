@@ -22,6 +22,7 @@ import * as ServerLifecycleEvents from "t3/src/serverLifecycleEvents.ts";
 import packageJson from "t3/package.json" with { type: "json" };
 
 import { environmentServices } from "../agents/bindings.ts";
+import { type T3Track, t3TrackOf } from "./pins.ts";
 import { serverUpdateRefusal, tagOf } from "./policy.ts";
 import { NO_UPDATE_TARGET, type UpdateRecord, type Updates } from "./records.ts";
 
@@ -52,15 +53,21 @@ export const readyWithOutcome = (events: ReadonlyArray<ServerLifecycleStreamEven
   return ready === undefined || ready.type !== "ready" ? undefined : { version: ready.version, type: "ready" as const, payload: { ...ready.payload, updateOutcome: outcome } };
 };
 
+/** Declared by the build (build.ts `define`): the t3 track it was made for (ADR-0041). */
+declare const __T3FLARE_BUILD__: { readonly t3Track?: string } | undefined;
+/** The t3 track this build was made for, or undefined when it names none (an unbundled test). */
+const builtTrack = (): T3Track | undefined => t3TrackOf(typeof __T3FLARE_BUILD__ === "undefined" ? undefined : __T3FLARE_BUILD__.t3Track);
+
 /** The records of this Environment (`environmentServices().updates`), or undefined where none are configured. */
 const configuredUpdates = (): Updates | undefined => {
   const updates = environmentServices().updates;
   return updates?.configured === true ? updates : undefined;
 };
 
-export const make = (options: { readonly version?: string; readonly updates?: () => Updates | undefined } = {}) =>
+export const make = (options: { readonly version?: string; readonly track?: T3Track; readonly updates?: () => Updates | undefined } = {}) =>
   Effect.gen(function* () {
     const version = options.version ?? packageJson.version;
+    const track = options.track ?? builtTrack();
     const updatesOf = options.updates ?? configuredUpdates;
     const lifecycle = yield* ServerLifecycleEvents.ServerLifecycleEvents;
     const wake = yield* Queue.unbounded<void>();
@@ -101,7 +108,7 @@ export const make = (options: { readonly version?: string; readonly updates?: ()
         Effect.gen(function* () {
           const updates = updatesOf();
           if (updates === undefined) return yield* failWith(NO_UPDATE_TARGET);
-          const refusal = serverUpdateRefusal(input, version);
+          const refusal = serverUpdateRefusal(input, version, track);
           if (refusal !== undefined) return yield* failWith(refusal);
           const target = input.targetVersion.trim();
           const pressed = yield* Effect.tryPromise({

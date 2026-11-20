@@ -12,6 +12,7 @@ const REQUIRED = {
   T3FLARE_ACCESS_TEAM_DOMAIN: "team.cloudflareaccess.com",
   T3FLARE_OWNER_EMAIL: "owner@example.com",
   T3FLARE_WORKERS_DEV_SUBDOMAIN: "account",
+  T3FLARE_T3_TRACK: "stable",
 };
 /** The retired settings, as a dev.env or a shell may still hold them. */
 const RETIRED = { MODEL_PROXY_URL: "https://llm.example.com", MODEL_PROXY_API_KEY: "cms_spi1176-proxy-key-0123456789", COMMISSARY_CONTAINER_API_KEY: "cms_container" };
@@ -70,6 +71,10 @@ describe("the Deployment settings (docs/deploy.md)", () => {
       error: [missingSettingMessage("T3FLARE_ACCESS_TEAM_DOMAIN"), missingSettingMessage("T3FLARE_WORKERS_DEV_SUBDOMAIN")].join("\n"),
     });
     expect(deployPlan({ stage: "prod", args: [], read: { ...REQUIRED, T3FLARE_OWNER_EMAIL: "" }, env: ci })).toEqual({ ok: false, error: missingSettingMessage("T3FLARE_OWNER_EMAIL") });
+    // The t3 track has no default (ADR-0041): a Deployment says which t3 releases it follows.
+    const { T3FLARE_T3_TRACK: _track, ...withoutTrack } = REQUIRED;
+    expect(deployPlan({ stage: "p1176", args: [], read: withoutTrack, env: laptop })).toEqual({ ok: false, error: missingSettingMessage("T3FLARE_T3_TRACK") });
+    expect(deployPlan({ stage: "prod", args: [], read: { ...REQUIRED, T3FLARE_T3_TRACK: "latest" }, env: ci })).toEqual({ ok: false, error: malformedSettingMessage("T3FLARE_T3_TRACK") });
   });
 
   it("refuses a malformed one, and passes them all to alchemy", () => {
@@ -107,7 +112,7 @@ describe("devEnvNames", () => {
   });
   it("reads every setting when a required one is missing, and never a retired one", () => {
     expect(devEnvNames({}, ["T3FLARE_MODEL_ENDPOINT"])).toEqual(allDeploySettings(["T3FLARE_MODEL_ENDPOINT"]));
-    expect(allDeploySettings()).toEqual(["T3FLARE_GITHUB_APP_ID", "T3FLARE_GITHUB_APP_PRIVATE_KEY", "T3FLARE_ACCESS_TEAM_DOMAIN", "T3FLARE_OWNER_EMAIL", "T3FLARE_WORKERS_DEV_SUBDOMAIN"]);
+    expect(allDeploySettings()).toEqual(["T3FLARE_GITHUB_APP_ID", "T3FLARE_GITHUB_APP_PRIVATE_KEY", "T3FLARE_ACCESS_TEAM_DOMAIN", "T3FLARE_OWNER_EMAIL", "T3FLARE_WORKERS_DEV_SUBDOMAIN", "T3FLARE_T3_TRACK"]);
     // A Deployment setting missing from the environment (a laptop passing only some on the command line) reads them all.
     const { T3FLARE_OWNER_EMAIL: _, ...withoutEmail } = REQUIRED;
     expect(devEnvNames(withoutEmail, [])).toEqual(allDeploySettings());

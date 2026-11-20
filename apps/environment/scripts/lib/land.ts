@@ -3,7 +3,7 @@
 // the files themselves were written by a job that ran upstream code, so nothing here trusts their content: each rule
 // checks it. Dependency-free.
 import { bareKey, closure, DEPENDENCY_FIELDS, importerKey, type Json, nameOfKey } from "../../../../scripts/lockGraph.ts";
-import { compareVersions, CLI_PIN_FILES, EXACT_VERSION, NIGHTLY_TAG, type Pin, T3_PIN_FILES } from "../../src/updates/pins.ts";
+import { compareVersions, CLI_PIN_FILES, EXACT_VERSION, type Pin, T3_PIN_FILES, T3_TAG, type T3Track, trackOfTag } from "../../src/updates/pins.ts";
 import { type Fingerprint, LIST_COMMAND, UPDATE_COMMAND, watchedFiles } from "./upstreamFingerprintFixture.ts";
 
 export const LAND_ALLOWLIST = { t3: T3_PIN_FILES, cli: CLI_PIN_FILES } as const;
@@ -43,7 +43,7 @@ export const landRefusal = (facts: LandFacts): string | undefined => {
  * not the branch is still there.
  */
 export const landMode = (pin: Pin, main: { readonly tag?: string | undefined; readonly cliVersion?: string | undefined }): "land" | "deploy-only" => {
-  if (pin.kind === "t3") return main.tag !== undefined && NIGHTLY_TAG.test(main.tag) && compareVersions(main.tag.slice(1), pin.tag.slice(1)) >= 0 ? "deploy-only" : "land";
+  if (pin.kind === "t3") return main.tag !== undefined && T3_TAG.test(main.tag) && compareVersions(main.tag.slice(1), pin.tag.slice(1)) >= 0 ? "deploy-only" : "land";
   return main.cliVersion !== undefined && compareVersions(main.cliVersion, pin.version) >= 0 ? "deploy-only" : "land";
 };
 
@@ -263,7 +263,9 @@ export interface T3PlanInput {
   readonly tag?: string | undefined;
   readonly land: boolean;
   readonly verify: boolean;
-  /** The newest nightly on t3code's origin, and the tag main's gitlink is. */
+  /** The Deployment's t3 track (ADR-0041): what an Update may move to. */
+  readonly track: T3Track;
+  /** The newest tag on the track on t3code's origin, and the tag that names main's gitlink (`pinTagOf`). */
   readonly newest?: string | undefined;
   readonly mainTag?: string | undefined;
   /** `bump/<tag>` of the tag the run is about, when it exists. */
@@ -322,7 +324,7 @@ export const bumpAttemptOf = (text: string): BumpAttempt | undefined => {
   const report = reportObject(text);
   if (typeof report === "string") return undefined;
   if (typeof report.base !== "string" || !/^[0-9a-f]{40}$/.test(report.base)) return undefined;
-  if (typeof report.to !== "string" || !NIGHTLY_TAG.test(report.to)) return undefined;
+  if (typeof report.to !== "string" || !T3_TAG.test(report.to)) return undefined;
   if (!Array.isArray(report.steps)) return undefined;
   const failed = (report.steps as Array<unknown>).find((s): s is { name: string } => s !== null && typeof s === "object" && (s as { ok?: unknown }).ok === false && typeof (s as { name?: unknown }).name === "string");
   return { base: report.base, to: report.to, failed: failed === undefined ? undefined : stepKindOf(failed.name) };
@@ -337,11 +339,14 @@ const failedDeterministically = (attempt: BumpAttempt | undefined, tag: string, 
 
 export type T3Plan = { readonly mode: "skip" | "bump" | "land"; readonly tag: string; readonly reason: string; readonly proven?: boolean };
 
-const atOrAbove = (tag: string | undefined, target: string) => tag !== undefined && NIGHTLY_TAG.test(tag) && compareVersions(tag.slice(1), target.slice(1)) >= 0;
+/** `tag` is a release at or above `target` by semver: a stable is above its own nightlies (ADR-0041). */
+const atOrAbove = (tag: string | undefined, target: string) => tag !== undefined && T3_TAG.test(tag) && compareVersions(tag.slice(1), target.slice(1)) >= 0;
 
 /**
  * What a `bump.yml` run does, decided by a trusted job before any upstream code runs (review F1, F2, A1):
- * - hourly: skip a nightly main already pins, or one already proposed through the Full gate; else bump it.
+ * - hourly: skip when main's pin is at or above the newest tag on the Deployment's t3 track (a Deployment that switched
+ *   to stable waits for the first stable past its nightly pin), or that tag is already proposed through the Full gate;
+ *   else bump it.
  * - an Update (`land`): land when main already pins it (land.yml then only deploys) or a branch the trusted publish job
  *   proved (either gate) sits one commit on main; else bump it through the Update gate first.
  * - anything else (by hand, verify): bump.
@@ -350,22 +355,22 @@ export const planT3 = (input: T3PlanInput): T3Plan | string => {
   if (input.verify) return { mode: "bump", tag: "", reason: "verify main's own pin through the Full gate" };
   if (input.event === "schedule") {
     const newest = input.newest;
-    if (newest === undefined) return { mode: "skip", tag: "", reason: "no nightly tag" };
-    if (atOrAbove(input.mainTag, newest)) return { mode: "skip", tag: newest, reason: `${newest} is already pinned` };
+    if (newest === undefined) return { mode: "skip", tag: "", reason: `no tag on the ${input.track} track` };
+    if (atOrAbove(input.mainTag, newest)) return { mode: "skip", tag: newest, reason: input.mainTag === newest ? `${newest} is already pinned` : `main pins ${input.mainTag}, at or above ${newest}` };
     if (input.branch?.gate === "full") return { mode: "skip", tag: newest, reason: `${newest} is already proposed through the Full gate` };
     // The same tag on the same main failed the same way: another hour changes nothing. A commit on main, a newer
-    // nightly or a run by hand tries again.
+    // tag or a run by hand tries again.
     const recent = (input.attempts ?? []).slice(0, DETERMINISTIC_FAILURES_TO_STOP);
     if (input.mainSha !== undefined && recent.length === DETERMINISTIC_FAILURES_TO_STOP && recent.every((attempt) => failedDeterministically(attempt, newest, input.mainSha!))) {
-      return { mode: "skip", tag: newest, reason: `${newest} failed its ${recent[0]!.failed} step on this main ${DETERMINISTIC_FAILURES_TO_STOP} times; a change to main, a newer nightly or a run by hand tries again` };
+      return { mode: "skip", tag: newest, reason: `${newest} failed its ${recent[0]!.failed} step on this main ${DETERMINISTIC_FAILURES_TO_STOP} times; a change to main, a newer tag or a run by hand tries again` };
     }
     return { mode: "bump", tag: newest, reason: input.branch?.gate === "update" ? `${newest} was proven by the Update gate only; the Full gate proposes it` : `${newest} is new` };
   }
   if (!input.land) return { mode: "bump", tag: input.tag ?? "", reason: "a bump by hand" };
-  if (input.tag === undefined || !NIGHTLY_TAG.test(input.tag)) return `an Update needs a nightly tag, not ${JSON.stringify(input.tag)}`;
+  if (input.tag === undefined || trackOfTag(input.tag) !== input.track) return `an Update needs a tag on the ${input.track} track, not ${JSON.stringify(input.tag)}`;
   // D6, review A11: an Update moves prod to exactly the client's tag. Main already past it means prod is about to move
   // past it too: refused, so the client is told why, rather than deploying the newer pin and failing its check later.
-  if (input.mainTag !== undefined && NIGHTLY_TAG.test(input.mainTag) && compareVersions(input.mainTag.slice(1), input.tag.slice(1)) > 0) {
+  if (input.mainTag !== undefined && T3_TAG.test(input.mainTag) && compareVersions(input.mainTag.slice(1), input.tag.slice(1)) > 0) {
     return `prod is moving to ${input.mainTag}, newer than ${input.tag}: update to ${input.mainTag} once it is deployed`;
   }
   if (input.mainTag === input.tag) return { mode: "land", tag: input.tag, reason: `main already pins ${input.tag}; deploy it` };
@@ -392,7 +397,7 @@ export const readBumpReport = (
   if (typeof report.changed !== "boolean") return "report.changed is not a boolean";
   const changed = report.changed;
   if (expect.kind === "t3") {
-    if (typeof report.to !== "string" || !NIGHTLY_TAG.test(report.to)) return `report.to is not a nightly tag: ${JSON.stringify(report.to)}`;
+    if (typeof report.to !== "string" || !T3_TAG.test(report.to)) return `report.to is not a t3 release tag: ${JSON.stringify(report.to)}`;
     // Review A8: the gate is the one the run was asked for; the report must say it ran that one.
     if (report.gate !== expect.gate) return `the report's gate is ${JSON.stringify(report.gate)}, not the requested ${expect.gate}`;
     if (expect.tag !== undefined && report.to !== expect.tag) return `the report pins ${report.to}, not the requested ${expect.tag}`;

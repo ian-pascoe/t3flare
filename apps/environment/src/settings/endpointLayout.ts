@@ -11,7 +11,7 @@
 // root or path-inserted well-known document, so clients discover it from the 401's `resource_metadata`). That a token of
 // one application is refused at the other's paths was tested with a service-token stand-in, then with a real OAuth
 // bearer: owner step 1 passed on 2026-11-15 (P6, P11 at 900 s, P12, P13 the same `sub`; `docs/steps/settings-mcp/m5a-stage-run.md`
-// items 1-4). Prod and the nightly job's `bump` stay out of layout (B) (`OWNER_ENDPOINT_EXCLUDED_STAGES`) until the owner turns it on.
+// items 1-4). Prod and the t3 bump's `bump` stay out of layout (B) (`OWNER_ENDPOINT_EXCLUDED_STAGES`) until the owner turns it on.
 
 /**
  * The stages deployed without the Owner-client endpoint (ADR-0036): no `SettingsAccess` application, the admin
@@ -20,7 +20,7 @@
  * Prod is here until the owner turns the endpoint on (owner step 1 passed and M5a's stage evidence is recorded,
  * `docs/steps/settings-mcp/m5a-stage-run.md` items 1-4); enabling prod is removing it from this list. `bump` is here for good (SPI-1195 review): the nightly
  * job deploys it with the CI token `t3flare-ci-bump`, which is not known to be allowed to create a managed-OAuth Access
- * application, and a failure there would break the nightly job; its acceptance test never calls the endpoint.
+ * application, and a failure there would break the t3 bump; its acceptance test never calls the endpoint.
  */
 export const OWNER_ENDPOINT_EXCLUDED_STAGES: ReadonlyArray<string> = ["prod", "bump"];
 

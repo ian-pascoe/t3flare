@@ -16,7 +16,7 @@ const keep = { keep: true } as const;
 const strip = (why: string): Classification => ({ strip: why });
 const advertise = (why: string): Classification => ({ advertise: why });
 
-const SELF_UPDATE = "the Environment is updated by the nightly bump and a deploy, never by itself (ADR-0017)";
+const SELF_UPDATE = "the Environment is updated by the t3 bump and a deploy, never by itself (ADR-0017, ADR-0041)";
 /** What a stock client's server Update does here (ADR-0037): the DO dispatches CI, which proves and lands the bump. */
 const UPDATE_BY_CI = "a stock client's server Update dispatches a t3 bump that CI proves and lands (ADR-0037); t3flare's own ServerSelfUpdate answers it";
 

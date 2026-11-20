@@ -23,7 +23,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { Plugin } from "rolldown";
 
-import { stampedManifest, t3ServerVersion } from "./serverVersion.ts";
+import { stampedManifest, t3ServerVersion, t3TrackSetting } from "./serverVersion.ts";
+import type { T3Track } from "./src/updates/pins.ts";
 import { T3_CONNECT_DEFINES } from "./src/t3/connectPublicConfig.ts";
 
 const here = import.meta.dirname;
@@ -345,8 +346,11 @@ const DEFINES = {
   ...T3_CONNECT_DEFINES,
 };
 
-/** Bundles the Worker to `dist/worker/`, as alchemy would, and writes `dist/build-report.json`. */
-export const buildWorker = async (options: { readonly quiet?: boolean } = {}): Promise<BuildReport> => {
+/**
+ * Bundles the Worker to `dist/worker/`, as alchemy would, and writes `dist/build-report.json`. The Deployment's t3
+ * `track` (ADR-0041) names the pin's Server version, and the bundle's server Update policy takes only its releases.
+ */
+export const buildWorker = async (options: { readonly track: T3Track; readonly quiet?: boolean }): Promise<BuildReport> => {
   const { rolldown } = await import("rolldown");
   const { default: cloudflare } = await import("@alchemy.run/cloudflare-runtime/rolldown");
   const fsAlias = { rewritten: 0, importers: new Set<string>(), skippedDependencyImports: 0 };
@@ -354,8 +358,8 @@ export const buildWorker = async (options: { readonly quiet?: boolean } = {}): P
   const stamp = { importers: 0 };
   const applied: Array<string> = [];
   const shadowed = new Set<string>();
-  const serverVersion = t3ServerVersion();
-  const identity = { t3: t3Version(), serverVersion: serverVersion.version, commit: ourCommit(), builtAt: new Date().toISOString() };
+  const serverVersion = t3ServerVersion(options.track);
+  const identity = { t3: t3Version(), serverVersion: serverVersion.version, t3Track: options.track, commit: ourCommit(), builtAt: new Date().toISOString() };
   const bundle = await rolldown({
     input: path.join(here, "src/worker.ts"),
     cwd: here,
@@ -423,6 +427,6 @@ if (import.meta.main) {
     process.exit(results.every((r) => r.ok) ? 0 : 1);
   }
   const started = performance.now();
-  await buildWorker();
+  await buildWorker({ track: t3TrackSetting() });
   console.log(`t3flare: build took ${((performance.now() - started) / 1000).toFixed(1)} s`);
 }

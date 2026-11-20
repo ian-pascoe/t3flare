@@ -99,6 +99,7 @@ jobs:
           T3FLARE_WORKERS_DEV_SUBDOMAIN: ${{ vars.T3FLARE_WORKERS_DEV_SUBDOMAIN }}
           T3FLARE_OWNER_EMAIL: ${{ secrets.T3FLARE_OWNER_EMAIL }}
           T3FLARE_FIXTURE_REPO: ${{ vars.T3FLARE_FIXTURE_REPO }}
+          T3FLARE_T3_TRACK: ${{ vars.T3FLARE_T3_TRACK }}
 
       - name: Report
         if: always()

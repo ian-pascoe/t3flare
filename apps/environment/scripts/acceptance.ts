@@ -38,7 +38,7 @@ import * as fs from "node:fs";
 
 import { defaultTextModel } from "@t3flare/models/endpoints";
 
-import { t3ServerVersion } from "../serverVersion.ts";
+import { t3ServerVersion, t3TrackSetting } from "../serverVersion.ts";
 import { adminClient, ensureModelEndpoint } from "./lib/modelEndpoint.ts";
 import { checkVersionAgreement } from "./lib/versionAgreement.ts";
 import { cliCoverage, keptReportJson, stageEndpointSpec } from "./lib/modelEndpointSpec.ts";
@@ -172,7 +172,7 @@ check(
 
 // 2c. The Server version (in-app updates plan D1, D16): the pin's tag, t3's descriptor's `serverVersion` and the web
 // client's APP_VERSION agree, else every stock client reads the stage as out of date.
-const versions = await checkVersionAgreement(base, t3ServerVersion().tag);
+const versions = await checkVersionAgreement(base, t3ServerVersion(t3TrackSetting()).tag);
 report.serverVersion = versions;
 for (const failure of versions.failures) check(`server version: ${failure}`, false);
 

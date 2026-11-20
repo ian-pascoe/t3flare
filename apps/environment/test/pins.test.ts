@@ -1,18 +1,77 @@
 // @effect-diagnostics nodeBuiltinImport:off
-// The pins an Update moves, named once (ADR-0037; review A1, A5, A6): nightly tags, branch names and what a land deletes,
-// the proof a trusted job records, and the CLI list the workflow offers.
+// The pins an Update moves, named once (ADR-0037, ADR-0041; review A1, A5, A6): t3's release tags on each t3 track, branch
+// names and what a land deletes, the proof a trusted job records, and the CLI list the workflow offers.
 import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { parse } from "yaml";
 import { describe, expect, it } from "vitest";
 
-import { branchOf, landedBranches, newestNightly, parsePin, pinOf, pinOfBranch, pinText, proofRunRefusal, provenStatus, UPDATABLE_CLIS } from "../src/updates/pins.ts";
+import {
+  branchOf,
+  compareVersions,
+  landedBranches,
+  newestOnTrack,
+  parsePin,
+  pinOf,
+  pinOfBranch,
+  pinTagOf,
+  pinText,
+  proofRunRefusal,
+  provenStatus,
+  t3TrackOf,
+  trackOfTag,
+  trackOfVersion,
+  UPDATABLE_CLIS,
+} from "../src/updates/pins.ts";
 
-describe("nightly tags", () => {
-  it("orders by date, then run", () => {
-    expect(newestNightly(["v0.1.11-nightly.20261117.4851", "v0.1.11-nightly.20261117.999", "v0.1.10-nightly.20261118.1", "v0.2.0", "nightly"])).toBe("v0.1.10-nightly.20261118.1");
-    expect(newestNightly(["v0.2.0"])).toBeUndefined();
+describe("t3 tracks", () => {
+  it("names a tag's and a version's track; anything else has none", () => {
+    expect(trackOfTag("v0.1.11")).toBe("stable");
+    expect(trackOfTag("v0.1.11-nightly.20261120.4979")).toBe("nightly");
+    expect(trackOfTag("v0.1.10-preview.20261112.4593")).toBeUndefined();
+    expect(trackOfTag("0.1.11")).toBeUndefined();
+    expect(trackOfTag("v0.1.11\nsha=evil")).toBeUndefined();
+    expect(trackOfVersion("0.1.11")).toBe("stable");
+    expect(trackOfVersion("0.1.12-nightly.20261120.4994")).toBe("nightly");
+    expect(trackOfVersion("v0.1.11")).toBeUndefined();
+  });
+
+  it("reads the setting's value: stable or nightly, nothing else", () => {
+    expect(t3TrackOf("stable")).toBe("stable");
+    expect(t3TrackOf("nightly")).toBe("nightly");
+    expect(t3TrackOf("preview")).toBeUndefined();
+    expect(t3TrackOf("Stable")).toBeUndefined();
+    expect(t3TrackOf(undefined)).toBeUndefined();
+  });
+
+  it("finds the newest tag on a track by semver: a nightly by version, then date, then run", () => {
+    const tags = ["v0.1.11-nightly.20261117.4851", "v0.1.11-nightly.20261117.999", "v0.1.10-nightly.20261118.1", "v0.1.9", "v0.1.11", "v0.1.10", "v0.1.10-preview.20261112.4593", "nightly"];
+    expect(newestOnTrack(tags, "nightly")).toBe("v0.1.11-nightly.20261117.4851");
+    expect(newestOnTrack(["v0.1.11-nightly.20261117.4851", "v0.1.11-nightly.20261118.1"], "nightly")).toBe("v0.1.11-nightly.20261118.1");
+    expect(newestOnTrack(tags, "stable")).toBe("v0.1.11");
+    expect(newestOnTrack(["v0.2.0"], "nightly")).toBeUndefined();
+    expect(newestOnTrack(["v0.1.11-nightly.20261117.4851"], "stable")).toBeUndefined();
+  });
+
+  it("names a pin by its track's tag when it carries one, else by the other track's (a stable is a promoted nightly)", () => {
+    const both = ["v0.1.11-nightly.20261120.4979", "v0.1.11"];
+    expect(pinTagOf(both, "stable")).toBe("v0.1.11");
+    expect(pinTagOf(both, "nightly")).toBe("v0.1.11-nightly.20261120.4979");
+    expect(pinTagOf(["v0.1.12-nightly.20261120.4994"], "stable")).toBe("v0.1.12-nightly.20261120.4994");
+    expect(pinTagOf(["v0.1.12"], "nightly")).toBe("v0.1.12");
+    expect(pinTagOf(["v0.1.10-preview.20261112.4593", "nightly-latest"], "stable")).toBeUndefined();
+  });
+});
+
+describe("versions", () => {
+  it("order as semver: a release above its own nightlies, below the next version's", () => {
+    expect(compareVersions("0.1.12", "0.1.12-nightly.20261120.4994")).toBeGreaterThan(0);
+    expect(compareVersions("0.1.11", "0.1.12-nightly.20261120.4994")).toBeLessThan(0);
+    expect(compareVersions("0.1.11-nightly.20261117.999", "0.1.11-nightly.20261117.4851")).toBeLessThan(0);
+    expect(compareVersions("0.1.11-nightly.20261118.1", "0.1.11-nightly.20261117.4851")).toBeGreaterThan(0);
+    expect(compareVersions("0.10.0", "0.9.9")).toBeGreaterThan(0);
+    expect(compareVersions("0.169.0", "0.169.0")).toBe(0);
   });
 });
 
@@ -26,6 +85,10 @@ describe("bump branches", () => {
     expect(pinOf({ kind: "cli", cli: "opencode", version: "1.0.0" })).toMatch(/not an updatable CLI/);
     expect(pinOf({ kind: "cli", cli: "codex", version: "1.0.0; rm" })).toMatch(/not an exact version/);
     expect(pinOf({ kind: "t3", tag: "v0.1.11-nightly.20261117.4851" })).toEqual({ kind: "t3", tag: "v0.1.11-nightly.20261117.4851" });
+    expect(pinOf({ kind: "t3", tag: "v0.1.12" })).toEqual({ kind: "t3", tag: "v0.1.12" });
+    expect(pinOf({ kind: "t3", tag: "v0.1.10-preview.20261112.4593" })).toMatch(/not a t3 release tag/);
+    expect(branchOf({ kind: "t3", tag: "v0.1.12" })).toBe("bump/v0.1.12");
+    expect(pinOfBranch("bump/v0.1.12")).toEqual({ kind: "t3", tag: "v0.1.12" });
   });
 
   it("a land deletes only its kind's and CLI's branches at or below its version (A5)", () => {
@@ -41,6 +104,13 @@ describe("bump branches", () => {
       "feature/x",
     ];
     expect(landedBranches({ kind: "t3", tag: "v0.1.11-nightly.20261117.4851" }, branches)).toEqual(["bump/v0.1.11-nightly.20261117.4825", "bump/v0.1.11-nightly.20261117.4851"]);
+    // A stable lands above its own nightlies.
+    expect(landedBranches({ kind: "t3", tag: "v0.1.11" }, [...branches, "bump/v0.1.11", "bump/v0.1.12-nightly.20261120.4994"])).toEqual([
+      "bump/v0.1.11-nightly.20261117.4825",
+      "bump/v0.1.11-nightly.20261117.4851",
+      "bump/v0.1.11-nightly.20261118.1",
+      "bump/v0.1.11",
+    ]);
     expect(landedBranches({ kind: "cli", cli: "codex", version: "0.169.0" }, branches)).toEqual(["bump/cli-codex-0.167.2", "bump/cli-codex-0.169.0"]);
   });
 });
@@ -79,7 +149,7 @@ describe("a pin as one string (A12)", () => {
     for (const pin of [{ kind: "t3", tag: "v0.1.11-nightly.20261117.4851" }, { kind: "cli", cli: "claude", version: "0.108.0" }] as const) expect(parsePin(pinText(pin))).toEqual(pin);
     expect(parsePin("cli:codex:0.169.0:x")).toMatch(/not a pin/);
     expect(parsePin("cli:codex:main")).toMatch(/not an exact version/);
-    expect(parsePin("t3:main")).toMatch(/not a nightly tag/);
+    expect(parsePin("t3:main")).toMatch(/not a t3 release tag/);
     expect(parsePin(undefined)).toMatch(/not a pin/);
   });
 });

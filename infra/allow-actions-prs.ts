@@ -1,5 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off globalConsole:off
-// Allows GitHub Actions to create pull requests on the repository, which the nightly bump job needs to propose a new
+// Allows GitHub Actions to create pull requests on the repository, which the t3 bump job needs to propose a new
 // pin (.github/workflows/bump.yml). No alchemy resource covers the setting, so `ci:setup` runs this after the stack.
 // Keeps the default workflow token read-only; the bump workflow asks for `contents` and `pull-requests` itself.
 // The repository is GITHUB_REPOSITORY (owner/name, no default; `ci:setup` reads it from ~/.config/t3flare/dev.env).

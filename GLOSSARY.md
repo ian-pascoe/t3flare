@@ -447,8 +447,12 @@ _Avoid_: fork change, hack
 A bundle-time substitute for a Node builtin or a dependency that cannot load in workerd, applied only to the modules that need it.
 _Avoid_: polyfill, Shadow
 
+**t3 track**:
+Which of t3's releases a Deployment follows, `stable` or `nightly`: a Deployment setting.
+_Avoid_: release channel, channel, update track (t3's client setting)
+
 **t3 pin**:
-The nightly tag the `t3code` submodule is at.
+The t3 release tag the `t3code` submodule is at, named by its tag on the Deployment's t3 track.
 _Avoid_: t3 version, upstream version
 
 **Server version**:
@@ -456,7 +460,7 @@ The t3 pin without its `v`: the version the Cloud Environment and its web client
 _Avoid_: app version, t3 version
 
 **t3 bump**:
-Moving the t3 pin to another nightly tag and proving it on the `bump` stage.
+Moving the t3 pin forward to a newer tag on the t3 track and proving it on the `bump` stage.
 _Avoid_: upgrade, sync
 
 **Upstream fingerprint**:
@@ -480,7 +484,7 @@ The short proof an Update waits on: the checks, a deploy to the `bump` Stage, an
 _Avoid_: fast gate, smoke
 
 **Full gate**:
-The nightly bump's whole proof, every CLI agent's turn included; a landed Update gets it afterwards.
+The scheduled t3 bump's whole proof, every CLI agent's turn included; a landed Update gets it afterwards.
 _Avoid_: full test, slow gate
 
 **Land**:

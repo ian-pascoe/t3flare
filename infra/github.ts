@@ -18,7 +18,8 @@
  *   GITHUB_REPOSITORY  the Deployment repository, owner/name (required)
  *   T3FLARE_DOMAIN, T3FLARE_DOMAIN_ZONE_ID   prod's custom domain and the id of its zone (required): the variable
  *                      T3FLARE_DOMAIN on `prod`, and the zone permissions of prod's token
- *   T3FLARE_ACCESS_TEAM_DOMAIN, T3FLARE_WORKERS_DEV_SUBDOMAIN   (required) repository variables of those names
+ *   T3FLARE_ACCESS_TEAM_DOMAIN, T3FLARE_WORKERS_DEV_SUBDOMAIN, T3FLARE_T3_TRACK   (required) repository variables of
+ *                      those names (the t3 track, stable or nightly: ADR-0041)
  *   T3FLARE_OWNER_EMAIL  (required) a repository secret: Actions logs are public, and a variable prints unmasked
  *   T3FLARE_FIXTURE_REPO  (required) the variable of that name on `bump`: the fixture its acceptance test uses
  *   T3FLARE_UPDATE_REPO  (optional) the variable of that name on `prod`, prod's update target; unset, none is set (and a
@@ -84,6 +85,7 @@ const SETTINGS = [
   "T3FLARE_DOMAIN_ZONE_ID",
   "T3FLARE_ACCESS_TEAM_DOMAIN",
   "T3FLARE_WORKERS_DEV_SUBDOMAIN",
+  "T3FLARE_T3_TRACK",
   "T3FLARE_OWNER_EMAIL",
   "T3FLARE_FIXTURE_REPO",
 ] as const;
@@ -125,10 +127,12 @@ export default Alchemy.Stack(
     const [owner = "", repository = ""] = GITHUB_REPOSITORY.split("/");
     const repo = { owner, repository };
 
-    // The Deployment settings every deploy needs (apps/environment/alchemy.run.ts), for both workflows: two repository
+    // The Deployment settings every deploy needs (apps/environment/alchemy.run.ts), for every workflow: three repository
     // variables, and the Owner's email as a repository secret (a variable's value prints unmasked in the public logs).
+    // The t3 track is the repository's, not an environment's: the bump's plan, the land and every deploy read it.
     yield* GitHub.Variable("AccessTeamDomain", { ...repo, name: "T3FLARE_ACCESS_TEAM_DOMAIN", value: settings.value.T3FLARE_ACCESS_TEAM_DOMAIN });
     yield* GitHub.Variable("WorkersDevSubdomain", { ...repo, name: "T3FLARE_WORKERS_DEV_SUBDOMAIN", value: settings.value.T3FLARE_WORKERS_DEV_SUBDOMAIN });
+    yield* GitHub.Variable("T3Track", { ...repo, name: "T3FLARE_T3_TRACK", value: settings.value.T3FLARE_T3_TRACK });
     yield* GitHub.Secret("OwnerEmail", { ...repo, name: "T3FLARE_OWNER_EMAIL", value: Redacted.make(settings.value.T3FLARE_OWNER_EMAIL) });
 
     // Retained on destroy: deleting a GitHub environment also deletes whatever was set on it by hand. Deployable from
