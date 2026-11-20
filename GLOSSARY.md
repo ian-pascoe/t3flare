@@ -154,7 +154,7 @@ The paths written in a Workspace since a given revision of its files, read from 
 _Avoid_: change feed, dirty list
 
 **Stale read**:
-A passive git read answered while the Container is stopped: its last real answer, patched with the Write journal where its shape allows. A passive read never starts the Container.
+A passive git read answered while the Container is stopped: its last real answer, patched with the Write journal where its shape allows, or, for one file's review diff with no last answer, an answer computed from the Workspace's own git facts. A passive read never starts the Container.
 _Avoid_: cached status, emulated git
 
 **Terminal**:

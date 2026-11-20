@@ -139,8 +139,15 @@ const hunksOf = (oldText: string, newText: string): string => {
   return out;
 };
 
-/** One file's section of `git diff --patch`, as Latin-1 text. */
+const SYMLINK = "120000";
+
+/** Whether a file became a symlink, or a symlink a file: git's type change (`T`), which it patches as a delete and an add. */
+export const typeChanged = (change: FileChange): boolean =>
+  change.old !== null && change.new !== null && (change.old.mode === SYMLINK) !== (change.new.mode === SYMLINK);
+
+/** One file's section of `git diff --patch`, as Latin-1 text (a type change's two sections). */
 export const filePatch = (change: FileChange): string => {
+  if (typeChanged(change)) return filePatch({ ...change, new: null }) + filePatch({ ...change, old: null });
   const { old: before, new: after } = change;
   let out = `diff --git ${prefixed("a/", change.oldPath)} ${prefixed("b/", change.newPath)}\n`;
   const renamed = change.oldPath !== change.newPath && before !== null && after !== null;
@@ -192,6 +199,23 @@ export const fileNumstat = (change: FileChange): string => {
   return change.oldPath !== change.newPath && change.old !== null && change.new !== null
     ? `${head}\0${path(change.oldPath)}\0${path(change.newPath)}\0`
     : `${head}${path(change.newPath)}\0`;
+};
+
+/**
+ * One file's record of `git diff --raw -z <commit>` (the commit against the working tree), as Latin-1 text: the modes,
+ * the abbreviated ids and the status (`M`, `A`, `D`, `T` for a type change, or `R100` for an exact rename). git names the
+ * working tree's blob when the file is its index entry unchanged (`indexed`) or a rename's new side, and zeros otherwise. git also writes zeros for a file
+ * whose bytes match its index entry but whose stat it has not refreshed, which the bytes cannot tell.
+ */
+export const fileRaw = (change: FileChange, indexed: boolean): string => {
+  const { old: before, new: after } = change;
+  const renamed = change.oldPath !== change.newPath && before !== null && after !== null;
+  const status = renamed ? "R100" : before === null ? "A" : after === null ? "D" : typeChanged(change) ? "T" : "M";
+  // A rename's new side is a blob git found by its id, so git names it whatever the index says.
+  const newOid = after === null || !(indexed || renamed) ? ZERO : abbrev(after.oid);
+  const path = (value: string) => latin1(new TextEncoder().encode(value));
+  const paths = renamed ? `${path(change.oldPath)}\0${path(change.newPath)}` : path(change.newPath);
+  return `:${before?.mode ?? "000000"} ${after?.mode ?? "000000"} ${before === null ? ZERO : abbrev(before.oid)} ${newOid} ${status}\0${paths}\0`;
 };
 
 /** git's path order (`strcmp` on the bytes). */

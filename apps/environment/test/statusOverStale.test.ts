@@ -8,6 +8,9 @@
 //   its poll's `--no-ahead-behind` shape, and the Container was stopped.
 // - The worktree's submodule checkout put the submodule's files in the write journal; a patched status listed it as
 //   untracked.
+// - SPI-1295: t3's diff panel (`getReviewDiffPreview`) sent review argv `kindOf` did not match, so its reads got their
+//   last answer or none; one file's reads, never answered before, were refused. Each working-tree read the Workspace
+//   answers once stopped is compared with what real git prints for the same argv.
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,6 +19,7 @@ import { join } from "node:path";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as ServerConfig from "t3/src/config.ts";
 import * as GitVcsDriver from "t3/src/vcs/GitVcsDriver.ts";
@@ -28,7 +32,8 @@ import * as ProcessRouter from "../src/agents/processRouter.ts";
 import type { WorkspaceRecord } from "../src/agents/workspaces.ts";
 
 const REPO_ROOT = "/workspace/repo";
-const root = fs.mkdtempSync(join(tmpdir(), "t3flare-status-"));
+// Real path: macOS links /var to /private/var, and git answers `--show-toplevel` with the real one.
+const root = fs.realpathSync(fs.mkdtempSync(join(tmpdir(), "t3flare-status-")));
 afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
 const ENV = {
   ...process.env,
@@ -49,42 +54,58 @@ const git = (cwd: string, args: ReadonlyArray<string>, env: Record<string, strin
 };
 
 /** A repo with `t3code` as a submodule, cloned (the submodule's directory left empty, as the project's clone has it). */
-const project = () => {
-  const sub = join(root, "t3code-source");
+const project = (name = "project") => {
+  const sub = join(root, `${name}-t3code-source`);
   fs.mkdirSync(join(sub, "apps"), { recursive: true });
   git(root, ["init", "-q", "-b", "main", sub]);
   for (let at = 0; at < 20; at++) fs.writeFileSync(join(sub, "apps", `f${at}.ts`), `export const f${at} = ${at};\n`);
   git(sub, ["add", "-A"]);
   git(sub, ["commit", "-q", "-m", "t3code"]);
-  const origin = join(root, "origin");
+  const origin = join(root, `${name}-origin`);
   git(root, ["init", "-q", "-b", "main", origin]);
   fs.writeFileSync(join(origin, "README.md"), "# t3flare\n");
   git(origin, ["-c", "protocol.file.allow=always", "submodule", "add", "-q", sub, "t3code"]);
   git(origin, ["add", "-A"]);
   git(origin, ["commit", "-q", "-m", "one"]);
-  const dir = join(root, "project");
+  const dir = join(root, name);
   git(root, ["clone", "-q", origin, dir]);
   return dir;
 };
+
+/** A read the Workspace answered while its Container was stopped: how, and whether its stdout is what git prints now. */
+interface StoppedRead {
+  readonly argv: ReadonlyArray<string>;
+  readonly route: "stale-patched" | "stale-last-answer" | "container-stopped" | "would-start-container";
+  readonly asGit: boolean;
+}
 
 /** A Workspace DO over `dir`: real git while `running`, the DO's stale rule once stopped. */
 const workspaceOver = (dir: string) => {
   const answers = new Map<string, { readonly rev: number; readonly answer: { exitCode: number; stdout: string; stderr: string } }>();
   const state = { running: true, rev: 0, journal: [] as Array<string> };
+  const stopped: Array<StoppedRead> = [];
   const keyOf = (argv: ReadonlyArray<string>, env: Readonly<Record<string, string>> | undefined) =>
     JSON.stringify([argv, Object.entries(env ?? {}).toSorted(([a], [b]) => a.localeCompare(b))]);
   const inDir = (word: string) => word.replaceAll(REPO_ROOT, dir);
   const stub = {
     git: async (run: { argv: ReadonlyArray<string>; cwd: string; env?: Record<string, string>; startContainer: boolean; readScope?: "git-dir" | "repo" }) => {
       if (!state.running) {
-        if (run.startContainer) return { ran: false, reason: "container_refused", detail: "stopped in this test" };
+        if (run.startContainer) {
+          stopped.push({ argv: run.argv, route: "would-start-container", asGit: false });
+          return { ran: false, reason: "container_refused", detail: "stopped in this test" };
+        }
         const outcome = await staleRead(run, {
           last: (argv) => Promise.resolve(answers.get(keyOf(argv, run.env))),
           journalSince: () => state.journal,
           withinGuard: () => withinGuard({ fs, dir, cache: {} }),
           facts: (base) => repoFacts({ fs, dir, cache: {} }, base),
         });
-        if (!outcome.found) return { ran: false, reason: "container_stopped", detail: "needs the Workspace's Container, which is stopped, and has no earlier answer" };
+        if (!outcome.found) {
+          stopped.push({ argv: run.argv, route: "container-stopped", asGit: false });
+          return { ran: false, reason: "container_stopped", detail: "needs the Workspace's Container, which is stopped, and has no earlier answer" };
+        }
+        const now = git(inDir(run.cwd), run.argv.map(inDir), Object.fromEntries(Object.entries(run.env ?? {}).map(([key, value]) => [key, inDir(value)])));
+        stopped.push({ argv: run.argv, route: `stale-${outcome.stale}`, asGit: outcome.answer.stdout === now.stdout.replaceAll(dir, REPO_ROOT) });
         return { ran: true, ...outcome.answer, ms: 0, cached: true, stale: outcome.stale };
       }
       const env = Object.fromEntries(Object.entries(run.env ?? {}).map(([key, value]) => [key, inDir(value)]));
@@ -105,8 +126,22 @@ const workspaceOver = (dir: string) => {
       state.running = false;
       state.journal = [...journal];
     },
+    /** The reads answered since the Container stopped. */
+    stopped: () => stopped,
   };
 };
+
+/**
+ * The routing FileSystem's answer for a Workspace's root (`src/platform/routingFileSystem.ts`), which t3's review asks
+ * before one file's working-tree diff: it exists. Every other path is the local disk's (an index lock is not there).
+ */
+const workspacePathsExist = Layer.effect(
+  FileSystem.FileSystem,
+  Effect.gen(function* () {
+    const local = yield* FileSystem.FileSystem;
+    return FileSystem.FileSystem.of({ ...local, exists: (path) => (/^\/w\/[^/]+$/.test(path) ? Effect.succeed(true) : local.exists(path)) });
+  }),
+);
 
 const driver = <A, E>(use: (driver: GitVcsDriver.GitVcsDriver["Service"]) => Effect.Effect<A, E>) =>
   Effect.runPromise(
@@ -117,6 +152,7 @@ const driver = <A, E>(use: (driver: GitVcsDriver.GitVcsDriver["Service"]) => Eff
         GitVcsDriver.layer.pipe(
           Layer.provideMerge(ServerConfig.layerTest(root, { prefix: "t3flare-status-config-" })),
           Layer.provideMerge(ProcessRouter.layer),
+          Layer.provideMerge(workspacePathsExist),
           Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
         ),
       ),
@@ -147,5 +183,79 @@ describe("t3's status over the Workspace's passive answers, on a repo with a sub
     // And the poll again, patched with the journal.
     const again = await driver((git) => git.statusDetailsLocal("/w/t3flare", { includeDivergence: false }));
     expect(again.workingTree.files.map((file) => file.path)).toEqual(["README.md"]);
+  });
+});
+
+/** t3's reads of the working tree, as opposed to its `.git`-only reads (refs, config), which keep their last answer. */
+const isWorkingTreeRead = (argv: ReadonlyArray<string>) =>
+  argv[0] === "status" || argv[0] === "diff-index" || argv[0] === "ls-files" || (argv[0] === "-c" && argv[2] === "diff");
+
+/** The working-tree reads answered since the Container stopped, each as `<route> <asGit> <argv>`, for one readable diff. */
+const workingTreeReads = (reads: ReadonlyArray<StoppedRead>) =>
+  reads.filter((read) => isWorkingTreeRead(read.argv)).map((read) => `${read.route} ${read.asGit ? "as-git" : "NOT-as-git"} ${read.argv.join(" ")}`);
+
+describe("t3's diff panel over the Workspace's passive answers (SPI-1295)", { timeout: 60_000 }, () => {
+  it("whole-diff and one-file review reads are patched or computed, and each equals git's; none starts the Container", async () => {
+    const dir = project("review");
+    for (const [path, content] of Object.entries({ "a.ts": "export const a = 1;\n", "before.ts": "export const b = 1;\n", "gone.ts": "gone\n", "ren.txt": "r1\nr2\nr3\nr4\n" })) {
+      fs.writeFileSync(join(dir, path), content);
+    }
+    git(dir, ["add", "-A"]);
+    git(dir, ["commit", "-q", "-m", "files"]);
+    git(dir, ["checkout", "-q", "-b", "feature"]);
+    fs.writeFileSync(join(dir, "a.ts"), "export const a = 2;\n");
+    git(dir, ["commit", "-q", "-am", "feature"]);
+    // Uncommitted before the panel opens: in its whole-diff answers, but these files' own reads never run.
+    fs.writeFileSync(join(dir, "before.ts"), "export const b = 2;\n");
+    git(dir, ["mv", "ren.txt", "moved.txt"]);
+    const workspace = workspaceOver(dir);
+    const cwd = "/w/t3flare";
+    // While the Container runs, the panel opens: the whole diff of both sources, then one file of it.
+    const opened = await driver((git) => git.getReviewDiffPreview({ cwd, baseRef: "main" }));
+    expect(opened.sources.map((source) => source.files?.map((file) => file.path))).toEqual([
+      ["before.ts", "moved.txt"],
+      ["a.ts", "before.ts", "moved.txt"],
+    ]);
+    await driver((git) => git.getReviewDiffPreview({ cwd, baseRef: "main", file: { path: "a.ts", previousPath: null, sourceKind: "working-tree" } }));
+    // It stops; then files change in the Workspace (the journal).
+    workspace.stop(["a.ts", "gone.ts"]);
+    fs.writeFileSync(join(dir, "a.ts"), "export const a = 3;\n");
+    fs.unlinkSync(join(dir, "gone.ts"));
+
+    const whole = await driver((git) => git.getReviewDiffPreview({ cwd, baseRef: "main" }));
+    expect(whole.sources.map((source) => [source.kind, source.files?.map((file) => file.path)])).toEqual([
+      ["working-tree", ["a.ts", "before.ts", "gone.ts", "moved.txt"]],
+      ["branch-range", ["a.ts", "before.ts", "gone.ts", "moved.txt"]],
+    ]);
+    for (const file of [
+      { path: "a.ts", previousPath: null },
+      { path: "before.ts", previousPath: null },
+      { path: "gone.ts", previousPath: null },
+      { path: "moved.txt", previousPath: "ren.txt" },
+    ]) {
+      for (const sourceKind of ["working-tree", "branch-range"] as const) {
+        const one = await driver((git) => git.getReviewDiffPreview({ cwd, baseRef: "main", sourceKind, file: { ...file, sourceKind } }));
+        expect(one.sources[0]?.diff, `${file.path} ${sourceKind}`).toContain(`b/${file.path}`);
+      }
+    }
+    const reads = workingTreeReads(workspace.stopped());
+    expect(reads.length).toBeGreaterThan(10);
+    expect(reads.filter((read) => !read.startsWith("stale-patched as-git "))).toEqual([]);
+    expect(workspace.stopped().filter((read) => read.route === "would-start-container")).toEqual([]);
+  });
+
+  it("a repo that hides untracked files: statusDetails reads the poll's answer, both with --untracked-files=normal", async () => {
+    const dir = project("hidden-untracked");
+    git(dir, ["config", "status.showUntrackedFiles", "no"]);
+    const workspace = workspaceOver(dir);
+    await driver((git) => git.statusDetailsLocal("/w/t3flare", { includeDivergence: false }));
+    workspace.stop(["README.md", "notes.txt"]);
+    fs.writeFileSync(join(dir, "README.md"), "# t3flare, edited\n");
+    fs.writeFileSync(join(dir, "notes.txt"), "n\n");
+    const details = await driver((git) => git.statusDetails("/w/t3flare"));
+    expect(details.workingTree.files.map((file) => file.path).toSorted()).toEqual(["README.md", "notes.txt"]);
+    const reads = workingTreeReads(workspace.stopped());
+    expect(reads.some((read) => read.includes("status --porcelain=2 --branch -z --untracked-files=normal"))).toBe(true);
+    expect(reads.filter((read) => !read.startsWith("stale-patched as-git "))).toEqual([]);
   });
 });

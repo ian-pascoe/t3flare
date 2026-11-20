@@ -288,6 +288,7 @@ export const repoFacts = async (repo: Repo, base = "HEAD"): Promise<RepoFacts> =
   }
   const ignored = (path: string) => git.isIgnored({ fs: repo.fs, dir: repo.dir, filepath: path });
   return {
+    base: head,
     facts: async (path) => {
       const file = await worktreeFile(repo, path);
       const worktree = file === null ? null : { ...file, oid: (await git.hashBlob({ object: file.bytes })).oid };
