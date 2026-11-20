@@ -6,7 +6,7 @@
  * `admin` alchemy profile (a Cloudflare key that may create API tokens, and `gh`), and again to rotate the token or
  * change its permissions:
  *
- *   pnpm --filter @t3flare/infra run ci:setup
+ *   pnpm --filter @t3flare/infra run ci:setup [--yes]
  *
  * `ci:setup` also allows GitHub Actions to create pull requests on the repository (the job proposes each new pin as
  * `bump/<tag>`), which no alchemy resource covers.
