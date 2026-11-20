@@ -203,15 +203,16 @@ export const fileNumstat = (change: FileChange): string => {
 
 /**
  * One file's record of `git diff --raw -z <commit>` (the commit against the working tree), as Latin-1 text: the modes,
- * the abbreviated ids and the status (`M`, `A`, `D`, or `R100` for an exact rename). git names the working tree's blob
- * only when the file is its index entry unchanged (`indexed`), and zeros otherwise. git also writes zeros for a file
+ * the abbreviated ids and the status (`M`, `A`, `D`, `T` for a type change, or `R100` for an exact rename). git names the
+ * working tree's blob when the file is its index entry unchanged (`indexed`) or a rename's new side, and zeros otherwise. git also writes zeros for a file
  * whose bytes match its index entry but whose stat it has not refreshed, which the bytes cannot tell.
  */
 export const fileRaw = (change: FileChange, indexed: boolean): string => {
   const { old: before, new: after } = change;
   const renamed = change.oldPath !== change.newPath && before !== null && after !== null;
   const status = renamed ? "R100" : before === null ? "A" : after === null ? "D" : typeChanged(change) ? "T" : "M";
-  const newOid = after === null || !indexed ? ZERO : abbrev(after.oid);
+  // A rename's new side is a blob git found by its id, so git names it whatever the index says.
+  const newOid = after === null || !(indexed || renamed) ? ZERO : abbrev(after.oid);
   const path = (value: string) => latin1(new TextEncoder().encode(value));
   const paths = renamed ? `${path(change.oldPath)}\0${path(change.newPath)}` : path(change.newPath);
   return `:${before?.mode ?? "000000"} ${after?.mode ?? "000000"} ${before === null ? ZERO : abbrev(before.oid)} ${newOid} ${status}\0${paths}\0`;

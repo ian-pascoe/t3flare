@@ -347,6 +347,49 @@ describe("one file's review reads with no last answer are computed (SPI-1295)", 
     await expectComputed(r.dir, paths.flatMap((path) => [...reads(path, "HEAD"), ...reads(path, r.base)]), written);
   });
 
+  it("an unstaged rename with a mode change, an unstaged type change, and pairs made in path order whatever the journal's", async () => {
+    const r = setup("unstaged-pairs");
+    r.put("m.sh", "m\n");
+    r.put("a/x.txt", "same\n");
+    r.put("b/y.txt", "same\n");
+    r.put("t.txt", "t\n");
+    git(r.dir, ["add", "-A"]);
+    git(r.dir, ["commit", "-q", "-m", "one"]);
+    await compare(r.dir, () => {
+      git(r.dir, ["mv", "m.sh", "m2.sh"]);
+      fs.chmodSync(join(r.dir, "m2.sh"), 0o755);
+      git(r.dir, ["rm", "-q", "a/x.txt", "b/y.txt"]);
+      r.put("c/z.txt", "same\n");
+      git(r.dir, ["add", "c/z.txt"]);
+      fs.unlinkSync(join(r.dir, "t.txt"));
+      fs.symlinkSync("m2.sh", join(r.dir, "t.txt"));
+      // Not in path order, as computer's change log need not be.
+      return ["t.txt", "m2.sh", "c/z.txt", "b/y.txt", "c", "a/x.txt", "m.sh"];
+    }, {
+      only: [
+        [...STATS, "HEAD", "--"],
+        [...PATCH, "HEAD", "--"],
+        ["diff-index", "-M", "--numstat", "-z", "HEAD", "--"],
+      ],
+    });
+  });
+
+  it("status: a type change staged and one not (renames in a patched status stay their two sides, ADR-0009)", async () => {
+    const r = setup("status-types");
+    r.put("staged.txt", "s\n");
+    r.put("worktree.txt", "w\n");
+    git(r.dir, ["add", "-A"]);
+    git(r.dir, ["commit", "-q", "-m", "one"]);
+    await compare(r.dir, () => {
+      fs.unlinkSync(join(r.dir, "staged.txt"));
+      fs.symlinkSync("worktree.txt", join(r.dir, "staged.txt"));
+      git(r.dir, ["add", "staged.txt"]);
+      fs.unlinkSync(join(r.dir, "worktree.txt"));
+      fs.symlinkSync("staged.txt", join(r.dir, "worktree.txt"));
+      return ["staged.txt", "worktree.txt"];
+    }, { only: [["status", "--porcelain=2", "--branch", "-z"], ["status", "--porcelain=2", "--branch", "-z", "--no-ahead-behind"]] });
+  });
+
   it("a file that became a symlink: git's type change", async () => {
     const r = branched("one-symlink");
     fs.unlinkSync(join(r.dir, "before.txt"));

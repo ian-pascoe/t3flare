@@ -161,8 +161,10 @@ const parseStatus = (stdout: string): StatusParts => {
 const trackedEntry = (path: string, facts: PathFacts): string | undefined => {
   const { head, index, worktree } = facts;
   if (index === null && head === null) return undefined;
-  const x = index === null ? "D" : head === null ? "A" : head.oid !== index.oid || head.mode !== index.mode ? "M" : ".";
-  const y = index === null ? "." : worktree === null ? "D" : worktree.oid !== index.oid || worktree.mode !== index.mode ? "M" : ".";
+  // git's letter for one side's change: `T` when a file became a symlink or back, else `M`.
+  const changed = (from: { readonly mode: string }, to: { readonly mode: string }) => ((from.mode === "120000") !== (to.mode === "120000") ? "T" : "M");
+  const x = index === null ? "D" : head === null ? "A" : head.oid !== index.oid || head.mode !== index.mode ? changed(head, index) : ".";
+  const y = index === null ? "." : worktree === null ? "D" : worktree.oid !== index.oid || worktree.mode !== index.mode ? changed(index, worktree) : ".";
   if (x === "." && y === ".") return undefined;
   const mH = head?.mode ?? "000000";
   const mI = index?.mode ?? "000000";
@@ -244,7 +246,8 @@ const headChange = async (path: string, facts: PathFacts, repo: RepoFacts): Prom
  */
 const changesOf = async (paths: Iterable<string>, repo: RepoFacts): Promise<Array<Changed>> => {
   const changes: Array<Changed> = [];
-  for (const path of paths) {
+  // In git's path order: git pairs each added file, in that order, with the first deleted file in that order.
+  for (const path of [...paths].toSorted(byPath)) {
     const change = await headChange(path, await repo.facts(path), repo);
     if (change !== undefined) changes.push(change);
   }
@@ -480,15 +483,15 @@ export type StaleOutcome =
   | { readonly found: false }
   | { readonly found: true; readonly answer: StaleAnswer; readonly stale: "patched" | "last-answer"; readonly why?: string };
 
+/** The read's patched shape: undefined for a `.git`-scoped read, or argv no shape matches. */
+const shapeOf = (read: { readonly argv: ReadonlyArray<string>; readonly env?: Readonly<Record<string, string>> | undefined; readonly readScope?: "git-dir" | "repo" | undefined }) =>
+  (read.readScope ?? "repo") === "repo" ? kindOf(read.argv, read.env) : undefined;
+
 /**
  * A passive read while the Container is stopped: its last real answer (else, for status, its sibling shape's), patched
  * with the paths written since where the shape allows and the DO can afford it; else that answer alone. One file's read
  * with no last answer is computed within the guard (`computeOneFile`).
  */
-/** The read's patched shape: undefined for a `.git`-scoped read, or argv no shape matches. */
-const shapeOf = (read: { readonly argv: ReadonlyArray<string>; readonly env?: Readonly<Record<string, string>> | undefined; readonly readScope?: "git-dir" | "repo" | undefined }) =>
-  (read.readScope ?? "repo") === "repo" ? kindOf(read.argv, read.env) : undefined;
-
 export const staleRead = async (
   read: { readonly argv: ReadonlyArray<string>; readonly env?: Readonly<Record<string, string>> | undefined; readonly readScope?: "git-dir" | "repo" | undefined },
   sources: StaleSources,
