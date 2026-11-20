@@ -2,7 +2,7 @@
 // tree, pick the Skill folders by the `skills` CLI's path rules (`paths.ts`), and read the chosen Skills' files at that
 // commit. GitHub is read through a `RepoReader` (`contents.ts` asks GitHub with the Environment's token), so the rules are
 // tested without a network. Nothing is kept here: the store keeps what comes out. Ported from cloudpid@47941c7c
-// (`apps/server/src/github/skill-fetch.ts`), cut to what the Harness panel asks: a preview, a fetch of the folders the
+// (`apps/server/src/github/skill-fetch.ts`), cut to what the Settings page asks: a preview, a fetch of the folders the
 // owner picked at the previewed commit, and an update check that reads no file.
 //
 // Every request is bounded (plan §3.3): a preview reads one commit, one tree and at most `MAX_SKILL_CANDIDATES`

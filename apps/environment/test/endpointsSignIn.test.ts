@@ -1,5 +1,5 @@
 // @effect-diagnostics globalConsole:off
-// ChatGPT plan usage on the Harness panel (SPI-1164): the owner starts the sign-in, opens the authorize link, pastes the
+// ChatGPT plan usage on the Settings page (SPI-1164): the owner starts the sign-in, opens the authorize link, pastes the
 // address the browser lands on, and sees the account or why it failed; a ChatGPT endpoint is saved with the models its
 // token lists; sign-out revokes and stops the endpoint's Sessions. The panel's answers, page and audit log never hold a
 // token. Against the panel's real routes, a real endpoint store and broker, and a fake of OpenAI's authorization server.
@@ -90,10 +90,10 @@ const setup = async () => {
     [CSRF_HEADER]: await csrfToken(store.csrfKey(), "owner-sub", NOW),
   };
   const post = async (body: unknown, path = "endpoints/sign-in") => {
-    const response = await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/${path}`, { method: "POST", headers, body: JSON.stringify(body) }), deps);
+    const response = await handleHarness(new Request(`https://${HOST}/_t3flare/settings/api/${path}`, { method: "POST", headers, body: JSON.stringify(body) }), deps);
     return { status: response.status, text: await response.text() };
   };
-  const page = async () => (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), deps)).text();
+  const page = async () => (await handleHarness(new Request(`https://${HOST}/_t3flare/settings`), deps)).text();
   /** Everything a token must never reach: the storage, the audit log, the console. */
   const leaks = () => {
     const places = [JSON.stringify([...kv.map.entries()]), JSON.stringify(store.auditLog(50)), logged.join("\n")];
@@ -110,7 +110,7 @@ const signIn = async (context: Awaited<ReturnType<typeof setup>>) => {
   return { started, done };
 };
 
-describe("ChatGPT plan usage on the Harness panel", () => {
+describe("ChatGPT plan usage on the Settings page", () => {
   it("offers the sign-in with its unverified, Plus-or-Pro note", async () => {
     const { page } = await setup();
     const html = await page();
@@ -246,7 +246,7 @@ const claudeSignInFlow = async (context: Awaited<ReturnType<typeof setup>>) => {
 
 const CLAUDE_TARGET = { api: "anthropic-messages" as const, baseUrl: "https://api.anthropic.com", headers: {} };
 
-describe("Claude on the Harness panel (SPI-1165)", () => {
+describe("Claude on the Settings page (SPI-1165)", () => {
   it("offers the sign-in with its note: the owner's terms-of-service risk, a Pro or Max plan, no revocation", async () => {
     const html = await (await setup()).page();
     expect(html).toContain('data-sign-in-kind="claude"');
@@ -382,7 +382,7 @@ const copilotSignInFlow = async (context: Awaited<ReturnType<typeof setup>>) => 
 const COPILOT_TARGET = { api: "openai-responses" as const, baseUrl: "https://api.individual.githubcopilot.com", headers: {} };
 const EDITOR_HEADERS = { "User-Agent": "GitHubCopilotChat/0.35.0", "Editor-Version": "vscode/1.107.0", "Editor-Plugin-Version": "copilot-chat/0.35.0", "Copilot-Integration-Id": "vscode-chat" };
 
-describe("GitHub Copilot on the Harness panel (SPI-1166)", () => {
+describe("GitHub Copilot on the Settings page (SPI-1166)", () => {
   it("offers the device sign-in with its note: the owner's terms-of-service risk, a Copilot plan, no revocation; no paste field", async () => {
     const html = await (await setup()).page();
     const form = /<form[^>]*data-sign-in-kind="copilot"[\s\S]*?<\/form>/.exec(html)?.[0] ?? "";

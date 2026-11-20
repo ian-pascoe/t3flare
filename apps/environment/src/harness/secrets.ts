@@ -1,6 +1,6 @@
 // @effect-diagnostics globalDate:off
 // Direct MCP servers' secrets (ADR-0012's refinement, decision (b): MCP servers only): a header value the owner typed in
-// the harness panel, kept in the Environment DO's secret store namespace (`t3flare/secret/…`, apart from SQL, ADR-0010),
+// the Settings page, kept in the Environment DO's secret store namespace (`t3flare/secret/…`, apart from SQL, ADR-0010),
 // write-only: no route, page, log, push, Session or Container gets it back. What is shown is that it is set, when, and a
 // fingerprint: an HMAC under a key only this object holds (review LOW: owner-typed values may be low-entropy).
 import type { KvStorage } from "./keys.ts";

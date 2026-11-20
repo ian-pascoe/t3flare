@@ -60,7 +60,7 @@ const harness = async (method: string, pathname: string, body?: unknown) => {
 };
 
 const setEnvironment = async (settings: Record<string, unknown>) => {
-  const answer = await harness("POST", "/_t3flare/harness/api/environment", { settings });
+  const answer = await harness("POST", "/_t3flare/settings/api/environment", { settings });
   if (answer.status !== 200) throw new Error(`environment change refused: ${answer.status} ${JSON.stringify(answer.json)}`);
   return answer.json as { revision: number; resolved: Record<string, unknown> };
 };
@@ -298,7 +298,7 @@ const NODE_PIN = '[tools]\nnode = "24.11.1"\n';
 const OUT_DIR = "/workspace/.pmise";
 
 const setMise = (text: string) => setEnvironment({ globalMiseConfig: text });
-const status = async () => (await harness("GET", "/_t3flare/harness/api/status")).json?.["last Global mise lay-down"] ?? null;
+const status = async () => (await harness("GET", "/_t3flare/settings/api/status")).json?.["last Global mise lay-down"] ?? null;
 const sha256 = async (text: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
 /** Stops every pmise Workspace's Container and waits until each is stopped. */
@@ -541,7 +541,7 @@ const size = async () => {
   text += "#".repeat(16 * 1024 - new TextEncoder().encode(text).length - 1) + "\n";
   const bytes = new TextEncoder().encode(text).length;
   const saved = await setMise(text);
-  const over = await harness("POST", "/_t3flare/harness/api/environment", { settings: { globalMiseConfig: `${text}#` } });
+  const over = await harness("POST", "/_t3flare/settings/api/environment", { settings: { globalMiseConfig: `${text}#` } });
   await stopAll();
   const run = await execOn(WORKSPACE, `wc -c < ${GLOBAL_FILE}; sha256sum ${GLOBAL_FILE} | cut -c1-64; node --version`, 600_000);
   const [readBytes, readSha, node] = run.stdout.trim().split("\n");

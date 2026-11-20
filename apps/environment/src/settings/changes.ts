@@ -71,7 +71,7 @@ export const scrubUrls = (text: string): string => text.replace(/https?:\/\/[^\s
 /** A change's state (plan D8). `open` and `applying` are open; the rest are closed. */
 export type ChangeState = "open" | "applying" | "applied" | "declined" | "withdrawn" | "expired" | "moved" | "failed";
 
-/** An Owner client's Elicitation modes (plan D12): set per client on the Harness panel (clients.ts), or `?elicitation_mode=`. */
+/** An Owner client's Elicitation modes (plan D12): set per client on the Settings page (clients.ts), or `?elicitation_mode=`. */
 export const OWNER_MODES = ["browser", "native", "model"] as const;
 export type OwnerMode = (typeof OWNER_MODES)[number];
 

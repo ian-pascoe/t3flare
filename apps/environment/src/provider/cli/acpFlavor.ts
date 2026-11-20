@@ -99,7 +99,7 @@ export const cliPromptFailure = (cause: unknown): OrchestrationV2ProviderFailure
     return makeProviderFailure({
       cause,
       class: "permission_error",
-      message: "The Model endpoint refused the agent's credential. Check the endpoint's key or sign-in in the Harness panel; this agent never signs in to a vendor itself.",
+      message: "The Model endpoint refused the agent's credential. Check the endpoint's key or sign-in on the Settings page; this agent never signs in to a vendor itself.",
       code,
       retryable: false,
     });

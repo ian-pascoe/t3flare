@@ -1,4 +1,4 @@
-// The harness panel's page structure (SPI-1086): a snapshot of its markup from the fixture state, and checks over the
+// The Settings page's structure (SPI-1086): a snapshot of its markup from the fixture state, and checks over the
 // parsed tags (balanced, ids unique, every section in the navigation, every control named), every state it draws, the
 // CSP's limits (no inline style or handler, one script), and escaping of hostile strings in every server-supplied field.
 import { EMPTY_HARNESS, resolveHarness } from "@t3flare/harness-registry";
@@ -184,8 +184,10 @@ describe("harness page", () => {
     for (const tag of tags) {
       expect(Object.keys(tag.attrs).filter((name) => name === "style" || /^on/i.test(name)), tag.name).toEqual([]);
       if (tag.name === "use") expect(tag.attrs.href).toMatch(/^#i-/);
-      expect(["img", "link", "iframe", "object", "embed"]).not.toContain(tag.name);
+      expect(["img", "iframe", "object", "embed"]).not.toContain(tag.name);
     }
+    // The one link is the favicon, a `data:` URL: the only source the CSP's `img-src` allows.
+    expect(tags.filter((tag) => tag.name === "link").map((tag) => [tag.attrs.rel, tag.attrs.href?.slice(0, 19)])).toEqual([["icon", "data:image/svg+xml,"]]);
   });
 
   it("escapes hostile strings in every server-supplied field", () => {

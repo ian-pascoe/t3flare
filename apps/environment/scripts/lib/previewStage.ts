@@ -150,7 +150,7 @@ export const VITE_APP = (t3Origin: string) => ({
   out.session = await t(fetch(${JSON.stringify(`${t3Origin}/api/auth/session`)}, { credentials: "include" }).then((r) => "status " + r.status, (e) => "error " + e.name));
   out.mcp = await t(fetch(${JSON.stringify(`${t3Origin}/mcp`)}, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: "{}" }).then((r) => "status " + r.status, (e) => "error " + e.name));
   out.ws = await t(new Promise((r) => { const s = new WebSocket(${JSON.stringify(`${t3Origin.replace("https:", "wss:")}/ws`)}); s.onopen = () => r("open"); s.onerror = () => r("error"); s.onclose = (e) => r("closed " + e.code); }));
-  out.panel = await t(fetch(${JSON.stringify(`${t3Origin}/_t3flare/harness/api/mcp/servers`)}, { method: "POST", credentials: "include", body: "{}" }).then((r) => "status " + r.status, (e) => "error " + e.name));
+  out.panel = await t(fetch(${JSON.stringify(`${t3Origin}/_t3flare/settings/api/mcp/servers`)}, { method: "POST", credentials: "include", body: "{}" }).then((r) => "status " + r.status, (e) => "error " + e.name));
   out.otherWorkspace = await t(fetch("http://5174.t3flare.internal/", { mode: "no-cors" }).then((r) => "answered " + r.type, (e) => "error " + e.name));
   out.computerd = await t(fetch("http://8080.t3flare.internal/").then((r) => "status " + r.status, (e) => "error " + e.name));
   out.forgedHost = await t(fetch("/", { headers: { "x-forwarded-host": "8080.t3flare.internal" } }).then((r) => "status " + r.status, (e) => "error " + e.name));

@@ -11,7 +11,7 @@
 //   keeps one `ownerClients`, which creates it on its first call). At most `CLIENTS_PER_KEY` per key: a new name past
 //   that evicts the least recently seen `browser` row first, and only then the least recently seen of any mode, so a flood
 //   of names cannot grow the table or drop a mode the owner set while a `browser` row is left to go.
-// - Only the Harness panel's CSRF-guarded POST (harness/panel.ts) changes a mode or removes a row (`setMode`, `remove`).
+// - Only the Settings page's CSRF-guarded POST (harness/panel.ts) changes a mode or removes a row (`setMode`, `remove`).
 //   No MCP door, and no Settings server tool, reaches them: the endpoint holds this behind `seen` alone.
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 import { withoutHidden } from "@t3flare/harness-registry";

@@ -230,7 +230,7 @@ describe("T-endpoint: versions and methods", () => {
     for (const name of ["get_status", "change_environment"]) {
       const result = (await bodyOf(await endpoint(modern("tools/call", { name, arguments: FREE })))).result;
       expect(result).toMatchObject({ isError: true, structuredContent: { status: "refused" } });
-      expect(JSON.stringify(result?.content)).toMatch(/Harness panel/);
+      expect(JSON.stringify(result?.content)).toMatch(/Settings page/);
     }
   });
 
@@ -365,7 +365,7 @@ describe("layout (B): the endpoint's paths (settings/endpointLayout.ts)", () => 
     expect(settingsMcpUrl("t3.example.dev")).toBe(ENDPOINT);
     expect(isSettingsMcpPath("/_t3flare/mcp")).toBe(true);
     expect(isSettingsMcpPath("/_t3flare/mcp/anything")).toBe(true);
-    for (const path of ["/_t3flare/mcpx", "/_t3flare/harness", "/_t3flare", "/mcp", "/_t3flare/mc"]) expect(isSettingsMcpPath(path)).toBe(false);
+    for (const path of ["/_t3flare/mcpx", "/_t3flare/settings", "/_t3flare", "/mcp", "/_t3flare/mc"]) expect(isSettingsMcpPath(path)).toBe(false);
   });
 
   it("SPI-1195 review: prod is deployed without the endpoint until the owner turns it on, and bump (the t3 bump's) without it; every other stage with it", () => {

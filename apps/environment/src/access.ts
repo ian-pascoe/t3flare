@@ -29,7 +29,7 @@ export type Refusal =
   | "bad_admin_token"
   | "error";
 
-/** `subject`: the owner's Access `sub` (the harness panel binds its CSRF token to it); absent in local mode. */
+/** `subject`: the owner's Access `sub` (the Settings page binds its CSRF token to it); absent in local mode. */
 export type Caller = { readonly kind: "owner"; readonly subject?: string } | { readonly kind: "service-token" };
 
 /**
@@ -206,7 +206,7 @@ export const verifyAdminToken = (request: Request, config: GuardConfig): Verdict
     : refuse(config.adminToken ? "bad_admin_token" : "not_configured");
 
 /**
- * The harness panel's check (ADR-0026, ADR-0010's refinement), on the admin host only: the owner's Access assertion
+ * The Settings page's check (ADR-0026, ADR-0010's refinement), on the admin host only: the owner's Access assertion
  * alone (a browser cannot send the admin token; the panel adds CSRF and Origin checks), or the stage's service token
  * with the admin token, as every other admin route. `config.audience` is the admin host's own Access application.
  * Never throws.

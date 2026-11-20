@@ -1,18 +1,18 @@
 # Model endpoints
 
-**Every model call t3flare makes goes to a Model endpoint you set up in the Harness panel.** An endpoint is one of your
+**Every model call t3flare makes goes to a Model endpoint you set up on the Settings page.** An endpoint is one of your
 own ways to reach models: an API pi-ai speaks, at a base URL, with an API key, a subscription sign-in or no auth, and the
 models it serves ([ADR-0034](adr/0034-model-endpoints-are-the-owners-set-in-the-harness-panel.md)). t3flare has no
 other way to reach a model: no Model proxy, no key of its own in a Worker setting (the hard cut, SPI-1176; until then a
 Model proxy, Commissary, served every model, [ADR-0012](adr/0012-all-model-access-goes-through-the-model-proxy.md)).
 
 A new Environment has no endpoint, so it starts in the **setup state**: every agent's provider shows **Needs attention**
-with "No Model endpoint is set up: add one in the Harness panel (/_t3flare/harness), under Model endpoints." (each CLI
+with "No Model endpoint is set up: add one on the Settings page (/_t3flare/settings), under Model endpoints." (each CLI
 agent names the API it needs), and a CLI agent's thread is refused at its start, saying so. Do the setup step below once.
 
 ## The setup step
 
-1. Open the Harness panel at `https://<your t3 host>/_t3flare/harness` (behind Cloudflare Access, as the owner) and go to
+1. Open the Settings page at `https://<your t3 host>/_t3flare/settings` (behind Cloudflare Access, as the owner) and go to
    **Model endpoints**.
 2. **Add an endpoint** for each way you reach models:
    - **An API key**: pick a preset (Anthropic API, OpenAI API, OpenRouter) or **Custom** (any OpenAI-compatible
@@ -66,7 +66,7 @@ count.
   While you have picked none, the setting names the default: a small model (haiku, mini, nano, flash, lite, small,
   tiny) of the first endpoint that has one, its cheapest by known price, else the default model. It follows your
   endpoints as they change (ADR-0034 §5).
-- **The Guardian, prompt suggestions and `web_search`** use the same small model unless the Harness panel names another
+- **The Guardian, prompt suggestions and `web_search`** use the same small model unless the Settings page names another
   (`<endpointId>/<modelId>` in the extension's Model setting). `web_search` needs an Anthropic Messages endpoint with an
   API key or no auth whose server takes Anthropic's web search tool (Anthropic's API, Commissary). The Advisor follows
   the thread's model unless you name one.
@@ -87,7 +87,7 @@ you.
   other providers do too; an API-key endpoint (the Anthropic API or OpenAI API preset, or another provider's key) is the
   way to use t3flare without this question.
 
-The Harness panel will not start a sign-in until you tick a checkbox that states the vendor's position in one sentence
+The Settings page will not start a sign-in until you tick a checkbox that states the vendor's position in one sentence
 and links here; the Environment refuses a start that does not carry that acknowledgement.
 
 The quotes below are verbatim from the linked pages, read on 2026-11-19. Terms change: the linked page, not this one, is
@@ -198,7 +198,7 @@ own SDK.
 A failed answer is classified by its endpoint's API and auth, from what the vendor documents as machine-readable (the
 status, the error's type and code, the reset headers), never its prose (ADR-0034 §8). A usage limit pauses the thread
 until its reset ("Usage limit reached", auto-resume when the client has it on); a refused key or sign-in names the
-endpoint and says what to do in the Harness panel; overload and 5xx are retried. Nothing falls back to another endpoint.
+endpoint and says what to do on the Settings page; overload and 5xx are retried. Nothing falls back to another endpoint.
 
 ## Usage and limits (t3's Usage page and limit meters)
 
@@ -218,7 +218,7 @@ Nothing is read from a vendor's or Commissary's management API.
   model you want as the default first, e.g. `claude-sonnet-<version>`, `claude-haiku-<version>` on the Anthropic
   Messages endpoint.
 - **Its MCP tools**: Commissary's MCP endpoint is not built in (SPI-1160; ADR-0028's SPI-1160 refinement). Add it in the
-  Harness panel's **MCP servers** as a direct server:
+  Settings page's **MCP servers** as a direct server:
   1. **A key.** Create a Commissary API key with a tool scope of the toolkits t3flare should see. Use a key of its own,
      not the one your model endpoints use.
   2. **Add the server.** **Add server**: name `commissary` (its tools are then `mcp__commissary__<tool>`); URL
@@ -226,9 +226,9 @@ Nothing is read from a vendor's or Commissary's management API.
      key. It is stored write-only and never enters a Container.
   3. **Test** lists its tools.
 
-  The same from a script: `POST /_t3flare/harness/api/mcp/servers` on the t3 host, through Access with a service token
+  The same from a script: `POST /_t3flare/settings/api/mcp/servers` on the t3 host, through Access with a service token
   and the admin token, with the body `{"server": "commissary", "url": "https://<api host>/mcp", "auth": {"kind":
-  "header", "header": "x-api-key"}, "value": "<key>"}`, then `POST /_t3flare/harness/api/mcp/test` with
+  "header", "header": "x-api-key"}, "value": "<key>"}`, then `POST /_t3flare/settings/api/mcp/test` with
   `{"server": "commissary"}`. `apps/environment/scripts/commissaryMcp.ts add` does this on a throwaway stage
   (`T3FLARE_MCP_API_URL` and `T3FLARE_MCP_KEY` exported inline).
   - **No Commissary approval rules on it** (OD-T3): t3flare asks by each thread's mode; Commissary's rules would ask a
@@ -238,8 +238,8 @@ Nothing is read from a vendor's or Commissary's management API.
 
 ## The stages' Model endpoints
 
-SPI-1175. After each deploy, `stage.ts` saves the stage's Model endpoints through the Harness panel's own API
-(`/_t3flare/harness/api/endpoints`, with the stage's Access service token and admin token), and the acceptance test does
+SPI-1175. After each deploy, `stage.ts` saves the stage's Model endpoints through the Settings page's own API
+(`/_t3flare/settings/api/endpoints`, with the stage's Access service token and admin token), and the acceptance test does
 the same before its turns; its real turn then runs on the first endpoint's small model. They are one setting,
 `T3FLARE_MODEL_ENDPOINT`, a JSON object holding an endpoint and its key, or a list of them
 ([`apps/environment/scripts/lib/modelEndpointSpec.ts`](../apps/environment/scripts/lib/modelEndpointSpec.ts)):

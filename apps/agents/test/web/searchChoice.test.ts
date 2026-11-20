@@ -27,14 +27,14 @@ describe("searchChoice", () => {
 
   it("takes a usable endpoint's slug, and refuses one of another API or of a sign-in", () => {
     expect(searchChoice("open/claude-haiku-5-5", endpoints)).toMatchObject({ slug: "open/claude-haiku-5-5", endpoint: { auth: "none" } });
-    expect(searchChoice("resp/gpt-mini", endpoints)).toEqual({ error: "the search model resp/gpt-mini is not a model of an Anthropic Messages Model endpoint with an API key or no auth (the Harness panel's Web tools)" });
+    expect(searchChoice("resp/gpt-mini", endpoints)).toEqual({ error: "the search model resp/gpt-mini is not a model of an Anthropic Messages Model endpoint with an API key or no auth (the Settings page's Web tools)" });
     expect(searchChoice("plan/claude-haiku-5-5", endpoints)).toMatchObject({ error: expect.stringContaining("plan/claude-haiku-5-5 is not a model") });
   });
 
-  it("says so, pointing to the Harness panel, when no usable endpoint lists a model (sign-ins only, or another API)", () => {
+  it("says so, pointing to the Settings page, when no usable endpoint lists a model (sign-ins only, or another API)", () => {
     const signInsOnly = of(endpoint("plan", "anthropic-messages", "claude", ["claude-haiku-5-5"]), endpoint("resp", "openai-responses", "api-key", ["gpt-mini"]));
     expect(searchChoice("default", signInsOnly)).toEqual({
-      error: "no Anthropic Messages Model endpoint with an API key or no auth lists a model to search with: add one in the Harness panel (/_t3flare/harness), under Model endpoints",
+      error: "no Anthropic Messages Model endpoint with an API key or no auth lists a model to search with: add one on the Settings page (/_t3flare/settings), under Model endpoints",
     });
   });
 });

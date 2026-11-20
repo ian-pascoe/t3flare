@@ -60,7 +60,7 @@ const world = (extra: Partial<Env> = {}) => {
     const response = await worker.fetch(new Request(`https://${host}${path}`, { method: "POST", headers }), env);
     return { status: response.status, seen: seen.splice(0) };
   };
-  return { call };
+  return { call, env };
 };
 
 describe("the Owner-client endpoint's branch (worker.ts)", () => {
@@ -81,9 +81,9 @@ describe("the Owner-client endpoint's branch (worker.ts)", () => {
   it("refuses the panel's audience at the endpoint, and the endpoint's at the panel", async () => {
     const w = world();
     expect(await w.call("/_t3flare/mcp", { "cf-access-jwt-assertion": await assertion(PANEL_AUD) })).toEqual({ status: 404, seen: [] });
-    expect(await w.call("/_t3flare/harness", { "cf-access-jwt-assertion": await assertion(SETTINGS_AUD) })).toEqual({ status: 404, seen: [] });
+    expect(await w.call("/_t3flare/settings", { "cf-access-jwt-assertion": await assertion(SETTINGS_AUD) })).toEqual({ status: 404, seen: [] });
     // The panel's own audience still reaches the panel.
-    expect((await w.call("/_t3flare/harness", { "cf-access-jwt-assertion": await assertion(PANEL_AUD) })).seen).toEqual([{ method: "harness", caller: { kind: "owner", subject: "owner-sub" } }]);
+    expect((await w.call("/_t3flare/settings", { "cf-access-jwt-assertion": await assertion(PANEL_AUD) })).seen).toEqual([{ method: "harness", caller: { kind: "owner", subject: "owner-sub" } }]);
   });
 
   it("orders the branches: below the endpoint is its 404, never the admin branch; /_t3flare/mcpx is the admin branch's", async () => {
@@ -109,7 +109,7 @@ describe("the Owner-client endpoint's branch (worker.ts)", () => {
   it("the Change page and its API: nothing but the panel's own assertion reaches them", async () => {
     const w = world();
     const id = `chg_${"A".repeat(43)}`;
-    for (const path of [`/_t3flare/harness/changes/${id}`, `/_t3flare/harness/api/changes/${id}`, "/_t3flare/harness/api/changes"]) {
+    for (const path of [`/_t3flare/settings/changes/${id}`, `/_t3flare/settings/api/changes/${id}`, "/_t3flare/settings/api/changes"]) {
       expect(await w.call(path), path).toEqual({ status: 404, seen: [] });
       expect(await w.call(path, { authorization: `Bearer ${ADMIN}` }), path).toEqual({ status: 404, seen: [] });
       expect(await w.call(path, { "cf-access-jwt-assertion": await assertion(SETTINGS_AUD) }), path).toEqual({ status: 404, seen: [] });
@@ -127,5 +127,23 @@ describe("the Owner-client endpoint's branch (worker.ts)", () => {
     expect(await w.call("/_t3flare/mcp", { authorization: `Bearer ${ADMIN}` }, HOST)).toEqual({ status: 404, seen: [] });
     // Outside local mode the admin token alone on loopback is nothing.
     expect(await world().call("/_t3flare/mcp", { authorization: `Bearer ${ADMIN}` }, "localhost:8791")).toEqual({ status: 404, seen: [] });
+  });
+});
+
+describe("the Settings page's old path (worker.ts)", () => {
+  it("redirects /_t3flare/harness and below to /_t3flare/settings, keeping the rest of the path and the query", async () => {
+    const env = world();
+    const owner = { "cf-access-jwt-assertion": await assertion(PANEL_AUD) };
+    for (const [from, to] of [
+      ["/_t3flare/harness", "/_t3flare/settings"],
+      ["/_t3flare/harness/", "/_t3flare/settings/"],
+      ["/_t3flare/harness/changes/chg_1?x=1", "/_t3flare/settings/changes/chg_1?x=1"],
+    ]) {
+      const response = await worker.fetch(new Request(`https://${HOST}${from}`, { headers: owner }), env.env);
+      expect([response.status, response.headers.get("location")], from).toEqual([308, to]);
+    }
+    expect(await env.call("/_t3flare/harness"), "no assertion: no redirect").toEqual({ status: 404, seen: [] });
+    expect(await env.call("/_t3flare/harness", { "cf-access-jwt-assertion": await assertion(SETTINGS_AUD) }), "the endpoint's audience").toEqual({ status: 404, seen: [] });
+    expect((await env.call("/_t3flare/harnessx", { "cf-access-jwt-assertion": await assertion(PANEL_AUD), authorization: `Bearer ${ADMIN}` })).seen).toEqual([{ method: "fetch" }]);
   });
 });

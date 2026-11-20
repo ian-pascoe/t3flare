@@ -74,7 +74,7 @@ const decisionOf = (review: ReviewResult): Decision => {
   if (review.kind === "aborted") return { result: "aborted", reason: "The Guardian Review was aborted, so the call did not run." };
   return {
     result: "failed",
-    reason: `The Guardian could not review this call (${review.failure}), so it did not run. A Review Failure never allows a call. Tell the owner; they can change the Guardian's model or its Tool Policies in the Harness panel.`,
+    reason: `The Guardian could not review this call (${review.failure}), so it did not run. A Review Failure never allows a call. Tell the owner; they can change the Guardian's model or its Tool Policies on the Settings page.`,
     model: review.model,
   };
 };
@@ -168,7 +168,7 @@ export const guardianExtension = (host: GuardianHost, settings: GuardianSettings
           // Invalid settings may have held `deny` rules: every call but the read-only built-ins fails closed.
           if (invalid.length > 0) {
             if (readOnlyBuiltIns.includes(call.name)) return undefined;
-            const decision: Decision = { result: "failed", reason: `The Guardian's settings cannot be read (${invalid.map((pair) => JSON.stringify(pair)).join(", ")} is not name=allow|review|deny), so no call but a read runs until the owner fixes them in the Harness panel.` };
+            const decision: Decision = { result: "failed", reason: `The Guardian's settings cannot be read (${invalid.map((pair) => JSON.stringify(pair)).join(", ")} is not name=allow|review|deny), so no call but a read runs until the owner fixes them on the Settings page.` };
             await audit(host, api, call, decision, context);
             return { block: decision.reason };
           }

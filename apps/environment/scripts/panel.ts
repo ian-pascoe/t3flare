@@ -38,17 +38,17 @@ const FIXTURE_URL = workersDevUrl("t3flare-mcpfixture-panel");
 
 const seed = async () => {
   // The stage's fixture MCP Worker (scripts/tools/fixtureMcp.ts), signed in with a header: a server that lists tools.
-  await api("POST", "/_t3flare/harness/api/mcp/servers", { server: "fixture", url: `${FIXTURE_URL}/mcp`, auth: { kind: "header", header: "Authorization" }, value: `Bearer ${process.env.T3FLARE_FIXTURE_BEARER ?? ""}` });
-  await api("POST", "/_t3flare/harness/api/mcp/test", { server: "fixture" });
+  await api("POST", "/_t3flare/settings/api/mcp/servers", { server: "fixture", url: `${FIXTURE_URL}/mcp`, auth: { kind: "header", header: "Authorization" }, value: `Bearer ${process.env.T3FLARE_FIXTURE_BEARER ?? ""}` });
+  await api("POST", "/_t3flare/settings/api/mcp/test", { server: "fixture" });
   // A direct server on a host that does not resolve: its test fails, so the page shows a server with an error.
-  await api("POST", "/_t3flare/harness/api/mcp/servers", { server: "docs", url: "https://mcp.docs-fixture.invalid/mcp", auth: { kind: "header", header: "Authorization" }, value: "panel-fixture-not-a-real-token" });
+  await api("POST", "/_t3flare/settings/api/mcp/servers", { server: "docs", url: "https://mcp.docs-fixture.invalid/mcp", auth: { kind: "header", header: "Authorization" }, value: "panel-fixture-not-a-real-token" });
   // An OAuth server never signed in.
-  await api("POST", "/_t3flare/harness/api/mcp/servers", { server: "linear", url: "https://mcp.linear.app/mcp", auth: { kind: "oauth" } });
-  await api("POST", "/_t3flare/harness/api/mcp/test", { server: "docs" });
-  await api("POST", "/_t3flare/harness/api/extensions", { extension: "codemode", settings: { inlineBudget: 3000 } });
-  const servers = JSON.parse((await api("GET", "/_t3flare/harness/api/mcp")).text) as { servers: Array<{ name: string; tools: Array<{ upstream: string; class: string }> }> };
+  await api("POST", "/_t3flare/settings/api/mcp/servers", { server: "linear", url: "https://mcp.linear.app/mcp", auth: { kind: "oauth" } });
+  await api("POST", "/_t3flare/settings/api/mcp/test", { server: "docs" });
+  await api("POST", "/_t3flare/settings/api/extensions", { extension: "codemode", settings: { inlineBudget: 3000 } });
+  const servers = JSON.parse((await api("GET", "/_t3flare/settings/api/mcp")).text) as { servers: Array<{ name: string; tools: Array<{ upstream: string; class: string }> }> };
   const tool = servers.servers.find((server) => server.name === "fixture")?.tools[0];
-  if (tool !== undefined) await api("POST", "/_t3flare/harness/api/mcp", { op: "class", server: "fixture", tool: tool.upstream, class: tool.class === "read" ? "write" : "read" });
+  if (tool !== undefined) await api("POST", "/_t3flare/settings/api/mcp", { op: "class", server: "fixture", tool: tool.upstream, class: tool.class === "read" ? "write" : "read" });
 };
 
 const browser = (...args: Array<string>) => {
@@ -59,7 +59,7 @@ const browser = (...args: Array<string>) => {
 
 const shoot = (label: string) => {
   fs.mkdirSync(OUT, { recursive: true });
-  const url = new URL("/_t3flare/harness", HARNESS).toString();
+  const url = new URL("/_t3flare/settings", HARNESS).toString();
   for (const scheme of ["light", "dark"]) {
     for (const [name, width, height, scale] of [["desktop", 1280, 860, 1], ["phone", 390, 844, 2]] as const) {
       browser("--headers", JSON.stringify(headers), "--color-scheme", scheme, "open", url);
@@ -86,7 +86,7 @@ const pause = (ms: number) => spawnSync("sleep", [String(ms / 1000)]);
  */
 const states = () => {
   fs.mkdirSync(OUT, { recursive: true });
-  const url = new URL("/_t3flare/harness", HARNESS).toString();
+  const url = new URL("/_t3flare/settings", HARNESS).toString();
   for (const [scheme, name, width, height, scale] of [["dark", "desktop", 1280, 860, 1], ["light", "phone", 390, 844, 2]] as const) {
     const save = (shot: string) => {
       const file = path.join(OUT, `states-${shot}-${name}-${scheme}.png`);

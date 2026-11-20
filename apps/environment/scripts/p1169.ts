@@ -4,7 +4,7 @@
 //   node scripts/stage.ts deploy p1169
 //   node scripts/stage.ts run p1169 p1169 [--out ../../docs/steps/spi-1169/p1169.json]
 //
-// 1. Three Model endpoints saved through the Harness panel's API, all Commissary's with the proxy key (SPI-1162's
+// 1. Three Model endpoints saved through the Settings page's API, all Commissary's with the proxy key (SPI-1162's
 //    approach), one per API OpenCode speaks: `comm` (Anthropic Messages at <MODEL_PROXY_URL>), `oai` (OpenAI-compatible
 //    Chat Completions at <MODEL_PROXY_URL>/v1) and `resp` (OpenAI Responses at <MODEL_PROXY_URL>/v1).
 // 2. OpenCode lists the endpoints' models by slug, first; its system configuration has one provider per endpoint at the

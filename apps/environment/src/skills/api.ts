@@ -1,4 +1,4 @@
-// The Harness panel's Environment skills API (SPI-1148, plan §5), under `/_t3flare/harness/api/skills`: the list, a view,
+// The Settings page's Environment skills API (SPI-1148, plan §5), under `/_t3flare/settings/api/skills`: the list, a view,
 // and the owner's changes (preview, install, check, update, remove, enable). `panel.ts` routes here after its guards
 // (Access, JSON, Origin, `Sec-Fetch-Site`, CSRF), so these answer only well-formed requests. A GitHub failure is a 502
 // whose text is the failure's whole message; a request that runs out of time keeps nothing.

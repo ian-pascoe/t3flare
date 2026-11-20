@@ -1,6 +1,6 @@
 // @effect-diagnostics globalDate:off globalConsole:off asyncFunction:off
 // OAuth sign-ins for direct MCP servers (review M4, ADR-0010's and ADR-0012's refinements; cloudpid ADR-0034's model):
-// the owner starts one in the harness panel, the server's authorization server sends the browser back to a public exact
+// the owner starts one on the Settings page, the server's authorization server sends the browser back to a public exact
 // path on the t3 host, outside `/_t3flare` (with the client metadata document; owner, 2026-11-12, back to stock), and the
 // Environment DO keeps the client and the tokens write-only in its secret store. Every outbound request (discovery,
 // registration, the token exchange, each refresh) is the MCP Worker's (`McpOAuth`, review M5).
@@ -197,7 +197,7 @@ export class HarnessOAuth {
     const pending = this.#deps.kv.get<PendingState>(stateKey(state));
     // Single use: gone whatever happens next.
     this.#deps.kv.delete(stateKey(state));
-    if (pending === undefined || pending.expiresAt < this.#now()) return page(400, "Sign-in refused", "This sign-in expired or was already used; start it again from the harness panel.");
+    if (pending === undefined || pending.expiresAt < this.#now()) return page(400, "Sign-in refused", "This sign-in expired or was already used; start it again from the Settings page.");
     const error = url.searchParams.get("error");
     if (error !== null) {
       this.#deps.audit?.({ action: "mcp.oauth.refused", target: pending.server, after: { error: error.slice(0, 100) } });

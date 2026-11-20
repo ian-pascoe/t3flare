@@ -1,4 +1,4 @@
-// Every Settings change, called by both doors (ADR-0035, plan D1): the Harness panel's handlers, moved here as functions
+// Every Settings change, called by both doors (ADR-0035, plan D1): the Settings page's handlers, moved here as functions
 // over the same dependencies, with no `Request` or `Response` in their signatures. The panel calls these and nothing
 // else, and so do both doors of the Settings server, except `setMcpHeader` and `beginMcpSignIn`: a header value and an
 // authorization URL never travel in a tool's arguments or result (ADR-0035), so those two run from the panel and the

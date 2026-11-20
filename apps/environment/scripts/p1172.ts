@@ -190,7 +190,7 @@ switch (step) {
     check("one model request", turn.proxy?.requests === 1, turn.proxy);
     check(
       "a refused key whose error names the endpoint",
-      failure.class === "permission_error" && failure.code === "key_refused" && failure.message === `The Model endpoint "${ENDPOINT}" refused its API key (HTTP 401): check it in the Harness panel.`,
+      failure.class === "permission_error" && failure.code === "key_refused" && failure.message === `The Model endpoint "${ENDPOINT}" refused its API key (HTTP 401): check it on the Settings page.`,
       failure,
     );
     check("no pause: no reset", (failure.resetAt ?? null) === null, failure);
@@ -223,7 +223,7 @@ switch (step) {
     if (!check("the stage's script has MODEL_PROXY_URL (dev.env)", proxyUrl !== "")) finish();
     // A made-up key of no vendor's shape: only the relay's known-value redaction would catch an echo of it.
     const refusedKey = `p1172-refused-${stamp}-not-a-real-key`;
-    const api = (method: string, pathname: string, body?: unknown) => admin(method, `/_t3flare/harness/api/${pathname}`, body);
+    const api = (method: string, pathname: string, body?: unknown) => admin(method, `/_t3flare/settings/api/${pathname}`, body);
     const cli = option("cli", "pi");
     // Codex speaks OpenAI Responses (Commissary's at `/v1`); pi and Claude Code, Anthropic Messages.
     const responses = cli === "codex";

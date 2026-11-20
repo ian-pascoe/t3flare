@@ -63,7 +63,7 @@ const finish = (): never => {
   if (out !== undefined) fs.writeFileSync(out, `${text}\n`);
   process.exit(report.ok ? 0 : 1);
 };
-const api = (method: string, pathname: string, body?: unknown) => admin(method, `/_t3flare/harness/api/${pathname}`, body);
+const api = (method: string, pathname: string, body?: unknown) => admin(method, `/_t3flare/settings/api/${pathname}`, body);
 
 // `--scan <dir>`: the leak scan of the evidence (every file in `dir`) for the stage's own secrets, which only this run's
 // environment holds; it prints only which secret names matched where, never a value.

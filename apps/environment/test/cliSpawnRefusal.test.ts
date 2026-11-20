@@ -26,7 +26,7 @@ describe("a refused CLI spawn (SPI-1176)", () => {
     expect(mapped._tag).toBe("ProviderAdapterOpenSessionError");
     // t3's session manager wraps the open error once more before the turn start reads it.
     expect(knownProviderFailureMessage({ cause: mapped })).toBe(`${refusal}.`);
-    expect(refusal).toContain("Harness panel");
+    expect(refusal).toContain("Settings page");
   });
 
   it("leaves any other failure as it was", () => {

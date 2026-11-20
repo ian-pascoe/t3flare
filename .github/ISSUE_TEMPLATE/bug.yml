@@ -45,7 +45,7 @@ body:
         - A CLI agent (Codex, Claude Code, OpenCode, Pi)
         - Model endpoints
         - Workspaces, Containers and git
-        - Harness panel or Settings server
+        - Settings page or Settings server
         - MCP servers
         - Updates and bumps
         - Other

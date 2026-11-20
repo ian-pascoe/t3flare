@@ -742,7 +742,7 @@ describe("model: Executor's Pause, and resume", () => {
     expect(await structuredOf(await endpoint(resume(record.id, "accept")))).toMatchObject({ status: "refused" });
     setAccess(f, { enabled: false });
     const off = await bodyOf(await endpoint(resume(record.id, "accept")));
-    expect(JSON.stringify(off.result?.content)).toContain("Harness panel");
+    expect(JSON.stringify(off.result?.content)).toContain("Settings page");
     expect(f.store.loadEnvironment().revision).toBe(0);
   });
 

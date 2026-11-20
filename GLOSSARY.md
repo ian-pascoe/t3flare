@@ -202,10 +202,11 @@ Claude Code's highest settings source, shared by every Claude process in a Conta
 
 ## Tools
 
-**Harness panel**:
-The Owner's page at `/_t3flare/harness` on the t3 host for t3flare's own settings: the Harness settings and the
-Environment settings, with Status, the audit log and the Open changes waiting for them.
-_Avoid_: settings page, dashboard, admin UI
+**Settings page**:
+The Owner's page at `/_t3flare/settings` on the t3 host for t3flare's own settings: the Harness settings and the
+Environment settings, with Status, the audit log and the Open changes waiting for them. It was the Harness panel, at
+`/_t3flare/harness`, until 2026-11-20; that path redirects here.
+_Avoid_: Harness panel, dashboard, admin UI
 
 **Harness settings**:
 What agents are offered and how Pi Durable's loop runs: its extensions with their options, and the MCP server set.
@@ -242,7 +243,7 @@ _Avoid_: scripting, eval
 An MCP endpoint whose tools t3flare's agents may call: a Direct server, or the Settings server.
 
 **Direct server**:
-A remote MCP server added to the MCP server set by the Owner in the Harness panel, or at an agent's asking, with its
+A remote MCP server added to the MCP server set by the Owner on the Settings page, or at an agent's asking, with its
 own sign-in kept by t3flare.
 _Avoid_: custom server, Route B (the plan's word)
 
@@ -266,7 +267,7 @@ How a Durable agent is offered an MCP tool: `direct` (in its tool list), `deferr
 
 **Tool class**:
 Read or write: the tool's own `readOnlyHint` (true is read; anything else, write), unless the Owner overrides it in
-the Harness panel. A read runs; a write follows the thread's mode, Linked work included.
+the Settings page. A read runs; a write follows the thread's mode, Linked work included.
 _Avoid_: permission level
 
 **Tool handle**:
@@ -302,7 +303,7 @@ _Avoid_: entrypoint, channel (a Process channel is another thing), transport
 
 **Owner client**:
 An MCP client outside t3flare, such as Claude Code or Cursor on the Owner's own machine, that the Owner signed in to the
-Settings server through Access. Its Elicitation mode is the Owner's setting for it on the Harness panel, by its own
+Settings server through Access. Its Elicitation mode is the Owner's setting for it on the Settings page, by its own
 name, which is a label, never proof of which client calls.
 _Avoid_: external agent, laptop client (the Laptop Environment is t3's), remote client
 
@@ -322,14 +323,14 @@ An asked Settings change waiting for its answer, kept for at most 10 minutes and
 _Avoid_: Proposal (cloudpid's, a queue), pending request (t3's), draft
 
 **Change page**:
-The Harness panel's page for one Open change, where the Owner reads it and answers. It is the only place a secret is
+A page under the Settings page for one Open change, where the Owner reads it and answers. It is the only place a secret is
 typed or a Direct server's sign-in is started for a change an agent asked.
 _Avoid_: confirm page, approval page
 
 **Elicitation mode**:
 How an Owner client's asked change is answered: `browser` (the Owner, on the Change page), `native` (a form in the
 client) or `model` (the client's agent, by calling `resume`). Executor's names and meanings. Set per Owner client on the
-Harness panel (`browser` until the Owner changes it); `?elicitation_mode=` on the URL overrides it, for clients that keep
+Settings page (`browser` until the Owner changes it); `?elicitation_mode=` on the URL overrides it, for clients that keep
 a query. t3flare's own agents have none: theirs is always a Server question.
 _Avoid_: approval mode, form mode, URL mode (an elicitation is a form or a page)
 
@@ -383,7 +384,7 @@ _Avoid_: prompt, snippet, MCP prompt
 One configured way to reach an agent or model provider, with its own credentials. Used in t3's sense.
 
 **Model endpoint**:
-One of the Owner's own ways to reach models: where to send requests, with an API key, a sign-in or none, and the models it serves. Every model call t3flare makes goes to one. Set up in the Harness panel.
+One of the Owner's own ways to reach models: where to send requests, with an API key, a sign-in or none, and the models it serves. Every model call t3flare makes goes to one. Set up on the Settings page.
 _Avoid_: provider (that is t3's or pi-ai's), connection, backend
 
 **Model relay**:
@@ -403,7 +404,7 @@ The usage windows one Model endpoint answer reported in its vendor's rate-limit 
 _Avoid_: quota report, usage record (that counts tokens)
 
 **Subscription**:
-An Owner's own paid plan with a model vendor (ChatGPT, Claude Pro or Max, GitHub Copilot), signed in to as a Model endpoint in the Harness panel, as opposed to an API key. It belongs to one Owner and one Deployment and is never shared.
+An Owner's own paid plan with a model vendor (ChatGPT, Claude Pro or Max, GitHub Copilot), signed in to as a Model endpoint on the Settings page, as opposed to an API key. It belongs to one Owner and one Deployment and is never shared.
 _Avoid_: Subscription login, OAuth, account
 
 **Credential broker**:

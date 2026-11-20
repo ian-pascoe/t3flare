@@ -241,9 +241,9 @@ describe("D16's caps", () => {
   it(`at most ${OPEN_ACROSS} across the Environment, naming the panel's list; the 17th child is refused`, () => {
     const w = world();
     for (let index = 0; index < OPEN_ACROSS; index++) w.open({ ...OWN, key: `child-${index}`, thread: `child-${index}` });
-    const refusal = capRefusal(w.deps().changes, { ...OWN, key: "child-16", thread: "child-16" }, "hash-a", w.now(), "https://h/_t3flare/harness#changes");
+    const refusal = capRefusal(w.deps().changes, { ...OWN, key: "child-16", thread: "child-16" }, "hash-a", w.now(), "https://h/_t3flare/settings#changes");
     expect(refusal).toMatchObject({ reason: "open-across" });
-    expect(refusal!.text).toContain("https://h/_t3flare/harness#changes");
+    expect(refusal!.text).toContain("https://h/_t3flare/settings#changes");
   });
 
   it("the same change after a decline is refused for 10 minutes", async () => {
@@ -321,11 +321,11 @@ describe("D16's caps", () => {
       expect(w.deps().changes.get(record.id)?.closed?.cut).toBe(true);
       w.advance(60_000);
     }
-    const refusal = capRefusal(w.deps().changes, OWNER, "hash-new", w.now(), "https://h/_t3flare/harness#changes");
+    const refusal = capRefusal(w.deps().changes, OWNER, "hash-new", w.now(), "https://h/_t3flare/settings#changes");
     expect(refusal).toMatchObject({ reason: "opened-cap" });
     expect(refusal!.changeId).toBeUndefined();
     expect(refusal!.text).toBe(
-      `Not changed: you asked for ${OPENED_CAP} changes in the last hour, answered or not, the most t3flare allows. Make the change on the Harness panel (https://h/_t3flare/harness#changes), or try again later.`,
+      `Not changed: you asked for ${OPENED_CAP} changes in the last hour, answered or not, the most t3flare allows. Make the change on the Settings page (https://h/_t3flare/settings#changes), or try again later.`,
     );
     // Per caller and per door: another sub, and an own thread whose key is this sub, are not capped.
     expect(capRefusal(w.deps().changes, { ...OWNER, key: "sub-2" }, "hash-new", w.now())).toBeUndefined();

@@ -1,6 +1,6 @@
 // @effect-diagnostics globalDate:off globalConsole:off
 // Plan §5's hostile list (ADR-0035), M6 (SPI-1202): the cases that can be driven without a stage, end to end through the
-// doors as the Environment wires them (the MCP host, the CLI relay, the Owner-client endpoint, the Harness panel). Each
+// doors as the Environment wires them (the MCP host, the CLI relay, the Owner-client endpoint, the Settings page). Each
 // `describe` names its line of the list; `docs/steps/settings-mcp.md` maps every line to its tests here and elsewhere,
 // and `docs/steps/settings-mcp/m6-stage-run.md` to what the stage run records.
 import { MCP_QUESTION_MARKER, type McpAsker, type McpQuestionAnswer, type McpQuestionCard } from "@t3flare/session-protocol";
@@ -58,7 +58,7 @@ const panelHeaders = async (f: SettingsFixture) => ({
   "x-t3flare-csrf": await csrfToken(f.store.csrfKey(), "owner-sub", f.now()),
 });
 const panelPost = async (f: SettingsFixture, path: string, body: unknown) =>
-  handleHarness(new Request(`https://${HOST}/_t3flare/harness${path}`, { method: "POST", headers: await panelHeaders(f), body: JSON.stringify(body) }), f.panel());
+  handleHarness(new Request(`https://${HOST}/_t3flare/settings${path}`, { method: "POST", headers: await panelHeaders(f), body: JSON.stringify(body) }), f.panel());
 
 describe("hostile: an injected agent asking repeatedly is stopped by the caps; 17 children leave the 17th refused", () => {
   it("one thread: a repeat of a declined change is refused, and the third decline in a row locks it out without a card", async () => {
@@ -99,7 +99,7 @@ describe("hostile: an injected agent asking repeatedly is stopped by the caps; 1
     expect(statuses.slice(0, OPENED_CAP).every((status) => status?.status === "withdrawn")).toBe(true);
     expect(statuses.slice(OPENED_CAP).every((status) => status?.status === "refused" && status.reason === "opened-cap")).toBe(true);
     expect(f.cards).toHaveLength(OPENED_CAP);
-    expect(refusal).toContain("Harness panel");
+    expect(refusal).toContain("Settings page");
     expect(f.store.loadEnvironment().revision).toBe(0);
 
     // The card's Cancel is no different: each closes withdrawn, and the asks past the cap get no card.
@@ -121,7 +121,7 @@ describe("hostile: an injected agent asking repeatedly is stopped by the caps; 1
     const last = await f.call(f.durable(`child-${OPEN_ACROSS}`), "change_environment", { expectedRevision: 0, settings: { variables: { LAST_CHILD: "1" } } });
     expect(structured(last)).toMatchObject({ status: "refused", reason: "open-across" });
     expect(textOf(last)).toContain("Open changes list");
-    expect(textOf(last)).toContain(`https://${HOST}/_t3flare/harness`);
+    expect(textOf(last)).toContain(`https://${HOST}/_t3flare/settings`);
     expect(f.cards).toHaveLength(OPEN_ACROSS);
     expect(f.deps.changes.open()).toHaveLength(OPEN_ACROSS);
     expect(f.store.loadEnvironment().revision).toBe(0);

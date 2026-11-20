@@ -139,7 +139,7 @@ describe("a Stop closes the change before the card", () => {
 
 describe("the access switch on a 2026 retry (plan D2)", () => {
   it.each([
-    [{ enabled: false }, "Harness panel"],
+    [{ enabled: false }, "Settings page"],
     [{ writes: false }, "read-only"],
   ] as const)("%o: the retry is refused naming the panel, and the change stays as it was", async (access, words) => {
     const f = world();
@@ -184,7 +184,7 @@ describe("a tool the owner hid after its change opened (SPI-1195 review)", () =>
       ),
     );
     expect(retry.result).toMatchObject({ isError: true, structuredContent: { status: "refused" } });
-    expect(JSON.stringify(retry.result?.content)).toContain("Harness panel");
+    expect(JSON.stringify(retry.result?.content)).toContain("Settings page");
     expect(f.deps.changes.get(record!.id)?.state).toBe("open");
     expect(f.store.loadEnvironment().revision).toBe(0);
   });
@@ -199,7 +199,7 @@ describe("a tool the owner hid after its change opened (SPI-1195 review)", () =>
     hide(f, change);
     const outcome = await answerOpenChange(answerDepsOf(f.deps), record!.id, { by: "page", answerer: { kind: "owner", subject: SUB }, action: "approve" });
     expect(outcome).toMatchObject({ ok: true, outcome: { state: "failed", by: "page" } });
-    expect(outcome.ok ? outcome.outcome.error : "").toContain("Harness panel");
+    expect(outcome.ok ? outcome.outcome.error : "").toContain("Settings page");
     expect(f.store.loadEnvironment().revision).toBe(0);
   });
 
@@ -216,7 +216,7 @@ describe("a tool the owner hid after its change opened (SPI-1195 review)", () =>
     });
     const answer = await f.call(f.durable(), "change_environment", ASKED);
     expect(structured(answer)).toMatchObject({ status: "refused" });
-    expect(textOf(answer)).toContain("Harness panel");
+    expect(textOf(answer)).toContain("Settings page");
     expect(f.store.loadEnvironment().revision).toBe(0);
   });
 });

@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off globalFetch:off
-// SPI-1165's evidence on its stage: the Harness panel's "Sign in with Claude" (a Claude Pro or Max plan, Claude Code's
+// SPI-1165's evidence on its stage: the Settings page's "Sign in with Claude" (a Claude Pro or Max plan, Claude Code's
 // OAuth) through the panel's own routes, as a script with the stage's service token, a Durable turn with tools on the
 // Claude endpoint, and a sign-out.
 //
@@ -31,7 +31,7 @@ const out = outIndex === -1 ? undefined : process.argv[outIndex + 1];
 const [step, ...args] = process.argv.slice(2).filter((arg, index, all) => !arg.startsWith("--") && all[index - 1] !== "--out");
 const file = args[0];
 const ID = "claude";
-const api = (method: string, path: string, body?: unknown) => admin(method, `/_t3flare/harness/api/${path}`, body);
+const api = (method: string, path: string, body?: unknown) => admin(method, `/_t3flare/settings/api/${path}`, body);
 /** A Claude subscription's token forms (access `sk-ant-oat…`, refresh `sk-ant-ort…`), and a bearer header. */
 const TOKEN_FORMS = /sk-ant-o[ar]t|Bearer /;
 
@@ -52,7 +52,7 @@ const describeAuthorize = (url: string) => {
 };
 
 const page = async (): Promise<{ readonly status: number; readonly html: string }> => {
-  const full = await fetch(new URL("/_t3flare/harness", process.env.T3_URL), {
+  const full = await fetch(new URL("/_t3flare/settings", process.env.T3_URL), {
     headers: { "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID!, "cf-access-client-secret": process.env.T3FLARE_ACCESS_CLIENT_SECRET!, authorization: `Bearer ${process.env.T3FLARE_ADMIN_TOKEN}` },
   });
   return { status: full.status, html: await full.text() };

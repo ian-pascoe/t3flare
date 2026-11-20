@@ -122,19 +122,19 @@ describe("differ", () => {
       expect(failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "no_model", detail, startedAt: 0 }, now), detail).toMatchObject({
         class: "provider_error",
         code: "no_model",
-        message: "No Model endpoint is set up: add one in the Harness panel (/_t3flare/harness), under Model endpoints.",
+        message: "No Model endpoint is set up: add one on the Settings page (/_t3flare/settings), under Model endpoints.",
       });
     }
     // pi-durable's settlement without a detail: the setup state decides (no endpoint lists a model).
     const bare = { submissionId: "1", runId: "r", attemptId: "a", status: "failed" as const, reason: "no_model", startedAt: 0 };
-    expect(failureOf(bare, now, () => true).message).toBe("No Model endpoint is set up: add one in the Harness panel (/_t3flare/harness), under Model endpoints.");
+    expect(failureOf(bare, now, () => true).message).toBe("No Model endpoint is set up: add one on the Settings page (/_t3flare/settings), under Model endpoints.");
     expect(failureOf(bare, now, () => false).message).toBe("The selected model is not available: its Model endpoint was removed or no longer lists it. Pick another model.");
   });
 
   it("shows a Model endpoint's credential failure as the Session recorded it, typed, never the error's text (SPI-1164)", () => {
     const at = (credential: { endpointId: string; kind: "signed_out" | "unavailable"; message: string; retryable: boolean } | undefined, detail: string) =>
       failureOf({ submissionId: "1", runId: "r", attemptId: "a", status: "failed", reason: "model_error", detail, startedAt: 0, ...(credential === undefined ? {} : { proxy: { requests: 0, credential } }) }, now);
-    const message = 'The Model endpoint "chatgpt" is not signed in to ChatGPT (ChatGPT refused to renew the sign-in (invalid_grant)): sign in with ChatGPT again in the Harness panel.';
+    const message = 'The Model endpoint "chatgpt" is not signed in to ChatGPT (ChatGPT refused to renew the sign-in (invalid_grant)): sign in with ChatGPT again on the Settings page.';
     expect(at({ endpointId: "chatgpt", kind: "signed_out", message, retryable: false }, `API key auth failed for provider chatgpt: ${message} sk-secret`)).toMatchObject({ class: "provider_error", code: "signed_out", retryable: false, message });
     expect(at({ endpointId: "chatgpt", kind: "unavailable", message: "m", retryable: true }, "")).toMatchObject({ code: "unavailable", retryable: true, message: "m" });
     // Without the record, the text is never read for it: the generic model error.
@@ -176,7 +176,7 @@ describe("differ", () => {
     });
 
     it("a refused key is a permission error naming the endpoint, with no reset", () => {
-      const message = 'The Model endpoint "commissary" refused its API key (HTTP 401): check it in the Harness panel.';
+      const message = 'The Model endpoint "commissary" refused its API key (HTTP 401): check it on the Settings page.';
       expect(failureOf(failed({ endpointId: "commissary", class: "permission_error", code: "key_refused", message, retryable: false, stop: true, at: nowMs }), now)).toEqual({
         class: "permission_error",
         message,

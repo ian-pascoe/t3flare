@@ -99,7 +99,7 @@ describe("the Change page renders every kind escaped, a hostile value inert", ()
     const response = await handleHarness(new Request(`https://${HOST}${changePagePath(newChangeId())}`), fixture.panel());
     expect(response.status).toBe(404);
     expect(await response.text()).toContain("This change is gone");
-    const bad = await handleHarness(new Request(`https://${HOST}/_t3flare/harness/changes/chg_short%3Cscript%3E`), fixture.panel());
+    const bad = await handleHarness(new Request(`https://${HOST}/_t3flare/settings/changes/chg_short%3Cscript%3E`), fixture.panel());
     expect(bad.status).toBe(404);
   });
 });
@@ -231,10 +231,10 @@ describe("the Change page's CSP and the panel's list", () => {
     expect(html).toContain(`<script>${CHANGE_SCRIPT}</script>`);
     expect(CHANGE_SCRIPT).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML|document\.write/);
     // The panel lists it, linking to its page, and so does its API.
-    const panel = await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness`), run.panel())).text();
+    const panel = await (await handleHarness(new Request(`https://${HOST}/_t3flare/settings`), run.panel())).text();
     expect(panel).toContain('id="changes"');
     expect(panel).toContain(changePagePath(open!.id));
-    const listed = (await (await handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/changes`), run.panel())).json()) as { changes: Array<Record<string, unknown>> };
+    const listed = (await (await handleHarness(new Request(`https://${HOST}/_t3flare/settings/api/changes`), run.panel())).json()) as { changes: Array<Record<string, unknown>> };
     expect(listed.changes).toMatchObject([{ changeId: open!.id, thread: "thread-d", agent: "piDurable", url: `https://${HOST}${changePagePath(open!.id)}` }]);
   });
 });

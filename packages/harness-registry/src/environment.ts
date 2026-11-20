@@ -1,6 +1,6 @@
 // The Environment settings (SPI-1149, ADR-0032): what the Cloud Environment gives every Workspace and its Container,
 // apart from the Harness settings (ADR-0026). Kept in the Environment DO under their own key and revision, so a change
-// here never makes a Session take the Harness settings again. Edited in the Harness panel's Environment section; read by
+// here never makes a Session take the Harness settings again. Edited in the Settings page's Environment section; read by
 // each Workspace DO before a Container start. Imported by both Workers.
 //
 // One schema (`ENVIRONMENT_SETTINGS`), one resolve (`resolveEnvironment`), one change (`applyEnvironmentChange`): a later

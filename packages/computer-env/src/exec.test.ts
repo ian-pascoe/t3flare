@@ -4,7 +4,7 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { describe, expect, it, vi } from "vitest";
 
-const REASON = "Container budget (1) reached: raise it at /_t3flare/harness#environment";
+const REASON = "Container budget (1) reached: raise it at /_t3flare/settings#environment";
 
 /** The error a refused start rejects with, as computer wraps it after a Container exited before (met on stage). */
 const refused = () => {

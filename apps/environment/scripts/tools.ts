@@ -1,6 +1,6 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
 // The tools step's stage harness (docs/steps/tools-plan.md §7): code mode on a Durable thread, its probes, the hostile
-// scripts, and the harness panel's API and safety. Each case writes its evidence to docs/steps/tools/<file>.json, with
+// scripts, and the Settings page's API and safety. Each case writes its evidence to docs/steps/tools/<file>.json, with
 // tokens, cookies and handles redacted.
 //
 //   node scripts/stage.ts run tools tools m1            a script that reads, greps, edits and runs a test (m1-codemode.json)
@@ -55,7 +55,7 @@ const writeEvidence = (name: string, value: unknown) => {
   console.log(`wrote ${path.join(EVIDENCE, name)}`);
 };
 
-/** The panel's JSON API at `/_t3flare/harness` on the t3 host, as a script calls it: the service token and the admin token. */
+/** The panel's JSON API at `/_t3flare/settings` on the t3 host, as a script calls it: the service token and the admin token. */
 const harness = async (method: string, pathname: string, body?: unknown, headers: Record<string, string> = {}) => {
   const response = await fetch(new URL(pathname, HARNESS), {
     method,
@@ -78,7 +78,7 @@ const harness = async (method: string, pathname: string, body?: unknown, headers
   return { status: response.status, json, headers: response.headers };
 };
 
-const setPreset = async (preset: string) => harness("POST", "/_t3flare/harness/api/extensions", { extension: "offered-tools", settings: { preset } });
+const setPreset = async (preset: string) => harness("POST", "/_t3flare/settings/api/extensions", { extension: "offered-tools", settings: { preset } });
 
 let cookie = "";
 let providerOn = false;
@@ -484,37 +484,37 @@ text(String(answer).slice(0, 300) + "\\n" + await pending.catch((e) => "bash: " 
 // The panel from outside
 
 const panel = async () => {
-  // Owner, 2026-11-12, back to stock: the panel is `/_t3flare/harness` on the t3 host, behind the `/_t3flare` Access
+  // Owner, 2026-11-12, back to stock: the Settings page is `/_t3flare/settings` on the t3 host, behind the `/_t3flare` Access
   // application; the OAuth callback and client document are public paths outside `/_t3flare`. Security case 2 (SPI-1078):
   // the panel from a Container, from a linked laptop's credential and from a Durable agent's script.
   const results: Array<Case> = [];
   const t3 = process.env.T3_URL ?? "";
-  const settings = await harness("GET", "/_t3flare/harness/api/settings");
-  results.push({ name: "service token + admin token reads the settings at /_t3flare/harness on the t3 host", host: new URL(HARNESS).host === new URL(t3).host, status: settings.status, ok: settings.status === 200 && typeof settings.json?.revision === "number" && new URL(HARNESS).host === new URL(t3).host });
-  const changed = await harness("POST", "/_t3flare/harness/api/extensions", { extension: "codemode", settings: { inlineBudget: 2500 } });
+  const settings = await harness("GET", "/_t3flare/settings/api/settings");
+  results.push({ name: "service token + admin token reads the settings at /_t3flare/settings on the t3 host", host: new URL(HARNESS).host === new URL(t3).host, status: settings.status, ok: settings.status === 200 && typeof settings.json?.revision === "number" && new URL(HARNESS).host === new URL(t3).host });
+  const changed = await harness("POST", "/_t3flare/settings/api/extensions", { extension: "codemode", settings: { inlineBudget: 2500 } });
   results.push({ name: "and changes them (revision bumps)", status: changed.status, revision: changed.json?.revision, ok: changed.status === 200 });
-  await harness("POST", "/_t3flare/harness/api/extensions", { extension: "codemode", settings: { inlineBudget: 2000 } });
-  const noToken = await fetch(new URL("/_t3flare/harness/api/settings", t3), { headers: accessHeaders, redirect: "manual" });
+  await harness("POST", "/_t3flare/settings/api/extensions", { extension: "codemode", settings: { inlineBudget: 2000 } });
+  const noToken = await fetch(new URL("/_t3flare/settings/api/settings", t3), { headers: accessHeaders, redirect: "manual" });
   results.push({ name: "service token without the admin token: refused", status: noToken.status, ok: noToken.status === 404 });
-  const bare = await fetch(new URL("/_t3flare/harness/api/settings", t3), { redirect: "manual" });
+  const bare = await fetch(new URL("/_t3flare/settings/api/settings", t3), { redirect: "manual" });
   results.push({ name: "no Access credentials: refused at the edge", status: bare.status, ok: [302, 401, 403].includes(bare.status) });
-  const forged = await fetch(new URL("/_t3flare/harness/api/settings", t3), { headers: { "cf-access-jwt-assertion": "e30.e30.e30" }, redirect: "manual" });
+  const forged = await fetch(new URL("/_t3flare/settings/api/settings", t3), { headers: { "cf-access-jwt-assertion": "e30.e30.e30" }, redirect: "manual" });
   results.push({ name: "a forged assertion header alone: refused at the edge", status: forged.status, ok: [302, 401, 403].includes(forged.status) });
-  const viaCookie = await fetch(new URL("/_t3flare/harness/api/settings", t3), { headers: { cookie }, redirect: "manual" });
+  const viaCookie = await fetch(new URL("/_t3flare/settings/api/settings", t3), { headers: { cookie }, redirect: "manual" });
   results.push({ name: "t3's session cookie: refused", status: viaCookie.status, ok: [302, 401, 403, 404].includes(viaCookie.status) });
   // A linked laptop's MCP bearer (a peer link at full access) on every panel route: refused.
   const link = await signIn((await mintPairingCode(cookie, { label: "tools panel" })).code, "full-access", { clientName: "tools panel" });
   const linkedStatuses: Array<number> = [];
-  for (const pathname of ["/_t3flare/harness", "/_t3flare/harness/api/settings", "/_t3flare/harness/api/mcp", "/_t3flare/harness/api/audit"]) {
+  for (const pathname of ["/_t3flare/settings", "/_t3flare/settings/api/settings", "/_t3flare/settings/api/mcp", "/_t3flare/settings/api/audit"]) {
     linkedStatuses.push((await fetch(new URL(pathname, t3), { headers: { authorization: `Bearer ${link.token}` }, redirect: "manual" })).status);
   }
-  const linkedPost = (await fetch(new URL("/_t3flare/harness/api/extensions", t3), { method: "POST", headers: { authorization: `Bearer ${link.token}`, "content-type": "application/json" }, body: JSON.stringify({ extension: "tool-search", enabled: false }), redirect: "manual" })).status;
+  const linkedPost = (await fetch(new URL("/_t3flare/settings/api/extensions", t3), { method: "POST", headers: { authorization: `Bearer ${link.token}`, "content-type": "application/json" }, body: JSON.stringify({ extension: "tool-search", enabled: false }), redirect: "manual" })).status;
   results.push({ name: "a linked laptop's MCP bearer on every panel route (GET and a change): refused", statuses: [...linkedStatuses, linkedPost], ok: [...linkedStatuses, linkedPost].every((status) => [302, 401, 403, 404].includes(status)) });
   // From a Container: computer.internal and the public t3 host, with no credential and with a forged assertion.
   const workspace = `tools-panel-${Date.now().toString(36)}`;
   await (await import("./lib/cliTurn.ts")).ensureProject(cookie, workspace);
   const exec = async (script: string) => ((await admin("POST", `/_t3flare/agents/workspace-call?id=${workspace}`, { exec: { script, timeoutMs: 60_000 } })).json as any)?.result ?? {};
-  const paths = ["/_t3flare/harness", "/_t3flare/harness/api/settings", "/_t3flare/harness/api/mcp"];
+  const paths = ["/_t3flare/settings", "/_t3flare/settings/api/settings", "/_t3flare/settings/api/mcp"];
   const curls = paths
     .flatMap((pathname) => [
       `echo "internal ${pathname} $(curl -s -m 10 -o /dev/null -w '%{http_code}' http://computer.internal${pathname})"`,
@@ -526,7 +526,7 @@ const panel = async () => {
   const fromContainer = String((await exec(curls)).stdout ?? "").trim().split("\n");
   results.push({ name: "from a Container: computer.internal 404, the public host refused at the edge, forged assertions and changes refused", answers: fromContainer, ok: fromContainer.length === paths.length * 4 && fromContainer.every((line) => (line.startsWith("internal") ? line.endsWith(" 404") : / (302|401|403|404)$/.test(line))) });
   // A Durable agent's script: code mode has no network (no fetch); its bash is the Container's (above).
-  const script = await mcpScript("panel-shell", "full-access", `let out; try { out = typeof fetch === "function" ? String((await fetch(${JSON.stringify(`${t3}/_t3flare/harness/api/settings`)})).status) : "no fetch"; } catch (e) { out = "threw: " + String(e).slice(0, 80); }\ntext(out);`, () => "decline");
+  const script = await mcpScript("panel-shell", "full-access", `let out; try { out = typeof fetch === "function" ? String((await fetch(${JSON.stringify(`${t3}/_t3flare/settings/api/settings`)})).status) : "no fetch"; } catch (e) { out = "threw: " + String(e).slice(0, 80); }\ntext(out);`, () => "decline");
   results.push({ name: "a Durable agent's code mode script cannot reach the panel (no fetch in the sandbox)", output: script.output.slice(-120), ok: /no fetch|threw/.test(script.output) && !/\b200\b/.test(script.output.split("Output:")[1] ?? "") });
   await cleanup(workspace);
   // The OAuth paths: public, GET only; nothing else of the panel is.
@@ -534,12 +534,12 @@ const panel = async () => {
   const client = await fetch(new URL("/t3flare/oauth/client.json", t3), { redirect: "manual" });
   results.push({ name: "the OAuth callback and client document are public outside /_t3flare (an unknown state refused)", statuses: [callback.status, client.status], ok: callback.status >= 400 && callback.status < 500 && client.status === 200 });
   // Cross-origin and form posts: refused before anything is stored.
-  const before = (await harness("GET", "/_t3flare/harness/api/settings")).json?.revision;
-  const crossOrigin = await harness("POST", "/_t3flare/harness/api/extensions", { extension: "tool-search", enabled: false }, { origin: "https://evil.example" });
-  const form = await harness("POST", "/_t3flare/harness/api/extensions", "extension=tool-search&enabled=false", { "content-type": "application/x-www-form-urlencoded" });
-  const after = (await harness("GET", "/_t3flare/harness/api/settings")).json?.revision;
+  const before = (await harness("GET", "/_t3flare/settings/api/settings")).json?.revision;
+  const crossOrigin = await harness("POST", "/_t3flare/settings/api/extensions", { extension: "tool-search", enabled: false }, { origin: "https://evil.example" });
+  const form = await harness("POST", "/_t3flare/settings/api/extensions", "extension=tool-search&enabled=false", { "content-type": "application/x-www-form-urlencoded" });
+  const after = (await harness("GET", "/_t3flare/settings/api/settings")).json?.revision;
   results.push({ name: "cross-origin and form-encoded changes refused", statuses: [crossOrigin.status, form.status], ok: crossOrigin.status === 403 && form.status === 403 && before === after });
-  const page = await harness("GET", "/_t3flare/harness");
+  const page = await harness("GET", "/_t3flare/settings");
   const csp = page.headers.get("content-security-policy") ?? "";
   results.push({ name: "the page's CSP allows only its own hashed script and style", csp, ok: page.status === 200 && /script-src 'sha256-/.test(csp) && !csp.includes("'self' 'unsafe") });
   writeEvidence(process.argv[3] ?? "m3-panel-safety.json", { host: new URL(t3).host, note: "rerun after the back-to-stock cuts (owner, 2026-11-12): the panel on the t3 host; security case 2 included", cases: results, ok: results.every((r) => r.ok) });
@@ -554,24 +554,24 @@ const fixture = async (pathname: string, method = "GET") =>
   (await fetch(`${FIXTURE_URL}${pathname}`, { method, headers: { authorization: `Bearer ${process.env.T3FLARE_FIXTURE_BEARER ?? ""}` } })).json() as Promise<any>;
 const notes = async (): Promise<Array<string>> => (await fixture("/log")).lines ?? [];
 
-const mcpChange = (change: unknown) => harness("POST", "/_t3flare/harness/api/mcp", change);
+const mcpChange = (change: unknown) => harness("POST", "/_t3flare/settings/api/mcp", change);
 
 const directSetup = async () => {
-  const exists = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).some((server: any) => server.name === "fixture");
+  const exists = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).some((server: any) => server.name === "fixture");
   if (exists) await mcpChange({ op: "remove", server: "fixture" });
-  const added = await harness("POST", "/_t3flare/harness/api/mcp/servers", {
+  const added = await harness("POST", "/_t3flare/settings/api/mcp/servers", {
     server: "fixture",
     url: `${FIXTURE_URL}/mcp`,
     auth: { kind: "header", header: "Authorization" },
     value: `Bearer ${process.env.T3FLARE_FIXTURE_BEARER ?? ""}`,
   });
-  const tested = await harness("POST", "/_t3flare/harness/api/mcp/test", { server: "fixture" });
-  const before = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((server: any) => server.name === "fixture");
+  const tested = await harness("POST", "/_t3flare/settings/api/mcp/test", { server: "fixture" });
+  const before = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).find((server: any) => server.name === "fixture");
   // A direct server's tools are write until the owner marks them read (review H3): the read fixtures, as the owner would.
   for (const tool of before?.tools ?? []) {
     if (["fixture_echo", "fixture_inject", "fixture_slow"].includes(tool.upstream)) await mcpChange({ op: "class", server: "fixture", tool: tool.upstream, class: "read", hash: tool.hash });
   }
-  const listed = await harness("GET", "/_t3flare/harness/api/mcp");
+  const listed = await harness("GET", "/_t3flare/settings/api/mcp");
   const row = (listed.json?.servers ?? []).find((server: any) => server.name === "fixture");
   return {
     firstListed: (before?.tools ?? []).map((tool: any) => `${tool.upstream}:${tool.class}`), added: { status: added.status, secret: added.json?.secret ?? null }, tested: tested.json, tools: (row?.tools ?? []).map((tool: any) => `${tool.upstream}:${tool.class}`) };
@@ -627,19 +627,19 @@ const durableMcp = async (server: string, file: string) => {
 /** H3 on the direct server: class override stops a card; a flipped hint stays write until confirmed. */
 const classCases = async () => {
   const cases: Array<Case> = [];
-  const listed = async () => ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((server: any) => server.name === "fixture")?.tools ?? [];
+  const listed = async () => ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).find((server: any) => server.name === "fixture")?.tools ?? [];
   const unknown = (await listed()).find((tool: any) => tool.upstream === "fixture_unknown");
   await mcpChange({ op: "class", server: "fixture", tool: "fixture_unknown", class: "read", hash: unknown?.hash });
   {
     const run = await mcpScript("mcp-override", "approval-required", `text(await tools.mcp__fixture__fixture_unknown({ text: "now read" }));`, () => "decline");
     cases.push({ name: "the owner marks fixture_unknown read: no card", ...run, ok: run.cards.length === 0 && run.output.includes("unknown ran") });
   }
-  const serverTools = async (name: string) => ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((server: any) => server.name === name)?.tools ?? [];
+  const serverTools = async (name: string) => ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).find((server: any) => server.name === name)?.tools ?? [];
   const flipOf = async (name: string) => (await serverTools(name)).find((tool: any) => tool.upstream.endsWith("fixture_flip"));
   const before = { direct: await flipOf("fixture"), commissary: await flipOf("commissary") };
   await fixture("/flip", "POST");
-  await harness("POST", "/_t3flare/harness/api/mcp/test", { server: "fixture" });
-  await harness("POST", "/_t3flare/harness/api/mcp/test", { server: "commissary" });
+  await harness("POST", "/_t3flare/settings/api/mcp/test", { server: "fixture" });
+  await harness("POST", "/_t3flare/settings/api/mcp/test", { server: "commissary" });
   const after = { direct: await flipOf("fixture"), commissary: await flipOf("commissary") };
   {
     const run = await mcpScript("mcp-flip", "approval-required", `text(await tools.mcp__fixture__fixture_flip({ text: "f" }).catch((e) => e.message));`, () => "decline");
@@ -887,7 +887,7 @@ done
 H=$(for p in /proc/[0-9]*; do tr '\0' '\n' < $p/environ 2>/dev/null | sed -n 's/^T3FLARE_TOOL_HANDLE=//p'; done | head -1)
 echo "== stolen handle: $(test -n "$H" && echo yes || echo no)"
 LIST='{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-for path in /t3flare/mcp/commissary /t3flare/mcp/fixture /t3flare/mcp/fixoauth /t3flare/mcp/executor /t3flare/mcp/t3 /t3flare/model-key /t3flare/git /_t3flare/harness /_t3flare/harness/api/settings /_t3flare/harness/api/mcp /_t3flare/harness/api/audit /_t3flare/harness/oauth/callback /_t3flare/agents/session /_t3flare/check/peer-leak; do
+for path in /t3flare/mcp/commissary /t3flare/mcp/fixture /t3flare/mcp/fixoauth /t3flare/mcp/executor /t3flare/mcp/t3 /t3flare/model-key /t3flare/git /_t3flare/settings /_t3flare/settings/api/settings /_t3flare/settings/api/mcp /_t3flare/settings/api/audit /_t3flare/settings/oauth/callback /_t3flare/agents/session /_t3flare/check/peer-leak; do
   for auth in none forged stolen; do
     case $auth in none) A="x-none: 1";; forged) A="authorization: Bearer 0000000000000000000000000000000000000000000000000000000000000000";; stolen) A="authorization: Bearer $H";; esac
     echo "== GET $path ($auth) $(curl -s -m 10 -o /tmp/hunt-body -w '%{http_code}' -H "$A" http://computer.internal$path)"; head -c 4000 /tmp/hunt-body; echo
@@ -981,11 +981,11 @@ const oauthCases = async () => {
   const server = "fixoauth";
   const unsigned = (pathname: string) => fetch(new URL(pathname, HARNESS), { redirect: "manual" });
   {
-    const client = await unsigned("/_t3flare/harness/oauth/client.json");
+    const client = await unsigned("/_t3flare/settings/oauth/client.json");
     const doc = client.status === 200 ? await client.json() : null;
-    const callback = await unsigned("/_t3flare/harness/oauth/callback?state=00");
-    const panel = await unsigned("/_t3flare/harness");
-    const api = await unsigned("/_t3flare/harness/api/settings");
+    const callback = await unsigned("/_t3flare/settings/oauth/callback?state=00");
+    const panel = await unsigned("/_t3flare/settings");
+    const api = await unsigned("/_t3flare/settings/api/settings");
     cases.push({
       name: "P13: only the callback and the client document are public on the admin host",
       clientDocument: { status: client.status, clientId: (doc as any)?.client_id ?? null, redirectUris: (doc as any)?.redirect_uris ?? null },
@@ -995,12 +995,12 @@ const oauthCases = async () => {
       ok: client.status === 200 && callback.status === 400 && panel.status !== 200 && api.status !== 200,
     });
   }
-  const existing = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).some((row: any) => row.name === server);
+  const existing = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).some((row: any) => row.name === server);
   if (existing) await mcpChange({ op: "remove", server });
-  const added = await harness("POST", "/_t3flare/harness/api/mcp/servers", { server, url: `${FIXTURE_URL}/oauth-mcp`, auth: { kind: "oauth" } });
-  const before = await harness("POST", "/_t3flare/harness/api/mcp/test", { server });
+  const added = await harness("POST", "/_t3flare/settings/api/mcp/servers", { server, url: `${FIXTURE_URL}/oauth-mcp`, auth: { kind: "oauth" } });
+  const before = await harness("POST", "/_t3flare/settings/api/mcp/test", { server });
   const statsBefore = await fixture("/oauth/stats");
-  const begun = await harness("POST", "/_t3flare/harness/api/mcp/oauth", { server });
+  const begun = await harness("POST", "/_t3flare/settings/api/mcp/oauth", { server });
   const authorizationUrl = String(begun.json?.authorizationUrl ?? "");
   const authorized = authorizationUrl === "" ? null : await fetch(authorizationUrl, { redirect: "manual" });
   const back = authorized?.headers.get("location") ?? "";
@@ -1021,7 +1021,7 @@ const oauthCases = async () => {
     ok: added.status === 200 && begun.status === 200 && landed?.status === 200 && /Signed in/.test(landedText) && replay?.status === 400,
   });
   {
-    const again = await harness("POST", "/_t3flare/harness/api/mcp/oauth", { server });
+    const again = await harness("POST", "/_t3flare/settings/api/mcp/oauth", { server });
     const url2 = String(again.json?.authorizationUrl ?? "");
     const loc = url2 === "" ? "" : ((await fetch(url2, { redirect: "manual" })).headers.get("location") ?? "");
     const forged = loc === "" ? null : new URL(loc);
@@ -1029,8 +1029,8 @@ const oauthCases = async () => {
     const refused = forged === null ? null : await fetch(forged, { redirect: "manual" });
     cases.push({ name: "an answer whose iss is not the authorization server's is refused", status: refused?.status ?? null, ok: refused?.status === 400 });
   }
-  const tested = await harness("POST", "/_t3flare/harness/api/mcp/test", { server });
-  const row = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((entry: any) => entry.name === server);
+  const tested = await harness("POST", "/_t3flare/settings/api/mcp/test", { server });
+  const row = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).find((entry: any) => entry.name === server);
   cases.push({ name: "with the token the server lists its tools; the panel shows signed in (never the token)", test: tested.json, oauth: row?.oauth ?? null, ok: tested.json?.status === "ok" && tested.json?.tools === 6 && row?.oauth?.signedIn === true });
   {
     const run = await mcpScript("oauth-call", "full-access", `text(await tools.mcp__fixoauth__fixture_echo({ text: "oauth-ok" }));`, () => "accept");
@@ -1068,7 +1068,7 @@ const approvalOf = (value: unknown) => {
   return { url, requestId };
 };
 const replyText = (projection: any) => itemsOf(projection).filter((item: any) => item.type === "assistant_message").map((item: any) => String(item.text ?? "")).join("\n");
-const executorRow = async () => ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).find((row: any) => row.name === EXECUTOR);
+const executorRow = async () => ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).find((row: any) => row.name === EXECUTOR);
 
 interface ExecutorState {
   marker: string;
@@ -1393,9 +1393,9 @@ switch (command) {
   case "mcp-list": {
     // The panel's MCP section as a script sees it (names, status, tool classes; never a secret), and whether the page
     // carries the add-a-server form.
-    const page = await fetch(new URL("/_t3flare/harness", HARNESS), { redirect: "manual", headers: { ...accessHeaders, authorization: `Bearer ${process.env.T3FLARE_ADMIN_TOKEN ?? ""}` } });
+    const page = await fetch(new URL("/_t3flare/settings", HARNESS), { redirect: "manual", headers: { ...accessHeaders, authorization: `Bearer ${process.env.T3FLARE_ADMIN_TOKEN ?? ""}` } });
     const html = await page.text();
-    const rows = (await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? [];
+    const rows = (await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? [];
     console.log(JSON.stringify({ page: page.status, addForm: html.includes("data-mcp-add"), servers: rows.map((row: any) => ({ name: row.name, url: typeof row.setting?.url === "string" ? row.setting.url.replace(/connection=[^&]+/, "connection=<id>") : null, kind: row.setting?.kind, enabled: row.setting?.enabled, auth: row.setting?.auth?.kind, signedIn: row.oauth?.signedIn, status: row.status, error: row.error, tools: (row.tools ?? []).map((tool: any) => `${tool.upstream}:${tool.class}`) })) }, null, 1));
     break;
   }

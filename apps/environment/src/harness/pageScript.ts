@@ -1,4 +1,4 @@
-// The harness panel's one script (ADR-0026), allowed by its SHA-256 hash in the CSP, so it is a constant. It only turns
+// The Settings page's one script (ADR-0026), allowed by its SHA-256 hash in the CSP, so it is a constant. It only turns
 // the page's controls into calls to the panel's JSON API (with the CSRF token from the page's meta tag) and shows their
 // progress and outcome. It writes server answers with `textContent`, never as HTML. Without it the page still reads.
 import { ENDPOINTS_SCRIPT } from "./pageEndpoints.ts";
@@ -41,7 +41,7 @@ for (const button of document.querySelectorAll("button[data-mcp]")) {
   button.addEventListener("click", async () => {
     const change = JSON.parse(button.dataset.mcp);
     if (change.op === "remove" && !confirm("Remove " + change.server + " and its sign-in? Agents lose its tools at their next turn.")) return;
-    if (await post("/_t3flare/harness/api/mcp", change, button)) done();
+    if (await post("/_t3flare/settings/api/mcp", change, button)) done();
   });
 }
 for (const select of document.querySelectorAll("select[data-mcp-exposure]")) {
@@ -50,7 +50,7 @@ for (const select of document.querySelectorAll("select[data-mcp-exposure]")) {
     const change = select.dataset.tool === undefined
       ? { op: "server", server, exposure: select.value }
       : { op: "server", server, toolExposure: { [select.dataset.tool]: select.value === "" ? null : select.value } };
-    if (await post("/_t3flare/harness/api/mcp", change, select)) done();
+    if (await post("/_t3flare/settings/api/mcp", change, select)) done();
     else select.value = select.querySelector("option[selected]").value;
   });
 }
@@ -58,14 +58,14 @@ for (const select of document.querySelectorAll("select[data-mcp-exposure]")) {
 for (const select of document.querySelectorAll("select[data-client-mode]")) {
   select.addEventListener("change", async () => {
     const body = { key: select.dataset.clientKey, clientName: select.dataset.clientName, mode: select.value };
-    if (await post("/_t3flare/harness/api/mcp/clients", body, select)) done();
+    if (await post("/_t3flare/settings/api/mcp/clients", body, select)) done();
     else select.value = select.querySelector("option[selected]").value;
   });
 }
 for (const button of document.querySelectorAll("button[data-client-remove]")) {
   button.addEventListener("click", async () => {
     if (!confirm("Forget the client " + button.dataset.clientName + "? It is listed again, in browser, at its next request.")) return;
-    if (await post("/_t3flare/harness/api/mcp/clients", { key: button.dataset.clientKey, clientName: button.dataset.clientName, remove: true }, button)) done();
+    if (await post("/_t3flare/settings/api/mcp/clients", { key: button.dataset.clientKey, clientName: button.dataset.clientName, remove: true }, button)) done();
   });
 }
 for (const button of document.querySelectorAll("button[data-mcp-test]")) {
@@ -74,7 +74,7 @@ for (const button of document.querySelectorAll("button[data-mcp-test]")) {
     const out = document.querySelector('[data-test-result="' + CSS.escape(server) + '"]');
     out.dataset.tone = "";
     out.textContent = "Testing…";
-    const response = await post("/_t3flare/harness/api/mcp/test", { server }, button);
+    const response = await post("/_t3flare/settings/api/mcp/test", { server }, button);
     busy(button, false);
     if (response === undefined) { out.textContent = ""; return; }
     const answer = await response.json();
@@ -89,7 +89,7 @@ for (const button of document.querySelectorAll("button[data-mcp-test]")) {
 }
 for (const button of document.querySelectorAll("button[data-mcp-oauth]")) {
   button.addEventListener("click", async () => {
-    const response = await post("/_t3flare/harness/api/mcp/oauth", { server: button.dataset.mcpOauth }, button);
+    const response = await post("/_t3flare/settings/api/mcp/oauth", { server: button.dataset.mcpOauth }, button);
     busy(button, false);
     if (response === undefined) return;
     const answer = await response.json();
@@ -119,7 +119,7 @@ if (adding !== null) {
       body.auth.header = field("header");
       body.value = adding.querySelector("[name=value]").value;
     }
-    const response = await post("/_t3flare/harness/api/mcp/servers", body, adding.querySelector("[type=submit]"));
+    const response = await post("/_t3flare/settings/api/mcp/servers", body, adding.querySelector("[type=submit]"));
     adding.querySelector("[name=value]").value = "";
     if (response !== undefined) done();
   });
@@ -202,7 +202,7 @@ for (const form of document.querySelectorAll("form[data-environment]")) {
       notify("err", error.message);
       return;
     }
-    if (await post("/_t3flare/harness/api/environment", { settings }, save)) done();
+    if (await post("/_t3flare/settings/api/environment", { settings }, save)) done();
   });
 }
 for (const form of document.querySelectorAll("form[data-extension]")) {
@@ -213,7 +213,7 @@ for (const form of document.querySelectorAll("form[data-extension]")) {
     if (Object.keys(settings).length > 0) change.settings = settings;
     const enabled = form.querySelector("[data-enabled]");
     if (enabled !== null) change.enabled = enabled.checked;
-    if (await post("/_t3flare/harness/api/extensions", change, control)) done();
+    if (await post("/_t3flare/settings/api/extensions", change, control)) done();
     else if (control !== save && enabled !== null) enabled.checked = !enabled.checked;
   };
   const switched = form.querySelector("[data-enabled]");
@@ -246,7 +246,7 @@ if (installing !== null && preview !== null) {
     event.preventDefault();
     const source = installing.querySelector("[name=source]").value.trim();
     show(preview, el("p", "Reading " + source + " from GitHub…"));
-    const response = await post("/_t3flare/harness/api/skills/preview", { source }, installing.querySelector("[type=submit]"));
+    const response = await post("/_t3flare/settings/api/skills/preview", { source }, installing.querySelector("[type=submit]"));
     busy(installing.querySelector("[type=submit]"), false);
     if (response === undefined) { show(preview); return; }
     const answer = await response.json();
@@ -280,7 +280,7 @@ if (installing !== null && preview !== null) {
     install.addEventListener("click", async () => {
       const folders = picks.filter((box) => box.checked).map((box) => box.value);
       if (folders.length === 0) { notify("err", "Pick at least one skill."); return; }
-      const done = await post("/_t3flare/harness/api/skills/install", { source, commit: answer.commit, folders }, install);
+      const done = await post("/_t3flare/settings/api/skills/install", { source, commit: answer.commit, folders }, install);
       busy(install, false);
       if (done === undefined) return;
       const result = await done.json();
@@ -298,7 +298,7 @@ for (const button of document.querySelectorAll("button[data-skill-view]")) {
     const name = button.dataset.skillView;
     const out = outOf(name);
     try {
-      const view = await getJson("/_t3flare/harness/api/skills/view?name=" + encodeURIComponent(name));
+      const view = await getJson("/_t3flare/settings/api/skills/view?name=" + encodeURIComponent(name));
       const list = el("ul");
       for (const file of view.files) {
         const item = el("li");
@@ -318,7 +318,7 @@ for (const button of document.querySelectorAll("button[data-skill-view]")) {
 for (const button of document.querySelectorAll("button[data-skill-check]")) {
   button.addEventListener("click", async () => {
     const name = button.dataset.skillCheck;
-    const response = await post("/_t3flare/harness/api/skills/check", name === "" ? {} : { names: [name] }, button);
+    const response = await post("/_t3flare/settings/api/skills/check", name === "" ? {} : { names: [name] }, button);
     busy(button, false);
     if (response === undefined) return;
     const answer = await response.json();
@@ -331,7 +331,7 @@ for (const button of document.querySelectorAll("button[data-skill-check]")) {
       const update = el("button", "Update to " + result.to, "btn btn-primary btn-sm");
       update.type = "button";
       update.addEventListener("click", async () => {
-        const done = await post("/_t3flare/harness/api/skills/update", { name: result.name, commit: result.commit }, update);
+        const done = await post("/_t3flare/settings/api/skills/update", { name: result.name, commit: result.commit }, update);
         busy(update, false);
         if (done === undefined) return;
         const updated = await done.json();
@@ -348,12 +348,12 @@ for (const button of document.querySelectorAll("button[data-skill-remove]")) {
   button.addEventListener("click", async () => {
     const name = button.dataset.skillRemove;
     if (!confirm("Remove the Environment skill " + name + "? Agents lose it at their next turn.")) return;
-    if (await post("/_t3flare/harness/api/skills/remove", { name }, button)) done();
+    if (await post("/_t3flare/settings/api/skills/remove", { name }, button)) done();
   });
 }
 for (const input of document.querySelectorAll("input[data-skill-enable]")) {
   input.addEventListener("change", async () => {
-    if (await post("/_t3flare/harness/api/skills/enable", { name: input.dataset.skillEnable, enabled: input.checked }, input)) done();
+    if (await post("/_t3flare/settings/api/skills/enable", { name: input.dataset.skillEnable, enabled: input.checked }, input)) done();
     else input.checked = !input.checked;
   });
 }

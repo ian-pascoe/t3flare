@@ -227,7 +227,7 @@ const turns = async (projectId: string, root: string) => {
 };
 
 const switchOff = async (projectId: string, root: string) => {
-  const off = await harness("POST", "/_t3flare/harness/api/extensions", { extension: "skills", enabled: false });
+  const off = await harness("POST", "/_t3flare/settings/api/extensions", { extension: "skills", enabled: false });
   try {
     const snapshotOff = await composerSnapshot(root);
     const threadId = await newThread(projectId, "spi-1147: skills off");
@@ -244,7 +244,7 @@ const switchOff = async (projectId: string, root: string) => {
     console.log(`switch: ${ok ? "ok" : "FAIL"} ${JSON.stringify(checks)}`);
     return { ok, off: { status: off.status }, checks, snapshotOff, threadId, steps: { listing, mention, template } };
   } finally {
-    const on = await harness("POST", "/_t3flare/harness/api/extensions", { extension: "skills", enabled: true });
+    const on = await harness("POST", "/_t3flare/settings/api/extensions", { extension: "skills", enabled: true });
     console.log(`switch back on: ${on.status}`);
   }
 };

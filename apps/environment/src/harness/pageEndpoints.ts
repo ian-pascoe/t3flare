@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off
-// The Harness panel's Model endpoints section (SPI-1162): each endpoint with its API, base URL, key mark and models, and
+// The Settings page's Model endpoints section (SPI-1162): each endpoint with its API, base URL, key mark and models, and
 // one form that adds or edits an endpoint, filled from a preset or from the endpoint being edited. Every string is
 // escaped (page.ts's rule). Its behaviour is ENDPOINTS_SCRIPT, part of the page's one script.
 //
@@ -226,7 +226,7 @@ if (endpointForm !== null) {
     let endpoint;
     try { endpoint = endpointOf(); } catch (error) { notify("err", error.message); return; }
     note.textContent = "Reading the model list…";
-    const response = await post("/_t3flare/harness/api/endpoints/discover", { endpoint, apiKey: input("apiKey").value }, discover);
+    const response = await post("/_t3flare/settings/api/endpoints/discover", { endpoint, apiKey: input("apiKey").value }, discover);
     busy(discover, false);
     if (response === undefined) { note.textContent = ""; return; }
     const answer = await response.json();
@@ -242,7 +242,7 @@ if (endpointForm !== null) {
     try { endpoint = endpointOf(); } catch (error) { notify("err", error.message); return; }
     const body = { op: "save", endpoint };
     if (input("apiKey").value !== "") body.apiKey = input("apiKey").value;
-    const response = await post("/_t3flare/harness/api/endpoints", body, endpointForm.querySelector("[type=submit]"));
+    const response = await post("/_t3flare/settings/api/endpoints", body, endpointForm.querySelector("[type=submit]"));
     input("apiKey").value = "";
     if (response !== undefined) done();
   });
@@ -250,7 +250,7 @@ if (endpointForm !== null) {
 }
 /** One step of a sign-in on the panel's route: its JSON answer, or undefined when the panel refused it (already shown). */
 const signInStep = async (body, control) => {
-  const response = await post("/_t3flare/harness/api/endpoints/sign-in", body, control);
+  const response = await post("/_t3flare/settings/api/endpoints/sign-in", body, control);
   busy(control, false);
   return response === undefined ? undefined : response.json();
 };
@@ -346,7 +346,7 @@ for (const button of document.querySelectorAll("button[data-endpoint-remove]")) 
   button.addEventListener("click", async () => {
     const id = button.dataset.endpointRemove;
     if (!confirm("Remove the endpoint " + id + " and its key? A thread on one of its models fails its next turn until another model is picked.")) return;
-    const response = await post("/_t3flare/harness/api/endpoints", { op: "remove", id }, button);
+    const response = await post("/_t3flare/settings/api/endpoints", { op: "remove", id }, button);
     if (response === undefined) return;
     const answer = await response.json();
     if (!answer.revocation) { done(); return; }

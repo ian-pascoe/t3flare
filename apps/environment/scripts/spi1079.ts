@@ -73,13 +73,13 @@ const setup = async () => {
   ];
   const results = [];
   for (const { server, url } of servers) {
-    const existing = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).some((row: any) => row.name === server);
-    if (existing) await harness("POST", "/_t3flare/harness/api/mcp", { op: "remove", server });
-    const added = await harness("POST", "/_t3flare/harness/api/mcp/servers", { server, url, auth: { kind: "header", header: "Authorization" }, value: `Bearer ${process.env.T3FLARE_FIXTURE_BEARER ?? ""}` });
-    const tested = await harness("POST", "/_t3flare/harness/api/mcp/test", { server });
+    const existing = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).some((row: any) => row.name === server);
+    if (existing) await harness("POST", "/_t3flare/settings/api/mcp", { op: "remove", server });
+    const added = await harness("POST", "/_t3flare/settings/api/mcp/servers", { server, url, auth: { kind: "header", header: "Authorization" }, value: `Bearer ${process.env.T3FLARE_FIXTURE_BEARER ?? ""}` });
+    const tested = await harness("POST", "/_t3flare/settings/api/mcp/test", { server });
     results.push({ server, added: added.status, tested: tested.json });
   }
-  const listed = ((await harness("GET", "/_t3flare/harness/api/mcp")).json?.servers ?? []).map((row: any) => ({ name: row.name, tools: (row.tools ?? []).map((tool: any) => `${tool.upstream}:${tool.class}`) }));
+  const listed = ((await harness("GET", "/_t3flare/settings/api/mcp")).json?.servers ?? []).map((row: any) => ({ name: row.name, tools: (row.tools ?? []).map((tool: any) => `${tool.upstream}:${tool.class}`) }));
   writeEvidence("setup.json", { fixture: FIXTURE_URL, results, listed, ok: results.every((row) => row.added < 300) });
 };
 

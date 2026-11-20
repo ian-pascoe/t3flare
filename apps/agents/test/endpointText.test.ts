@@ -99,8 +99,8 @@ describe("generateEndpointText", () => {
 
   for (const api of ["anthropic-messages", "openai-responses", "openai-completions"] as const) {
     for (const [status, says] of [
-      [401, 'The Model endpoint "gw" refused its API key (HTTP 401): check it in the Harness panel.'],
-      [403, 'The Model endpoint "gw" refused its API key (HTTP 403): check it in the Harness panel.'],
+      [401, 'The Model endpoint "gw" refused its API key (HTTP 401): check it on the Settings page.'],
+      [403, 'The Model endpoint "gw" refused its API key (HTTP 403): check it on the Settings page.'],
       [404, 'The Model endpoint "gw" does not serve the model small-mini (HTTP 404).'],
       [429, 'The Model endpoint "gw" is rate-limited (HTTP 429).'],
       [400, 'The Model endpoint "gw" refused the request (HTTP 400).'],
@@ -124,7 +124,7 @@ describe("generateEndpointText", () => {
     ["anthropicOverloaded", "anthropic-messages", "api-key", 'The Model endpoint "gw" is overloaded (HTTP 529).'],
     ["openaiInsufficientQuota", "openai-responses", "api-key", `The Model endpoint "gw"'s account is out of quota, credit or its spend limit: raise it with the vendor.`],
     ["openaiRateLimit", "openai-completions", "api-key", 'The Model endpoint "gw" is rate-limited (HTTP 429). It resets at '],
-    ["openaiKeyRefused", "openai-responses", "api-key", 'The Model endpoint "gw" refused its API key (HTTP 401): check it in the Harness panel.'],
+    ["openaiKeyRefused", "openai-responses", "api-key", 'The Model endpoint "gw" refused its API key (HTTP 401): check it on the Settings page.'],
     ["chatgptUsageLimitReached", "openai-responses", "api-key", 'The Model endpoint "gw" reached its usage limit. It resets at 2026-11-16T13:00:00.000Z.'],
   ] as const) {
     it(`classifies ${name} by the endpoint's API (${api}), never echoing the body`, async () => {
@@ -139,7 +139,7 @@ describe("generateEndpointText", () => {
   it("says an endpoint with no auth refused the request, not a key", async () => {
     const wire = recorder(() => Response.json({ error: { message: VENDOR_BODY } }, { status: 401 }));
     expect(errorOf(await generate(endpoint("openai-completions", "none"), { credential: keyFor().credential, fetch: wire.fetch }))).toBe(
-      'The Model endpoint "gw" refused the request without a credential (HTTP 401): check its auth in the Harness panel.',
+      'The Model endpoint "gw" refused the request without a credential (HTTP 401): check its auth on the Settings page.',
     );
   });
 
@@ -147,7 +147,7 @@ describe("generateEndpointText", () => {
     const wire = recorder(() => Response.json({ message: VENDOR_BODY }, { status: 401 }));
     vi.stubGlobal("fetch", wire.fetch);
     const error = errorOf(await generate(endpoint("mistral-conversations"), { credential: keyFor().credential }));
-    expect(error).toBe('The Model endpoint "gw" refused its API key (HTTP 401): check it in the Harness panel.');
+    expect(error).toBe('The Model endpoint "gw" refused its API key (HTTP 401): check it on the Settings page.');
     expect(wire.sent).toHaveLength(1);
   });
 
@@ -174,8 +174,8 @@ describe("generateEndpointText", () => {
 
   it("says why there is no key, as a Session's turn does, and sends nothing", async () => {
     for (const [credential, says] of [
-      [{ apiKey: null }, 'The Model endpoint "gw" has no API key: set one in the Harness panel.'],
-      [{ apiKey: null, unreadable: true }, `The Model endpoint "gw"'s API key can no longer be read (this Environment's credentials key changed): enter it again in the Harness panel.`],
+      [{ apiKey: null }, 'The Model endpoint "gw" has no API key: set one on the Settings page.'],
+      [{ apiKey: null, unreadable: true }, `The Model endpoint "gw"'s API key can no longer be read (this Environment's credentials key changed): enter it again on the Settings page.`],
       [{ apiKey: null, changed: true }, 'The Model endpoint "gw" changed or was removed while the text was being generated: try again.'],
     ] as const) {
       const wire = recorder(() => anthropicOk("never"));
@@ -219,14 +219,14 @@ describe("generateEndpointText", () => {
     const refused = recorder(() => Response.json({ error: { message: VENDOR_BODY, code: "subscription_sharing_user_not_eligible" } }, { status: 403 }));
     const error = errorOf(await generate(chatgpt, { credential: keyFor({ apiKey: "at-chatgpt", expiresAt: 4_000_000_000_000 }).credential, fetch: refused.fetch }));
     // SPI-1172: plan usage's code says why: the plan, not the sign-in.
-    expect(error).toBe('The Model endpoint "gw"\'s ChatGPT account cannot use its plan for this request (HTTP 403): ChatGPT plan usage needs a Plus or Pro plan; otherwise sign in again in the Harness panel.');
+    expect(error).toBe('The Model endpoint "gw"\'s ChatGPT account cannot use its plan for this request (HTTP 403): ChatGPT plan usage needs a Plus or Pro plan; otherwise sign in again on the Settings page.');
     expect(refused.sent[0]!.headers.authorization).toBe("Bearer at-chatgpt");
     const body = JSON.parse(refused.sent[0]!.body) as Record<string, unknown>;
     expect(body).toMatchObject({ store: false, stream: true });
     expect(body).not.toHaveProperty("max_output_tokens");
     const signedOut = recorder(() => anthropicOk("never"));
     expect(errorOf(await generate(chatgpt, { credential: keyFor({ apiKey: null, signedOut: true }).credential, fetch: signedOut.fetch }))).toBe(
-      'The Model endpoint "gw" is not signed in to ChatGPT: sign in with ChatGPT again in the Harness panel.',
+      'The Model endpoint "gw" is not signed in to ChatGPT: sign in with ChatGPT again on the Settings page.',
     );
     expect(signedOut.sent).toEqual([]);
   });

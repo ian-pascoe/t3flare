@@ -209,7 +209,7 @@ export interface RunView {
  * fallback. Undefined without one (a stage in the setup state).
  */
 export const endpointModelFor = async (cli: "codex" | "pi" | "claude" | "opencode"): Promise<string | undefined> => {
-  const listed = ((await admin("GET", "/_t3flare/harness/api/endpoints")).json?.endpoints ?? []) as Array<{ id: string; api: string; models?: Array<{ id: string }> }>;
+  const listed = ((await admin("GET", "/_t3flare/settings/api/endpoints")).json?.endpoints ?? []) as Array<{ id: string; api: string; models?: Array<{ id: string }> }>;
   const apis = CLI_APIS[cli] as ReadonlyArray<string>;
   const endpoint = listed.find((entry) => apis.includes(entry.api) && (entry.models?.length ?? 0) > 0);
   return endpoint === undefined ? undefined : `${endpoint.id}/${endpoint.models![0]!.id}`;

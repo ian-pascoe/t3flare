@@ -3,7 +3,7 @@
 // Durable thread uses each ported tool in real turns, and t3's own projection is read back for the items it shows.
 // Evidence goes to docs/steps/pi-ports-1/<file>.json, tokens and cookies redacted.
 //
-//   node scripts/stage.ts run ports ports settings   the harness panel's API: web search on, and the registry's entries
+//   node scripts/stage.ts run ports ports settings   the Settings page's API: web search on, and the registry's entries
 //   node scripts/stage.ts run ports ports turns      web, todo, notes across turns, a rollover and a turn after it
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -48,9 +48,9 @@ const harness = async (method: string, pathname: string, body?: unknown) => {
 };
 
 const settings = async () => {
-  const before = await harness("GET", "/_t3flare/harness/api/settings");
-  const on = await harness("POST", "/_t3flare/harness/api/extensions", { extension: "web", settings: { search: true } });
-  const after = await harness("GET", "/_t3flare/harness/api/settings");
+  const before = await harness("GET", "/_t3flare/settings/api/settings");
+  const on = await harness("POST", "/_t3flare/settings/api/extensions", { extension: "web", settings: { search: true } });
+  const after = await harness("GET", "/_t3flare/settings/api/settings");
   const pick = (json: any) => {
     const extensions = json?.resolved?.extensions ?? json?.extensions ?? {};
     return Object.fromEntries(["web", "todo", "context"].map((id) => [id, extensions[id] ?? null]));

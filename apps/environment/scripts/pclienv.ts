@@ -1,6 +1,6 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off globalDateInEffect:off
 // SPI-1153's stage harness (Environment skills for the CLI agents; docs/steps/env-skills-cli.md), through t3's own
-// calls as the web client makes them, and the Harness panel's API as a script calls it. The Repo fixture
+// calls as the web client makes them, and the Settings page's API as a script calls it. The Repo fixture
 // (apps/environment/test/fixtures/cli-skills/, and a `pair-<word>` Skill in each CLI Repo root, `PAIRS`) is written,
 // uncommitted, into a clone of the fixture project; the Environment skills come from the fixture repo's branch
 // `spi1153-env`, pushed by `fixture`: env-code (its code, MANGO-5, in a reference file), a `pair-<word>` of each name
@@ -116,7 +116,7 @@ const fixture = () => {
 // ── The panel's API, the Workspace, the client ───────────────────────────────────────────────────────────────────────
 
 const harness = async (method: string, pathname: string, body?: unknown) => {
-  const response = await fetch(new URL(`/_t3flare/harness/api/${pathname}`, HARNESS), {
+  const response = await fetch(new URL(`/_t3flare/settings/api/${pathname}`, HARNESS), {
     method,
     redirect: "manual",
     headers: { ...scriptHeaders, ...(body === undefined ? {} : { "content-type": "application/json" }) },

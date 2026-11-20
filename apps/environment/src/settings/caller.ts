@@ -34,4 +34,4 @@ export interface OwnerCaller {
 }
 
 /** The answer to any call while the owner has the Settings server off (plan D2): the MCP host's and the server's. */
-export const OFF_MESSAGE = "The owner turned the Settings server off; only the Harness panel turns it back on.";
+export const OFF_MESSAGE = "The owner turned the Settings server off; only the Settings page turns it back on.";

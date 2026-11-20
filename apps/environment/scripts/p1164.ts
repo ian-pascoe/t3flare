@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off globalFetch:off
-// SPI-1164's evidence on its stage: the Harness panel's "Sign in with ChatGPT" (ChatGPT plan usage) through the panel's
+// SPI-1164's evidence on its stage: the Settings page's "Sign in with ChatGPT" (ChatGPT plan usage) through its
 // own routes, as a script with the stage's service token, and a Durable turn with tools on the stage's API-key endpoint
 // through the same Session code a sign-in's turn uses (the provider, the credential request, the turn).
 //
@@ -24,7 +24,7 @@ const [step, file] = process.argv.slice(2).filter((arg, index, all) => !arg.star
 const outIndex = process.argv.indexOf("--out");
 const out = outIndex === -1 ? undefined : process.argv[outIndex + 1];
 const ID = "chatgpt";
-const api = (method: string, path: string, body?: unknown) => admin(method, `/_t3flare/harness/api/${path}`, body);
+const api = (method: string, path: string, body?: unknown) => admin(method, `/_t3flare/settings/api/${path}`, body);
 
 const write = (report: Record<string, unknown>) => {
   const text = JSON.stringify({ at: new Date().toISOString(), step, ...report }, null, 2);
@@ -43,7 +43,7 @@ const describeAuthorize = (url: string) => {
 };
 
 if (step === "page") {
-  const full = await fetch(new URL("/_t3flare/harness", process.env.T3_URL), {
+  const full = await fetch(new URL("/_t3flare/settings", process.env.T3_URL), {
     headers: { "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID!, "cf-access-client-secret": process.env.T3FLARE_ACCESS_CLIENT_SECRET!, authorization: `Bearer ${process.env.T3FLARE_ADMIN_TOKEN}` },
   });
   const page = await full.text();

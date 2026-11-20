@@ -242,7 +242,7 @@ export class AdvisorObserver {
     const conversation = await (await this.#harness()).conversation(conversationId as never, context);
     // Data only: t3 shows it, the agent never reads it.
     await conversation
-      ?.submit({ type: "write", entry: { kind: ADVICE_ENTRY, data: { severity: "paused", message: `The Advisor paused: ${reason.slice(0, 500)}. The agent keeps working; change the Advisor's settings in the Harness panel to resume it.` } } }, context)
+      ?.submit({ type: "write", entry: { kind: ADVICE_ENTRY, data: { severity: "paused", message: `The Advisor paused: ${reason.slice(0, 500)}. The agent keeps working; change the Advisor's settings on the Settings page to resume it.` } } }, context)
       .catch(() => undefined);
   }
 

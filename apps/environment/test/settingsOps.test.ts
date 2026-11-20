@@ -62,7 +62,7 @@ const post = async (setupped: ReturnType<typeof setup>, path: string, body: unkn
     headers.origin = `https://${HOST}`;
     headers[CSRF_HEADER] = await csrfToken(setupped.store.csrfKey(), "owner-sub", NOW);
   }
-  return handleHarness(new Request(`https://${HOST}/_t3flare/harness/api/${path}`, { method: "POST", headers, body: JSON.stringify(body) }), setupped.panel);
+  return handleHarness(new Request(`https://${HOST}/_t3flare/settings/api/${path}`, { method: "POST", headers, body: JSON.stringify(body) }), setupped.panel);
 };
 
 const withoutActor = (entry: AuditEntry) => {

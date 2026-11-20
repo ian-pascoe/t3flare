@@ -1,4 +1,4 @@
-// Model endpoints (SPI-1162; draft ADR-0034): the owner's own ways to reach models, set in the Harness panel. Each is an
+// Model endpoints (SPI-1162; draft ADR-0034): the owner's own ways to reach models, set on the Settings page. Each is an
 // API pi-ai speaks at a base URL, with an API key or none, optional headers, and the models it serves. The entity holds no
 // secret: an endpoint's key is sealed apart from it (the Environment's credentials store) and read only at use time.
 //
@@ -100,7 +100,7 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
     title: "ChatGPT",
     noteTitle: "Unverified",
     note: "ChatGPT plan usage is unverified in t3flare: no working sign-in has been seen yet. OpenAI offers it to ChatGPT Plus or Pro plans, for open-source and locally hosted apps. If it fails, please report it with the message shown.",
-    refused: "ChatGPT plan usage needs a Plus or Pro plan; otherwise sign in again in the Harness panel.",
+    refused: "ChatGPT plan usage needs a Plus or Pro plan; otherwise sign in again on the Settings page.",
     about: "Use your ChatGPT plan's usage for Pi Durable, on OpenAI's Responses API.",
     paste: {
       instructions: "Open the sign-in and approve. Your browser then lands on a 127.0.0.1 page that does not load: copy its whole address into the field, then Finish.",
@@ -124,7 +124,7 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
     title: "Claude",
     noteTitle: "Your risk",
     note: "This signs in as Claude Code, with its OAuth client, as pi-ai does. Anthropic's terms may not allow a Claude plan's usage outside its own apps: that risk is yours, chosen knowingly. It needs a Claude Pro or Max plan. Anthropic offers no revocation to apps, so signing out here does not end the grant: remove it at claude.ai, under Settings, Claude Code.",
-    refused: "a Claude Pro or Max plan is needed; otherwise sign in with Claude again in the Harness panel.",
+    refused: "a Claude Pro or Max plan is needed; otherwise sign in with Claude again on the Settings page.",
     about: "Use your Claude Pro or Max plan's usage for Pi Durable, on Anthropic's Messages API.",
     paste: {
       instructions: "Open the sign-in and approve. Anthropic then shows a code: copy all of it (it holds a #) into the field, then Finish.",
@@ -152,7 +152,7 @@ export const SIGN_IN_KINDS: Readonly<Record<SignIn, SignInKind>> = {
     title: "GitHub Copilot",
     noteTitle: "Your risk",
     note: "This signs in as the Copilot editor extension, with its GitHub client, as pi-ai does. GitHub's terms may not allow a Copilot plan's usage outside its own editors: that risk is yours, chosen knowingly. It needs a Copilot plan on your GitHub account, and lists Copilot's models on its Responses API (GPT, Grok), not its Claude or Gemini models, which take other APIs. GitHub offers this client no revocation, so signing out here does not end the grant: revoke it at github.com, under Settings, Applications.",
-    refused: "the GitHub account needs a Copilot plan with this model enabled; otherwise sign in with GitHub Copilot again in the Harness panel.",
+    refused: "the GitHub account needs a Copilot plan with this model enabled; otherwise sign in with GitHub Copilot again on the Settings page.",
     about: "Use your GitHub Copilot plan's models for Pi Durable, on Copilot's Responses API.",
     paste: null,
     device: {
@@ -315,7 +315,7 @@ export const defaultModelSlug = (endpoints: ModelEndpoints): string | undefined 
 };
 
 /** Where the owner sets up Model endpoints: what a provider needing setup, or a refused spawn, points to. */
-export const SETUP_HINT = "add one in the Harness panel (/_t3flare/harness), under Model endpoints";
+export const SETUP_HINT = "add one on the Settings page (/_t3flare/settings), under Model endpoints";
 
 /** Pi Durable's text while no Model endpoint lists a model: its provider needs setup (SPI-1176). */
 export const NO_ENDPOINT_MESSAGE = `No Model endpoint is set up: ${SETUP_HINT}.`;

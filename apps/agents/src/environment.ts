@@ -50,7 +50,7 @@ export interface EnvironmentRpc {
    * itself, so the Environment drops its last refusal. Never boots t3.
    */
   environmentSkillSet(input: { readonly workspace: string }): Promise<SkillSet>;
-  /** A Workspace refused or could not mount the set `hash` (SPI-1148): shown on the Harness panel's Status. */
+  /** A Workspace refused or could not mount the set `hash` (SPI-1148): shown on the Settings page's Status. */
   skillSetRefused(input: { readonly workspace: string; readonly hash: string; readonly message: string }): Promise<void>;
   /** A Global mise lay-down at a Container start (SPI-1150), for the panel's Status. Never boots t3. */
   noteGlobalMise(report: GlobalMiseReport): Promise<{ readonly kept: boolean }>;

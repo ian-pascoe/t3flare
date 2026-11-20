@@ -5,7 +5,7 @@
 //   T3FLARE_ACCESS_CLIENT_ID=… T3FLARE_ACCESS_CLIENT_SECRET=… node scripts/acceptance.ts [--threads 12] [--runs 4] [--out file.json]
 //
 // 1. The admin guard: refused without the admin token, admitted with Access (service token) plus the token.
-// 1b. The Model endpoints (SPI-1175): set up through the Harness panel's API from T3FLARE_MODEL_ENDPOINT (one, or one per
+// 1b. The Model endpoints (SPI-1175): set up through the Settings page's API from T3FLARE_MODEL_ENDPOINT (one, or one per
 //     API); the text-generation setting then names their default, and the real turn runs on the first one's small
 //     model. Without a setting, skipped and said so: the stage has no model, so the real turn fails. A CLI asked for
 //     (`--codex` …) with no endpoint for its API fails by name before it runs (`cliCoverage`).
@@ -195,7 +195,7 @@ const cookie = paired.cookie;
 if (endpointModel !== undefined) {
   const { enablePiDurable, waitForTextGenerationSetting } = await import("./lib/client.ts");
   await enablePiDurable(cookie);
-  const listed = JSON.parse((await adminCall("GET", "/_t3flare/harness/api/endpoints")).text) as { revision: number; endpoints: Array<any> };
+  const listed = JSON.parse((await adminCall("GET", "/_t3flare/settings/api/endpoints")).text) as { revision: number; endpoints: Array<any> };
   const expected = defaultTextModel({ revision: listed.revision, endpoints: listed.endpoints });
   const seen = await waitForTextGenerationSetting(cookie, expected);
   report.textGeneration = { expected: expected ?? null, instanceId: seen?.instanceId ?? null, model: seen?.model ?? null };

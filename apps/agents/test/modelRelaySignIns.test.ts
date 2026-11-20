@@ -275,7 +275,7 @@ describe("a sign-in that gives no token", () => {
     const response = await handleModelRelay(post("chatgpt/responses", "{}"), h.deps);
     expect(response.status).toBe(401);
     const answer = (await response.json()) as { error: { message: string } };
-    expect(answer.error.message).toMatch(/The Model endpoint "chatgpt" is not signed in to ChatGPT \(it is not signed in\): sign in with ChatGPT again in the Harness panel/);
+    expect(answer.error.message).toMatch(/The Model endpoint "chatgpt" is not signed in to ChatGPT \(it is not signed in\): sign in with ChatGPT again on the Settings page/);
     expect(h.sent).toEqual([]);
     expect(h.outcomes).toEqual([
       { class: "permission_error", code: "sign_in_refused", retryable: false, stop: true, message: expect.stringContaining("not signed in to ChatGPT"), endpointId: "chatgpt", at: expect.any(Number) },

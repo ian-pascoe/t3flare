@@ -59,7 +59,7 @@ const probePage = (origin: string) => `<!doctype html><html><head><title>Probe</
   try { localStorage.setItem("x", "1"); out.localStorage = "works"; } catch (e) { out.localStorage = "throws " + e.name; }
   try { out.parentDocument = typeof parent.document; } catch (e) { out.parentDocument = "throws " + e.name; }
   out.session = await t(fetch("${origin}/api/auth/session", { credentials: "include" }).then((r) => "status " + r.status, (e) => "error " + e.name));
-  out.panel = await t(fetch("${origin}/_t3flare/harness/api/mcp/servers", { method: "POST", credentials: "include", body: "{}" }).then((r) => "status " + r.status, (e) => "error " + e.name));
+  out.panel = await t(fetch("${origin}/_t3flare/settings/api/mcp/servers", { method: "POST", credentials: "include", body: "{}" }).then((r) => "status " + r.status, (e) => "error " + e.name));
   document.getElementById("out").textContent = JSON.stringify(out);
   parent.postMessage({ probe: out }, "*");
   try { window.top.location.href = "https://example.com/"; } catch (e) { parent.postMessage({ topNavigation: "throws " + e.name }, "*"); }

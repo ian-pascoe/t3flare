@@ -1,4 +1,4 @@
-// SPI-1175: the Model endpoints a stage, the acceptance test and CI set up through the Harness panel's API, as one
+// SPI-1175: the Model endpoints a stage, the acceptance test and CI set up through the Settings page's API, as one
 // setting: `T3FLARE_MODEL_ENDPOINT` (in ~/.config/t3flare/dev.env, or the GitHub secret of that name), a JSON object
 //
 //   {"id": "commissary", "label": "Commissary", "api": "anthropic-messages", "baseUrl": "https://…", "apiKey": "…",

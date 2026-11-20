@@ -95,7 +95,7 @@ export interface EnvironmentEnv extends AgentsBindings {
   readonly T3FLARE_UPDATE_REPO?: string;
   /** The t3 host as deployed (alchemy.run.ts): the panel's Origin, the OAuth redirect's host, the CLIs' `/mcp`. */
   readonly T3FLARE_HOST?: string;
-  /** The harness panel's admin host (ADR-0026): what a change's `Origin` must name. */
+  /** The Settings page's admin host (ADR-0026): what a change's `Origin` must name. */
   /** The MCP Worker's engine (ADR-0028): every MCP list and call goes through it. */
   readonly MCP_ENGINE?: McpEngineBinding;
   /** The MCP Worker's OAuth entrypoint (review M4, M5): every sign-in and refresh request is made there. */
@@ -376,7 +376,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   }
 
   /**
-   * The harness panel (ADR-0026) at `/_t3flare/harness` on the t3 host, RPC from the Worker after it verified Access.
+   * The Settings page (ADR-0026) at `/_t3flare/settings` on the t3 host, RPC from the Worker after it verified Access.
    * Never boots t3. Not reachable through `fetch`.
    */
   async harness(request: Request, caller: AccessCaller): Promise<Response> {

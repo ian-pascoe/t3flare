@@ -155,7 +155,7 @@ describe("a Session's Model endpoint failures (SPI-1172)", () => {
   it("a refused key: one request, a permission error naming the endpoint", async () => {
     const run = await submit(() => answerOf("anthropicKeyRefused"));
     expect(run.requests).toBe(1);
-    expect(run.records.at(-1)).toMatchObject({ class: "permission_error", code: "key_refused", message: 'The Model endpoint "claude" refused its API key (HTTP 401): check it in the Harness panel.' });
+    expect(run.records.at(-1)).toMatchObject({ class: "permission_error", code: "key_refused", message: 'The Model endpoint "claude" refused its API key (HTTP 401): check it on the Settings page.' });
   });
 
   it("an overload is retried by pi-durable and is not a usage limit", async () => {
