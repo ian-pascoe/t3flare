@@ -104,7 +104,7 @@ const typePrompt = (text: string, delayMs = 0): void => {
 
 export const SHOTS: Record<string, Shot> = {
   // Beats 1 and 2: one continuous Pi Durable turn. The prompt is in the composer when the take starts; it is sent
-  // at 1 s; the rest of the take is the turn working in the cloud: tool calls, the diff, the summary.
+  // at 1 s; the rest of the take is the turn working in the Cloud Environment: tool calls, the diff, the summary.
   "hook-turn": {
     prepare: async () => {
       await cloudDraft();
@@ -124,7 +124,8 @@ export const SHOTS: Record<string, Shot> = {
     },
   },
 
-  // Beat 3: the composer's environment selector lists the laptop and the cloud; the cloud is chosen.
+  // Beat 3: the composer's environment selector lists the Laptop Environment and the Cloud Environment, and chooses
+  // the latter.
   switcher: {
     cursor: true,
     prepare: async () => {
@@ -194,11 +195,11 @@ export const SHOTS: Record<string, Shot> = {
     },
   },
 
-  // Beat 6: the laptop's agent delegates a Remote task to the cloud over its Peer link and waits on it; the child
-  // thread runs on t3flare (the Lineage panel follows it), and the laptop's turn ends with its report.
+  // Beat 6: the laptop's agent delegates a Remote task to the Cloud Environment over its Peer link and waits on it;
+  // the child thread runs on t3flare (the Lineage panel follows it), and the laptop's turn ends with its report.
   "remote-task": {
     prepare: async () => {
-      // A Remote task runs in the cloud project's own checkout, never a worktree: put it back to its last commit.
+      // A Remote task runs in the project's own checkout, never a worktree: put it back on its remote's default branch.
       stageScript("demo-reset");
       await laptopDraft();
       typePrompt(
