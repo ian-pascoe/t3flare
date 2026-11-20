@@ -1,15 +1,17 @@
 // t3flare's own theme in T3 Code: the Settings page's look (harness/pageStyle.ts) as an Environment theme, which t3
-// publishes to every web and desktop client of the Cloud Environment (`EnvironmentThemeService`), with no change to
-// t3's web app (ADR-0001: a Layer). The file `<stateDir>/themes/t3flare.json` is written at each boot, so a deploy
-// ships palette changes and an owner's edit to it does not last (Duplicate it in the picker to keep a variant). It is
-// made the Environment's default theme once, and only while the owner has set none: each client then switches to it
-// once (t3's `useDefaultTheme`), and every later choice, the owner's or a client's, wins.
+// publishes (`EnvironmentThemeService`) to each client whose primary Environment is the Cloud Environment, such as the
+// web app a Deployment serves, with no change to t3's web app (ADR-0001: a Layer). The file
+// `<stateDir>/themes/t3flare.json` is written at each boot, so a deploy ships palette changes and an owner's edit to it
+// does not last (Duplicate it in the picker to keep a variant). It is made the Environment's default theme once, and
+// only while no Environment default was ever set (`defaultThemeSetAt`; a theme picked in a client's picker is that
+// client's own and does not count): each client then switches to it once (t3's `useDefaultTheme`), existing ones too,
+// and every later choice, the owner's or a client's, wins.
 //
 // Both appearances are defined, so the theme keeps each client's light, dark or system mode, as the Settings page
 // follows `prefers-color-scheme`. Every one of t3's colour roles is given, none derived: dark is the page's true black
 // with flare orange (pageBrand.ts's FLARE_FROM, FLARE_TO for focus), light its zinc with the deeper orange, dark ink
-// on the orange in both. The page's translucent tokens are flattened onto the surface they sit on (theme colours
-// are opaque).
+// on the orange in both. Theme colours are opaque, so the page's translucent tokens become near greys: a border, for
+// one, sits between the page's 9% white on black (#171717) and on a card (#272727).
 import type { EnvironmentThemeFile } from "@t3tools/contracts";
 import type { ThemeColorRole } from "@t3tools/shared/themePalettes";
 import * as Effect from "effect/Effect";
@@ -171,7 +173,7 @@ const FLARE_THEME_SEEDED = "t3flare:seeded/default-theme";
 
 /**
  * Publishes the t3flare theme at each boot, and makes it the default theme once per Environment, while the owner has
- * set none. Below `EnvironmentTheme.layer` in the composition, which it publishes through.
+ * set none. Above `EnvironmentTheme.layer` in the composition, which provides the service it publishes through.
  */
 export const layerFlareTheme = Layer.effectDiscard(
   Effect.gen(function* () {

@@ -31,6 +31,11 @@ const contrast = (a: string, b: string) => {
   return (hi + 0.05) / (lo + 0.05);
 };
 
+const APPEARANCES = [
+  ["dark", FLARE_DARK],
+  ["light", FLARE_LIGHT],
+] as const;
+
 describe("the t3flare theme's palette", () => {
   it("is a valid Environment theme file with colours", () => {
     const decoded = Schema.decodeUnknownSync(Schema.fromJsonString(EnvironmentThemeFile))(FLARE_THEME_JSON);
@@ -38,18 +43,12 @@ describe("the t3flare theme's palette", () => {
     expect(environmentThemeFileHasColors(decoded)).toBe(true);
   });
 
-  it.each([
-    ["dark", FLARE_DARK],
-    ["light", FLARE_LIGHT],
-  ])("gives every colour role in %s, as opaque hex", (_appearance, palette) => {
+  it.each(APPEARANCES)("gives every colour role in %s, as opaque hex", (_appearance, palette) => {
     expect(Object.keys(palette).toSorted()).toEqual([...THEME_COLOR_ROLES].toSorted());
     for (const colour of Object.values(palette)) expect(colour).toMatch(/^#[0-9a-f]{6}$/);
   });
 
-  it.each([
-    ["dark", FLARE_DARK],
-    ["light", FLARE_LIGHT],
-  ])("keeps text and ink on the orange readable in %s", (_appearance, palette) => {
+  it.each(APPEARANCES)("keeps text and ink on the orange readable in %s", (_appearance, palette) => {
     expect(contrast(palette.text, palette.canvas)).toBeGreaterThanOrEqual(7);
     expect(contrast(palette.text, palette.surface)).toBeGreaterThanOrEqual(7);
     expect(contrast(palette.textMuted, palette.canvas)).toBeGreaterThanOrEqual(4.5);

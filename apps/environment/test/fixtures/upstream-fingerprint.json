@@ -113,6 +113,13 @@
       "hash": "7567b32965e34a97",
       "ourFile": "apps/environment/src/t3/peerLinks.ts",
       "entry": "U45"
+    },
+    {
+      "file": "apps/server/src/environmentTheme.ts",
+      "symbol": "readThemeFileGuarded",
+      "hash": "a37794e5e520e85d",
+      "ourFile": "apps/environment/src/shims/node-fs.ts",
+      "entry": "U93"
     }
   ],
   "literals": [
@@ -185,6 +192,7 @@
   ],
   "files": {
     "apps/server/src/environment/ServerEnvironment.ts": "a9dfdcb6e60486290eee95367d1d56005a4c2443",
+    "apps/server/src/environmentTheme.ts": "73df72f6b01e7bf081bf22adf4d16ea76c0ce7bd",
     "apps/server/src/peer/PeerLinks.ts": "4fa159dd7033785744568a5c413b019f08e837bb",
     "apps/server/src/server.ts": "35f63e9c44a60c70d8dc68ce087e92ebdc4df6ae",
     "apps/server/src/sourceControl/SourceControlDiscovery.ts": "e69f0d3761e68b291b6e58b0710a09fcba9f9079",

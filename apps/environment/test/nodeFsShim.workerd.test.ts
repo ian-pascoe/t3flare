@@ -50,6 +50,8 @@ describe("node:fs shim descriptors", () => {
       fs.writeFileSync("/t3/themes/a.json", '{"name":"A"}');
       expect(guardedRead("/t3/themes/a.json")).toBe('{"name":"A"}');
       expect(fs.readFileSync("/t3/themes/a.json", "utf8")).toBe('{"name":"A"}');
+      // t3 keys a theme's background image on it (`findThemeBackground`).
+      expect(typeof fs.lstatSync("/t3/themes/a.json").mtimeNs).toBe("bigint");
     });
   });
 
@@ -74,6 +76,8 @@ describe("node:fs shim descriptors", () => {
       expect(fs.readFileSync("/t3/w/f", "utf8")).toBe("kept");
       fs.closeSync(fs.openSync("/t3/w/f", O_WRONLY | O_TRUNC));
       expect(fs.readFileSync("/t3/w/f", "utf8")).toBe("");
+      expect(() => fs.openSync("/t3/w", "a")).toThrow(/EISDIR/);
+      expect(() => fs.openSync("/t3/w", O_WRONLY | O_CREAT)).toThrow(/EISDIR/);
     });
   });
 

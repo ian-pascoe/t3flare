@@ -252,12 +252,15 @@ const openModeOf = (flags: string | number): OpenMode =>
 
 export function openSync(input: unknown, flags: string | number = "r", mode?: number): number {
   const path = pathOf(input);
-  const open = openModeOf(flags);
-  if (open.nofollow && store.get(path)?.kind === "symlink") throw new store.FsError("ELOOP", "open", path);
-  const exists = store.resolve(path) !== undefined;
-  if (open.create && open.exclusive && exists) throw new store.FsError("EEXIST", "open", path);
-  if (!open.create && !exists) throw new store.FsError("ENOENT", "open", path);
-  if (open.truncate || !exists) store.writeFile(path, new Uint8Array(0), mode === undefined ? {} : { mode });
+  const openMode = openModeOf(flags);
+  if (openMode.nofollow && store.get(path)?.kind === "symlink") throw new store.FsError("ELOOP", "open", path);
+  const entry = store.resolve(path);
+  const exists = entry !== undefined;
+  // As Node: a directory opens for reading only.
+  if ((openMode.create || openMode.truncate) && entry?.kind === "dir") throw new store.FsError("EISDIR", "open", path);
+  if (openMode.create && openMode.exclusive && exists) throw new store.FsError("EEXIST", "open", path);
+  if (!openMode.create && !exists) throw new store.FsError("ENOENT", "open", path);
+  if (openMode.truncate || !exists) store.writeFile(path, new Uint8Array(0), mode === undefined ? {} : { mode });
   const fd = nextFd++;
   fds.set(fd, { path, chunks: [], position: 0 });
   return fd;
@@ -269,7 +272,14 @@ type ReadOptions = { offset?: number; length?: number; position?: number | bigin
 export function readSync(fd: number, buffer: ArrayBufferView, offsetOrOptions?: number | ReadOptions, length?: number, position?: number | bigint | null): number {
   const file = fds.get(fd);
   if (file === undefined) throw new store.FsError("EINVAL", "read", `fd ${fd}`);
-  const options: ReadOptions = typeof offsetOrOptions === "object" ? offsetOrOptions : { ...(offsetOrOptions === undefined ? {} : { offset: offsetOrOptions }), ...(length === undefined ? {} : { length }), position: position ?? null };
+  const options: ReadOptions =
+    typeof offsetOrOptions === "object"
+      ? offsetOrOptions
+      : {
+          ...(offsetOrOptions === undefined ? {} : { offset: offsetOrOptions }),
+          ...(length === undefined ? {} : { length }),
+          position: position ?? null,
+        };
   const target = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   const offset = options.offset ?? 0;
   const count = Math.max(0, Math.min(options.length ?? target.byteLength - offset, target.byteLength - offset));
