@@ -198,6 +198,7 @@ import * as SecretStore from "../platform/secretStore.ts";
 import * as RedactingConsole from "../host/redactingConsole.ts";
 import { environmentServices } from "../agents/bindings.ts";
 import { webhookBaseUrl } from "./webhookOrigin.ts";
+import { layerFlareTheme } from "./flareTheme.ts";
 import { cloudCapabilities } from "./capabilities.ts";
 import * as CloudSelfUpdate from "../updates/selfUpdate.ts";
 import { layerManagedPolicy } from "./managedPolicy.ts";
@@ -661,6 +662,8 @@ export const make = (options: CompositionOptions) => {
     // t3flare: the laptop links to the cloud (step 3, L1, once). Agent browser access is the owner's setting, with
     // stock's default (G11: the pin that held it off is gone).
     layerSeedLinkedEnvironmentsOn,
+    // t3flare: the Settings page's look as an Environment theme, the default once while the owner has set none.
+    layerFlareTheme,
   ).pipe(
     Layer.provideMerge(layerOrchestrationApplication),
     Layer.provideMerge(RuntimeLayer.layerEventInfrastructure),
