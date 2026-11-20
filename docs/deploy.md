@@ -95,8 +95,9 @@ refuses to deploy `prod` without it, and refuses any other Stage with it, as `al
 ### CI (optional)
 
 From the Deployment repository, after a first `prod` deploy from the laptop, run
-`T3FLARE_DOMAIN=t3.example.com pnpm --filter @t3flare/infra run ci:setup` ([`infra/github.ts`](../infra/github.ts)). It
-reads `dev.env` and sets up:
+`T3FLARE_DOMAIN=t3.example.com pnpm --filter @t3flare/infra run ci:setup` ([`infra/github.ts`](../infra/github.ts)). Its
+arguments go to `alchemy deploy`: add `--yes` to apply the plan without the approval prompt, as an agent with no
+terminal must. It reads `dev.env` and sets up:
 
 - the repository variables `T3FLARE_ACCESS_TEAM_DOMAIN`, `T3FLARE_WORKERS_DEV_SUBDOMAIN` and `T3FLARE_T3_TRACK`, and
   the repository secret `T3FLARE_OWNER_EMAIL`;
