@@ -29,9 +29,14 @@ workspace 9; `T3FLARE_DEMO_WORKSPACE` changes it), and a Deployment you can depl
    - Add the fixture repository as a project on the cloud (Add project → t3flare → Git URL), and on the laptop from a
      local clone whose `origin` is the same URL (Add project → MacBook Pro → Local folder). Reload once, so the
      composer's "Run on" lists both.
+   - Beat 6's laptop agent: `node scripts/stage.ts run demo demo-laptop` in `apps/environment` relaunches the
+     instance with t3's Pi provider on the Stage's Model endpoint (the key only in its environment). Then, in its
+     settings: Providers (MacBook Pro) → Add provider → Pi; Labs → Linked environments on; Environments → Linked
+     environments · MacBook Pro → Link → t3flare, Full access. That page shows the Stage's host: keep it off camera.
 4. `mise exec -- pnpm capture shot <name>` records one shot into `public/footage/<name>.mp4` with `<name>.json`, the
    times of its events; `all` records every shot. The scenes trim to those times; after a re-take, update the
-   Durable scene's `restartAt`, `noticeAt` and `doneAt` from `durable-restart.json`.
+   Durable scene's `restartAt`, `noticeAt` and `doneAt` from `durable-restart.json`, and the Laptop link scene's
+   `delegatedAt` and `doneAt` from `remote-task.json`.
 5. Once the video is approved: `pnpm capture stop`, `pnpm --filter @t3flare/environment exec node scripts/stage.ts destroy demo`,
    and remove `~/.cache/t3flare-demo`.
 
@@ -41,7 +46,7 @@ workspace 9; `T3FLARE_DEMO_WORKSPACE` changes it), and a Deployment you can depl
 | `switcher` | 3 Payoff | The composer's "Run on" listing MacBook Pro and t3flare |
 | `durable-restart` | 4 Durable | A turn inside a bash call; `POST /_t3flare/restart`; t3's cancel and resume notices; the turn finishing |
 | `providers` | 5 CLI agents | The cloud's model picker: Codex, Claude, OpenCode, Pi, Pi Durable |
-| `remote-task` | 6 Laptop link | Not recorded yet: the scene shows its placeholder |
+| `remote-task` | 6 Laptop link | The laptop's Pi delegates a Remote task to t3flare and waits; the cloud checkout is reset first (`demo-reset`) |
 
 ## Claims on screen
 
@@ -51,6 +56,7 @@ workspace 9; `T3FLARE_DEMO_WORKSPACE` changes it), and a Deployment you can depl
 | Restart mid-turn. It carries on. / A restart costs a re-prompt, never the conversation. | ADR-0004, and the `durable-restart` footage |
 | Your model endpoints. No vendor keys in the box. | README.md, CLI agents; ADR-0013 |
 | From $5/mo on Cloudflare, + your model usage; heavy use ≈ $35/mo | docs/cost.md |
+| Delegate from your laptop (a Remote task over a Peer link) | GLOSSARY.md, Remote task and Peer link; the `remote-task` footage |
 | The phone's "Done: t3flare-fixture" alert | t3code/infra/relay/src/agentActivity/agentActivityAlerts.ts |
 
 ## Before publishing

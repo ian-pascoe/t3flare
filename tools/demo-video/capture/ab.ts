@@ -16,6 +16,13 @@ export const attach = async (): Promise<void> => {
   await sleep(800);
 };
 
+/** `value` as a JS string literal safe to splice into page code: JSON, with <, >, / and the line separators escaped. */
+export const jsString = (value: string): string =>
+  JSON.stringify(value).replace(
+    /[<>/\u2028\u2029]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
+
 export const evaluate = <T>(js: string): T => JSON.parse(JSON.parse(ab("eval", `JSON.stringify((() => { ${js} })())`)) as string) as T;
 
 /** Waits until `js` (an expression) is truthy in the page. */
@@ -34,7 +41,7 @@ export const waitFor = async (js: string, timeoutMs = 60_000, label = js): Promi
 
 /** Waits until the page's text contains `text`. */
 export const waitForText = (text: string, timeoutMs = 60_000) =>
-  waitFor(`document.body.innerText.includes(${JSON.stringify(text)})`, timeoutMs, text);
+  waitFor(`document.body.innerText.includes(${jsString(text)})`, timeoutMs, text);
 
 /** The ref of the first interactive element whose snapshot line matches. */
 export const ref = (pattern: RegExp): string => {
@@ -55,7 +62,7 @@ export const tap = (pattern: RegExp): void => {
  * a JS expression for the element when it starts with "js:".
  */
 export const pointAt = async (target: string, { click = true, settleMs = 120 } = {}): Promise<void> => {
-  const element = target.startsWith("js:") ? target.slice(3) : `document.querySelector(${JSON.stringify(target)})`;
+  const element = target.startsWith("js:") ? target.slice(3) : `document.querySelector(${jsString(target)})`;
   const at = evaluate<{ x: number; y: number } | null>(
     `const e = ${element}; if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };`,
   );

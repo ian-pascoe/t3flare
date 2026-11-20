@@ -35,7 +35,7 @@ export const Launch = () => {
           <CliAgents name="CLI agents" />
         </TransitionSeries.Sequence>
         <TransitionSeries.Sequence name="6 Laptop link" durationInFrames={161}>
-          <LaptopLink name="Laptop link" />
+          <LaptopLink name="Laptop link" delegatedAt={14.9} doneAt={40.9} />
         </TransitionSeries.Sequence>
         <TransitionSeries.Transition presentation={fade()} timing={linearTiming({ durationInFrames: 10 })} />
         <TransitionSeries.Sequence name="7 Cost" durationInFrames={131}>

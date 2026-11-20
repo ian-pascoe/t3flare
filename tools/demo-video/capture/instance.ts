@@ -35,7 +35,7 @@ export const prepareHome = (): void => {
 
 export const instancePid = (): number | undefined => {
   try {
-    const out = sh("pgrep", ["-f", `^${APP.replace(/[()]/g, "\\$&")} --remote-debugging-port=${CDP_PORT}`]);
+    const out = sh("pgrep", ["-f", `^${APP.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")} --remote-debugging-port=${CDP_PORT}`]);
     return out ? Number(out.split("\n")[0]) : undefined;
   } catch {
     return undefined;
@@ -78,6 +78,14 @@ export const launch = async (): Promise<number> => {
         T3CODE_HOME: path.join(CAP, "t3home"),
         T3CODE_DISABLE_AUTO_UPDATE: "1",
         T3CODE_TELEMETRY_ENABLED: "false",
+        // Beat 6's laptop agent: t3's Pi provider on the Stage's Model endpoint, passed only when
+        // apps/environment/scripts/demo-laptop.ts launches the instance. The key stays in the environment.
+        ...Object.fromEntries(
+          ["PI_CODING_AGENT_DIR", "T3FLARE_LAPTOP_MODEL_KEY"].flatMap((name) => {
+            const value = process.env[name];
+            return value === undefined ? [] : [[name, value]];
+          }),
+        ),
       },
     },
   );

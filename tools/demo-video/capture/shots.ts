@@ -7,7 +7,7 @@
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { ab, pointAt, ref, sleep, tap, waitFor, waitForText } from "./ab.ts";
+import { ab, jsString, pointAt, ref, sleep, tap, waitFor, waitForText } from "./ab.ts";
 import { CAP } from "./instance.ts";
 
 const FOOTAGE = path.resolve(import.meta.dirname, "..", "public", "footage");
@@ -58,8 +58,43 @@ const cloudDraft = async (): Promise<void> => {
   ab("mouse", "move", "1500", "900");
 };
 
+/**
+ * A new draft thread on the laptop, "MacBook Pro", in its checkout of the fixture, on its Pi agent's Sonnet (README.md,
+ * Beat 6). Off camera.
+ */
+const laptopDraft = async (): Promise<void> => {
+  ab("press", "Escape");
+  if (/button "Dismiss"/.test(ab("snapshot", "-i"))) tap(/button "Dismiss"/);
+  tap(/button "New thread"/);
+  await waitFor(`document.querySelector('textarea, [contenteditable=true]')`);
+  await sleep(800);
+  const runOn = ab("snapshot", "-i").match(/combobox "Run on"[^\n]*: (.*)$/m)?.[1];
+  if (runOn?.trim() !== "MacBook Pro") {
+    tap(/combobox "Run on"/);
+    await sleep(500);
+    tap(/option "MacBook Pro/);
+    await sleep(800);
+  }
+  tap(/button "(PD )?(Claude|Sonnet|Haiku|GPT|claude-|Pi default)/);
+  await sleep(600);
+  await pointAt('button[aria-label="Pi"]');
+  await sleep(400);
+  tap(/option "claude-sonnet-5-5 , Pi/);
+  await sleep(400);
+  ab("press", "Escape");
+  ab("mouse", "move", "1500", "900");
+};
+
+/** Runs one of apps/environment's scripts against the Stage (`stage.ts run`). */
+const stageScript = (...args: ReadonlyArray<string>): void => {
+  execFileSync("node", ["scripts/stage.ts", "run", process.env.T3FLARE_DEMO_STAGE ?? "demo", ...args], {
+    cwd: path.resolve(import.meta.dirname, "..", "..", "..", "apps", "environment"),
+    stdio: "ignore",
+  });
+};
+
 const option = (label: string) =>
-  `js:[...document.querySelectorAll('[role=option]')].find((o) => o.textContent.trim().startsWith(${JSON.stringify(label)}))`;
+  `js:[...document.querySelectorAll('[role=option]')].find((o) => o.textContent.trim().startsWith(${jsString(label)}))`;
 
 const typePrompt = (text: string, delayMs = 0): void => {
   const box = ref(/textbox "Message/);
@@ -129,10 +164,7 @@ export const SHOTS: Record<string, Shot> = {
       await waitForText("Running", 60_000);
       await sleep(5000);
       mark("restart");
-      execFileSync("node", ["scripts/stage.ts", "run", process.env.T3FLARE_DEMO_STAGE ?? "demo", "admin", "POST", "/_t3flare/restart"], {
-        cwd: path.resolve(import.meta.dirname, "..", "..", "..", "apps", "environment"),
-        stdio: "ignore",
-      });
+      stageScript("admin", "POST", "/_t3flare/restart");
       await waitForText("restarted and resumed this turn", 120_000);
       mark("notice");
       await waitFor(turnIdle, 180_000, "turn finished");
@@ -162,12 +194,27 @@ export const SHOTS: Record<string, Shot> = {
     },
   },
 
-  // Beat 6: written once the laptop's Peer link is set up (README.md, Beat 6).
+  // Beat 6: the laptop's agent delegates a Remote task to the cloud over its Peer link and waits on it; the child
+  // thread runs on t3flare (the Lineage panel follows it), and the laptop's turn ends with its report.
   "remote-task": {
     prepare: async () => {
-      throw new Error("remote-task: not recorded yet; the scene falls back to its placeholder");
+      // A Remote task runs in the cloud project's own checkout, never a worktree: put it back to its last commit.
+      stageScript("demo-reset");
+      await laptopDraft();
+      typePrompt(
+        "Delegate this to my t3flare cloud environment and wait for it: add src/mod.sh (a % b, refusing b = 0) to t3flare-fixture, cover it in test.sh, and run the checks. Then summarise what it did.",
+      );
     },
-    record: async () => {},
+    record: async ({ mark }) => {
+      await sleep(1000);
+      ab("press", "Enter");
+      mark("submit");
+      await waitForText("on t3flare", 90_000);
+      mark("delegated");
+      await waitFor(turnIdle, 300_000, "turn finished");
+      mark("done");
+      await sleep(3000);
+    },
   },
 };
 
