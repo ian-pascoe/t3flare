@@ -13,14 +13,18 @@ const HOUSEKEEPING_FLOOR_MS = 500;
 export interface NextAlarm {
   /** When to arm the alarm; null to delete it. */
   readonly at: number | null;
-  /** When housekeeping is next due, if it is: an alarm before it only pushes. */
+  /**
+   * When housekeeping is next due, if it is: an alarm before it only pushes. Not floored, so a push alarm sees overdue
+   * housekeeping as due however often pushes rearm the alarm.
+   */
   readonly housekeepingAt: number | undefined;
 }
 
 /** The alarm for a due push (now) and for the earliest housekeeping `candidates` (at least `HOUSEKEEPING_FLOOR_MS` away). */
 export const nextAlarm = (now: number, input: { readonly pushDue: boolean; readonly candidates: ReadonlyArray<number> }): NextAlarm => {
-  const housekeepingAt = input.candidates.length === 0 ? undefined : Math.max(now + HOUSEKEEPING_FLOOR_MS, Math.min(...input.candidates));
-  return { at: input.pushDue ? now : (housekeepingAt ?? null), housekeepingAt };
+  const housekeepingAt = input.candidates.length === 0 ? undefined : Math.min(...input.candidates);
+  if (input.pushDue) return { at: now, housekeepingAt };
+  return { at: housekeepingAt === undefined ? null : Math.max(now + HOUSEKEEPING_FLOOR_MS, housekeepingAt), housekeepingAt };
 };
 
 /**

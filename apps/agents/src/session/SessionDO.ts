@@ -172,8 +172,13 @@ export class SessionDO extends DurableObject<SessionEnv> {
   #pushTimer: ReturnType<typeof setTimeout> | undefined;
   #pushing: Promise<void> = Promise.resolve();
   #dirty = false;
-  /** A push waits for the alarm (`alarmPlan.ts`). Memory only: a restart's alarm keeps house, which pushes. */
+  /**
+   * A push waits for the alarm (`alarmPlan.ts`). Memory only: after a restart, a push is sent again from the heartbeat
+   * while a turn is live (the liveness push) or a push retry is stored, as before.
+   */
   #pushDue = false;
+  /** Set by `destroy()`: no alarm is armed again on the emptied object. */
+  #destroyed = false;
   /** When `#arm` last put housekeeping (memory only, as `#pushDue`). */
   #housekeepingAt: number | undefined;
   /** Registry the tool extensions install into, before the Harness resumes work that needs them. */
@@ -726,6 +731,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
 
   /** Arms the alarm for a due push (now), else the earliest of: heartbeat (a turn live), each live turn's deadline, a push retry. */
   async #arm(): Promise<void> {
+    if (this.#destroyed) return;
     const now = Date.now();
     const turns = Object.values(this.#turns()).filter(isLive);
     const candidates: Array<number> = [];
@@ -749,7 +755,6 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const harness = await this.#opening;
     const now = Date.now();
     const work = alarmWork(now, { pushDue: this.#pushDue, housekeepingAt: this.#housekeepingAt });
-    this.#pushDue = false;
     let push = work.push;
     if (work.housekeeping && (await this.#housekeeping(harness, now))) {
       this.#dirty = true;
@@ -757,6 +762,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
     }
     // From inside the alarm, this request: see `alarmPlan.ts`.
     if (push) {
+      // Cleared only now, so a housekeeping failure (the platform retries the alarm) cannot lose a due push.
+      this.#pushDue = false;
       this.#pushing = this.#pushing.then(() => this.#push()).catch(() => undefined);
       await this.#pushing;
     }
@@ -1098,6 +1105,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     if (this.#pushTimer !== undefined) clearTimeout(this.#pushTimer);
     this.#pushTimer = undefined;
     this.#pushDue = false;
+    this.#destroyed = true;
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
     setTimeout(() => this.ctx.abort("t3flare: session destroyed"), 0);

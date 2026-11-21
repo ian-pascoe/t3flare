@@ -11,12 +11,12 @@ describe("nextAlarm", () => {
     expect(nextAlarm(NOW, { pushDue: false, candidates: [] })).toEqual({ at: null, housekeepingAt: undefined });
   });
 
-  it("arms the earliest housekeeping, never sooner than 500 ms", () => {
+  it("arms the earliest housekeeping, never sooner than 500 ms, and keeps when it was due", () => {
     expect(nextAlarm(NOW, { pushDue: false, candidates: [NOW + 60_000, NOW + 5_000] })).toEqual({
       at: NOW + 5_000,
       housekeepingAt: NOW + 5_000,
     });
-    expect(nextAlarm(NOW, { pushDue: false, candidates: [NOW - 10] })).toEqual({ at: NOW + 500, housekeepingAt: NOW + 500 });
+    expect(nextAlarm(NOW, { pushDue: false, candidates: [NOW - 10] })).toEqual({ at: NOW + 500, housekeepingAt: NOW - 10 });
   });
 
   it("arms now for a due push, without the 500 ms floor, and keeps the housekeeping time", () => {
@@ -33,6 +33,16 @@ describe("alarmWork", () => {
 
   it("pushes and keeps house when both are due", () => {
     expect(alarmWork(NOW, { pushDue: true, housekeepingAt: NOW })).toEqual({ push: true, housekeeping: true });
+  });
+
+  it("keeps house on a push alarm once housekeeping is overdue, however often pushes rearm the alarm", () => {
+    // A streaming Session pushes every 300 ms and rearms each time: an overdue deadline must not move 500 ms ahead again.
+    let now = NOW;
+    const overdue = NOW - 10;
+    for (let push = 0; push < 5; push++, now += 300) {
+      const { housekeepingAt } = nextAlarm(now, { pushDue: true, candidates: [overdue] });
+      expect(alarmWork(now, { pushDue: true, housekeepingAt })).toEqual({ push: true, housekeeping: true });
+    }
   });
 
   it("keeps house on any other alarm: one armed before a restart, or the constructor's fallback", () => {
