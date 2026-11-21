@@ -4,9 +4,10 @@
 // the Harness opens in the constructor after a fallback alarm is armed, `resume()` runs from the constructor and the
 // alarm, the alarm is armed before work is admitted, and a 60 s heartbeat runs while a turn is live.
 //
-// The Session pushes its committed state to the Environment DO over DO RPC (`sessionPush`), coalesced to about 100 ms
+// The Session pushes its committed state to the Environment DO over DO RPC (`sessionPush`), coalesced to about 300 ms
 // while streaming and at least every 60 s while a turn is live; the Environment's adapter diffs it into t3's events.
-// One alarm, computed in one place (`#arm`): the heartbeat, the turn deadline, the liveness push, a push retry.
+// One alarm, computed in one place (`#arm`): the heartbeat, the turn deadline, the liveness push, a push retry, and
+// every push, which goes out from the alarm so it never nests in the Environment's last call (`alarmPlan.ts`).
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import {
   type Conversation,
@@ -92,6 +93,7 @@ import { armFault, compactionLimits, type Fault, modelLimits, type ModelLimitsOp
 import { KILL_RETRY_MS, RunningExecs } from "./runningExecs.ts";
 import { FORK_PAGE_BYTES, forkPage, forkPoint, freshConversation, rewind, rollbackPlan, seed } from "./branches.ts";
 import { liveOf, pushedEntry, turnDetail, turnOfEntry, usageOf } from "./state.ts";
+import { alarmWork, nextAlarm } from "./alarmPlan.ts";
 
 export interface SessionEnv {
   readonly ENVIRONMENT: DurableObjectNamespace;
@@ -170,6 +172,10 @@ export class SessionDO extends DurableObject<SessionEnv> {
   #pushTimer: ReturnType<typeof setTimeout> | undefined;
   #pushing: Promise<void> = Promise.resolve();
   #dirty = false;
+  /** A push waits for the alarm (`alarmPlan.ts`). Memory only: a restart's alarm keeps house, which pushes. */
+  #pushDue = false;
+  /** When `#arm` last put housekeeping (memory only, as `#pushDue`). */
+  #housekeepingAt: number | undefined;
   /** Registry the tool extensions install into, before the Harness resumes work that needs them. */
   readonly #registry: RegistryReader;
   readonly #approvals: ApprovalStore;
@@ -718,7 +724,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
   // -------------------------------------------------------------------------------------------------------------------
   // The one alarm
 
-  /** Arms the alarm for the earliest of: heartbeat (a turn live), each live turn's deadline, a push retry. */
+  /** Arms the alarm for a due push (now), else the earliest of: heartbeat (a turn live), each live turn's deadline, a push retry. */
   async #arm(): Promise<void> {
     const now = Date.now();
     const turns = Object.values(this.#turns()).filter(isLive);
@@ -730,18 +736,34 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const retry = this.ctx.storage.kv.get<number>(RETRY_KEY);
     if (retry !== undefined) candidates.push(retry);
     if (this.#execs.retryDue()) candidates.push(now + KILL_RETRY_MS);
-    if (candidates.length === 0) {
+    const { at, housekeepingAt } = nextAlarm(now, { pushDue: this.#pushDue, candidates });
+    this.#housekeepingAt = housekeepingAt;
+    if (at === null) {
       await this.ctx.storage.deleteAlarm();
       return;
     }
-    await this.ctx.storage.setAlarm(Math.max(now + 500, Math.min(...candidates)));
+    await this.ctx.storage.setAlarm(at);
   }
 
   override async alarm(): Promise<void> {
     const harness = await this.#opening;
+    const now = Date.now();
+    const work = alarmWork(now, { pushDue: this.#pushDue, housekeepingAt: this.#housekeepingAt });
+    this.#pushDue = false;
+    let push = work.push;
+    if (work.housekeeping) push = (await this.#keepHouse(harness, now)) || push;
+    // From inside the alarm, this request: see `alarmPlan.ts`.
+    if (push) {
+      this.#pushing = this.#pushing.then(() => this.#push()).catch(() => undefined);
+      await this.#pushing;
+    }
+    await this.#arm();
+  }
+
+  /** The alarm's housekeeping: resume, turn deadlines, kill retries, the watch. Whether a push is due (retry, liveness). */
+  async #keepHouse(harness: Harness, now: number): Promise<boolean> {
     this.#noteDiagnostic("alarms");
     harness.resume();
-    const now = Date.now();
     const turns = this.#turns();
     for (const [providerTurnId, turn] of Object.entries(turns)) {
       if (isLive(turn) && now - turn.startedAt >= this.#deadlineMs()) {
@@ -754,9 +776,10 @@ export class SessionDO extends DurableObject<SessionEnv> {
     if (live) void this.#watch();
     const lastPush = this.ctx.storage.kv.get<number>(LAST_PUSH_KEY) ?? 0;
     if (this.ctx.storage.kv.get<number>(RETRY_KEY) !== undefined || (live && now - lastPush >= LIVENESS_PUSH_MS - 5_000)) {
-      this.#schedulePush(0);
+      this.#dirty = true;
+      return true;
     }
-    await this.#arm();
+    return false;
   }
 
   // -------------------------------------------------------------------------------------------------------------------
@@ -1072,6 +1095,10 @@ export class SessionDO extends DurableObject<SessionEnv> {
     } catch (error) {
       console.warn(JSON.stringify({ t3flare: "session-destroy-abort-failed", error: String(error).slice(0, 300) }));
     }
+    // The abort's push is not sent (the thread is going): no alarm is armed again for it after the delete.
+    if (this.#pushTimer !== undefined) clearTimeout(this.#pushTimer);
+    this.#pushTimer = undefined;
+    this.#pushDue = false;
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
     setTimeout(() => this.ctx.abort("t3flare: session destroyed"), 0);
@@ -1249,9 +1276,11 @@ export class SessionDO extends DurableObject<SessionEnv> {
     this.#dirty = true;
     if (this.#pushTimer !== undefined && delayMs > 0) return;
     if (this.#pushTimer !== undefined) clearTimeout(this.#pushTimer);
+    // The push itself goes out from the alarm, never from here: a timer runs inside whichever call came in last.
     this.#pushTimer = setTimeout(() => {
       this.#pushTimer = undefined;
-      this.#pushing = this.#pushing.then(() => this.#push()).catch(() => undefined);
+      this.#pushDue = true;
+      void this.#arm().catch((error: unknown) => console.warn(JSON.stringify({ t3flare: "session-push-arm-failed", error: String(error).slice(0, 500) })));
     }, delayMs);
   }
 
