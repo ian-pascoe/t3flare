@@ -1,3 +1,4 @@
+// @effect-diagnostics effectFnOpportunity:off
 // A stock client blocked from the Cloud Environment by an orchestration-protocol mismatch (in-app updates plan D16; t3
 // `client-runtime/src/connection/outdatedHostUpdate.ts`): with the descriptor t3flare advertises on prod, the client does
 // not tell the owner to update by hand; it opens its bare socket and calls the unary server Update (no progress stream:

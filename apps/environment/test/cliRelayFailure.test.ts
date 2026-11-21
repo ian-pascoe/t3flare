@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off globalDate:off
+// @effect-diagnostics nodeBuiltinImport:off globalDate:off effectFnOpportunity:off globalJsonInEffect:off processEnvInEffect:off
 // SPI-1172: a CLI agent's failed turn on a Model endpoint shows the model relay's classification of the process's last
 // answer, by the endpoint's API and auth, not what the CLI or its t3 adapter made of the error text (for Claude Code and
 // OpenCode, ACP's `cliPromptFailure`, which reads Commissary's texts and is kept for proxy-mode processes only).
@@ -170,7 +170,7 @@ const acpTurn = (cli: "claude" | "opencode", relayed: EndpointFailureRecord | nu
     }
   });
 
-const run = <A>(body: Effect.Effect<A, unknown, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => Effect.runPromise(body.pipe(Effect.scoped, Effect.provide(layerTest)) as never) as Promise<A>;
+const run = <A, E>(body: Effect.Effect<A, E, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => Effect.runPromise(body.pipe(Effect.scoped, Effect.provide(layerTest)) as never) as Promise<A>;
 
 for (const cli of ["claude", "opencode"] as const) {
   describe(`${cli} on a Model endpoint, through the relay`, () => {

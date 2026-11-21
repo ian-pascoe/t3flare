@@ -1,3 +1,4 @@
+// @effect-diagnostics globalDate:off nodeBuiltinImport:off
 // Step 3+ (plan section 4.4, review findings 3 and 8): the publish recorder reads t3's AgentAwarenessRelay log events,
 // keeps each publish's outcome, holds the idle reset while a publish is still pending, and classifies a refusal.
 // The messages are the shapes `t3/src/relay/AgentAwarenessRelay.ts` logs (fragility U28).

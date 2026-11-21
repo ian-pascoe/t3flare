@@ -55,7 +55,7 @@ describe("the ACP registry here", () => {
     const catalog = refusingCatalog(stock as never);
     const prepared = await Effect.runPromise(Effect.flip(catalog.prepare({ agentId: "claude-acp" })));
     expect(prepared.detail).toMatch(/add the Claude provider/);
-    const custom = await Effect.runPromise(Effect.flip(catalog.resolve({ agentId: "" } as never, "/w/x")));
+    const custom = await Effect.runPromise(Effect.scoped(Effect.flip(catalog.resolve({ agentId: "" } as never, "/w/x"))));
     expect(custom.detail).toMatch(/custom ACP command/);
     expect(await Effect.runPromise(catalog.uninstallManagedBinary({ agentId: "gemini" }))).toEqual({ agentId: "gemini", removed: false });
   });

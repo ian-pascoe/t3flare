@@ -1,3 +1,4 @@
+// @effect-diagnostics globalTimers:off
 // The MCP host's seam (ADR-0028): `McpHost` over a fake engine. Listing and the view (classes from the tool's own
 // hint or the owner's override; every enabled server for every thread: owner, 2026-11-12, back to stock), calls (disabled
 // servers, failures that may have run), and the target it hands the engine (the header value, and nothing else, to

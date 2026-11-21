@@ -1,3 +1,4 @@
+// @effect-diagnostics globalJsonInEffect:off
 // G11 (previews, ADR-0031): the seams of the Cloud Environment's previews that run without Browser Run or a Container:
 // where a `localhost` navigation goes, which listeners are listed and whose (review M7), the configured URLs stock takes
 // (review M4), the Browser Run sessions and profiles kept in the Environment DO (reviews L4, M5), the acquire options

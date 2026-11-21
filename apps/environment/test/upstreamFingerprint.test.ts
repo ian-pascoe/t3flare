@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 // The upstream fingerprint (SPI-1011, fragility T2): our files that restate or emulate t3 code typecheck cannot watch
 // are tied to hashes of t3's regions and to literals that must still appear in t3's source. A change to either fails
 // here, naming our file to review and its register entry, until the fixture is updated after that review.
@@ -115,7 +116,7 @@ describe("checkFingerprint", () => {
       {
         file: "apps/server/src/server.ts",
         symbol: "*",
-        hash: hashRegion(files["apps/server/src/server.ts"]!, { symbol: "*" }),
+        hash: hashRegion(files["apps/server/src/server.ts"]!, { symbol: "*" })!,
         ourFile: "apps/environment/src/t3/composition.ts",
         entry: "U1",
       },

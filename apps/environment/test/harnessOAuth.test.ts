@@ -1,3 +1,4 @@
+// @effect-diagnostics globalTimers:off
 // OAuth sign-ins for direct MCP servers (review M4): single-use state, the issuer check, write-only tokens, and one
 // refresh in flight. The MCP Worker's side is stubbed; it is the only one that fetches.
 import { describe, expect, it } from "vitest";

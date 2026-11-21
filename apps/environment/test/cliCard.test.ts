@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off
+// @effect-diagnostics nodeBuiltinImport:off effectFnOpportunity:off globalJsonInEffect:off processEnvInEffect:off
 // ADR-0028 (review M9): the MCP relay's tool card on a CLI thread is raised as t3's approval card on that thread's live
 // turn by the CLI wrapper, and answered from t3's own `respondToRuntimeRequest`. Run over t3's ACP adapter, built with
 // the driver's own options (`acpAdapterOptions`), and a scripted agent (fixtures/fake-acp-agent.mjs) whose turn waits on
@@ -134,7 +134,7 @@ const cardOpened = (event: Event) => isCard(event) && event.type === "runtime_re
 const ask = (harness: Harness, askId: string) =>
   Effect.promise(() => approveCliTool({ thread: harness.threadId, askId, title: "Allow fixture: fixture_note?", summary: "fixture_note {\"line\":\"x\"}", detail: "fixture: fixture_note" }));
 
-const test = <A>(body: Effect.Effect<A, unknown, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => Effect.runPromise(body.pipe(Effect.scoped, Effect.provide(layerTest)) as never);
+const test = <A, E>(body: Effect.Effect<A, E, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => Effect.runPromise(body.pipe(Effect.scoped, Effect.provide(layerTest)) as never);
 
 describe("a relay tool call asked on a CLI thread (ADR-0028, M9)", () => {
   it("raises t3's approval card on the live turn and answers with the owner's decision", () =>

@@ -1,0 +1,12 @@
+{
+  // The `workerd` Vitest project's files (vitest.config.ts), checked apart from the package's Node-typed program
+  // (../tsconfig.json): they run in workerd, and use the Workers globals and @cloudflare/vitest-plugin's
+  // `cloudflare:test`, which clash with Node's across t3's code. `scripts/typecheck.ts` checks both programs.
+  "extends": "../../../t3code/tsconfig.base.json",
+  "compilerOptions": {
+    "erasableSyntaxOnly": true,
+    "types": ["node", "@cloudflare/workers-types", "@cloudflare/vitest-plugin/types"],
+    "lib": ["ESNext", "esnext.disposable"]
+  },
+  "include": ["**/*.workerd.test.ts", "workerd.fixture.ts"]
+}

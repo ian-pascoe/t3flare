@@ -1,3 +1,4 @@
+// @effect-diagnostics globalTimers:off
 // The Credential broker (SPI-1164; ADR-0018 revived): the Environment DO holds each sign-in's tokens sealed, is their
 // only refresher (one refresh in flight per endpoint), saves a rotated refresh token before any caller gets the new access
 // token, and signs the endpoint out when OpenAI refuses a renewal. Tested against a fake of OpenAI's authorization server;
@@ -92,7 +93,7 @@ describe("the Credential broker", () => {
     expect(tokens.has(first.ok ? first.accessToken : "")).toBe(false);
     expect(answers[0]).toMatchObject({ ok: true, expiresAt: now() + HOUR });
     // The stored refresh token is the replacement: the next renewal uses it, and OpenAI accepts it.
-    expect((await broker.read("chatgpt"))?.refresh).toBe(vendor.currentRefresh());
+    expect(await broker.read("chatgpt")).toMatchObject({ type: "oauth", refresh: vendor.currentRefresh() });
     advance(HOUR);
     expect(await broker.access("chatgpt")).toMatchObject({ ok: true });
     expect(vendor.counts.refreshes).toBe(2);
@@ -111,7 +112,7 @@ describe("the Credential broker", () => {
     expect(vendor.accessTokens).toHaveLength(2);
     expect(JSON.stringify(answer)).not.toContain(vendor.accessTokens[1]!);
     // The stored credential is still the first.
-    expect((await broker.read("chatgpt"))?.access).toBe(vendor.accessTokens[0]);
+    expect(await broker.read("chatgpt")).toMatchObject({ type: "oauth", access: vendor.accessTokens[0] });
     kv.failWhen(undefined);
     scan(kv, vendor);
   });

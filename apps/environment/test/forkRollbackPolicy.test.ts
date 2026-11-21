@@ -8,9 +8,7 @@ import { describe, expect, it } from "vitest";
 import { PiDurableCapabilities } from "../src/provider/capabilities.ts";
 
 const policy = Effect.runPromise(
-  Effect.gen(function* () {
-    return yield* CommandPolicy.CommandPolicyV2;
-  }).pipe(Effect.provide(CommandPolicy.layer)),
+  CommandPolicy.CommandPolicyV2.pipe(Effect.provide(CommandPolicy.layer)),
 );
 
 const ids = { commandId: CommandId.make("command-1"), threadId: ThreadId.make("thread-1"), providerInstanceId: ProviderInstanceId.make("piDurable") };
@@ -24,6 +22,8 @@ describe("t3's command policy for the Durable agent (G6)", () => {
         capabilities: PiDurableCapabilities,
         sameProvider: true,
         hasStrongNativeSource: true,
+        // The Durable agent exposes no native turn ids (PiDurableCapabilities), so its turns carry no native boundary.
+        hasNativeTurnBoundary: false,
         sourceRunStatus: "completed",
         fromSpecificTurn: true,
         sourceBusy: false,
@@ -40,6 +40,8 @@ describe("t3's command policy for the Durable agent (G6)", () => {
         capabilities: PiDurableCapabilities,
         sameProvider: true,
         hasStrongNativeSource: true,
+        // The Durable agent exposes no native turn ids (PiDurableCapabilities), so its turns carry no native boundary.
+        hasNativeTurnBoundary: false,
         sourceRunStatus: "completed",
         fromSpecificTurn: true,
         sourceBusy: true,

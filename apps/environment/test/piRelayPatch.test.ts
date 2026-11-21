@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 // Patch 0007 (settings-mcp plan D4, SPI-1076): t3's pi extension lets a server tool of pi's built-in MCP client through
 // its `tool_call` hook when its server is one the relay serves this process (`T3FLARE_RELAY_SERVERS`, SPI-1199 review),
 // since t3flare's MCP relay judges and asks for those; every other tool is asked as before. The

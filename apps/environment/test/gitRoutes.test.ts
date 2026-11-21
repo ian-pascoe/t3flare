@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 // The process router's rules (step 2a plan, section 2): what may start a Container, t3's clone, URLs, paths.
 import { describe, expect, it } from "vitest";
 

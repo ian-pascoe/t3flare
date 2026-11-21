@@ -1,3 +1,4 @@
+// @effect-diagnostics effectFnOpportunity:off globalJsonInEffect:off multipleEffectProvide:off nodeBuiltinImport:off
 // Step 3+ (P4; review findings 1, 2 and 5): the Connect service's link step with t3's real CloudLink and signing key
 // against a fake relay. The link is publish-only whatever was stored before (relink after unlink included), a relay
 // that hands back a tunnel is undone, the mint key is gone after the link, and the account token is kept or discarded
@@ -129,7 +130,7 @@ const run = <A, E>(h: Harness, policy: ConnectService.ConnectPolicy, use: (conne
       Effect.provideService(HttpClient.HttpClient, relay),
       Effect.provide(ServerConfigModule.layerTest("/", { prefix: "t3flare-connect-test-" }).pipe(Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)))),
       Effect.scoped,
-    ) as Effect.Effect<A, E>,
+    ),
   );
 };
 

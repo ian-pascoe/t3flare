@@ -3,17 +3,18 @@
 // guards (CSRF, Origin, JSON) as on its other routes.
 import { describe, expect, it } from "vitest";
 
+import type { AccessCaller } from "../src/access.ts";
 import { sealedStore } from "../src/credentials/sealed.ts";
 import { endpointsChange, type EndpointsApiDeps } from "../src/endpoints/api.ts";
 import type { Discovery } from "../src/endpoints/discover.ts";
 import { endpointStore } from "../src/endpoints/store.ts";
 import { csrfToken } from "../src/harness/csrf.ts";
-import { CSRF_HEADER, handleHarness, type HarnessCaller, type HarnessDeps } from "../src/harness/panel.ts";
+import { CSRF_HEADER, handleHarness, type HarnessDeps } from "../src/harness/panel.ts";
 import { harnessStore } from "../src/harness/store.ts";
 
 const HOST = "t3.example.dev";
 const NOW = Date.UTC(2026, 10, 14, 10, 0);
-const owner: HarnessCaller = { kind: "owner", subject: "owner-sub" };
+const owner: AccessCaller = { kind: "owner", subject: "owner-sub" };
 const SECRET = "sk-panel-secret-0001";
 
 const memory = () => {
@@ -25,7 +26,7 @@ const memory = () => {
   };
 };
 
-const setup = (caller: HarnessCaller = owner) => {
+const setup = (caller: AccessCaller = owner) => {
   const kv = memory();
   const store = harnessStore(kv);
   const endpoints = endpointStore(kv, sealedStore(kv, "d".repeat(64), () => NOW));

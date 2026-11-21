@@ -20,7 +20,7 @@ const bind = (...endpoints: Array<ReturnType<typeof endpoint>>) => {
   return value;
 };
 const HARNESS = /Settings page \(\/_t3flare\/settings\), under Model endpoints\.$/;
-const view = (snapshot: { status: string; message?: string; models: ReadonlyArray<{ slug: string }> }) => ({ status: snapshot.status, message: snapshot.message, models: snapshot.models.map((entry) => entry.slug) });
+const view = (snapshot: { status: string; message?: string | undefined; models: ReadonlyArray<{ slug: string }> }) => ({ status: snapshot.status, message: snapshot.message, models: snapshot.models.map((entry) => entry.slug) });
 
 const acp = (cli: "claude" | "opencode") => acpSnapshotOf({ cli, driver: ProviderDriverKind.make(cli === "claude" ? "claudeAgent" : "opencode"), presentation: { displayName: cli } as never, version: "1" }, true);
 

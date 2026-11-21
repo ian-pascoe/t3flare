@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 // The CLI agents' roots table (SPI-1151 §1, M1): discovery with each CLI's roots finds, in the probe's fixture, the
 // repo Skills and commands that CLI itself loaded (`apps/environment/test/fixtures/spi-1151/m0-roots.json`, recorded by
 // `test/docker/skills.docker.test.ts` from the pinned CLIs), with its winner of a same-named pair; and their built-in

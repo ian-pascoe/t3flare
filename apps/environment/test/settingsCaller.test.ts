@@ -106,7 +106,7 @@ describe("the adapter's part of the record (durableModeRecord, as makePiDurableA
 describe("a Settings server write from a caller the Environment cannot vouch for", () => {
   const setup = () => {
     const map = new Map<string, unknown>();
-    const kv = { get: <T>(key: string) => map.get(key) as T | undefined, put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)) };
+    const kv = { get: <T>(key: string) => map.get(key) as T | undefined, put: <T>(key: string, value: T) => void map.set(key, structuredClone(value)), delete: (key: string) => map.delete(key) };
     const store = harnessStore(kv);
     const sql = projection();
     const host: McpHost = new McpHost({

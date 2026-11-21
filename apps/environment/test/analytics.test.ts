@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import { layerManagedPolicy } from "../src/t3/managedPolicy.ts";
 
 /** Records two events and flushes them; returns the URLs t3 posted to. */
-const sends = (policy: Layer.Layer<ManagedPolicy.ManagedPolicy, unknown>) => {
+const sends = <E>(policy: Layer.Layer<ManagedPolicy.ManagedPolicy, E>) => {
   const posted: Array<string> = [];
   const client = HttpClient.make((request) =>
     Effect.sync(() => {
@@ -41,7 +41,7 @@ const sends = (policy: Layer.Layer<ManagedPolicy.ManagedPolicy, unknown>) => {
       yield* analytics.record("t3flare.test.two");
       yield* analytics.flush;
       return posted;
-    }).pipe(Effect.provide(layer), Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)), Effect.scoped),
+    }).pipe(Effect.provide(layer.pipe(Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)))), Effect.scoped),
   );
 };
 

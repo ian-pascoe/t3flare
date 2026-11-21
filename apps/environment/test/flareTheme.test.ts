@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 // The t3flare theme: a complete, valid Environment theme in both appearances, published at each boot through t3's own
 // EnvironmentThemeService, and made the default theme once, only while the owner has set none.
 import * as NodeFS from "node:fs";
@@ -38,7 +39,7 @@ const APPEARANCES = [
 
 describe("the t3flare theme's palette", () => {
   it("is a valid Environment theme file with colours", () => {
-    const decoded = Schema.decodeUnknownSync(Schema.fromJsonString(EnvironmentThemeFile))(FLARE_THEME_JSON);
+    const decoded = Schema.decodeSync(Schema.fromJsonString(EnvironmentThemeFile))(FLARE_THEME_JSON);
     expect(decoded).toEqual(FLARE_THEME);
     expect(environmentThemeFileHasColors(decoded)).toBe(true);
   });

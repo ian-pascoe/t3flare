@@ -1,3 +1,4 @@
+// @effect-diagnostics globalTimers:off
 // The `processGroup.ts` Shadow (step 4a): t3's `signalProcessGroup` on a process channel pid kills by marker through
 // the channel, and signal 0 answers whether it still runs, as t3's pi `rpc.ts` reads it (`hasExited`).
 import { describe, expect, it } from "vitest";

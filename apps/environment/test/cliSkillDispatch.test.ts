@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off
+// @effect-diagnostics nodeBuiltinImport:off effectFnOpportunity:off globalJsonInEffect:off processEnvInEffect:off
 // A picked Skill in a CLI agent's message (SPI-1151 §3): Claude Code gets stock's rewrite (`planClaudeSkillDispatch`)
 // in the wrapper's `startTurn`, a mention that opens the message becoming the native `/name rest` and any other an inline
 // `/name` with a note in stock's wording naming its `SKILL.md`; OpenCode gets the Skill embedded as its own skill tool returns it.
@@ -209,7 +209,7 @@ const promptFor = (cli: "claude" | "opencode", text: string, files: Record<strin
     return { blocks: prompt ?? [], asked };
   });
 
-const run = <A>(body: Effect.Effect<A, unknown, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => Effect.runPromise(body.pipe(Effect.scoped, Effect.provide(layerTest)) as never) as Promise<A>;
+const run = <A, E>(body: Effect.Effect<A, E, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => Effect.runPromise(body.pipe(Effect.scoped, Effect.provide(layerTest)) as never) as Promise<A>;
 
 const ENVIRONMENT_SKILL = "---\nname: env\ndescription: The Environment's.\n---\n\nInterview the owner.\n";
 const SKILL = "---\nname: fruit-code\ndescription: The fruit code.\n---\n\nRead reference/code.md for the code.\n";
@@ -282,7 +282,7 @@ describe("the ACP flavors' attachment blocks (t3's buildAttachmentPrompt)", () =
     const blocks = await Effect.runPromise(
       Effect.gen(function* () {
         const { buildAttachmentPrompt } = acpPromptBuilder(host, yield* FileSystem.FileSystem);
-        return yield* buildAttachmentPrompt!({ text: "the message", attachments: [attachment], resolveAttachmentPath: () => null, promptCapabilities: undefined, agentVersion: undefined, currentModel: undefined });
+        return yield* buildAttachmentPrompt!({ text: "the message", attachments: [attachment], resolveAttachmentPath: () => null, promptCapabilities: undefined });
       }).pipe(Effect.provide(NodeServices.layer)),
     );
     expect(blocks).toEqual([{ type: "text", text: '[Attached file "notes.txt" is unavailable: t3 has no saved file for it.]' }]);
@@ -292,7 +292,7 @@ describe("the ACP flavors' attachment blocks (t3's buildAttachmentPrompt)", () =
     const blocks = await Effect.runPromise(
       Effect.gen(function* () {
         const { buildAttachmentPrompt } = acpPromptBuilder(host, yield* FileSystem.FileSystem);
-        return yield* buildAttachmentPrompt!({ text: "the message", attachments: [], resolveAttachmentPath: () => null, promptCapabilities: undefined, agentVersion: undefined, currentModel: undefined });
+        return yield* buildAttachmentPrompt!({ text: "the message", attachments: [], resolveAttachmentPath: () => null, promptCapabilities: undefined });
       }).pipe(Effect.provide(NodeServices.layer)),
     );
     expect(blocks).toEqual([]);

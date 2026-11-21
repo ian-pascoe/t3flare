@@ -10,7 +10,7 @@ import { endpointsChanged, refreshOnEndpointsChanged } from "../src/endpoints/ch
 describe("refreshOnEndpointsChanged", () => {
   it("runs the refresh at each change while the scope is open, and stops with it", async () => {
     let refreshed = 0;
-    const scope = Effect.runSync(Scope.make());
+    const scope = Scope.makeUnsafe();
     Effect.runSync(refreshOnEndpointsChanged(Effect.sync(() => void (refreshed += 1))).pipe(Scope.provide(scope)));
     endpointsChanged();
     endpointsChanged();

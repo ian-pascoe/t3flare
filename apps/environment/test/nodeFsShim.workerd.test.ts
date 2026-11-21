@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 // The `node:fs` shim's descriptors on real DO SQLite: an open with Node's numeric flags reads the file it opens
 // (t3's `readThemeFileGuarded` opens Environment themes with `O_RDONLY | O_NOFOLLOW | O_NONBLOCK`), where it once
 // read numeric flags as `w` and emptied the file.
@@ -87,8 +88,8 @@ describe("node:fs shim descriptors", () => {
       store.mkdir("/t3/c", { recursive: true });
       fs.writeFileSync("/t3/c/f", "abc");
       fs.symlinkSync("/t3/c/f", "/t3/c/link");
-      const realpath = (path: string) => new Promise<string>((resolve, reject) => fs.realpath(path, (error, resolved) => (error ? reject(error) : resolve(resolved!))));
-      const stat = (path: string) => new Promise<{ size: number }>((resolve, reject) => fs.stat(path, (error, stats) => (error ? reject(error) : resolve(stats))));
+      const realpath = (path: string) => new Promise<string>((resolve, reject) => fs.realpath(path, (error: Error | null, resolved?: string) => (error ? reject(error) : resolve(resolved!))));
+      const stat = (path: string) => new Promise<{ size: number }>((resolve, reject) => fs.stat(path, (error: Error | null, stats?: { size: number }) => (error ? reject(error) : resolve(stats!))));
       expect(await realpath("/t3/c/link")).toBe("/t3/c/f");
       expect((await stat("/t3/c/f")).size).toBe(3);
       await expect(stat("/t3/c/missing")).rejects.toThrow(/ENOENT/);

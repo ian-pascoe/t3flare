@@ -54,6 +54,17 @@ describe("the typecheck's verdict", () => {
     expect(typecheckVerdict(null, `${T3_ERROR}\n`, cwd, t3Root)).toMatchObject({ ok: false, reason: expect.stringMatching(/signal/) });
   });
 
+  it("passes errors in our files that a program does not own, and fails on one in a file it owns", () => {
+    const isOurs = (file: string) => file.endsWith(".workerd.test.ts");
+    const workerdError = "test/stateStore.workerd.test.ts(3,1): error TS2322: no.";
+    const verdict = typecheckVerdict(2, `${OUR_ERROR}\n${T3_ERROR}\n`, cwd, t3Root, isOurs);
+    expect(verdict).toMatchObject({ ok: true, ours: [] });
+    expect(verdict.elsewhereErrors.map((d) => d.text)).toEqual([OUR_ERROR]);
+    expect(verdict.t3Errors.map((d) => d.text)).toEqual([T3_ERROR]);
+    expect(typecheckVerdict(2, `${OUR_ERROR}\n`, cwd, t3Root, isOurs)).toMatchObject({ ok: true });
+    expect(typecheckVerdict(2, `${OUR_ERROR}\n${workerdError}\n`, cwd, t3Root, isOurs)).toMatchObject({ ok: false });
+  });
+
   it("counts a file as t3's only inside the submodule", () => {
     const sibling = "../../t3code-shims/x.ts(1,1): error TS1: no.";
     expect(typecheckVerdict(2, `${sibling}\n`, cwd, t3Root)).toMatchObject({ ok: false });

@@ -1,3 +1,4 @@
+// @effect-diagnostics globalDateInEffect:off
 // t3's real terminal stack over ours (step 2b, plan M1/M3 "Node with real processes"): t3's `makeWithOptions` with our
 // options, t3's real `ProjectSetupScriptRunner`, our PTY adapter, and our Workspace DO terminal host, wired in process,
 // whose shells are a real bash under a real PTY (`script`) with our rc file (its markers). Covers open, write, the

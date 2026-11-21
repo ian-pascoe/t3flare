@@ -51,7 +51,7 @@ const run = (args: ReadonlyArray<string>, cwd: string) =>
   Effect.runPromise(
     Effect.gen(function* () {
       const handle = yield* spawn(ChildProcess.make("git", [...args], { cwd }) as ChildProcess.Command);
-      const text = (stream: Stream.Stream<Uint8Array, unknown>) => Stream.runFold(stream, () => "", (acc, bytes) => acc + new TextDecoder().decode(bytes));
+      const text = <E>(stream: Stream.Stream<Uint8Array, E>) => Stream.runFold(stream, () => "", (acc, bytes) => acc + new TextDecoder().decode(bytes));
       const stderr = yield* text(handle.stderr);
       return { exitCode: yield* handle.exitCode, stderr };
     }).pipe(Effect.scoped),

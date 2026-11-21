@@ -22,14 +22,14 @@ it("refuses linkProof, applyRelayConfig, answerHealthRequest and mintCredential;
     Effect.gen(function* () {
       const link = yield* CloudLink.CloudLink;
       const refused = yield* Effect.all({
-        linkProof: Effect.flip(link.linkProof({} as never, {} as never) as unknown as Effect.Effect<unknown, { _tag: string }>),
+        linkProof: Effect.flip(link.linkProof({} as never)),
         applyRelayConfig: Effect.flip(link.applyRelayConfig({} as never)),
         answerHealthRequest: Effect.flip(link.answerHealthRequest({} as never)),
         mintCredential: Effect.flip(link.mintCredential({} as never)),
       });
       const kept = [yield* link.linkState(), yield* link.unlink(), yield* link.updatePreferences({ publishAgentActivity: true })];
       return { refused: Object.fromEntries(Object.entries(refused).map(([name, error]) => [name, error._tag])), kept };
-    }).pipe(Effect.provide(layer)) as Effect.Effect<{ refused: Record<string, string>; kept: Array<unknown> }>,
+    }).pipe(Effect.provide(layer)),
   );
   expect(result.refused).toEqual({
     linkProof: "ManagedPolicyRefusedError",

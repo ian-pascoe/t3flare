@@ -41,13 +41,13 @@ const runGh = (args: ReadonlyArray<string>) =>
   Effect.runPromise(
     Effect.gen(function* () {
       const handle = yield* spawn(ChildProcess.make("gh", [...args]) as ChildProcess.Command);
-      const text = (stream: Stream.Stream<Uint8Array, unknown>) =>
+      const text = <E>(stream: Stream.Stream<Uint8Array, E>) =>
         Stream.runFold(stream, () => "", (acc, bytes) => acc + new TextDecoder().decode(bytes));
       const stdout = yield* text(handle.stdout);
       const stderr = yield* text(handle.stderr);
       const exitCode = yield* handle.exitCode;
       return { exitCode, stdout, stderr };
-    }),
+    }).pipe(Effect.scoped),
   );
 
 const authStatus = ["auth", "status", "--json", "hosts"];

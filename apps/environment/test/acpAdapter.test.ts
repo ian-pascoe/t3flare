@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off
+// @effect-diagnostics nodeBuiltinImport:off effectFnOpportunity:off globalJsonInEffect:off processEnvInEffect:off
 // t3's own ACP adapter (`makeAcpAdapterV2`) through our flavors (step 4b, plan §9's "Node with t3's adapter", review
 // F1; back to stock, owner 2026-11-12): a scripted agent (fixtures/fake-acp-agent.mjs) answers as claude-agent-acp 0.106.0 and opencode 2.2.7
 // did in M0's probes. Each test asserts what the agent was answered and what t3 saw.
@@ -153,9 +153,9 @@ const session = (cli: AcpCli, build: (cwd: string) => Script, policy: { readonly
   });
 
 const pendingRequest = (event: ProviderAdapter.ProviderAdapterV2Event) => event.type === "runtime_request.updated" && event.runtimeRequest.status === "pending";
-const answers = (log: ReturnType<Awaited<ReturnType<typeof run>>["agentLog"]>) => log.filter((entry) => entry.answered !== undefined).map((entry) => entry.result?.outcome?.optionId ?? entry.result?.outcome?.outcome);
-const run = <A>(effect: Effect.Effect<A, unknown, never>) => Effect.runPromise(effect);
-const test = <A>(body: Effect.Effect<A, unknown, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => run(body.pipe(Effect.scoped, Effect.provide(layerTest)) as never);
+const answers = (log: ReturnType<Effect.Success<ReturnType<typeof session>>["agentLog"]>) => log.filter((entry) => entry.answered !== undefined).map((entry) => entry.result?.outcome?.optionId ?? entry.result?.outcome?.outcome);
+const run = <A, E>(effect: Effect.Effect<A, E, never>) => Effect.runPromise(effect);
+const test = <A, E>(body: Effect.Effect<A, E, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => run(body.pipe(Effect.scoped, Effect.provide(layerTest)) as never);
 
 describe("Claude Code through t3's ACP adapter", () => {
   it("asks the owner for an edit at approval-required, and 'for the session' picks the agent's own (stock t3)", () =>

@@ -38,16 +38,14 @@ const bind = (answer: (request: EndpointTextRequest) => EndpointTextAnswer | Pro
 };
 
 const run = (model: string) =>
-  Effect.runPromise(
-    Effect.exit(
-      runText({
-        operation: "generateThreadTitle",
-        cwd: "/w/x",
-        prompt: "Name this thread.",
-        outputSchema: Schema.Struct({ title: Schema.String }),
-        modelSelection: { instanceId: ProviderInstanceId.make("piDurable"), model },
-      }),
-    ),
+  Effect.runPromiseExit(
+    runText({
+      operation: "generateThreadTitle",
+      cwd: "/w/x",
+      prompt: "Name this thread.",
+      outputSchema: Schema.Struct({ title: Schema.String }),
+      modelSelection: { instanceId: ProviderInstanceId.make("piDurable"), model },
+    }),
   );
 
 const detailOf = (exit: Exit.Exit<unknown, { readonly detail: string }>): string => {
@@ -126,7 +124,7 @@ describe("runText on Model endpoints", () => {
     bind(() => ({ ok: true, text: '{"title":"title"}' }));
     const textGeneration = makePiDurableTextGeneration();
     const title = (model: string) =>
-      Effect.runPromise(Effect.exit(textGeneration.generateThreadTitle({ cwd: "/w/x", message: "Fix the build", modelSelection: { instanceId: ProviderInstanceId.make("piDurable"), model } })));
+      Effect.runPromiseExit(textGeneration.generateThreadTitle({ cwd: "/w/x", message: "Fix the build", modelSelection: { instanceId: ProviderInstanceId.make("piDurable"), model } }));
     expect(detailOf(await title("openai/gpt-5-mini"))).toBe('The Model endpoint "openai" (model gpt-5-mini): The model returned the placeholder title "title".');
     expect(detailOf(await title("default"))).toBe('The Model endpoint "openai" (model gpt-5-mini): The model returned the placeholder title "title".');
   });
@@ -143,16 +141,16 @@ describe("runText on Model endpoints", () => {
       settledReview: "",
       modelSelection: { instanceId: ProviderInstanceId.make("piDurable"), model: "openai/gpt-5-mini" },
     });
-    expect(detailOf(await Effect.runPromise(Effect.exit(guide)))).toMatch(/^The Model endpoint "openai" \(model gpt-5-mini\): Pi Durable cannot investigate/);
+    expect(detailOf(await Effect.runPromiseExit(guide))).toMatch(/^The Model endpoint "openai" \(model gpt-5-mini\): Pi Durable cannot investigate/);
     expect(calls).toEqual([]);
   });
 
   it("leaves a failure that already names the endpoint as it is, and names the fallen-back endpoint of an old selection", async () => {
     bind(() => ({ ok: false, error: 'The Model endpoint "openai" failed (HTTP 503).' }));
     const title = makePiDurableTextGeneration().generateThreadTitle({ cwd: "/w/x", message: "m", modelSelection: { instanceId: ProviderInstanceId.make("piDurable"), model: "openai/gpt-5-mini" } });
-    expect(detailOf(await Effect.runPromise(Effect.exit(title)))).toBe('The Model endpoint "openai" failed (HTTP 503).');
+    expect(detailOf(await Effect.runPromiseExit(title))).toBe('The Model endpoint "openai" failed (HTTP 503).');
     bind(() => ({ ok: true, text: '{"title":"title"}' }));
     const old = makePiDurableTextGeneration().generateThreadTitle({ cwd: "/w/x", message: "m", modelSelection: { instanceId: ProviderInstanceId.make("piDurable"), model: "anthropic/claude-haiku-5-5" } });
-    expect(detailOf(await Effect.runPromise(Effect.exit(old)))).toBe('The Model endpoint "openai" (model gpt-5-mini): The model returned the placeholder title "title".');
+    expect(detailOf(await Effect.runPromiseExit(old))).toBe('The Model endpoint "openai" (model gpt-5-mini): The model returned the placeholder title "title".');
   });
 });

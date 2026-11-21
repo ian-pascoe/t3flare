@@ -1,7 +1,7 @@
 // The Pi Durable picker with Model endpoints (SPI-1162): every endpoint's models as `<endpointId>/<modelId>`, grouped by
 // endpoint, a reasoning model with the thinking picker. They are its only models (SPI-1176): with none, the provider
 // needs setup and points to the Settings page, and an old selection falls back to the default model.
-import type { ModelSelection } from "@t3tools/contracts";
+import { type ModelSelection, ProviderInstanceId } from "@t3tools/contracts";
 import { type ModelEndpoints, NO_ENDPOINT_MESSAGE } from "@t3flare/models/endpoints";
 import { describe, expect, it } from "vitest";
 
@@ -65,7 +65,7 @@ describe("the setup state (SPI-1176)", () => {
 
 describe("a Pi Durable selection's model (modelOf)", () => {
   const selection = (slug: string, thinking?: string): ModelSelection =>
-    ({ instanceId: "piDurable", model: slug, ...(thinking === undefined ? {} : { options: [{ id: "thinking", value: thinking }] }) }) as ModelSelection;
+    ({ instanceId: ProviderInstanceId.make("piDurable"), model: slug, ...(thinking === undefined ? {} : { options: [{ id: "thinking", value: thinking }] }) });
 
   it("is an endpoint's model by its slug, a model id holding `/` kept whole", () => {
     expect(modelOf(selection("commissary/claude-haiku-5-5", "low"), ENDPOINTS)).toEqual({ model: { provider: "commissary", modelId: "claude-haiku-5-5" }, thinking: "low" });

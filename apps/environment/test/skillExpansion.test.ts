@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 // Skill mentions and Slash commands in a Pi Durable message (SPI-1147 §4): `turnPrompt` expands them when its caller
 // passes the thread's skills (the Pi Durable adapter, for a new turn and a steer; of the ACP flavors, OpenCode's only).
 import * as NodeFs from "node:fs";

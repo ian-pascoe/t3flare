@@ -51,6 +51,11 @@ export interface TypecheckVerdict {
   readonly ours: ReadonlyArray<Diagnostic>;
   /** Errors in t3's files: reported, not failing. */
   readonly t3Errors: ReadonlyArray<Diagnostic>;
+  /**
+   * Errors in t3flare's files that this program reaches but does not own (`isOurs`): the workerd tests' program reaches
+   * `src`, which the package's own program checks under the configuration it is built for. Reported, not failing.
+   */
+  readonly elsewhereErrors: ReadonlyArray<Diagnostic>;
   /** Why the typecheck failed without an error of ours, if it did. */
   readonly reason?: string;
 }
@@ -58,17 +63,27 @@ export interface TypecheckVerdict {
 /**
  * The typecheck's verdict from the compiler's exit status and output. It passes a non-zero exit only when every error
  * is a diagnostic in t3's files and the compiler printed nothing else: any line it could not read (a global error, a
- * crash), a signal, or a non-zero exit with no error diagnostic fails it. Only a clean exit passes regardless.
+ * crash), a signal, or a non-zero exit with no error diagnostic fails it. Only a clean exit passes regardless. `isOurs`
+ * narrows our own files (by default every file outside t3's) to the ones this program owns; errors in the rest pass too.
  */
-export const typecheckVerdict = (status: number | null, output: string, cwd: string, t3Root: string): TypecheckVerdict => {
+export const typecheckVerdict = (
+  status: number | null,
+  output: string,
+  cwd: string,
+  t3Root: string,
+  isOurs: (file: string) => boolean = () => true,
+): TypecheckVerdict => {
   const { diagnostics, unparsed } = parseDiagnostics(output);
-  const ours = diagnostics.filter((d) => !isT3File(d.file, cwd, t3Root));
-  const t3Errors = diagnostics.filter((d) => d.category === "error" && isT3File(d.file, cwd, t3Root));
+  const t3 = (d: Diagnostic) => isT3File(d.file, cwd, t3Root);
+  const ours = diagnostics.filter((d) => !t3(d) && isOurs(d.file));
+  const t3Errors = diagnostics.filter((d) => d.category === "error" && t3(d));
+  const elsewhereErrors = diagnostics.filter((d) => d.category === "error" && !t3(d) && !isOurs(d.file));
   const ourErrors = ours.filter((d) => d.category === "error");
-  if (ourErrors.length > 0) return { ok: false, ours, t3Errors };
-  if (status === 0) return { ok: true, ours, t3Errors };
-  if (status === null) return { ok: false, ours, t3Errors, reason: "the compiler was killed by a signal" };
-  if (unparsed.length > 0) return { ok: false, ours, t3Errors, reason: `the compiler exited ${status} and printed lines that are not diagnostics: ${unparsed.slice(0, 5).join(" | ")}` };
-  if (t3Errors.length === 0) return { ok: false, ours, t3Errors, reason: `the compiler exited ${status} with no error diagnostic` };
-  return { ok: true, ours, t3Errors };
+  const base = { ours, t3Errors, elsewhereErrors };
+  if (ourErrors.length > 0) return { ok: false, ...base };
+  if (status === 0) return { ok: true, ...base };
+  if (status === null) return { ok: false, ...base, reason: "the compiler was killed by a signal" };
+  if (unparsed.length > 0) return { ok: false, ...base, reason: `the compiler exited ${status} and printed lines that are not diagnostics: ${unparsed.slice(0, 5).join(" | ")}` };
+  if (t3Errors.length === 0 && elsewhereErrors.length === 0) return { ok: false, ...base, reason: `the compiler exited ${status} with no error diagnostic` };
+  return { ok: true, ...base };
 };

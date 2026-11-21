@@ -17,7 +17,7 @@ const bindMarks = () => {
 };
 
 /** Boots `seed` over `settings` (one boot), then reads the settings. */
-const boot = (settings: Layer.Layer<ServerSettings.ServerSettingsService, unknown>, seed: Layer.Layer<never, never, ServerSettings.ServerSettingsService>) =>
+const boot = <E>(settings: Layer.Layer<ServerSettings.ServerSettingsService, E>, seed: Layer.Layer<never, never, ServerSettings.ServerSettingsService>) =>
   Effect.runPromise(
     Effect.gen(function* () {
       const service = yield* ServerSettings.ServerSettingsService;

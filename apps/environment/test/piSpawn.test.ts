@@ -52,7 +52,7 @@ const bind = (options: { readonly endpoints: ModelEndpoints }) =>
 // t3's fork launch: it needs no extension in the State directory.
 const FORK = ["--mode", "rpc", "--offline", "--no-extensions", "--no-tools", "--fork", `${PI_SESSIONS}/s1.jsonl`];
 const piCommand = () => ChildProcess.make("pi", FORK, { cwd: "/w/demo" }) as ChildProcess.StandardCommand;
-const spawnPi = () => Effect.runPromise(spawnCli(piCommand()).pipe(Effect.scoped, Effect.exit));
+const spawnPi = () => Effect.runPromiseExit(spawnCli(piCommand()).pipe(Effect.scoped));
 const modelsOf = (start: ChannelStart) => JSON.parse(start.files?.find((file) => file.path.endsWith("/agent/models.json"))?.text ?? "{}") as { providers: Record<string, { baseUrl: string; apiKey: string }> };
 
 /** One spawn: `sent` written to its stdin (in the chunks given), and what t3 reads from its stdout. */

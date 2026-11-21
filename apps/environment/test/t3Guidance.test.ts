@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 // SPI-1060 (plan SPI-1061 §11.1, D8; U49): a Durable agent is never told about a t3 tool it is denied. The denylist
 // (`T3_TOOL_DENYLIST`; owner, 2026-11-12, back to stock) names only real t3 tools, so a bump that renames or drops one
 // fails here; the prompt and the offered tools' descriptions name no denied tool.
@@ -26,7 +27,7 @@ beforeAll(async () => {
     const tools = (exported as { tools?: unknown } | null)?.tools;
     if (tools === null || typeof tools !== "object") continue;
     for (const tool of Object.values(tools as Record<string, { name: string; description?: string }>)) {
-      if (typeof tool?.name === "string" && tool.name !== TOOL_SEARCH) byName.set(tool.name, { name: tool.name, description: tool.description });
+      if (typeof tool?.name === "string" && tool.name !== TOOL_SEARCH) byName.set(tool.name, { name: tool.name, ...(tool.description === undefined ? {} : { description: tool.description }) });
     }
   }
   t3Tools = [...byName.values()];
