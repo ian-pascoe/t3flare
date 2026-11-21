@@ -1,4 +1,4 @@
-// @effect-diagnostics globalFetch:off asyncFunction:off globalDate:off
+// @effect-diagnostics globalDate:off
 // Text generation on a Model endpoint's model (SPI-1163): thread titles, commit messages and PR text, as one pi-ai request
 // with no tools. The Environment DO calls it over the `EndpointTextGeneration` entrypoint (`worker.ts`) with ids only,
 // so the Environment's bundle never holds pi-ai and no caller-supplied endpoint exists here: the endpoint is read from the

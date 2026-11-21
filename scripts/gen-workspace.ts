@@ -1,3 +1,4 @@
+// @effect-diagnostics globalConsole:off nodeBuiltinImport:off
 // Generates the root pnpm-workspace.yaml from t3code's (ADR-0001, ADR-0030): our packages plus the t3 packages we
 // import, and t3's settings copied as they are, so the root resolves t3's packages the way t3 does.
 //

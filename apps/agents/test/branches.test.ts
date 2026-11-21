@@ -1,7 +1,6 @@
 // G6 (SPI-997 fork, SPI-987 rollback) on a real pi-durable Harness over pi-ai's faux provider, whose model answers with
 // the user messages it was given: a rollback forgets the dropped turns (the model no longer sees them), a fork across
 // Harnesses (two Session DOs) sees the source's turns through the fork point and not after it.
-// @effect-diagnostics asyncFunction:off
 import { createModels, fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
 import { type Conversation, createRegistry, Harness as HarnessApi, MemoryStorage } from "@earendil-works/pi-durable";
 import { CodemodeStoreDoc } from "@earendil-works/pi-durable/codemode";

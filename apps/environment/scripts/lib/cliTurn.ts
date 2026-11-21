@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off
+// @effect-diagnostics globalDate:off
 // Step 4a: one CLI agent turn from t3's own client protocol (a Codex or Pi thread in a Workspace of the fixture), every
 // request answered, and the projection's evidence. Used by `scripts/cli4a.ts` and `acceptance.ts --codex/--pi`.
 import { dispatch, endpointModelFor, itemsOf, mutateProject, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall } from "./client.ts";

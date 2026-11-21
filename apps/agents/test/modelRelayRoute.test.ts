@@ -1,7 +1,7 @@
 // The model relay's route in `WorkspaceProxy` (SPI-1167): a CLI's request to `/t3flare/model/<endpointId>/…` with its
 // model handle goes to the endpoint's base URL with the endpoint's credential in place of the handle, the request and
 // the answer streamed through unchanged; the handle never leaves, and every request is logged without a value.
-// @effect-diagnostics globalTimers:off newPromise:off
+// @effect-diagnostics globalTimers:off
 import { describe, expect, it } from "vitest";
 
 import { ENDPOINT_ID } from "@t3flare/models/endpoints";

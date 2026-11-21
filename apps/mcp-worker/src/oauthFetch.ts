@@ -1,5 +1,5 @@
 // The MCP Worker's fetch for OAuth (review M5): https only, no credentials in the URL, no redirect followed, bounded.
-// @effect-diagnostics globalFetch:off asyncFunction:off
+// @effect-diagnostics asyncFunction:off
 /** Each OAuth request's own bound. */
 export const OAUTH_REQUEST_TIMEOUT_MS = 15_000;
 

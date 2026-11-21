@@ -1,5 +1,4 @@
 // Copied from cloudpid@93ba45a3:packages/extensions/src/web/content.ts, unchanged but for its header (SPI-1054; see ./NOTICE.md).
-// @effect-diagnostics missingPipeableSignature:off preferEffectArray:off
 // Fetched bytes to the text a model reads: the main content of an HTML page as Markdown or plain text, JSON
 // re-indented, anything else as it came. Ported from `convertHtmlPage` and `convertFetchedContent` in pi-web-tools'
 // `src/web-fetch.ts` (see ./NOTICE.md).

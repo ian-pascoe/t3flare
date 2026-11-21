@@ -3,7 +3,6 @@
 // parameters, limits, conversion and results as cloudpid's, as a plain pi-durable tool; the honest user agent names
 // t3flare, and `details` carry what t3's web item shows. A fetch is a read: no mode asks for it, plan mode included,
 // and linked threads may use it.
-// @effect-diagnostics asyncFunction:off
 import { defineTool, type ToolRegistration } from "@earendil-works/pi-durable";
 import { int, num, obj, oneOf, opt, str } from "@earendil-works/pi-schema";
 

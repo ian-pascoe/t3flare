@@ -1,4 +1,3 @@
-// @effect-diagnostics globalTimers:off
 // Limit readings (SPI-1174): the rate-limit headers of each answer on a Model endpoint, read where SPI-1173 records usage
 // (a Session's endpoint provider, text generation, the model relay) and sent to the Environment's `recordLimits`.
 import { createModels } from "@earendil-works/pi-ai";

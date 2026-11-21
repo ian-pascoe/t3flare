@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off nodeBuiltinImport:off
+// @effect-diagnostics nodeBuiltinImport:off
 // Step 3, M0 R6: the laptop's agent is t3's own Pi provider (`pi --mode rpc`) with an isolated agent directory whose
 // models.json names the stage's Model endpoint (`T3FLARE_MODEL_ENDPOINT`, with its `models`, which `stage.ts run` passes
 // from ~/.config/t3flare/dev.env) as one pi provider. The key is never written: models.json names

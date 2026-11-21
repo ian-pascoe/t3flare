@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off nodeBuiltinImport:off globalFetch:off globalTimers:off globalDate:off
+// @effect-diagnostics globalConsole:off nodeBuiltinImport:off globalFetch:off globalDate:off
 // Evidence for the boot counter and safe mode on a deployed stage:
 //
 //   node scripts/stage.ts run <stage> safe-mode [--out file.json]

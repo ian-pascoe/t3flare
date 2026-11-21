@@ -195,7 +195,7 @@ describe("Settings page", () => {
     store.save({ revision: 4, global: {}, overrides: {}, mcp: { servers: { commissary: { kind: "commissary", enabled: true, exposure: "deferred" } } } } as never);
     const secrets = harnessSecrets(kv);
     const mcp = new McpHost({ kv, engine: undefined, settings: () => store.load() });
-    const deps = { caller: { kind: "service-token" } as HarnessCaller, host: HOST, store, mcp, secrets, now: () => NOW };
+    const deps = { caller: { kind: "service-token" } as AccessCaller, host: HOST, store, mcp, secrets, now: () => NOW };
     const overview = async () => (await (await handleHarness(new Request(`https://${HOST}/_t3flare/settings/api/mcp`), deps)).json()) as { servers: Array<{ name: string; setting: unknown }> };
     expect((await overview()).servers.map((server) => server.name)).toEqual(["settings"]);
     expect((await handleHarness(new Request(`https://${HOST}/_t3flare/settings`), { ...deps, caller: owner })).status).toBe(200);
@@ -234,7 +234,7 @@ describe("Settings page", () => {
     };
     const secrets = harnessSecrets(kv);
     const mcp = new McpHost({ kv, engine, settings: () => store.load(), secret: async (server, field) => secrets.read(server, field), now: () => NOW });
-    const deps = { caller: { kind: "service-token" } as HarnessCaller, host: HOST, store, mcp, secrets, now: () => NOW };
+    const deps = { caller: { kind: "service-token" } as AccessCaller, host: HOST, store, mcp, secrets, now: () => NOW };
     const post = (path: string, body: unknown) => handleHarness(new Request(`https://${HOST}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }), deps);
     const overview = async () => ((await (await handleHarness(new Request(`https://${HOST}/_t3flare/settings/api/mcp`), deps)).json()) as { servers: Array<{ name: string; status: string; tools: Array<{ upstream: string }> }> }).servers;
     const add = { server: "commissary", url: "https://api.commissary.example/mcp", auth: { kind: "header", header: "x-api-key" }, value: "cms-key" };

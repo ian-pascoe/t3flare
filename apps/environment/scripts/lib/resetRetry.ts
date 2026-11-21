@@ -1,4 +1,4 @@
-// @effect-diagnostics globalFetch:off globalConsole:off globalTimers:off
+// @effect-diagnostics globalConsole:off globalTimers:off
 // The stage scripts' fetch, retried when the connection resets. Node's fetch (undici) speaks HTTP/2 to Cloudflare's
 // edge, which now and then resets a stream (`ECONNRESET`, `http2ErrorCode` set) before the Worker sees the request: the
 // bump's acceptance test died of it at random points while every request the Worker logged succeeded. A request with

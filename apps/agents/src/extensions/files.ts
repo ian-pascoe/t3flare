@@ -2,7 +2,6 @@
 // cloudpid@b8097ff0:packages/extensions/src/files.ts: the same three tools and the same Workspace DO searches
 // (`ComputerFiles`, which reaches the Container only for a Container-only path), as plain Promise tools with text
 // output. Each runs where the call's environment works (`api.env.cwd`), with relative paths resolved against it.
-// @effect-diagnostics asyncFunction:off preferEffectArray:off
 import type { ComputerFiles } from "@t3flare/computer-env";
 import { defineExtension, defineTool, type Extension } from "@earendil-works/pi-durable";
 import { bool, num, obj, opt, str } from "@earendil-works/pi-schema";

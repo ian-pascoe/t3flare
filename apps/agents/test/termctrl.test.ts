@@ -2,7 +2,7 @@
 // (`AgentTerminals`) over a fake PTY host that answers like a REPL: a turn starts a Terminal, types into it, polls it and
 // stops it, with pi-termctrl's result texts; `bash`'s background job; an exit told after the tool round; and the
 // approvals the thread's mode asks for (`terminal_start` and typing ask, a poll does not).
-// @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off globalDate:off
+// @effect-diagnostics globalTimers:off globalDate:off
 import { type AssistantMessage, createModels, fauxAssistantMessage, fauxProvider, fauxToolCall, type ToolResultMessage } from "@earendil-works/pi-ai";
 import { createRegistry, defineExtension, defineTool, type Extension, Harness, MemoryStorage, type ToolExecutionResult } from "@earendil-works/pi-durable";
 import { obj } from "@earendil-works/pi-schema";

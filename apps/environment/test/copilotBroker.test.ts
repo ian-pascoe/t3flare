@@ -1,4 +1,3 @@
-// @effect-diagnostics globalConsole:off
 // The Credential broker with a GitHub Copilot sign-in (SPI-1166): the same broker and lock as ChatGPT's and Claude's,
 // with GitHub's device flow. The attempt waits sealed between polls, each poll no sooner than GitHub's interval; the
 // GitHub token is the sealed grant and the Copilot token is derived from it under the lock, once however many ask; every

@@ -2,7 +2,7 @@
 // rather than HTTP: one MCP session per credential, kept in memory, initialised again when t3 answers 404 (the
 // Environment restarted), as t3's `PeerMcpClient` does. A 401 means the credential is gone (an Environment restart, the
 // provider session released): t3's tools are unavailable until the next turn brings a fresh one.
-// @effect-diagnostics asyncFunction:off globalConsole:off
+// @effect-diagnostics globalConsole:off
 import type { McpRpcAnswer, McpRpcRequest, T3McpCredential } from "@t3flare/session-protocol";
 
 import type { CatalogTool, McpCallAnswer } from "../extensions/t3-mcp.ts";

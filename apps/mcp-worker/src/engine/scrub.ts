@@ -11,7 +11,7 @@
  * place in the list.
  */
 // @effect-diagnostics missingPipeableSignature:off -- plain functions over plain values, not combinators.
-/* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-unknown-returns -- a walk over any JSON-shaped value, the SDK's decoded lists and results included, which changes only its strings and returns what it was given */
+// A walk over any JSON-shaped value, the SDK's decoded lists and results included, which changes only its strings and returns what it was given
 import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";

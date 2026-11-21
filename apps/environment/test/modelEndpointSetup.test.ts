@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 // SPI-1175: the Model endpoint a stage, the acceptance test and CI set up through the panel's API: where its spec comes
 // from (scripts/lib/modelEndpointSpec.ts), and how it is saved (scripts/lib/modelEndpoint.ts).
 import * as fs from "node:fs";

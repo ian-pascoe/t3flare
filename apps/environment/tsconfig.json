@@ -7,5 +7,6 @@
     "types": ["node"],
     "lib": ["ESNext", "esnext.disposable", "DOM"]
   },
-  "include": ["src", "scripts", "*.ts"]
+  "include": ["src", "scripts", "test", "*.ts"],
+  "exclude": ["test/**/*.workerd.test.ts", "test/workerd.fixture.ts"]
 }

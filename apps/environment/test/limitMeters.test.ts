@@ -1,3 +1,4 @@
+// @effect-diagnostics globalDate:off
 // t3's limit meters for subscription endpoints (SPI-1174): each vendor's rate-limit headers read as its own client reads
 // them (the shapes pinned here: a vendor's rename or a change of unit fails this file), kept per window by the latest
 // answer in the Environment DO's SQLite, and shown as one t3 limit source per endpoint, through t3's own contract and
@@ -284,7 +285,7 @@ describe("t3's limit sources: one per subscription endpoint", () => {
 
   it("are t3's own contract: each window's share, reset and length, under the endpoint's label, with no account identity", () => {
     const sources = limitSnapshots(windows, endpoints, NOW);
-    for (const source of sources) expect(() => Schema.decodeUnknownSync(UsageLimitSourceSnapshot)(source)).not.toThrow();
+    for (const source of sources) expect(() => Schema.decodeSync(UsageLimitSourceSnapshot)(source)).not.toThrow();
     expect(sources.map((source) => [source.id, source.label, source.error])).toEqual([
       [`${LIMIT_SOURCE_PREFIX}chatgpt`, "ChatGPT plan", undefined],
       [`${LIMIT_SOURCE_PREFIX}claude`, "Claude plan", undefined],
@@ -369,11 +370,10 @@ const stockService = {
 
 describe("the endpoints' meters in t3's UsageLimitSources", () => {
   /** Time passes on t3's (test) clock, and every fiber it wakes runs. */
-  const pass = (duration: Duration.Input) =>
-    Effect.gen(function* () {
-      yield* TestClock.adjust(duration);
-      for (let turn = 0; turn < 20; turn++) yield* Effect.yieldNow;
-    });
+  const pass = Effect.fn("pass")(function* (duration: Duration.Input) {
+    yield* TestClock.adjust(duration);
+    for (let turn = 0; turn < 20; turn++) yield* Effect.yieldNow;
+  });
   const claudeAt = (usedPercent: number) => reading("claude", NOW + usedPercent, [{ id: "five_hour", usedPercent, resetsAt: NOW + 4 * HOUR, windowMinutes: 300 }]);
   const shares = (sources: ReadonlyArray<UsageLimitSourceSnapshot>) => sources.filter((source) => source.id.startsWith(LIMIT_SOURCE_PREFIX)).map((source) => source.accounts[0]!.usageLimits.windows[0]!.usedPercent);
 

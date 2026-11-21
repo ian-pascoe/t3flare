@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
 // A large repo with a submodule as a project and a worktree thread (the prod bug of 2026-11-11: t3flare itself, whose
 // `t3code` submodule has 31,946 files), through t3's own RPCs:
 //

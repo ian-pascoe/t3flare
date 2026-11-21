@@ -1,7 +1,6 @@
 // The model relay's usage records (SPI-1173): each relayed CLI request's usage is read from its answer as it streams past
 // (the final stream event, or the body), per API, and recorded with the CLI, the endpoint and the model. The answer
 // reaches the CLI byte for byte, as it comes; an answer the reader cannot parse is still relayed whole, unrecorded.
-// @effect-diagnostics globalTimers:off newPromise:off
 import { describe, expect, it } from "vitest";
 
 import type { EndpointApi } from "@t3flare/models/endpoints";

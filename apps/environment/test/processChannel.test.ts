@@ -1,7 +1,7 @@
 // The Environment's half of the process channel (step 4a) at its seam, `ProcessChannel`, over a fake Workspace DO:
 // starts and refusals, ordered gap-free input that is retried but never skipped, output delivered in order with
 // duplicates dropped, backpressure on stdout, stderr that cannot stall it, and the epoch (review F6).
-// @effect-diagnostics globalTimers:off newPromise:off globalDate:off
+// @effect-diagnostics globalTimers:off
 import type { ProcessAnswer, ProcessFrame, ProcessInputAnswer, ProcessStartAnswer, ProcessStartInput } from "@t3flare/workspace-client";
 import { describe, expect, it, vi } from "vitest";
 

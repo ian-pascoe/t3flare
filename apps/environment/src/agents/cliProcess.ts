@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalConsoleInEffect:off globalJsonInEffect:off effectFnOpportunity:off
+// @effect-diagnostics effectFnOpportunity:off
 // t3's spawns of a CLI agent (step 4a): `codex app-server` and `pi --mode rpc …` in a Workspace run there, through the
 // process channel, as a streaming `ChildProcessHandle`. Fail closed: only the argv our drivers send, only in a
 // Workspace, only through a CLI profile (cliProfiles.ts) that fixes the binary, the environment and the home.
@@ -25,6 +25,7 @@ import { lineMapper, piLineFromPi, piLineToPi, piRelayOf } from "../provider/cli
 import { currentTextGenerationModel } from "./seedSettings.ts";
 import { PI_T3_MCP_EXTENSION_SOURCE } from "../../../../t3code/packages/provider-pi/src/server/mcpExtensionSource.ts";
 import * as StateStore from "../platform/stateStore.ts";
+import { workersLog } from "../platform/workersLog.ts";
 
 /** The CLI binaries this route answers, by the name t3 spawns. */
 export const CLI_NAMES: ReadonlySet<string> = new Set(["codex", "pi", "t3flare-probe", "claude-agent-acp", "opencode"]);
@@ -156,15 +157,15 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
       },
     );
     if ("refused" in launch) {
-      console.warn(JSON.stringify({ t3flare: "cli-spawn-refused", cli: name, reason: launch.refused, argv: args.slice(0, 6) }));
+      workersLog("warn", { t3flare: "cli-spawn-refused", cli: name, reason: launch.refused, argv: args.slice(0, 6) });
       return yield* refused(name, launch.refused);
     }
     // The resume proof (M5), at spawn: since v0.1.11-nightly.20261117.4825 t3 resumes a persisted pi session with
     // `--session <file>` on the new process instead of a `switch_session` message (the stdin hook below keeps that one).
     if (name === "pi" && args.includes("--session")) traceProtocol("pi", "--session", args[args.indexOf("--session") + 1] ?? "?");
     // The relay's wiring for this process (never the handle): whether t3's tools reach it, and through which session.
-    console.log(JSON.stringify({ t3flare: "cli-relay", cli: name, session: session !== undefined, t3Tools: launch.env.T3_MCP_URL !== undefined }));
-    if (launch.droppedEnv.length > 0) console.log(JSON.stringify({ t3flare: "cli-env-dropped", cli: name, keys: launch.droppedEnv }));
+    workersLog("log", { t3flare: "cli-relay", cli: name, session: session !== undefined, t3Tools: launch.env.T3_MCP_URL !== undefined });
+    if (launch.droppedEnv.length > 0) workersLog("log", { t3flare: "cli-env-dropped", cli: name, keys: launch.droppedEnv });
     const start: ChannelStart = {
       key,
       cli: cliOf(name),

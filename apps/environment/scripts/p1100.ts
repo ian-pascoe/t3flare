@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off globalDateInEffect:off
+// @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off
 // SPI-1100's stage harness (docs-archive-1:docs/steps/spi-1100.md): a turn's checkpoint holds what the agent wrote in it, for the CLI
 // agents (which write in the Workspace's Container) and the Durable agent (which writes through the Workspace DO).
 // For each agent, through t3's own commands as the web client sends them, on a worktree thread:

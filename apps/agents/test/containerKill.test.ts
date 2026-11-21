@@ -1,7 +1,6 @@
 // The kill script run on the Container only while it runs, never starting it (step 2a part 2's leftover race): the
 // platform's `ctx.container`, faked. Its `exec` never starts a Container (only `start()` does), so a Container that
 // stops between the check and the exec makes the exec fail rather than start it; that failure is "not running".
-// @effect-diagnostics asyncFunction:off
 import { describe, expect, it } from "vitest";
 
 import { killInRunningContainer, type RunningContainer } from "../src/workspace/containerKill.ts";

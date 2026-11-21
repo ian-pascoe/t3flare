@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off globalDateInEffect:off
+// @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off
 // SPI-997 and SPI-987's stage harness (parity gap G6; docs-archive-1:docs/steps/spi-997.md), on Durable threads, through t3's own
 // commands as the web client sends them:
 // - fork: a thread is given three code words, one a turn; a fork from the second turn (`thread.fork`, source point

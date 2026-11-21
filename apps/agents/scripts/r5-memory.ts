@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off globalConsole:off globalDate:off
+// @effect-diagnostics nodeBuiltinImport:off globalConsole:off globalTimers:off
 // R5 (step 2a plan, section 8; moved to M3): the heap the Workspace DO's isomorphic-git work takes on a 2,000-file repo,
 // measured in Node (V8, as workerd) with forced GCs around each step: a checkpoint capture (status of every file, a
 // blob per changed file, the trees, a commit), the checkpoint diff, and a stale status patch. workerd has no heap API,
@@ -65,7 +65,7 @@ const start = await step("capture (from)", () => captureCheckpoint(repo(), "refs
 fs.appendFileSync(join(dir, "pkg0/mod0/file0.ts"), "// more\n");
 const end = await step("capture (to)", () => captureCheckpoint(repo(), "refs/t3/r5/to", 2));
 const patch = await step("diff (patch)", () => diffCommits(repo(), start, end, { format: "patch" }));
-await step("stale status patch (25 journal paths)", async () => patchAnswer("status", status, journal, await repoFacts(repo())));
+await step("stale status patch (25 journal paths)", async () => patchAnswer({ kind: "status", base: "HEAD" }, status, journal, await repoFacts(repo())));
 const out = {
   measured: true,
   where: "Node (V8) with --expose-gc; workerd has no heap API",

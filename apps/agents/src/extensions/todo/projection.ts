@@ -13,7 +13,6 @@
 //   order): a note at the end of the request, which lasts until the model calls `todo` and its result shows the list.
 //
 // All rest on `details.todoRev`, the revision of the list that a result's text shows.
-// @effect-diagnostics asyncFunction:off preferEffectArray:off
 import type { Message } from "@earendil-works/pi-ai";
 import { GenerationTask, type Harness, hook, type HookRegistration, type JsonObject, ToolTask } from "@earendil-works/pi-durable";
 

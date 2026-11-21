@@ -1,3 +1,4 @@
+// @effect-diagnostics cryptoRandomUUID:off
 // A fake of Anthropic's OAuth for a Claude subscription (SPI-1165), as pi-ai 1.5.0's copy-code flow uses it and the
 // spike saw it (SPI-1161 Q1, Q5, Sign-out): the authorize step at claude.ai as a browser approval that answers with the
 // `code#state` Anthropic's page shows; the token endpoint (JSON; the authorization code with PKCE and its state, and

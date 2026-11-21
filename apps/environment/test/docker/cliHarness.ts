@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics nodeBuiltinImport:off
 // test:docker's harness for the skills probes (SPI-1151's `skills.docker.test.ts`, SPI-1153's `envSkills.docker.test.ts`):
 // the image, a stand-in `computer.internal` on an internal network (no model is called), a CLI launched as the Workspace
 // DO launches it (`profileLaunch` → `processCommand`) on a probe Model endpoint through the relay, and the JSON-RPC

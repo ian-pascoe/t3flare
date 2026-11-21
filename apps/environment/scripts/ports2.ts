@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalRandom:off
+// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
 // The second pi-harness ports' stage harness (SPI-1057 terminals, SPI-1058 guardian, SPI-1059 advisor;
 // docs-archive-1:docs/steps/pi-ports-2.md), after scripts/ports.ts: a Durable thread uses a Terminal in a real turn, the Guardian is
 // switched on through the Settings page's API and blocks a destructive command with its reason in t3, and the Advisor is

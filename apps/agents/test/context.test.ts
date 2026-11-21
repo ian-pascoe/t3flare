@@ -1,7 +1,6 @@
 // The `context` extension (SPI-1056) on a real pi-durable Harness over pi-ai's faux provider: Notes kept in the
 // Session's document within their bounds, History read back from stored entries (also from before a Handoff), and a
 // Rollover that hands off to a fresh context the same run goes on in. The compaction hook is checked on its own.
-// @effect-diagnostics asyncFunction:off
 import { type AssistantMessage, createModels, fauxAssistantMessage, fauxProvider, fauxToolCall, type ToolResultMessage } from "@earendil-works/pi-ai";
 import { createRegistry, type Harness, Harness as HarnessApi, type HookApi, MemoryStorage } from "@earendil-works/pi-durable";
 import { describe, expect, it } from "vitest";

@@ -1,4 +1,4 @@
-// @effect-diagnostics asyncFunction:off globalDate:off globalTimers:off newPromise:off
+// @effect-diagnostics globalTimers:off
 // The agent's Terminals and Background jobs (SPI-1057), the Workspace DO's half: pi-termctrl's Terminals
 // (ian-pascoe/pi-extensions@a5e15d1:packages/pi-termctrl, `termctrl-registry.ts` and the termctrl driver's screen) as
 // PTYs in the Workspace's Container. They run under a second `TerminalHost` (ADR-0021's host: the platform's PTY exec,

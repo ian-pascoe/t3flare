@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalConsoleInEffect:off globalJsonInEffect:off globalDate:off globalDateInEffect:off effectFnOpportunity:off cryptoRandomUUID:off
+// @effect-diagnostics effectFnOpportunity:off cryptoRandomUUID:off
 // The CLI adapters' wrapper (step 4a, plan §3 with review F1, F7, F10): t3's own Codex and Pi adapters, with what the
 // Cloud Environment changes around them.
 //
@@ -49,6 +49,7 @@ import type { ChannelProcess } from "../../agents/processChannel.ts";
 import { type CliAnswer, type CliAsk, registerCliAsker } from "./cliAsk.ts";
 import { takeEnvironmentSkillsAt } from "./environmentSkillsTake.ts";
 import { failureOf, withRelayFailure } from "./relayFailure.ts";
+import { workersLog } from "../../platform/workersLog.ts";
 
 /** ADR-0015: a CLI turn longer than this ends its process. */
 export const TURN_CAP_MS = 2 * 60 * 60_000;
@@ -364,7 +365,7 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               session.capFiber = yield* Effect.sleep(TURN_CAP_MS).pipe(
                 Effect.andThen(
                   Effect.sync(() => {
-                    console.warn(JSON.stringify({ t3flare: "cli-turn-cap", providerSessionId: input.providerSessionId, key: session.process?.key ?? null }));
+                    workersLog("warn", { t3flare: "cli-turn-cap", providerSessionId: input.providerSessionId, key: session.process?.key ?? null });
                     session.process?.kill();
                   }),
                 ),

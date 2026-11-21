@@ -1,4 +1,4 @@
-// @effect-diagnostics asyncFunction:off globalTimers:off globalConsole:off
+// @effect-diagnostics globalTimers:off globalConsole:off
 // The Workspace DO syncs files for its terminals (step 2b, ADR-0021; cloudpid's ADR-0012): computer syncs only around
 // its own commands, and a shell's writes would otherwise never reach the DO (t3's status, diffs, checkpoints).
 //

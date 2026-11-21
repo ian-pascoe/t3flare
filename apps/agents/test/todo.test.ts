@@ -2,7 +2,6 @@
 // Session's Todo document atomically, results show the list and its revision, and the projection puts the list back in
 // front of a context that holds no `todo` result (once per window, the same bytes every request), with a note when a
 // shown list is behind.
-// @effect-diagnostics asyncFunction:off
 import { type AssistantMessage, createModels, fauxAssistantMessage, fauxProvider, fauxToolCall, type Message } from "@earendil-works/pi-ai";
 import { createRegistry, type Harness, Harness as HarnessApi, type HookApi, MemoryStorage } from "@earendil-works/pi-durable";
 import { describe, expect, it } from "vitest";

@@ -4,7 +4,7 @@
 // matches when no retry can help. A usage limit is one request and never another endpoint's; an overload is retried;
 // error text is redacted before pi-durable keeps it. Answers are the recorded vendor shapes of
 // packages/models/test/fixtures/vendors.json.
-// @effect-diagnostics asyncFunction:off globalTimers:off globalDate:off newPromise:off
+// @effect-diagnostics globalTimers:off
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, isRetryableAssistantError } from "@earendil-works/pi-ai";
 import { createRegistry, Harness, MemoryStorage } from "@earendil-works/pi-durable";

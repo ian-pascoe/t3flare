@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalFetch:off
+// @effect-diagnostics globalDate:off
 // The Worker's routing for the Owner-client endpoint (worker.ts; ADR-0036, plan D13), SPI-1200 review: the endpoint's
 // branch comes before the panel's and the generic `/_t3flare` branch; it verifies against the endpoint's own audience,
 // so the panel's assertion is refused there and the endpoint's at the panel; a path below the endpoint answers 404; and
@@ -41,8 +41,8 @@ const assertion = async (aud: string, claims: Record<string, unknown> = { email:
   return `${header}.${payload}.${Buffer.from(signature).toString("base64url")}`;
 };
 
-/** The Worker over a recording Environment DO. */
-const world = (extra: Partial<Env> = {}) => {
+/** The Worker over a recording Environment DO, `extra` replacing its bindings (an `undefined` one unsets it). */
+const world = (extra: { readonly [K in keyof Env]?: Env[K] | undefined } = {}) => {
   const seen: Array<{ readonly method: string; readonly caller?: unknown }> = [];
   const answer = (method: string) => async (_request: Request, caller?: unknown) => (seen.push({ method, ...(caller === undefined ? {} : { caller }) }), new Response(method));
   const env = {
@@ -97,7 +97,7 @@ describe("the Owner-client endpoint's branch (worker.ts)", () => {
   });
 
   it("refuses everything when the endpoint's audience is not configured (prod until the owner turns it on, ADR-0036)", async () => {
-    const w = world({ T3FLARE_ACCESS_SETTINGS_AUD: undefined } as Partial<Env>);
+    const w = world({ T3FLARE_ACCESS_SETTINGS_AUD: undefined });
     expect(await w.call("/_t3flare/mcp", { "cf-access-jwt-assertion": await assertion(SETTINGS_AUD) })).toEqual({ status: 404, seen: [] });
     // Without `SettingsAccess` the admin application covers `/_t3flare/mcp`; its assertion and the admin token reach nothing there.
     expect(await w.call("/_t3flare/mcp", { "cf-access-jwt-assertion": await assertion(PANEL_AUD), authorization: `Bearer ${ADMIN}` })).toEqual({ status: 404, seen: [] });
@@ -115,13 +115,13 @@ describe("the Owner-client endpoint's branch (worker.ts)", () => {
       expect(await w.call(path, { "cf-access-jwt-assertion": await assertion(SETTINGS_AUD) }), path).toEqual({ status: 404, seen: [] });
       expect(await w.call(path, { "cf-access-jwt-assertion": await assertion(PANEL_AUD, { email: "someone@example.com", sub: "other-sub" }) }), path).toEqual({ status: 404, seen: [] });
       // The panel has no local-mode branch: the admin token on loopback is nothing there.
-      expect(await world({ T3FLARE_LOCAL_MODE: "true" } as Partial<Env>).call(path, { authorization: `Bearer ${ADMIN}` }, "localhost:8791"), path).toEqual({ status: 404, seen: [] });
+      expect(await world({ T3FLARE_LOCAL_MODE: "true" }).call(path, { authorization: `Bearer ${ADMIN}` }, "localhost:8791"), path).toEqual({ status: 404, seen: [] });
       expect((await w.call(path, { "cf-access-jwt-assertion": await assertion(PANEL_AUD) })).seen, path).toEqual([{ method: "harness", caller: { kind: "owner", subject: "owner-sub" } }]);
     }
   });
 
   it("local mode: the admin token alone on loopback, as the service-token caller; not off loopback, not without it", async () => {
-    const w = world({ T3FLARE_LOCAL_MODE: "true" } as Partial<Env>);
+    const w = world({ T3FLARE_LOCAL_MODE: "true" });
     expect(await w.call("/_t3flare/mcp", { authorization: `Bearer ${ADMIN}` }, "localhost:8791")).toEqual({ status: 200, seen: [{ method: "settingsMcp", caller: { kind: "service-token" } }] });
     expect(await w.call("/_t3flare/mcp", { authorization: "Bearer wrong" }, "localhost:8791")).toEqual({ status: 404, seen: [] });
     expect(await w.call("/_t3flare/mcp", { authorization: `Bearer ${ADMIN}` }, HOST)).toEqual({ status: 404, seen: [] });

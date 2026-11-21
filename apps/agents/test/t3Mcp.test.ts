@@ -2,7 +2,6 @@
 // catalog: the denylist, t3's tool names, the approvals per mode and annotation (accepted per tool name), the replay of a
 // call cut off by a Session restart (the same clientRequestId; refused under a credential t3 issued again), a 401 as a
 // tool error, plan mode, and waits in 50 s pieces.
-// @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off
 import { type AssistantMessage, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import type { InteractionMode, RuntimeMode } from "@t3flare/session-protocol";
 import { describe, expect, it } from "vitest";

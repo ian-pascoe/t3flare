@@ -7,7 +7,7 @@
 // The residual risk is cloudpid's too: the platform's own lookup at `fetch` time is separate from the guard's, so a
 // name that answers differently to two queries milliseconds apart can still pass. Both go through Cloudflare's caching
 // resolver, and Cloudflare's edge refuses Worker subrequests to private addresses anyway.
-// @effect-diagnostics asyncFunction:off globalFetch:off preferEffectArray:off extendsNativeError:off globalTimers:off
+// @effect-diagnostics globalFetch:off extendsNativeError:off globalTimers:off
 import { blockedAddressReason, blockedHostReason } from "./ssrf.ts";
 
 /** A web tool could not do what it was asked: the model sees `message` as the tool's error result. */
@@ -94,14 +94,12 @@ export const readBoundedBody = async (response: Response, maximumBytes: number, 
     for (;;) {
       let chunk: ReadableStreamReadResult<Uint8Array>;
       try {
-        // oxlint-disable-next-line no-await-in-loop -- chunks arrive in order
         chunk = await reader.read();
       } catch {
         throw new WebToolError("network error while reading the response body");
       }
       if (chunk.done) break;
       if (total + chunk.value.byteLength > maximumBytes) {
-        // oxlint-disable-next-line no-await-in-loop -- once, then out
         await reader.cancel().catch(() => undefined);
         throw tooLarge();
       }
@@ -199,14 +197,12 @@ export const guardedFetch = async (
     throw new WebToolError("invalid URL (expected an absolute HTTP or HTTPS URL)");
   }
   for (let hop = 0; ; hop++) {
-    // oxlint-disable-next-line no-await-in-loop -- each hop is checked before it is sent
+    // Each hop is checked before it is sent.
     await checkUrl(transport, current, hop, signal);
-    // oxlint-disable-next-line no-await-in-loop -- one hop at a time
     const response = await transport({ ...request, url: current.toString() }, signal);
     const location = response.headers.get("location");
     if (!REDIRECT_STATUSES.has(response.status) || location === null) return { response, url: current };
     // The redirect's body is never read.
-    // oxlint-disable-next-line no-await-in-loop -- one hop at a time
     await discardBody(response);
     if (hop >= MAX_REDIRECTS) throw new WebToolError(`too many redirects (more than ${MAX_REDIRECTS})`);
     try {

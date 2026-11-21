@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 // Step 3+ (P1, review finding 7): T3 Connect's public values match what t3 ships, and t3's own config reads them.
 // Run by the t3 bump (its test step), so a change upstream fails the bump instead of silently breaking the link.
 import * as fs from "node:fs";
@@ -32,8 +33,8 @@ describe("T3 Connect public config", () => {
 
   it("resolves through t3's own config with the build's defines", async () => {
     expect(hasCloudPublicConfig).toBe(true);
-    expect(await Effect.runPromise(Effect.gen(function* () { return yield* relayUrlConfig; }))).toBe("https://relay.t3.codes");
-    const oauth = await Effect.runPromise(Effect.gen(function* () { return yield* cloudCliOAuthConfig; }));
+    expect(await Effect.runPromise(relayUrlConfig)).toBe("https://relay.t3.codes");
+    const oauth = await Effect.runPromise(cloudCliOAuthConfig);
     expect(oauth.clientId).toBe("hzxSgY2cH10sDU2r");
     expect(oauth.deviceAuthorizationEndpoint).toBe("https://clerk.t3.codes/oauth/device_authorization");
     expect(oauth.tokenEndpoint).toBe("https://clerk.t3.codes/oauth/token");

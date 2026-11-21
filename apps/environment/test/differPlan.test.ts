@@ -78,7 +78,7 @@ const withTools = (entries: ReadonlyArray<PushedEntry>, tools: ReadonlyArray<Too
 
 describe("capabilities and presentation (SPI-996)", () => {
   it("are t3's capability shape, with plan mode, the proposed plan and streamed tool output on", () => {
-    const capabilities = Schema.decodeUnknownSync(OrchestrationV2ProviderCapabilities)(PiDurableCapabilities);
+    const capabilities = Schema.decodeSync(OrchestrationV2ProviderCapabilities)(PiDurableCapabilities);
     expect(capabilities.planning.emitsProposedPlan).toBe(true);
     expect(capabilities.streaming.streamsToolOutput).toBe(true);
     expect(PRESENTATION.showInteractionModeToggle).toBe(true);

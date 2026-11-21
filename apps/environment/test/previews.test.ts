@@ -6,6 +6,7 @@
 import type { PortScan } from "@t3flare/sandbox-image/ports";
 import { stopGroupArgv } from "@t3flare/sandbox-image/ports";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { EventEmitter } from "node:events";
@@ -41,6 +42,7 @@ describe("a navigation to localhost in Browser Run (R1, review L6)", () => {
   });
 });
 
+const encodeJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 const scan = (listeners: PortScan["listeners"], computerd: number | null = 7): PortScan => ({ computerd, listeners, table: [] });
 const listener = (over: Partial<PortScan["listeners"][number]>): PortScan["listeners"][number] => ({
   port: 5173,
@@ -246,8 +248,8 @@ describe("t3's HTML-render Chrome, bridged to Browser Run (review M3)", () => {
             { binding: () => binding as never, store: () => store },
           );
           yield* Effect.sleep(10);
-          fake.emit(JSON.stringify({ id: 1, result: { browserContextId: "ctx-1" } }));
-          fake.emit(JSON.stringify({ method: "Fetch.requestPaused", params: { request: { url: `${BRIDGED_PAGE_ORIGIN}/page.html` } }, sessionId: "s" }));
+          fake.emit(yield* encodeJson({ id: 1, result: { browserContextId: "ctx-1" } }));
+          fake.emit(yield* encodeJson({ method: "Fetch.requestPaused", params: { request: { url: `${BRIDGED_PAGE_ORIGIN}/page.html` } }, sessionId: "s" }));
           const text = yield* Stream.mkString(Stream.decodeText(handle.getOutputFd(4)));
           const code = yield* handle.exitCode;
           return { text, code };

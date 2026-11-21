@@ -1,6 +1,6 @@
 // `ask_user` (step 3, plan section 3.2) on a real pi-durable Harness: the question waits durably through more restarts
 // than `restartLimit`, and the owner's answer (a choice or free text) is the tool's result, once.
-// @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off
+// @effect-diagnostics globalTimers:off
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { describe, expect, it } from "vitest";
 

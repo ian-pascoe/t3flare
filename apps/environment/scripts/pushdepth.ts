@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalConsoleInEffect:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off globalConsole:off globalConsoleInEffect:off nodeBuiltinImport:off
 // The Session push depth check (ADR-0005, 2026-11-21 refinement): tool-using turns in a row in one Durable agent's
 // thread all complete. Before the refinement, each round trip between the Environment and a Session nested the next one
 // level deeper, until a turn failed with "Subrequest depth limit exceeded" ("did not answer open").

@@ -1,5 +1,4 @@
 // Copied from cloudpid@93ba45a3:packages/extensions/src/web/output.test.ts, imports repointed (SPI-1054).
-// @effect-diagnostics preferEffectArray:off
 import { describe, expect, it } from "vitest";
 import {
   boundStructuredText,

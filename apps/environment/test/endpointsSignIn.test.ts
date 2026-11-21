@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off
+// @effect-diagnostics nodeBuiltinImport:off
 // ChatGPT plan usage on the Settings page (SPI-1164): the owner starts the sign-in, opens the authorize link, pastes the
 // address the browser lands on, and sees the account or why it failed; a ChatGPT endpoint is saved with the models its
 // token lists; sign-out revokes and stops the endpoint's Sessions. The panel's answers, page and audit log never hold a
@@ -9,6 +9,7 @@ import * as path from "node:path";
 import { MODEL_ENDPOINTS_DOCS, SIGN_IN_KINDS, SIGN_INS } from "@t3flare/models/endpoints";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { AccessCaller } from "../src/access.ts";
 import { credentialBroker } from "../src/credentials/broker.ts";
 import { chatgptSignIn } from "../src/credentials/chatgpt.ts";
 import { claudeSignIn } from "../src/credentials/claude.ts";
@@ -18,7 +19,7 @@ import type { Discovery } from "../src/endpoints/discover.ts";
 import { endpointStore } from "../src/endpoints/store.ts";
 import { csrfToken } from "../src/harness/csrf.ts";
 import { escapeHtml } from "../src/harness/page.ts";
-import { CSRF_HEADER, handleHarness, type HarnessCaller, type HarnessDeps } from "../src/harness/panel.ts";
+import { CSRF_HEADER, handleHarness, type HarnessDeps } from "../src/harness/panel.ts";
 import { SCRIPT } from "../src/harness/pageScript.ts";
 import { harnessStore } from "../src/harness/store.ts";
 import { fakeAnthropic } from "./fixtures/fakeAnthropicAuth.ts";
@@ -27,7 +28,7 @@ import { fakeOpenAI } from "./fixtures/fakeOpenAIAuth.ts";
 
 const HOST = "t3.example.dev";
 const NOW = Date.UTC(2026, 10, 16, 10, 0);
-const owner: HarnessCaller = { kind: "owner", subject: "owner-sub" };
+const owner: AccessCaller = { kind: "owner", subject: "owner-sub" };
 
 const memory = () => {
   const map = new Map<string, unknown>();

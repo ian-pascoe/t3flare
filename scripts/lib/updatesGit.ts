@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off globalFetch:off
 // Git and GitHub reads and writes for the trusted update jobs (ADR-0037): `scripts/updates-ci.ts` and
 // `scripts/land-check.ts`.
 // Plain Node: no dependency.

@@ -1,3 +1,4 @@
+// @effect-diagnostics globalDate:off
 // The host's pure parts: the boot record and safe mode, the redacting Console, the idle queries over t3's
 // tables (on Node's SQLite), and the Pairing window's alarm and bootstrap refusal.
 import { describe, expect, it, vi } from "vitest";

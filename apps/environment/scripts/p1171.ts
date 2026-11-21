@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
 // SPI-1171's evidence on its stage: the subscription sign-ins (ChatGPT, Claude) through the model relay, for every CLI
 // agent whose API they speak.
 //

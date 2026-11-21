@@ -1,5 +1,5 @@
 // A stream's reads are Promise-based, so this file is too.
-// @effect-diagnostics asyncFunction:off newPromise:off globalTimers:off
+// @effect-diagnostics asyncFunction:off
 import { ServerError } from "@cloudpid/mcp/types";
 import * as Effect from "effect/Effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

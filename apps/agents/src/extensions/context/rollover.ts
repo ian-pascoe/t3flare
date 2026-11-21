@@ -15,7 +15,7 @@
 // - Changed from cloudpid's: no owner `/rollover` (t3 has no surface for it), so a Rollover never ends its run; the
 //   requests the hook and the tool submit are steers that never start a run of their own (`whenIdle: "reject"`), so no
 //   work happens outside a turn t3 started.
-// @effect-diagnostics asyncFunction:off preferEffectArray:off globalConsole:off
+// @effect-diagnostics globalConsole:off
 import type { Context } from "@earendil-works/chord";
 import {
   CompactionTask,

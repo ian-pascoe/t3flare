@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off globalDate:off
+// @effect-diagnostics nodeBuiltinImport:off
 // ADR-0028 (review M9): the MCP relay's tool card on a CLI thread is raised as t3's approval card on that thread's live
 // turn by the CLI wrapper, and answered from t3's own `respondToRuntimeRequest`. Run over t3's ACP adapter, built with
 // the driver's own options (`acpAdapterOptions`), and a scripted agent (fixtures/fake-acp-agent.mjs) whose turn waits on
@@ -12,12 +12,14 @@ import { makeAcpAdapterV2, type AcpAdapterV2RuntimeInput } from "@t3tools/provid
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import * as Config from "effect/Config";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -29,6 +31,7 @@ import { acpAdapterOptions, acpFlavor } from "../src/provider/cli/acpDriver.ts";
 import { approveCliTool, cancelCliAsk, cliQuestionAsker } from "../src/provider/cli/cliAsk.ts";
 import { wrapCliAdapter } from "../src/provider/cli/wrapper.ts";
 
+const encodeJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 const AGENT = path.join(import.meta.dirname, "fixtures/fake-acp-agent.mjs");
 
 const INITIALIZE = {
@@ -62,71 +65,68 @@ type Event = ProviderAdapter.ProviderAdapterV2Event;
 let threads = 0;
 
 /** A wrapped Claude session over the scripted agent, its turn started and waiting on the agent's own request. */
-const session = () =>
-  Effect.gen(function* () {
-    const fileSystem = yield* FileSystem.FileSystem;
-    const cwd = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3flare-cli-card-" });
-    const scriptPath = path.join(cwd, "..", `${path.basename(cwd)}.script.json`);
-    const logPath = path.join(cwd, "..", `${path.basename(cwd)}.log`);
-    fs.writeFileSync(scriptPath, JSON.stringify({ initialize: INITIALIZE, sessionNew: SESSION_NEW, prompts: [[HOLD]] }));
-    fs.writeFileSync(logPath, "");
-    const spawn = (input: AcpAdapterV2RuntimeInput) =>
-      Effect.gen(function* () {
-        const { processEnvironment: _env, runtimePolicy: _policy, mcpServers: _mcp, acpMcpServers: _acp, httpMcpServers: _http, ...rest } = input;
-        const context = yield* Layer.build(
-          AcpSessionRuntime.layer({
-            ...rest,
-            spawn: { command: process.execPath, args: [AGENT], cwd: input.cwd, env: { PATH: process.env.PATH ?? "", FAKE_ACP_SCRIPT: scriptPath, FAKE_ACP_LOG: logPath }, extendEnv: false },
-            authenticateOnAuthRequired: false,
-            ownDetachedProcessGroup: true,
-            processGroupPlatform: process.platform,
-          }),
-        );
-        return yield* Effect.service(AcpSessionRuntime.AcpSessionRuntime).pipe(Effect.provide(context));
-      });
-    const driver = ProviderDriverKind.make("claudeAgent");
-    const instanceId = ProviderInstanceId.make("claudeAgent");
-    const adapter = wrapCliAdapter(yield* makeAcpAdapterV2(acpAdapterOptions(instanceId, acpFlavor("claude", driver, { spawn }), undefined)), {
-      sessions: new Map(),
-    });
-    const threadId = ThreadId.make(`thread-card-${++threads}`);
-    const modelSelection = { instanceId, model: "comm/claude-sonnet-5-5" } as const;
-    const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({ runtimeMode: "approval-required", interactionMode: "default", cwd });
-    const runtime = yield* adapter.openSession({ threadId, providerSessionId: ProviderSessionId.make(`session-card-${threads}`), modelSelection, runtimePolicy });
-    const queue = yield* Queue.unbounded<Event>();
-    const seen: Array<Event> = [];
-    yield* runtime.events.pipe(
-      Stream.runForEach((event) => Effect.sync(() => seen.push(event)).pipe(Effect.andThen(Queue.offer(queue, event)))),
-      Effect.forkScoped,
+const session = Effect.fn("session")(function* () {
+  const fileSystem = yield* FileSystem.FileSystem;
+  const cwd = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3flare-cli-card-" });
+  const scriptPath = path.join(cwd, "..", `${path.basename(cwd)}.script.json`);
+  const logPath = path.join(cwd, "..", `${path.basename(cwd)}.log`);
+  yield* fileSystem.writeFileString(scriptPath, yield* encodeJson({ initialize: INITIALIZE, sessionNew: SESSION_NEW, prompts: [[HOLD]] }));
+  yield* fileSystem.writeFileString(logPath, "");
+  const PATH = yield* Config.String("PATH").pipe(Config.withDefault(""));
+  const spawn = Effect.fn("spawn")(function* (input: AcpAdapterV2RuntimeInput) {
+    const { processEnvironment: _env, runtimePolicy: _policy, mcpServers: _mcp, acpMcpServers: _acp, httpMcpServers: _http, ...rest } = input;
+    const context = yield* Layer.build(
+      AcpSessionRuntime.layer({
+        ...rest,
+        spawn: { command: process.execPath, args: [AGENT], cwd: input.cwd, env: { PATH, FAKE_ACP_SCRIPT: scriptPath, FAKE_ACP_LOG: logPath }, extendEnv: false },
+        authenticateOnAuthRequired: false,
+        ownDetachedProcessGroup: true,
+        processGroupPlatform: process.platform,
+      }),
     );
-    const until = (predicate: (event: Event) => boolean) =>
-      Effect.gen(function* () {
-        while (true) {
-          const event = yield* Queue.take(queue);
-          if (predicate(event)) return event;
-        }
-      }).pipe(Effect.timeout("20 seconds"));
-    const providerThread = yield* runtime.ensureThread({ threadId, modelSelection, runtimePolicy });
-    const agentLog = () =>
-      fs
-        .readFileSync(logPath, "utf8")
-        .split("\n")
-        .filter((line) => line.length > 0)
-        .map((line) => JSON.parse(line) as { received?: string; params?: Record<string, unknown> });
-    return { runtime, threadId, providerThread, instanceId, runtimePolicy, modelSelection, until, seen, agentLog };
+    return yield* Effect.service(AcpSessionRuntime.AcpSessionRuntime).pipe(Effect.provide(context));
   });
+  const driver = ProviderDriverKind.make("claudeAgent");
+  const instanceId = ProviderInstanceId.make("claudeAgent");
+  const adapter = wrapCliAdapter(yield* makeAcpAdapterV2(acpAdapterOptions(instanceId, acpFlavor("claude", driver, { spawn }), undefined)), {
+    sessions: new Map(),
+  });
+  const threadId = ThreadId.make(`thread-card-${++threads}`);
+  const modelSelection = { instanceId, model: "comm/claude-sonnet-5-5" } as const;
+  const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({ runtimeMode: "approval-required", interactionMode: "default", cwd });
+  const runtime = yield* adapter.openSession({ threadId, providerSessionId: ProviderSessionId.make(`session-card-${threads}`), modelSelection, runtimePolicy });
+  const queue = yield* Queue.unbounded<Event>();
+  const seen: Array<Event> = [];
+  yield* runtime.events.pipe(
+    Stream.runForEach((event) => Effect.sync(() => seen.push(event)).pipe(Effect.andThen(Queue.offer(queue, event)))),
+    Effect.forkScoped,
+  );
+  const until = Effect.fn("until")(function* (predicate: (event: Event) => boolean) {
+    while (true) {
+      const event = yield* Queue.take(queue);
+      if (predicate(event)) return event;
+    }
+  }, Effect.timeout("20 seconds"));
+  const providerThread = yield* runtime.ensureThread({ threadId, modelSelection, runtimePolicy });
+  const agentLog = () =>
+    fs
+      .readFileSync(logPath, "utf8")
+      .split("\n")
+      .filter((line) => line.length > 0)
+      .map((line) => JSON.parse(line) as { received?: string; params?: Record<string, unknown> });
+  return { runtime, threadId, providerThread, instanceId, runtimePolicy, modelSelection, until, seen, agentLog };
+});
 
 type Harness = Effect.Success<ReturnType<typeof session>>;
 
-const startTurn = (harness: Harness) =>
-  Effect.gen(function* () {
-    const { runtime, threadId, providerThread, instanceId, runtimePolicy, modelSelection } = harness;
-    yield* runtime.startTurn(makeTurnInput({ threadId, providerThread, instanceId, runtimePolicy, now: yield* DateTime.now, modelSelection }));
-    // The agent's own request: the turn is live, and its provider turn known.
-    const hold = yield* harness.until((event) => event.type === "runtime_request.updated" && event.runtimeRequest.status === "pending");
-    if (hold.type !== "runtime_request.updated") throw new Error("expected the agent's request");
-    return hold.runtimeRequest;
-  });
+const startTurn = Effect.fn("startTurn")(function* (harness: Harness) {
+  const { runtime, threadId, providerThread, instanceId, runtimePolicy, modelSelection } = harness;
+  yield* runtime.startTurn(makeTurnInput({ threadId, providerThread, instanceId, runtimePolicy, now: yield* DateTime.now, modelSelection }));
+  // The agent's own request: the turn is live, and its provider turn known.
+  const hold = yield* harness.until((event) => event.type === "runtime_request.updated" && event.runtimeRequest.status === "pending");
+  if (hold.type !== "runtime_request.updated") throw new Error("expected the agent's request");
+  return hold.runtimeRequest;
+});
 
 const isCard = (event: Event) => event.type === "runtime_request.updated" && event.runtimeRequest.id.includes(":t3flare-ask:");
 const cardOpened = (event: Event) => isCard(event) && event.type === "runtime_request.updated" && event.runtimeRequest.status === "pending";
@@ -134,7 +134,7 @@ const cardOpened = (event: Event) => isCard(event) && event.type === "runtime_re
 const ask = (harness: Harness, askId: string) =>
   Effect.promise(() => approveCliTool({ thread: harness.threadId, askId, title: "Allow fixture: fixture_note?", summary: "fixture_note {\"line\":\"x\"}", detail: "fixture: fixture_note" }));
 
-const test = <A>(body: Effect.Effect<A, unknown, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => Effect.runPromise(body.pipe(Effect.scoped, Effect.provide(layerTest)) as never);
+const test = <A, E>(body: Effect.Effect<A, E, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => Effect.runPromise(body.pipe(Effect.scoped, Effect.provide(layerTest)));
 
 describe("a relay tool call asked on a CLI thread (ADR-0028, M9)", () => {
   it("raises t3's approval card on the live turn and answers with the owner's decision", () =>

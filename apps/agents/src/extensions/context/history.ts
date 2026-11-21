@@ -1,5 +1,4 @@
 // Copied from cloudpid@93ba45a3:packages/extensions/src/context/history.ts, unchanged but for its header (SPI-1056).
-// @effect-diagnostics missingPipeableSignature:off preferEffectArray:off -- plain functions over stored entries' JSON.
 // History: a conversation's stored entries, which a Handoff or a compaction takes out of the model's context but never
 // out of storage. Ported from pi-context-management's `context-tools.ts` and `entry-preview.ts`: Context Windows, one-line
 // entry previews, references, and literal search over the decoded strings of an entry's JSON.
@@ -8,6 +7,8 @@ import type { ConversationId, EntryId, EntryRecord } from "@earendil-works/pi-du
 import * as DateTime from "effect/DateTime";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
+
+import { conversationIdOf, entryIdOf } from "../../durableIds.ts";
 
 /** Lists and searches return at most this many items per page. */
 export const PAGE_SIZE = 20;
@@ -35,13 +36,11 @@ export const parseRef = (ref: string): ParsedRef | undefined => {
 
   if (match === null) return undefined;
 
-  // SAFETY: the pattern's first group is digits: a conversation ID as `entryRef` and `noteRef` write it.
-  const conversationId = Number(match[1]) as ConversationId;
+  const conversationId = conversationIdOf(match[1]!);
 
   return match[2] !== undefined
     ? { type: "note", conversationId, name: match[2] }
-    : // SAFETY: the third group is digits: an entry ID as `entryRef` writes it.
-      { type: "entry", conversationId, entryId: Number(match[3]) as EntryId };
+    : { type: "entry", conversationId, entryId: entryIdOf(match[3]!) };
 };
 
 /** A Context Window: the entries from one head marker (a Handoff or a compaction) to the next. */

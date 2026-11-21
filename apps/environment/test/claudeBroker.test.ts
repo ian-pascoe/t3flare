@@ -1,4 +1,3 @@
-// @effect-diagnostics globalConsole:off
 // The Credential broker with a Claude sign-in (SPI-1165): the same broker and lock as ChatGPT's (SPI-1164), with
 // Anthropic's vendor. Its tokens last 8 h and its refresh token rotates on every refresh, a replaced one refused, so a
 // lost rotation costs a sign-in (SPI-1161 Q5): one refresh however many ask, saved before use. Anthropic offers no

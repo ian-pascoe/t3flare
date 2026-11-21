@@ -53,7 +53,7 @@ describe("sealedStore", () => {
     await sealedStore(kv, KEY).put("a", "value");
     expect(await sealedStore(kv, OTHER).open("a")).toBeUndefined();
     expect(await sealedStore(kv, undefined).open("a")).toBeUndefined();
-    const [[stored, record]] = [...kv.map.entries()].filter(([name]) => name.endsWith("/a"));
+    const [stored, record] = [...kv.map.entries()].find(([name]) => name.endsWith("/a"))!;
     kv.map.set(stored.replace(/\/a$/, "/b"), record);
     expect(await sealedStore(kv, KEY).open("b")).toBeUndefined();
   });

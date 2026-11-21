@@ -20,7 +20,7 @@
  * The app is registered under your own account and is public, so it could also be installed on an organization (an
  * installation by anyone else gives t3flare their repos, nothing of yours).
  */
-// @effect-diagnostics nodeBuiltinImport:off globalConsole:off globalFetch:off asyncFunction:off globalTimers:off globalDate:off newPromise:off processEnv:off preferEffectArray:off preferEffectRecord:off -- a local script, not a Worker.
+// @effect-diagnostics nodeBuiltinImport:off globalConsole:off globalFetch:off globalTimers:off globalDate:off -- a local script, not a Worker.
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";

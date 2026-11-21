@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
 // Step 2b M4: deleting a worktree thread frees its Workspace. Evidence around a deletion made in the stock web client:
 //
 //   node scripts/stage.ts run <stage> delete before --worktree <id> [--dirty]  an unpushed commit (and with --dirty an

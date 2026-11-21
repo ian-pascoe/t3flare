@@ -7,7 +7,7 @@
 // gets all of stdout and then all of stderr, attributed but not interleaved in arrival order. Backends that stream
 // (the Container) deliver chunks as they come.
 // pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
-// @effect-diagnostics asyncFunction:off cryptoRandomUUID:off globalDate:off globalTimers:off missingPipeableSignature:off newPromise:off preferEffectArray:off
+// @effect-diagnostics cryptoRandomUUID:off globalDate:off globalTimers:off
 import {
   getWorkspace,
   type RuntimeExecOptions,

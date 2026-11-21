@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
 // Turn liveness and recovery on a deployed stage (step 2a plan, section 3):
 //
 //   node scripts/stage.ts run step2a turns liveness   a clientless turn keeps the Environment up; it resets after

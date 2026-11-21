@@ -1,6 +1,5 @@
 // Copied from cloudpid@ae5a7b73:packages/effect-durable/src/section.test.ts.
 // pi-durable's Harness is Promise-based, so these tests are too.
-// @effect-diagnostics asyncFunction:off
 import { defineExtension, defineTool } from "@earendil-works/pi-durable";
 import * as Arr from "effect/Array";
 import * as Context from "effect/Context";

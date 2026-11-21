@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off
 // The Settings server's changes table (plan D8, D16): `t3flare_settings_changes` in the Environment DO's SQLite, one row
 // per change, the record as JSON, indexed by caller key and hash. It is the Open change table (M4, SPI-1199): an asked
 // change waiting for its answer is a row in state `open` until it closes. A free change made through the server is kept

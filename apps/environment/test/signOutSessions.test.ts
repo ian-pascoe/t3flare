@@ -1,4 +1,3 @@
-// @effect-diagnostics globalConsole:off
 // A sign-out stops the endpoint's Sessions (SPI-1164): every open Session is told; each drops the endpoint's token and
 // stops its turns when they run on the endpoint (its own storage decides, agents' signOut.test.ts); a Session that does
 // not answer is skipped.

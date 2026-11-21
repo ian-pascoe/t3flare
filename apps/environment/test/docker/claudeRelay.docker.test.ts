@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics nodeBuiltinImport:off
 // SPI-1168 in `pnpm run test:docker`: Claude Code on the model relay, launched as the Workspace DO launches it (the
 // profile with a `claudeRelay`, the handle in the process's environment) in the image's CLI layer, against the stand-in
 // `computer.internal`'s model relay (keyhost.mjs; no model is called). The real launcher, preload and handle helper:

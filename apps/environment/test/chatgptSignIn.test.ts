@@ -1,3 +1,4 @@
+// @effect-diagnostics globalDate:off
 // ChatGPT plan usage ("Sign in with ChatGPT", SPI-1164) against a fake of OpenAI's authorization server: the authorize
 // URL as OpenAI's docs give it, a pasted loopback redirect in the forms a phone gives, the code exchange with PKCE, the
 // ID token's checks, the plan-usage scope, refresh and revocation. Each failure is a fixed text that never holds a token.

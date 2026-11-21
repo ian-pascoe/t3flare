@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off globalDate:off
+// @effect-diagnostics nodeBuiltinImport:off
 // t3's own status reading over the cloud's passive git answers (the prod bugs of 2026-11-11): t3's real `GitVcsDriver`
 // spawns git through the process router, whose Workspace answers like a Workspace DO: real git while its Container
 // runs, and `staleRead` (the DO's rule for a passive read) once it stops. The repo is a clone of a repo with a
@@ -139,6 +139,7 @@ const workspacePathsExist = Layer.effect(
   FileSystem.FileSystem,
   Effect.gen(function* () {
     const local = yield* FileSystem.FileSystem;
+    // @effect-diagnostics-next-line effectFnOpportunity:off -- a fake service's stub method: Effect.fn's span adds nothing to a stand-in
     return FileSystem.FileSystem.of({ ...local, exists: (path) => (/^\/w\/[^/]+$/.test(path) ? Effect.succeed(true) : local.exists(path)) });
   }),
 );
@@ -157,7 +158,7 @@ const driver = <A, E>(use: (driver: GitVcsDriver.GitVcsDriver["Service"]) => Eff
         ),
       ),
       Effect.scoped,
-    ) as Effect.Effect<A, E, never>,
+    ),
   );
 
 describe("t3's status over the Workspace's passive answers, on a repo with a submodule", { timeout: 60_000 }, () => {

@@ -1,3 +1,4 @@
+// @effect-diagnostics globalDate:off
 // t3flare's own usage records (SPI-1173): the Environment keeps what the Sessions, text generation and the model relay
 // record, rolled up by quarter hour, agent, endpoint, model and session, for at most the retention window; t3's Usage page
 // reads them through our scan readers, split by agent (t3's usage provider) and model (`<endpointId>/<modelId>`). A model
@@ -7,8 +8,8 @@ import type { UsageEntry } from "@t3flare/models/usage";
 import * as Effect from "effect/Effect";
 import { describe, expect, it } from "vitest";
 
-import { UsageAggregator } from "../../../t3code/apps/server/src/usage/usageAggregation.ts";
-import { parseRateTable } from "../../../t3code/apps/server/src/usage/usagePricing.ts";
+import { UsageAggregator } from "t3/src/usage/usageAggregation.ts";
+import { parseRateTable } from "t3/src/usage/usagePricing.ts";
 import { bindEnvironmentServices, type EnvironmentServices } from "../src/agents/bindings.ts";
 import { usageReader } from "../src/usage/readers.ts";
 import {

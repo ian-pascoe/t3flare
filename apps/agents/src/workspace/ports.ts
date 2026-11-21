@@ -1,4 +1,3 @@
-// @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off
 // t3's port discovery in the Workspace's Container (G11's M2, ADR-0031): the scan (`@t3flare/sandbox-image/ports`), a
 // stop of one process group, and a probe of a configured `localhost` preview URL. Each runs only while the Container
 // runs and never starts it (as `containerKill.ts`: the platform's `exec` and `getTcpPort` need a running Container), and

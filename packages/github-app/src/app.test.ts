@@ -1,5 +1,5 @@
 // Copied from cloudpid@ae5a7b73:apps/server/src/github/app.test.ts.
-// @effect-diagnostics asyncFunction:off nodeBuiltinImport:off globalDate:off preferEffectArray:off preferEffectRecord:off -- WebCrypto and `fetch` are Promise APIs; node:crypto makes the test keys.
+// @effect-diagnostics nodeBuiltinImport:off globalDate:off -- WebCrypto and `fetch` are Promise APIs; node:crypto makes the test keys.
 import { generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { GitHubApp, githubAppKeyProblem, GitHubRefused, type MintedToken } from "./app.ts";

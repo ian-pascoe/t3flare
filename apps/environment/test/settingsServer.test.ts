@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off
 // T-own (plan §5; ADR-0035, plan D2, D7, D14, D16, D17), M3 (SPI-1198): the Settings server for t3flare's own agents,
 // through the MCP host as the Environment wires it. D7's mode table, every cell, for a Durable caller (modes from the
 // adapter's record) and a relayed CLI caller (modes from its live session); the access switch; no `resume` and no Pause;

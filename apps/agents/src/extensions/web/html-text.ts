@@ -1,7 +1,6 @@
 // Copied from cloudpid@93ba45a3:packages/extensions/src/web/html-text.ts, unchanged but for its header (SPI-1054; see ./NOTICE.md).
 // Ported from @ian-pascoe/pi-web-tools (`extractTextFromHtml` in `src/web-fetch.ts`, MIT, © 2026 Ian Pascoe; see
 // ./NOTICE.md). The native array and string methods of its parse loop stay as they are.
-// @effect-diagnostics preferEffectArray:off
 import { Parser } from "htmlparser2";
 import { withDepthLimit } from "./html-parse.ts";
 

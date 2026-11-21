@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off asyncFunction:off
+// @effect-diagnostics globalDate:off
 // M2's check (step 2a plan, section 7): `POST /_t3flare/check/workspaces`. Paths under `/w` whose Workspace the registry
 // does not list fail as not found without a Workspace DO being touched; `/w` lists the registry; git in such a path
 // fails as git would. Never boots t3.

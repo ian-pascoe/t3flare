@@ -1,0 +1,10 @@
+{
+  // The root scripts' own program (typecheck:scripts in vite.config.ts): Node CLIs, checked as t3flare's packages are.
+  "extends": "../t3code/tsconfig.base.json",
+  "compilerOptions": {
+    "erasableSyntaxOnly": true,
+    "types": ["node"],
+    "lib": ["ESNext"]
+  },
+  "include": ["*.ts", "lib"]
+}

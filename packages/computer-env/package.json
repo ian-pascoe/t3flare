@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "effect-tsgo tsrs --noEmit",
-    "lint": "oxlint --type-aware src",
+    "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives-severity error src vitest.config.ts",
     "test": "vitest run"
   },
   "dependencies": {

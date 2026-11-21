@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
 // M1's chat check (step 2a): a Durable agent answers in a thread, a steer joins its run, Stop interrupts a long one, and
 // the thread gets a generated title. Run against a stage:
 //

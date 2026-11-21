@@ -10,7 +10,6 @@
 //
 // A search spends a model request on the endpoint, so the harness setting keeps `web_search` off until the owner turns
 // it on (the registry's `web.search`).
-// @effect-diagnostics asyncFunction:off
 import { defineTool, type ToolRegistration } from "@earendil-works/pi-durable";
 import { type EndpointModel, findEndpointModel, type ModelEndpoint, type ModelEndpoints, modelSettingSlug, SETUP_HINT } from "@t3flare/models/endpoints";
 import { int, obj, opt, str } from "@earendil-works/pi-schema";

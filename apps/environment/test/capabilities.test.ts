@@ -64,9 +64,7 @@ describe("the descriptor's capabilities", () => {
 
 describe("t3flare's managed policy", () => {
   const policy = Effect.runPromise(
-    Effect.gen(function* () {
-      return yield* ManagedPolicy.ManagedPolicy;
-    }).pipe(Effect.provide(layerManagedPolicy)),
+    ManagedPolicy.ManagedPolicy.pipe(Effect.provide(layerManagedPolicy)),
   );
 
   it("is one t3 accepts, and tells clients what it locks", async () => {

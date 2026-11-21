@@ -1,4 +1,3 @@
-// @effect-diagnostics globalConsole:off globalDate:off
 // Step 3: the stage's project on the fixture repo, cloned through t3's own clone once per stage and reused, so the
 // laptop's local clone of the same repo resolves to it (`RemoteDelegation.resolveRemoteProject`).
 import { mutateProject, uuid, wsCall, wsFirst } from "./client.ts";

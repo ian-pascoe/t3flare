@@ -1,7 +1,7 @@
 // The Container kill script's choice of processes (step 2a part 2; apps/sandbox-image/src/kill.ts), on real processes:
 // each case runs in an Ubuntu container (the image's base) with Docker, and is skipped without Docker. The script runs as
 // `killArgv(...)` would, as one `/bin/sh -c` command line (`killCommand(...)`).
-// @effect-diagnostics nodeBuiltinImport:off globalDate:off
+// @effect-diagnostics nodeBuiltinImport:off
 import { spawnSync } from "node:child_process";
 
 import { inBash } from "@t3flare/computer-env/shell";

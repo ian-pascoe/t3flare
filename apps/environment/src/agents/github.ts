@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalFetch:off asyncFunction:off
+// @effect-diagnostics globalDate:off globalFetch:off
 // GitHub tokens from the t3flare GitHub App (ADR-0013), minted by the Environment DO alone (ADR-0018's broker): the
 // private key is a secret of the environment Worker only. Every token names its repositories and its permissions
 // explicitly (`@t3flare/github-app/permissions`): a Workspace's Container token is its one repo; the Environment's own

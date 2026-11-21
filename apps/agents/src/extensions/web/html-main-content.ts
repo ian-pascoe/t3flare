@@ -2,7 +2,6 @@
 // Ported from @ian-pascoe/pi-web-tools (`src/html-main-content.ts`, MIT, © 2026 Ian Pascoe; see ./NOTICE.md), unchanged but for
 // formatting and a depth limit on the parse (see html-parse.ts). The native array methods of the original's hot parse
 // loops stay as they are.
-// @effect-diagnostics preferEffectArray:off
 import { Parser } from "htmlparser2";
 import { withDepthLimit } from "./html-parse.ts";
 

@@ -1,7 +1,9 @@
+// @effect-diagnostics globalTimers:off
 // SPI-1170: the pi driver's model list (`provider/cli/piDriver.ts` `piSnapshot`): the endpoints' models when one lists a
 // model, else none and the provider needs setup (SPI-1176), and the list follows each endpoint change at once while the
 // driver's scope is open.
 import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts";
+import { noCompatibilityPolicy } from "@t3tools/provider-core/server/compatibility";
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import type { EndpointApi, ModelEndpoints } from "@t3flare/models/endpoints";
 import * as Effect from "effect/Effect";
@@ -22,16 +24,19 @@ const endpoint = (id: string, api: EndpointApi, models: ReadonlyArray<string>) =
 const host = ProviderHost.ProviderHost.of({
   paths: { cwd: "/", baseDir: "/tmp", stateDir: "/tmp", providerStatusCacheDir: "/tmp", attachmentsDir: "/tmp" },
   settings: { get: Effect.succeed(DEFAULT_SERVER_SETTINGS), withSnapshot: (use) => use(DEFAULT_SERVER_SETTINGS), changes: Stream.empty, subscribe: Effect.succeed(Stream.empty) },
+  // @effect-diagnostics-next-line effectFnOpportunity:off -- a fake service's stub method: Effect.fn's span adds nothing to a stand-in
   shouldRunBackgroundWork: () => Effect.succeed(true),
   resolveAttachmentPath: () => null,
+  // @effect-diagnostics-next-line effectFnOpportunity:off -- a fake service's stub method: Effect.fn's span adds nothing to a stand-in
   credentials: () => Effect.die("not used"),
+  compatibility: noCompatibilityPolicy,
 });
 
 describe("pi's driver snapshot", () => {
   it("needs setup with no endpoint, lists the endpoints' models as soon as one lists a model, and needs setup again", async () => {
     let endpoints: ModelEndpoints = { revision: 1, endpoints: [endpoint("empty", "anthropic-messages", [])] };
     bindEnvironmentServices({ modelEndpoints: () => endpoints } as unknown as EnvironmentServices);
-    const scope = Effect.runSync(Scope.make());
+    const scope = Scope.makeUnsafe();
     const stamp = (draft: object) => ({ ...draft, instanceId: "pi", driver: "pi" }) as never;
     const config = { ...Schema.decodeSync(PiSettings)({}), enabled: true };
     const snapshot = await Effect.runPromise(piSnapshot(config, stamp).pipe(Effect.provideService(ProviderHost.ProviderHost, host), Scope.provide(scope)));

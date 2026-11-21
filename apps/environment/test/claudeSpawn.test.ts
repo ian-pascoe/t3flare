@@ -31,7 +31,7 @@ const bind = (options: { readonly endpoints: ModelEndpoints }) =>
     },
   } as unknown as EnvironmentServices);
 
-const spawnClaude = () => Effect.runPromise(spawnCli(ChildProcess.make("claude-agent-acp", [], { cwd: "/w/demo" }) as ChildProcess.StandardCommand).pipe(Effect.scoped, Effect.exit));
+const spawnClaude = () => Effect.runPromiseExit(spawnCli(ChildProcess.make("claude-agent-acp", [], { cwd: "/w/demo" }) as ChildProcess.StandardCommand).pipe(Effect.scoped));
 const settingsOf = (start: ChannelStart) => JSON.parse(start.files?.find((file) => file.path.endsWith("/managed-settings.json"))?.text ?? "{}") as { apiKeyHelper: string; availableModels: Array<string>; env: Record<string, string> };
 
 afterEach(() => {

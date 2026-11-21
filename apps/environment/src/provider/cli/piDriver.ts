@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off effectFnOpportunity:off
+// @effect-diagnostics effectFnOpportunity:off
 // The pi CLI in the Cloud Environment (step 4a, plan §3, §5.2, §5.3): t3's own Pi adapter (`makePiAdapterV2`) with
 // t3flare's readiness (the image's version and the Model endpoints, SPI-1170; it needs setup without one, SPI-1176; never
 // a spawning probe), t3's MCP credential withheld (OD-3), the spawn's profile from `agents/cliProfiles.ts` (t3's

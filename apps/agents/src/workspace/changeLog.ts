@@ -11,7 +11,6 @@
 // stub, so computer reports no `workspace.fs.*` span for them: this log is the one record of every change, whoever made
 // it. These are dofs' private tables, as of `@cloudflare/computer` 0.11.2 (unchanged since 0.8.0): re-check them when upgrading it
 // (docs/development/dependencies.md). Reads only; a table that cannot be read throws, and `FileNotifier` logs it.
-// @effect-diagnostics preferEffectArray:off missingPipeableSignature:off
 
 /** A path a push sent: still there (a file or directory, or a symlink), or gone (removed, or renamed away). */
 export type ChangedPath = {

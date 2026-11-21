@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off
+// @effect-diagnostics globalDate:off
 // The acceptance test's step 2b part (`scripts/acceptance.ts --terminal --worktree`): on a fresh clone of the fixture, a
 // terminal echoes through t3's terminal RPCs; a worktree thread of a project with a setup script provisions and runs
 // it; the worktree is removed through t3's `vcs.removeWorktree` and frees its Workspace; the sweep's dry run reads t3's

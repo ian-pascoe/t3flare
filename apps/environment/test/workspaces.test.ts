@@ -1,6 +1,5 @@
 // The Workspace registry (step 2b, plan section 3.5) on real SQLite: step 2a's table migrated in place, worktree
 // Workspaces registered with their project's remote, and which states resolve for t3's paths.
-// @effect-diagnostics globalDate:off
 import { describe, expect, it } from "vitest";
 
 import { migrateWorkspaceRegistry, workspaceRegistry } from "../src/agents/workspaces.ts";

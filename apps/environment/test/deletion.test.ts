@@ -1,6 +1,5 @@
 // Deleting Workspaces (step 2b, plan section 5): what references a Workspace, read from t3's tables on real SQLite and
 // failing closed (review F3), and the sweep's plan for each state and its grace.
-// @effect-diagnostics globalDate:off
 import { describe, expect, it } from "vitest";
 
 import { planSweep, referencesFrom, STALE_PROVISIONING_MS } from "../src/agents/deletion.ts";

@@ -5,7 +5,7 @@
 // holding `.git` below the listed one is a work tree of its own: its ignore rules apply from there, in place of those
 // above it, as git applies a nested repository's.
 // pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
-// @effect-diagnostics asyncFunction:off globalDate:off missingPipeableSignature:off preferEffectArray:off
+// @effect-diagnostics globalDate:off
 import type { Workspace } from "@cloudflare/computer";
 import type { FileListEntry, FileListing, ListFilesOptions } from "@earendil-works/pi-durable/env";
 import ignore, { type Ignore } from "ignore";

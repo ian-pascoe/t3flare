@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off asyncFunction:off
+// @effect-diagnostics globalDate:off
 // M0's exit check (step 2a plan, section 7): `POST /_t3flare/check/agents`. Calls into the agents Worker and back,
 // starts Containers in two Workspaces, checks the paths, the Container budget, and a GitHub token's scope. Never boots t3.
 // `?repo=<owner/name>&other=<owner/name>`, both required: the repo a Container token is minted for, and one outside it.

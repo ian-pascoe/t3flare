@@ -2,7 +2,7 @@
 // and waits durably for the answer, as an approval waits (`permissions.ts`): kept in the Session's storage, asked again
 // by a rerun after a restart, each wait marked as progress. The Session pushes it as a question; the differ opens a
 // t3 `user_input` request; the owner answers in a client, or an agent with `t3_pending_request`. A Stop withdraws it.
-// @effect-diagnostics asyncFunction:off globalConsole:off globalDate:off
+// @effect-diagnostics globalConsole:off globalDate:off
 import type { Context } from "@earendil-works/chord";
 import { defineExtension, defineTool, type Extension, type ToolExecutionApi } from "@earendil-works/pi-durable";
 import { arr, bool, obj, opt, str } from "@earendil-works/pi-schema";

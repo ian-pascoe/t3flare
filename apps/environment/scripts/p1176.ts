@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off nodeBuiltinImport:off
 // SPI-1176's evidence on its stage: the hard cut. t3flare knows no Model proxy: a fresh Environment needs setup until the
 // owner adds a Model endpoint, then every agent kind runs a turn, and a selection from before the cut falls back.
 //

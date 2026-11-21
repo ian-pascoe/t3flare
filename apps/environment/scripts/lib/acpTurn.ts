@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off
 // Step 4b: Claude Code and OpenCode turns from t3's own client protocol, shared by `scripts/cli4b.ts` (the milestones'
 // evidence) and `scripts/acceptance.ts --claude --opencode`.
 import { admin, dispatch, endpointModelFor, itemsOf, mutateProject, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall } from "./client.ts";

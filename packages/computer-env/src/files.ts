@@ -4,7 +4,6 @@
 // Workspace's files and can never start a Container; the model's own tools ask for `reachContainer`, which runs a
 // search of a Container-only path on the Container (ADR-0018).
 // pi-durable's tools are Promise-native and stay so (ADR-0003); this adapter follows them.
-// @effect-diagnostics asyncFunction:off
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { type Call, caller } from "./client.ts";
 import type { ComputerWorkspaceStub } from "./env.ts";

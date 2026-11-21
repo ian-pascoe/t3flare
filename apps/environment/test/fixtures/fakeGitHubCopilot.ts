@@ -1,3 +1,4 @@
+// @effect-diagnostics cryptoRandomUUID:off
 // A fake of GitHub's device flow and Copilot token endpoint (SPI-1166), as pi-ai 1.5.0's Copilot sign-in uses them and
 // GitHub documents the device flow (docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
 // #device-flow): the device code (`device_code`, `user_code` as `XXXX-XXXX`, `verification_uri`, `expires_in` 900,

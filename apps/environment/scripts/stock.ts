@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
+// @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off
 // The back-to-stock step's stage cases (docs-archive-1:docs/steps/stock-plan.md): pushes land from the agent's own shell with no card
 // of t3flare's, under the thread's mode (Durable, Codex, and a linked thread under its link's mode); Claude Code runs a
 // repository's own `.claude/settings.json` hook; Codex's `auto` runs as t3 runs it. Evidence goes to .evidence/stock/.

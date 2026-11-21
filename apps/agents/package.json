@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "effect-tsgo tsrs --noEmit",
-    "lint": "oxlint --type-aware --deny-warnings src test build.ts",
+    "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives-severity error src test scripts build.ts",
     "test": "vitest run",
     "build": "node build.ts"
   },

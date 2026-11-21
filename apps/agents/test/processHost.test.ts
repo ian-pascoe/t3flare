@@ -1,7 +1,7 @@
 // The Workspace DO's CLI processes (step 4a, the process channel) at their seam, `ProcessHost`, over a fake non-PTY
 // exec: what the Environment's spawner sees pushed, what reaches the process's stdin, and what the kill script gets.
 // Review F6 (ordered input that never skips, bytes, never-dropped output), F7 (the hold) and plan §2.6 (epochs).
-// @effect-diagnostics globalTimers:off newPromise:off globalDate:off
+// @effect-diagnostics globalTimers:off
 import type { ProcessFrame, ProcessStartInput } from "@t3flare/workspace-client";
 import { describe, expect, it } from "vitest";
 

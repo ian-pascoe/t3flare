@@ -1,4 +1,4 @@
-// @effect-diagnostics globalTimers:off globalConsole:off globalDate:off extendsNativeError:off
+// @effect-diagnostics globalTimers:off globalConsole:off extendsNativeError:off
 // t3's PTY seam in the Cloud Environment (step 2b, ADR-0021). t3's TerminalManager spawns shells through `PtyAdapter`;
 // here a shell is a bash the Workspace DO of the cwd starts under the platform's PTY exec in its Container. Input,
 // size and close go to that DO over RPC; output comes back pushed (`EnvironmentDO.terminalOutput` → `deliver`).

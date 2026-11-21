@@ -10,7 +10,7 @@
 // both only within the hold cap from the Workspace's last input (ADR-0021's 30 minutes, review M5), which the Workspace DO
 // decides (`used`, `hold`). Neither is the owner's or the agent's activity: an open page keeps the Container only while
 // someone works there. Nothing here logs a request's path, query or cookies (review L5).
-// @effect-diagnostics asyncFunction:off globalTimers:off preferEffectArray:off globalJsonInEffect:off
+// @effect-diagnostics globalTimers:off
 import { CONTAINER_PREVIEW_PORTS, containerPreviewHost } from "@t3flare/workspace-client";
 
 import { CONTAINER_PREVIEW_HEADER, CONTAINER_PREVIEW_SCRIPT, CONTAINER_PREVIEW_SOCKET_PATH } from "./containerPreviewScript.ts";

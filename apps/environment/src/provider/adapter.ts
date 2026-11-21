@@ -1,5 +1,5 @@
-// @effect-diagnostics globalDate:off globalDateInEffect:off
-// The pushes arrive as plain Promise RPC from the DO host, so their timing uses the platform clock.
+// @effect-diagnostics globalDate:off
+// A push arrives as plain Promise RPC from the DO host, outside Effect, so its arrival time reads the platform clock.
 // The Durable agent provider's ProviderAdapterV2 (step 2a plan, sections 2–3). A provider session is t3's handle on one
 // thread's Session DO (agents Worker): commands go to the Session over DO RPC; its pushes come back through the session
 // sink and the differ turns them into t3's events. The Session is the durable party: a provider session holds nothing
@@ -33,6 +33,7 @@ import {
   type ThinkingLevel,
 } from "@t3flare/session-protocol";
 import type * as Cause from "effect/Cause";
+import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
@@ -254,7 +255,7 @@ export const makePiDurableAdapter = (
           applying.withPermits(1)(
             Effect.gen(function* () {
               if (closed) return { ok: true } as SessionPushAnswer;
-              const nowMs = Date.now();
+              const nowMs = yield* Clock.currentTimeMillis;
               // Only a push that still names a turn counts as a sign of it (the inverse guard).
               for (const id of differ.turns.keys()) if (push.turns[id] !== undefined) lastPushAt.set(id, nowMs);
               // Live turns of the Session that this provider session did not start: orphans (step 2a plan, section 2).
@@ -282,7 +283,7 @@ export const makePiDurableAdapter = (
       // The inverse guard: an open turn with no push for SILENT_TURN_MS pulls a snapshot; a turn the Session no longer
       // has is ended as lost, so a lost Session cannot keep a t3 run (and the Environment) open forever.
       yield* Effect.gen(function* () {
-        const nowMs = Date.now();
+        const nowMs = yield* Clock.currentTimeMillis;
         const silent = [...differ.turns.keys()].filter((id) => nowMs - (lastPushAt.get(id) ?? nowMs) >= SILENT_TURN_MS);
         if (silent.length === 0) return;
         yield* applying.withPermits(1)(
@@ -459,7 +460,7 @@ export const makePiDurableAdapter = (
             if (interactionModeOf(turnInput.runtimePolicy.interactionMode) === "default") forgetProposedPlan(differ);
             // Registered before the submit, so a push that arrives first is not taken for an orphan (plan revision 3).
             differ.turns.set(providerTurn.id, context);
-            lastPushAt.set(providerTurn.id, Date.now());
+            lastPushAt.set(providerTurn.id, yield* Clock.currentTimeMillis);
             if (thread === null || thread.id !== turnInput.providerThread.id) thread = turnInput.providerThread;
             offer({ type: "provider_turn.updated", driver, threadId: turnInput.threadId, providerTurn });
             emitThread(

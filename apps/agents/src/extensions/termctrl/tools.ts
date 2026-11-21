@@ -7,7 +7,7 @@
 // between slices the tool checks this conversation's inbox for a steer; nothing is written to files on the Worker
 // (termctrl's full-output files), so a cut result says to run the command with `bash` or redirect it; the cwd is the
 // Workspace's (`/workspace/repo`), and t3's `/w/<id>` paths are translated as `bash`'s are (`permissions.ts`).
-// @effect-diagnostics asyncFunction:off globalDate:off
+// @effect-diagnostics globalDate:off
 import type { Context } from "@earendil-works/chord";
 import { defineTool, InboxDoc, type JsonObject, type ToolExecutionApi, type ToolRegistration } from "@earendil-works/pi-durable";
 import { arr, bool, int, obj, opt, str } from "@earendil-works/pi-schema";

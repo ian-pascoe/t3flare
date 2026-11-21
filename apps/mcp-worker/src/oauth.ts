@@ -3,7 +3,7 @@
 // no bindings, through a fetch that takes only https URLs without credentials and follows no redirect. The Environment
 // DO keeps the state (the `state` value, the PKCE verifier, the client and the tokens) and calls these three methods over
 // its `MCP_OAUTH` service binding; nothing here is stored.
-// @effect-diagnostics asyncFunction:off globalFetch:off preferEffectArray:off
+// @effect-diagnostics asyncFunction:off preferEffectArray:off
 import {
   type AuthorizationServerMetadata,
   discoverOAuthServerInfo,

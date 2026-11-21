@@ -1,10 +1,11 @@
-// @effect-diagnostics globalDate:off globalDateInEffect:off effectFnOpportunity:off globalConsole:off cryptoRandomUUID:off
+// @effect-diagnostics globalDate:off effectFnOpportunity:off globalConsole:off
 // The Environment's process spawner (step 2a plan, section 2): the Environment DO runs no processes, so every command
 // t3 spawns is answered here. `git` in a Workspace (`/w/<id>/…`) runs in that Workspace's Container; t3's clone into
 // `/w` makes a Workspace; `gh auth token` is the Environment's own GitHub token (t3's PR features); everything else is
 // a missing binary, as in step 1. Every routed command is kept in a short trace (admin `GET /_t3flare/agents/router-trace`).
 import { describeFailure, fromWorkspaceText, isUnderW, normalize, REPO_ROOT, startRefusal, toWorkspace, WORKTREES_ROOT } from "@t3flare/workspace-client";
 import { containerGitHubPermissions, ENVIRONMENT_GITHUB_PERMISSIONS } from "@t3flare/github-app/permissions";
+import * as Clock from "effect/Clock";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -510,10 +511,10 @@ export const spawn = (command: ChildProcess.Command) =>
     const cwd = command.options.cwd;
     // Step 4a: a CLI agent streams through the process channel to its Workspace's Container.
     if (CLI_NAMES.has(name)) {
-      const started = Date.now();
+      const started = yield* Clock.currentTimeMillis;
       return yield* spawnCli(command).pipe(
-        Effect.tap(() => Effect.sync(() => record({ at: started, command: name, argv: traceArgv(args.slice(0, 4)), cwd: cwd ?? null, route: "process", exitCode: null, ms: Date.now() - started }))),
-        Effect.tapError((error) => Effect.sync(() => record({ at: started, command: name, argv: traceArgv(args.slice(0, 4)), cwd: cwd ?? null, route: "error", exitCode: null, ms: Date.now() - started, detail: String(error).slice(0, 300) }))),
+        Effect.tap(() => Effect.map(Clock.currentTimeMillis, (now) => record({ at: started, command: name, argv: traceArgv(args.slice(0, 4)), cwd: cwd ?? null, route: "process", exitCode: null, ms: now - started }))),
+        Effect.tapError((error) => Effect.map(Clock.currentTimeMillis, (now) => record({ at: started, command: name, argv: traceArgv(args.slice(0, 4)), cwd: cwd ?? null, route: "error", exitCode: null, ms: now - started, detail: String(error).slice(0, 300) }))),
       );
     }
     // In-app updates (ADR-0037, plan D21): t3's provider-update runner's command dispatches a CLI bump and follows its
@@ -523,7 +524,7 @@ export const spawn = (command: ChildProcess.Command) =>
       : routeOf(name, args, cwd);
     if (route === null) {
       spawnAttempts.set(name, (spawnAttempts.get(name) ?? 0) + 1);
-      record({ at: Date.now(), command: name, argv: traceArgv(args), cwd: cwd ?? null, route: "not-found", exitCode: null, ms: 0 });
+      record({ at: yield* Clock.currentTimeMillis, command: name, argv: traceArgv(args), cwd: cwd ?? null, route: "not-found", exitCode: null, ms: 0 });
       return yield* notFound(name);
     }
 
@@ -533,7 +534,7 @@ export const spawn = (command: ChildProcess.Command) =>
     let stdinStarted = false;
     const stdinDone = yield* Deferred.make<void>();
     const env = command.options.env as Readonly<Record<string, unknown>> | undefined;
-    const started = Date.now();
+    const started = yield* Clock.currentTimeMillis;
     const answer = yield* Effect.cached(
       Effect.gen(function* () {
         yield* Effect.sleep(5);
@@ -552,7 +553,7 @@ export const spawn = (command: ChildProcess.Command) =>
         });
       }).pipe(
         Effect.tap((result) =>
-          Effect.sync(() =>
+          Effect.map(Clock.currentTimeMillis, (now) =>
             record({
               at: started,
               command: name,
@@ -560,14 +561,14 @@ export const spawn = (command: ChildProcess.Command) =>
               cwd: cwd ?? null,
               route: result.route,
               exitCode: result.exitCode,
-              ms: Date.now() - started,
+              ms: now - started,
               ...(result.detail === undefined ? {} : { detail: redactTokens(result.detail) }),
             }),
           ),
         ),
         Effect.tapError((error) =>
-          Effect.sync(() =>
-            record({ at: started, command: name, argv: traceArgv(args), cwd: cwd ?? null, route: "error", exitCode: null, ms: Date.now() - started, detail: String(error).slice(0, 300) }),
+          Effect.map(Clock.currentTimeMillis, (now) =>
+            record({ at: started, command: name, argv: traceArgv(args), cwd: cwd ?? null, route: "error", exitCode: null, ms: now - started, detail: String(error).slice(0, 300) }),
           ),
         ),
       ),

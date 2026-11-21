@@ -1,6 +1,6 @@
 // Copied from cloudpid@ae5a7b73:packages/effect-durable/src/harness.fixture.ts.
 // pi-durable's Harness and the faux provider are Promise-based, so this file is too.
-// @effect-diagnostics asyncFunction:off missingPipeableSignature:off newPromise:off globalTimers:off
+// @effect-diagnostics globalTimers:off
 // A pi-durable Harness over memory storage whose model is pi-ai's faux provider, for driving adapted tools, hooks,
 // sections, and tasks through real runs.
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
@@ -134,10 +134,8 @@ export const openRestartingHarness = async (
     // parse.
     return new Proxy(memory, {
       get: (target, key) => {
-        // oxlint-disable-next-line anti-slop/no-reflect-get -- see above
         const value: unknown = Reflect.get(target, key, target);
 
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- see above
         if (typeof value !== "function") return value;
 
         // Refused when called, not when read, so a method the instance captured before the cut refuses too.

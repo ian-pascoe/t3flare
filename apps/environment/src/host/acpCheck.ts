@@ -1,15 +1,17 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalTimers:off globalConsoleInEffect:off globalDateInEffect:off effectFnOpportunity:off globalJsonInEffect:off nodeBuiltinImport:off
+// @effect-diagnostics globalDate:off globalTimers:off
 // Step 4b M1's demo (stages only): Claude Code or OpenCode started through t3's own `ChildProcessSpawner` (the process
 // router, the CLI profile, the process channel) in a Workspace's Container, without t3's drivers, and driven over ACP:
 // `initialize`, `session/new`, the model chosen, one prompt. Every permission request is refused. Admin
 // `POST /_t3flare/agents/acp-check` `{"cli":"claude"|"opencode","workspace":"<id>","model"?:"<catalog id>","prompt"?:"…"}`.
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Option from "effect/Option";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 
 import { spawn } from "../agents/processRouter.ts";
+import { decodeJsonObject } from "../platform/json.ts";
 import { countMarker } from "./processCheck.ts";
 
 const encoder = new TextEncoder();
@@ -102,12 +104,10 @@ const check = async (input: AcpCheckInput, scope: Scope.Closeable, started: numb
           const line = carry.slice(0, nl).trim();
           carry = carry.slice(nl + 1);
           if (line.length === 0) continue;
-          let message: Record<string, unknown>;
-          try {
-            message = JSON.parse(line) as Record<string, unknown>;
-          } catch {
-            continue;
-          }
+          const parsed = decodeJsonObject(line);
+          // Not a JSON object: not a message.
+          if (Option.isNone(parsed)) continue;
+          const message = parsed.value;
           if (message.method === "session/update") {
             const update = (message.params as { update: { sessionUpdate: string; content?: { type: string; text?: string } } }).update;
             if (update.sessionUpdate === "agent_message_chunk" && update.content?.type === "text") text += update.content.text ?? "";

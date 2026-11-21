@@ -5,7 +5,6 @@
 //
 // No guard lives here: every guard is in the tools (the `permissions` wraps, t3-mcp's own check), and pi-durable runs a
 // script's nested call through the registered, wrapped tool, so a call from a script is judged exactly as a direct one.
-// @effect-diagnostics preferEffectArray:off
 import { type CodemodeRemote, type CodemodeSandboxBase, RemoteCodemodeSandbox } from "@earendil-works/pi-codemode/portable";
 import { defineExtension, type Extension, section, type ToolRegistration } from "@earendil-works/pi-durable";
 import { type CodemodeNamespace, CODEMODE_TOOL_NAME, createCodemodeExtension } from "@earendil-works/pi-durable/codemode";

@@ -17,7 +17,6 @@
 // Recomputed paths pair exact renames, as git does; a rename in the last answer that touches a journal path and is no
 // longer exact is shown as its two sides. One file's reads (`:(top,literal)<path>`, the diff panel's) with no last
 // answer are computed from the repo's facts alone (SPI-1295; ADR-0009). Pure but for `RepoFacts`.
-// @effect-diagnostics asyncFunction:off preferEffectArray:off
 import { asOutput, byPath, type FileChange, fileNumstat, filePatch, fileRaw, latin1, type TreeEntry, typeChanged } from "./gitPatch.ts";
 
 /** What the repo says about one path now. */

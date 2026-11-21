@@ -3,7 +3,7 @@
 // File operations run in the Workspace DO and answer plain data (`host.ts`); commands run on the Workspace's runtime
 // through `@cloudflare/computer`'s RPC client (`exec.ts`).
 // pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
-// @effect-diagnostics asyncFunction:off cryptoRandomUUID:off preferEffectArray:off
+// @effect-diagnostics cryptoRandomUUID:off
 import type { WorkspaceHandle } from "@cloudflare/computer";
 import type { Context } from "@earendil-works/chord";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";

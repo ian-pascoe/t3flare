@@ -1,3 +1,4 @@
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
 // `pnpm run bump`: move t3code to the newest tag on the Deployment's t3 track and prove it on a deployed stage (ADR-0017,
 // ADR-0041). The track is the T3FLARE_T3_TRACK Deployment setting: `stable` (`v<x.y.z>`) or `nightly`.
 //

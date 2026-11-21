@@ -1,4 +1,4 @@
-// @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off
+// @effect-diagnostics globalTimers:off
 // A Browser Run browser's browser-level CDP WebSocket (G11, ADR-0031), as `--remote-debugging-pipe` would give it: one
 // socket, flattened target sessions, JSON text messages. Acquired with the options t3flare always uses (`acquireOptions`)
 // and never with `recording` or a Live View link (review L5).

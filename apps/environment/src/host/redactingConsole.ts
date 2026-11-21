@@ -1,4 +1,3 @@
-// @effect-diagnostics globalConsole:off
 // The Console t3 runs with in the Environment DO (ADR-0010): nothing secret reaches Workers Logs.
 //
 // t3 prints a fresh one-time pairing URL, token included, on every boot (`announceStartupPairingUrl` in

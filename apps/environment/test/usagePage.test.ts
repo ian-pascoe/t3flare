@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off
+// @effect-diagnostics nodeBuiltinImport:off globalDate:off
 // t3's Usage page on t3flare's records (SPI-1173), wired as the bundle wires it: t3's own `UsageService` (the Layer the
 // composition root builds, `t3/composition.ts`) over the Shadow's `BUILT_IN_USAGE_DRIVERS` (build.ts's SHADOWS redirect,
 // restated here as a module mock), reading the records the Environment's `recordUsage` keeps. If the Shadow lost its
@@ -15,14 +15,14 @@ import * as Layer from "effect/Layer";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { describe, expect, it, vi } from "vitest";
 
-import * as ServerConfig from "../../../t3code/apps/server/src/config.ts";
-import * as ServerSettings from "../../../t3code/apps/server/src/serverSettings.ts";
-import * as UsageService from "../../../t3code/apps/server/src/usage/UsageService.ts";
+import * as ServerConfig from "t3/src/config.ts";
+import * as ServerSettings from "t3/src/serverSettings.ts";
+import * as UsageService from "t3/src/usage/UsageService.ts";
 import { bindEnvironmentServices, type EnvironmentServices } from "../src/agents/bindings.ts";
 import { acceptUsage, usageStore } from "../src/usage/records.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
 
-vi.mock("../../../t3code/apps/server/src/provider/builtInDrivers.ts", () => import("../src/shadows/builtInDrivers.ts"));
+vi.mock("t3/src/provider/builtInDrivers.ts", () => import("../src/shadows/builtInDrivers.ts"));
 
 describe("t3's Usage page, through the Shadow's readers", () => {
   it("shows each agent's records by its endpoint's model, the unpriced one priced by t3's rate table", async () => {
@@ -73,6 +73,7 @@ describe("t3's Usage page, through the Shadow's readers", () => {
       }).pipe(Effect.provide(layer), Effect.scoped);
       // SAFETY: the type is t3's own drivers' (the mock is not seen by the typechecker): their readers need t3's usage
       // services (Antigravity, Codex history, Cursor, Muse); the Shadow's need none, which running it here shows.
+      // @effect-diagnostics-next-line unsafeEffectTypeAssertion:off -- t3's drivers' requirements, which the mocked Shadow's readers do not have (SAFETY above)
       const summary = await Effect.runPromise(read as Effect.Effect<Effect.Success<typeof read>, Effect.Error<typeof read>>);
       const ours = summary.buckets.map((bucket) => ({ provider: bucket.provider, source: bucket.sourcePath, model: bucket.model, costUsd: bucket.costUsd, costSource: bucket.costSource }));
       expect(ours).toEqual(

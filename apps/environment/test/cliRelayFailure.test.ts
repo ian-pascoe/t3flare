@@ -27,13 +27,14 @@ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderS
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import type { EndpointFailureRecord } from "@t3flare/session-protocol";
+import * as Config from "effect/Config";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
-import * as fs from "node:fs";
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -44,6 +45,7 @@ import { MIN_RESET_MS } from "@t3flare/models/failures";
 import { cliRelayFailure } from "../src/provider/cli/relayFailure.ts";
 import { wrapCliAdapter } from "../src/provider/cli/wrapper.ts";
 
+const encodeJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 const AGENT = path.join(import.meta.dirname, "fixtures/fake-acp-agent.mjs");
 const NOW = Date.parse("2026-11-16T10:00:00.000Z");
 
@@ -127,50 +129,49 @@ const PROMPT_ERROR = { code: -32603, message: 'Internal error: API Error: 401 {"
 
 let threads = 0;
 
-const acpTurn = (cli: "claude" | "opencode", relayed: EndpointFailureRecord | null, model: string) =>
-  Effect.gen(function* () {
-    const fileSystem = yield* FileSystem.FileSystem;
-    const cwd = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3flare-cli-relay-failure-" });
-    const scriptPath = path.join(cwd, "..", `${path.basename(cwd)}.script.json`);
-    fs.writeFileSync(scriptPath, JSON.stringify({ initialize: INITIALIZE, sessionNew: SESSION_NEW, prompts: [[{ error: PROMPT_ERROR }]] }));
-    const spawn = (input: AcpAdapterV2RuntimeInput) =>
-      Effect.gen(function* () {
-        const { processEnvironment: _env, runtimePolicy: _policy, mcpServers: _mcp, acpMcpServers: _acp, httpMcpServers: _http, ...rest } = input;
-        const context = yield* Layer.build(
-          AcpSessionRuntime.layer({
-            ...rest,
-            spawn: { command: process.execPath, args: [AGENT], cwd: input.cwd, env: { PATH: process.env.PATH ?? "", FAKE_ACP_SCRIPT: scriptPath, FAKE_ACP_LOG: path.join(cwd, "..", "log") }, extendEnv: false },
-            authenticateOnAuthRequired: false,
-            ownDetachedProcessGroup: true,
-            processGroupPlatform: process.platform,
-          }),
-        );
-        return yield* Effect.service(AcpSessionRuntime.AcpSessionRuntime).pipe(Effect.provide(context));
-      });
-    const driver = ProviderDriverKind.make(cli === "claude" ? "claudeAgent" : "opencode");
-    const instanceId = ProviderInstanceId.make(cli === "claude" ? "claudeAgent" : "opencode");
-    const adapter = wrapCliAdapter(yield* makeAcpAdapterV2(acpAdapterOptions(instanceId, acpFlavor(cli, driver, { spawn, modelEndpoints: () => ENDPOINTS }), undefined)), {
-      sessions: new Map(),
-      now: () => NOW,
-      relayFailure: async () => relayed,
-      takeEnvironmentSkills: () => Effect.void,
-    });
-    const threadId = ThreadId.make(`thread-relay-failure-${++threads}`);
-    const modelSelection = { instanceId, model } as const;
-    const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({ runtimeMode: "full-access", interactionMode: "default", cwd });
-    const runtime = yield* adapter.openSession({ threadId, providerSessionId: ProviderSessionId.make(`session-relay-failure-${threads}`), modelSelection, runtimePolicy });
-    const queue = yield* Queue.unbounded<Event>();
-    yield* runtime.events.pipe(Stream.runForEach((event) => Queue.offer(queue, event)), Effect.forkScoped);
-    const providerThread = yield* runtime.ensureThread({ threadId, modelSelection, runtimePolicy });
-    yield* runtime.startTurn(makeTurnInput({ threadId, providerThread, instanceId, runtimePolicy, now: yield* DateTime.now, modelSelection }));
-    while (true) {
-      const event = yield* Queue.take(queue).pipe(Effect.timeout("20 seconds"));
-      // t3's ACP adapter reports a failed prompt on the terminal alone (no error item), so the terminal is the whole failure.
-      if (event.type === "turn.terminal") return { terminal: event };
-    }
+const acpTurn = Effect.fn("acpTurn")(function* (cli: "claude" | "opencode", relayed: EndpointFailureRecord | null, model: string) {
+  const fileSystem = yield* FileSystem.FileSystem;
+  const cwd = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3flare-cli-relay-failure-" });
+  const scriptPath = path.join(cwd, "..", `${path.basename(cwd)}.script.json`);
+  yield* fileSystem.writeFileString(scriptPath, yield* encodeJson({ initialize: INITIALIZE, sessionNew: SESSION_NEW, prompts: [[{ error: PROMPT_ERROR }]] }));
+  const PATH = yield* Config.String("PATH").pipe(Config.withDefault(""));
+  const spawn = Effect.fn("spawn")(function* (input: AcpAdapterV2RuntimeInput) {
+    const { processEnvironment: _env, runtimePolicy: _policy, mcpServers: _mcp, acpMcpServers: _acp, httpMcpServers: _http, ...rest } = input;
+    const context = yield* Layer.build(
+      AcpSessionRuntime.layer({
+        ...rest,
+        spawn: { command: process.execPath, args: [AGENT], cwd: input.cwd, env: { PATH, FAKE_ACP_SCRIPT: scriptPath, FAKE_ACP_LOG: path.join(cwd, "..", "log") }, extendEnv: false },
+        authenticateOnAuthRequired: false,
+        ownDetachedProcessGroup: true,
+        processGroupPlatform: process.platform,
+      }),
+    );
+    return yield* Effect.service(AcpSessionRuntime.AcpSessionRuntime).pipe(Effect.provide(context));
   });
+  const driver = ProviderDriverKind.make(cli === "claude" ? "claudeAgent" : "opencode");
+  const instanceId = ProviderInstanceId.make(cli === "claude" ? "claudeAgent" : "opencode");
+  const adapter = wrapCliAdapter(yield* makeAcpAdapterV2(acpAdapterOptions(instanceId, acpFlavor(cli, driver, { spawn, modelEndpoints: () => ENDPOINTS }), undefined)), {
+    sessions: new Map(),
+    now: () => NOW,
+    relayFailure: async () => relayed,
+    takeEnvironmentSkills: () => Effect.void,
+  });
+  const threadId = ThreadId.make(`thread-relay-failure-${++threads}`);
+  const modelSelection = { instanceId, model } as const;
+  const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({ runtimeMode: "full-access", interactionMode: "default", cwd });
+  const runtime = yield* adapter.openSession({ threadId, providerSessionId: ProviderSessionId.make(`session-relay-failure-${threads}`), modelSelection, runtimePolicy });
+  const queue = yield* Queue.unbounded<Event>();
+  yield* runtime.events.pipe(Stream.runForEach((event) => Queue.offer(queue, event)), Effect.forkScoped);
+  const providerThread = yield* runtime.ensureThread({ threadId, modelSelection, runtimePolicy });
+  yield* runtime.startTurn(makeTurnInput({ threadId, providerThread, instanceId, runtimePolicy, now: yield* DateTime.now, modelSelection }));
+  while (true) {
+    const event = yield* Queue.take(queue).pipe(Effect.timeout("20 seconds"));
+    // t3's ACP adapter reports a failed prompt on the terminal alone (no error item), so the terminal is the whole failure.
+    if (event.type === "turn.terminal") return { terminal: event };
+  }
+});
 
-const run = <A>(body: Effect.Effect<A, unknown, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => Effect.runPromise(body.pipe(Effect.scoped, Effect.provide(layerTest)) as never) as Promise<A>;
+const run = <A, E>(body: Effect.Effect<A, E, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => Effect.runPromise(body.pipe(Effect.scoped, Effect.provide(layerTest)));
 
 for (const cli of ["claude", "opencode"] as const) {
   describe(`${cli} on a Model endpoint, through the relay`, () => {
@@ -230,17 +231,16 @@ const standIn = (driver: ProviderDriverKind, failure: OrchestrationV2ProviderFai
       }),
   }) as unknown as ProviderAdapter.ProviderAdapterV2["Service"];
 
-const standInTurn = (driver: string, failure: OrchestrationV2ProviderFailure, relayed: EndpointFailureRecord | null, model: string) =>
-  Effect.gen(function* () {
-    const adapter = wrapCliAdapter(standIn(ProviderDriverKind.make(driver), failure), { sessions: new Map(), now: () => NOW, relayFailure: async () => relayed });
-    const runtime = yield* adapter.openSession({
-      threadId: ThreadId.make(`thread-${driver}-${++threads}`),
-      providerSessionId: ProviderSessionId.make(`session-${driver}-${threads}`),
-      modelSelection: { instanceId: ProviderInstanceId.make(driver), model },
-      runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({ runtimeMode: "full-access", interactionMode: "default", cwd: "/w/x" }),
-    } as never);
-    return Array.from(yield* Stream.runCollect(runtime.events));
-  });
+const standInTurn = Effect.fn("standInTurn")(function* (driver: string, failure: OrchestrationV2ProviderFailure, relayed: EndpointFailureRecord | null, model: string) {
+  const adapter = wrapCliAdapter(standIn(ProviderDriverKind.make(driver), failure), { sessions: new Map(), now: () => NOW, relayFailure: async () => relayed });
+  const runtime = yield* adapter.openSession({
+    threadId: ThreadId.make(`thread-${driver}-${++threads}`),
+    providerSessionId: ProviderSessionId.make(`session-${driver}-${threads}`),
+    modelSelection: { instanceId: ProviderInstanceId.make(driver), model },
+    runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({ runtimeMode: "full-access", interactionMode: "default", cwd: "/w/x" }),
+  } as never);
+  return Array.from(yield* Stream.runCollect(runtime.events));
+});
 
 const CLI_FAILURES = {
   // t3's Codex adapter: Codex's own usage limit (its `usageLimitExceeded`), with no reset t3 can arm.

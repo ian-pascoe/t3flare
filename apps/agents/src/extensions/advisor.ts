@@ -21,12 +21,13 @@
 // tool, which pi-durable would also offer the agent. Not ported: Consultations (`advisor_ask`), Superseded Findings'
 // re-validation, token calibration, Advisor Session compaction (a Session past its size starts from a new seed), Child
 // Agents.
-// @effect-diagnostics asyncFunction:off globalDate:off globalTimers:off newPromise:off globalConsole:off
+// @effect-diagnostics globalDate:off globalTimers:off globalConsole:off
 import type { Context as ChordContext } from "@earendil-works/chord";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { type Conversation, defineExtension, type EntryId, type Extension, GenerationTask, type Harness, hook, type HookApi, type JsonObject } from "@earendil-works/pi-durable";
+import { type Conversation, type ConversationId, type Cursor, defineExtension, type EntryId, type Extension, GenerationTask, type Harness, hook, type HookApi, type JsonObject } from "@earendil-works/pi-durable";
 import { isRetiredSlug, parseEndpointSlug } from "@t3flare/models/endpoints";
 
+import { conversationIdOf, entryIdOf } from "../durableIds.ts";
 import { type EvidenceMessage, evidenceRefs, projectEntry, selectContextSeed } from "./advisor/evidence.ts";
 
 export const ADVISOR_EXTENSION = "advisor";
@@ -137,6 +138,13 @@ export const validFinding = (raw: unknown, refs: ReadonlySet<string>): AdvisorFi
   return { severity: fields.severity, message: fields.message.trim(), evidence: { ...(cited.length === 0 ? {} : { refs: cited }), ...(quote === undefined ? {} : { quote }) } };
 };
 
+/** `finding` as the data of an advice entry (the same fields, as JSON). */
+const findingData = ({ severity, message, evidence }: AdvisorFinding): JsonObject => ({
+  severity,
+  message,
+  evidence: { ...(evidence.refs === undefined ? {} : { refs: [...evidence.refs] }), ...(evidence.quote === undefined ? {} : { quote: evidence.quote }) },
+});
+
 const adviceText = (finding: AdvisorFinding) => `Advisor ${finding.severity}: ${finding.message}`;
 
 /**
@@ -188,7 +196,7 @@ export class AdvisorObserver {
     const cadence = this.#settings.reviewEvery;
     if (errored || (cadence === "turn" && !readOnly) || (typeof cadence === "number" && this.#backlog >= cadence)) this.#due = true;
     // A Review outlives this hook's invocation: it runs in the background context, as the Session's own work does.
-    if (this.#due && this.#running === undefined) this.#start("running", Number(api.conversationId), BACKGROUND_CONTEXT);
+    if (this.#due && this.#running === undefined) this.#start("running", api.conversationId, BACKGROUND_CONTEXT);
     // Catch-up: the agent waits (at most 30 s) for a Review under way while the backlog is at the threshold.
     if (this.#running !== undefined && this.#backlog >= CATCH_UP_THRESHOLD) await this.#within(this.#running, CATCH_UP_WAIT_MS);
   }
@@ -197,7 +205,7 @@ export class AdvisorObserver {
    * `onYield`: the final drain, while the run is still open. The Review under way finishes, the rest of the backlog is
    * reviewed, findings become notes for the next step, and a Blocker continues this same run once.
    */
-  async answered(conversationId: number): Promise<string | undefined> {
+  async answered(conversationId: ConversationId): Promise<string | undefined> {
     if (this.#paused === undefined) {
       if (this.#running !== undefined) await this.#within(this.#running, REVIEW_TIMEOUT_MS);
       if (this.#backlog > 0 || this.#deferred.length > 0) {
@@ -221,7 +229,7 @@ export class AdvisorObserver {
     return Promise.race([work, new Promise<void>((resolve) => setTimeout(resolve, ms))]);
   }
 
-  #start(mode: "running" | "final", conversationId: number, context: ChordContext): void {
+  #start(mode: "running" | "final", conversationId: ConversationId, context: ChordContext): void {
     this.#due = false;
     const covered = this.#backlog;
     this.#running = this.#review(mode, conversationId, context)
@@ -236,10 +244,10 @@ export class AdvisorObserver {
       });
   }
 
-  async #pause(conversationId: number, reason: string, context: ChordContext): Promise<void> {
+  async #pause(conversationId: ConversationId, reason: string, context: ChordContext): Promise<void> {
     this.#paused = reason;
     console.warn(JSON.stringify({ t3flare: "advisor-paused", reason: reason.slice(0, 300) }));
-    const conversation = await (await this.#harness()).conversation(conversationId as never, context);
+    const conversation = await (await this.#harness()).conversation(conversationId, context);
     // Data only: t3 shows it, the agent never reads it.
     await conversation
       ?.submit({ type: "write", entry: { kind: ADVICE_ENTRY, data: { severity: "paused", message: `The Advisor paused: ${reason.slice(0, 500)}. The agent keeps working; change the Advisor's settings on the Settings page to resume it.` } } }, context)
@@ -256,7 +264,7 @@ export class AdvisorObserver {
     const key = JSON.stringify([model, this.#settings.thinkingLevel]);
     const stored = this.#storage.get<Stored>(STATE_KEY);
     if (stored !== undefined && stored.key === key && stored.characters < SESSION_CHARACTERS) {
-      const conversation = await harness.conversation(stored.conversation as never, context);
+      const conversation = await harness.conversation(conversationIdOf(stored.conversation), context);
       if (conversation !== undefined) return { conversation, stored, fresh: false };
     }
     const conversation = await harness.createConversation(
@@ -280,17 +288,17 @@ export class AdvisorObserver {
     return { conversation, stored: next, fresh: true };
   }
 
-  async #review(mode: "running" | "final", conversationId: number, context: ChordContext): Promise<void> {
+  async #review(mode: "running" | "final", conversationId: ConversationId, context: ChordContext): Promise<void> {
     const harness = await this.#harness();
-    const observed = await harness.conversation(conversationId as never, context);
+    const observed = await harness.conversation(conversationId, context);
     if (observed === undefined) return;
     const { conversation, stored, fresh } = await this.#session(harness, observed, context);
     // Review Evidence the Advisor has not seen: everything (a seed) for a new Advisor Session, else what is newer.
     const messages: Array<EvidenceMessage> = [];
     let last = stored.supplied;
-    let cursor: unknown;
+    let cursor: Cursor | undefined;
     do {
-      const page = await observed.entries({ order: "ascending", ...(fresh ? {} : { minEntryId: (stored.supplied + 1) as never }) }, 200, cursor as never, context);
+      const page = await observed.entries({ order: "ascending", ...(fresh ? {} : { minEntryId: entryIdOf(stored.supplied + 1) }) }, 200, cursor, context);
       for (const entry of page.items) {
         const projected = projectEntry(entry);
         if (projected !== undefined) messages.push(projected);
@@ -347,7 +355,7 @@ export class AdvisorObserver {
       if (finding.severity === "nit") this.#nits++;
       if (finding.severity === "concern") this.#lastConcern = this.#completed;
       if (stored !== undefined) this.#storage.put(STATE_KEY, { ...stored, delivered: { ...stored.delivered, [key]: RANK[finding.severity] } });
-      const entry = { kind: ADVICE_ENTRY, data: finding as unknown as JsonObject };
+      const entry = { kind: ADVICE_ENTRY, data: findingData(finding) };
       const content = adviceText(finding);
       let steered = false;
       if (mode === "running" && finding.severity !== "nit") {
@@ -377,7 +385,7 @@ export const advisorExtension = (observer: AdvisorObserver): Extension =>
           await observer.turnDone(results, api, context);
         },
         onYield: async (_answer, api) => {
-          const correction = await observer.answered(Number(api.conversationId));
+          const correction = await observer.answered(api.conversationId);
           return correction === undefined ? undefined : { continue: correction };
         },
       }),

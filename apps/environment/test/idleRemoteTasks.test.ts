@@ -1,3 +1,4 @@
+// @effect-diagnostics globalDate:off
 // SPI-1061 M2 (plan §5.3, D7): an open Remote task is work. While the machine it runs on answers, the Environment stays up
 // to follow it; while it does not, the Environment may reset, and one alarm brings it back after 5, 15, then every 30
 // minutes, with the retry state in DO storage. The reads of t3's tables fail safe (U2, U48).

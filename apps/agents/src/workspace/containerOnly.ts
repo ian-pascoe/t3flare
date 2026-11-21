@@ -6,7 +6,6 @@
 // computer's Container backend takes its ignore patterns once, at the Container's start (`MOUNT_IGNORE`), so the
 // backend is made again whenever the patterns a start needs differ: the static `CONTAINER_IGNORE`, the submodules'
 // git directories (`.git/modules`), and each path `.gitmodules` names (read from the DO's files at each start).
-// @effect-diagnostics asyncFunction:off
 import type { WorkspaceBackend } from "@cloudflare/computer";
 import { SKILLS_LOCK_SCRIPT } from "@t3flare/workspace-client";
 

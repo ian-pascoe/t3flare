@@ -1,7 +1,7 @@
 // The text-generation setting's default (SPI-1163): while the owner has set no model, the setting names text generation's
 // default model, a small model of the first Model endpoint that has one (else the endpoints' default model), and follows it as the endpoints change. A model the owner picked is
 // never replaced; an old Pi Durable model is not one the owner can still use, and is replaced.
-import { ProviderInstanceId } from "@t3tools/contracts";
+import { ProviderInstanceId, type ServerSettingsError } from "@t3tools/contracts";
 import type { EndpointModel, ModelEndpoints } from "@t3flare/models/endpoints";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -44,7 +44,7 @@ const INSTANCES = { providerInstances: { [PI]: { driver: "piDurable", config: {}
 type Settings = ServerSettings.ServerSettingsService["Service"];
 
 /** Runs the sync once per step over one settings service (each step first changes what it will), then reads the setting. */
-const settingsAfter = (overrides: Parameters<typeof ServerSettings.layerTest>[0], steps: ReadonlyArray<(settings: Settings) => Effect.Effect<unknown> | void>) =>
+const settingsAfter = (overrides: Parameters<typeof ServerSettings.layerTest>[0], steps: ReadonlyArray<(settings: Settings) => Effect.Effect<unknown, ServerSettingsError> | void>) =>
   Effect.runPromise(
     Effect.gen(function* () {
       const service = yield* ServerSettings.ServerSettingsService;
@@ -56,7 +56,7 @@ const settingsAfter = (overrides: Parameters<typeof ServerSettings.layerTest>[0]
         seen.push((yield* service.getSettings).textGenerationModelSelection.model);
       }
       return { seen, selection: (yield* service.getSettings).textGenerationModelSelection };
-    }).pipe(Effect.provide(Layer.merge(ServerSettings.layerTest({ ...INSTANCES, ...overrides }), registry))) as Effect.Effect<{ readonly seen: Array<string>; readonly selection: { readonly instanceId: string; readonly model: string } }>,
+    }).pipe(Effect.provide(Layer.merge(ServerSettings.layerTest({ ...INSTANCES, ...overrides }), registry))),
   );
 
 const nothing = () => undefined;
@@ -117,17 +117,17 @@ describe("the text-generation setting's default", () => {
 });
 
 /** Runs `body` with the settings service `decorate` makes of the test one, then reads the setting. */
-const withSettings = (
+const withSettings = <E>(
   overrides: Parameters<typeof ServerSettings.layerTest>[0],
   decorate: (settings: Settings) => Settings,
-  body: Effect.Effect<unknown, unknown, ServerSettings.ServerSettingsService | ProviderInstanceRegistry.ProviderInstanceRegistry>,
+  body: Effect.Effect<unknown, E, ServerSettings.ServerSettingsService | ProviderInstanceRegistry.ProviderInstanceRegistry>,
 ) =>
   Effect.runPromise(
     Effect.gen(function* () {
       const inner = yield* ServerSettings.ServerSettingsService;
       yield* Effect.exit(body.pipe(Effect.provideService(ServerSettings.ServerSettingsService, decorate(inner))));
       return (yield* inner.getSettings).textGenerationModelSelection;
-    }).pipe(Effect.provide(Layer.merge(ServerSettings.layerTest({ ...INSTANCES, ...overrides }), registry))) as Effect.Effect<{ readonly instanceId: string; readonly model: string }>,
+    }).pipe(Effect.provide(Layer.merge(ServerSettings.layerTest({ ...INSTANCES, ...overrides }), registry))),
   );
 
 describe("what counts as unset, clause by clause", () => {
@@ -197,7 +197,7 @@ describe("the sync's record and its order", () => {
           for (let tries = 0; tries < 50 && (yield* service.getSettings).textGenerationModelSelection.model !== "openai/gpt-5-nano"; tries++) yield* Effect.sleep(5);
           return (yield* service.getSettings).textGenerationModelSelection;
         }),
-      ).pipe(Effect.provide(Layer.merge(ServerSettings.layerTest({ ...INSTANCES }), registry))) as Effect.Effect<{ readonly model: string }>,
+      ).pipe(Effect.provide(Layer.merge(ServerSettings.layerTest({ ...INSTANCES }), registry))),
     );
     expect(selection.model).toBe("openai/gpt-5-nano");
   });
@@ -223,7 +223,7 @@ describe("the sync's record and its order", () => {
           Effect.timeout(1_000),
           Effect.catchCause(() => Effect.succeed("blocked")),
         );
-      }).pipe(Effect.provide(Layer.merge(ServerSettings.layerTest({ ...INSTANCES }), registry))) as Effect.Effect<string>,
+      }).pipe(Effect.provide(Layer.merge(ServerSettings.layerTest({ ...INSTANCES }), registry))),
     );
     expect(outcome).toBe("ran");
   });

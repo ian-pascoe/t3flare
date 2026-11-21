@@ -1,4 +1,3 @@
-// @effect-diagnostics globalJsonInEffect:off effectFnOpportunity:off
 // The Codex driver's investigating text generation (parity G7, SPI-998): t3's PR review guide asks a coding agent to
 // read a checkout read-only (`TextGenerationOperations.Request.investigate`), and stock t3 runs `codex exec -s
 // read-only` with the checkout as its cwd (`CodexTextGeneration.runCodexJson`). Here the same run happens in the
@@ -66,6 +65,7 @@ export const withCodexInvestigation =
       const schemaPath = yield* fileSystem.makeTempFile({ prefix: "t3flare-codex-schema-" }).pipe(Effect.mapError((cause) => fail(operation, "Failed to write temp file", cause)));
       const answer = yield* Effect.gen(function* () {
         yield* fileSystem
+          // @effect-diagnostics-next-line globalJsonInEffect:off -- a JSON Schema object is plain data: stringify cannot throw
           .writeFileString(schemaPath, JSON.stringify(toJsonSchemaObject(request.outputSchema)))
           .pipe(Effect.mapError((cause) => fail(operation, "Failed to write temp file", cause)));
         const child = yield* spawner

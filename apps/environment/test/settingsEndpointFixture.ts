@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off
 // The Owner-client endpoint over one Environment's Settings server (settingsFixture), for M5a's tests (SPI-1200): its key
 // fixed, its holds short, and requests as the named clients send them (M0's capture, P17).
 import { applyMcpChange, type McpServerSetting } from "@t3flare/harness-registry";

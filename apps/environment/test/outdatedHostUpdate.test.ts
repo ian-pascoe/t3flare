@@ -124,7 +124,9 @@ describe("a client blocked by a protocol mismatch", () => {
           setEnabled: () => Effect.void,
         } as unknown as EnvironmentRegistry.EnvironmentRegistry["Service"]);
         const resolver = ConnectionResolver.ConnectionResolver.of({
+          // @effect-diagnostics-next-line effectFnOpportunity:off -- a fake service's stub method: Effect.fn's span adds nothing to a stand-in
           prepare: () => Effect.die(new Error("The update must bypass the protocol gate.")),
+          // @effect-diagnostics-next-line effectFnOpportunity:off -- a fake service's stub method: Effect.fn's span adds nothing to a stand-in
           prepareForUpdate: () =>
             Effect.sync(() => ({
               descriptor: served,

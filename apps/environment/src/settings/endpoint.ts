@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalTimers:off
+// @effect-diagnostics globalTimers:off
 // The Owner-client endpoint (ADR-0035, plan D11, D12), M5a and M5b (SPI-1200, SPI-1201): the Settings server's second
 // door, for the owner's own MCP clients (Claude Code, pi, Cursor, Codex, OpenCode) signed in through the endpoint's
 // Access application with managed OAuth (ADR-0036; where it lives is `endpointLayout.ts`). `EnvironmentDO.settingsMcp`

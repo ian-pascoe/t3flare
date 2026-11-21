@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalTimers:off anyUnknownInErrorContext:off globalDateInEffect:off globalRandom:off
+// @effect-diagnostics globalDate:off globalDateInEffect:off globalRandom:off anyUnknownInErrorContext:off
 // A headless client of t3's terminal (step 2b): `terminal.attach` streamed on one /ws socket, with writes, resizes and
 // closes on the same client, as the web client's terminal drawer does.
 import { WsRpcGroup } from "@t3tools/contracts";
@@ -9,8 +9,7 @@ import { RpcClient } from "effect/rpc";
 
 import { protocol, sleep } from "./client.ts";
 
-// biome-ignore lint: control characters are the point
-// oxlint-disable-next-line no-control-regex
+// oxlint-disable-next-line no-control-regex -- ANSI escapes are what this strips
 export const stripAnsi = (text: string) => text.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07|\x1b[()][A-Za-z0-9]|\r/g, "");
 
 export interface TerminalEventLike {

@@ -1,4 +1,4 @@
-// @effect-diagnostics asyncFunction:off globalConsole:off
+// @effect-diagnostics globalConsole:off
 // The Browser Run sessions a new Environment DO instance inherits (G11, review M5): its predecessor's CDP sockets died
 // with it, so its browsers can only cost money until Browser Run's keep-alive ends them. They are closed at once.
 import type { BrowserRunBinding } from "./browserRun.ts";

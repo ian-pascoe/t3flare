@@ -3,7 +3,6 @@
 // is an Effect tool). A call reads and changes the list in one commit, so it sees the list as the last call left it and
 // a failure changes nothing. Every result's text ends with the whole list, so the model's context shows the current
 // list wherever the last call is, and the projection only has to fill in when no call is.
-// @effect-diagnostics asyncFunction:off
 import { defineTool, type ToolRegistration, type ToolTaskInput } from "@earendil-works/pi-durable";
 import { arr, int, nullable, obj, oneOf, opt, str } from "@earendil-works/pi-schema";
 
@@ -137,7 +136,7 @@ export const todoTool = (): ToolRegistration =>
       if (!applied.outcome.ok) throw new Error(applied.outcome.message);
       return {
         output: [{ type: "text" as const, text: textOf(applied.outcome, applied.text) }],
-        structuredOutput: applied.outcome.output as never,
+        structuredOutput: applied.outcome.output,
         details: { [SHOWN_REV]: applied.rev },
       };
     },

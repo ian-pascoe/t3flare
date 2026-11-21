@@ -31,7 +31,7 @@ const bind = (options: { readonly endpoints: ModelEndpoints }) =>
     },
   } as unknown as EnvironmentServices);
 
-const spawnOpenCode = () => Effect.runPromise(spawnCli(ChildProcess.make("opencode", ["acp"], { cwd: "/w/demo" }) as ChildProcess.StandardCommand).pipe(Effect.scoped, Effect.exit));
+const spawnOpenCode = () => Effect.runPromiseExit(spawnCli(ChildProcess.make("opencode", ["acp"], { cwd: "/w/demo" }) as ChildProcess.StandardCommand).pipe(Effect.scoped));
 const configOf = (start: ChannelStart) => JSON.parse(start.files?.find((file) => file.path.endsWith("/opencode.json"))?.text ?? "{}") as { providers: Record<string, { settings: { baseURL: string } }>; model?: string };
 
 afterEach(() => {

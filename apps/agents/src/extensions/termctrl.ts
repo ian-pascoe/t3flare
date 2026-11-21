@@ -11,7 +11,7 @@
 //   steer into the run (`whenIdle: "reject"`), or after the answer as a note the next turn reads; never a run of its own
 //   (pi-termctrl starts a turn when idle; t3 owns the runs here).
 // - Nothing starts a container until a Terminal or a job starts: the tools are free to offer.
-// @effect-diagnostics asyncFunction:off globalDate:off
+// @effect-diagnostics globalDate:off
 import type { Context } from "@earendil-works/chord";
 import { defineExtension, type Extension, GenerationTask, type Harness, hook, type HookApi, section, type ToolExecutionApi } from "@earendil-works/pi-durable";
 import type { CodemodeNamespace } from "@earendil-works/pi-durable/codemode";

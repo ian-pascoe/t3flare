@@ -1,4 +1,3 @@
-// @effect-diagnostics nodeBuiltinImport:off
 // `node:fs/promises` for t3's own modules: the synchronous State-directory calls of
 // ./node-fs.ts, resolved as promises. DO SQLite is synchronous, so nothing is lost.
 import * as fs from "./node-fs.ts";

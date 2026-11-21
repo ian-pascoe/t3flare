@@ -1,3 +1,4 @@
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
 // `pnpm run cli-bump --cli pi|codex|claude`: move one CLI agent's pin in the Workspace image to its newest version and
 // prove it (ADR-0037; in-app updates plan D22). `cli-bump.yml` runs it for t3's provider-update button.
 //

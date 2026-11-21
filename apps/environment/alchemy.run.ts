@@ -1,4 +1,4 @@
-// @effect-diagnostics anyUnknownInErrorContext:off layerMergeAllWithDependencies:off nodeBuiltinImport:off
+// @effect-diagnostics nodeBuiltinImport:off
 // The environment Worker (ADR-0014): the front door, the Environment DO and the stock t3 web client as static
 // assets, plus the Access application that guards the admin routes. Deployed by scripts/stage.ts, which
 // builds first and supplies the stage's secrets:

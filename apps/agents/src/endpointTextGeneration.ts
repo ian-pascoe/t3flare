@@ -1,4 +1,3 @@
-// @effect-diagnostics asyncFunction:off
 // The agents Worker's entrypoint for text generation on a Model endpoint's model (SPI-1163): the Environment DO's
 // `TEXT_GENERATION` service binding calls `generate` with the endpoint's id, the model's and the prompt. No key and no
 // endpoint cross that call: the endpoint is read from the Environment (`modelEndpoints`) and its key asked for its target
@@ -11,10 +10,10 @@ import type { EndpointTextAnswer } from "@t3flare/models/endpoints";
 import { WorkerEntrypoint } from "cloudflare:workers";
 
 import { generateEndpointText } from "./endpointText.ts";
-import { environmentStub, limitsSender, usageSender } from "./environment.ts";
+import { type EnvironmentDO, environmentStub, limitsSender, usageSender } from "./environment.ts";
 
 export interface TextGenerationEnv {
-  readonly ENVIRONMENT: DurableObjectNamespace;
+  readonly ENVIRONMENT: DurableObjectNamespace<EnvironmentDO>;
 }
 
 export class EndpointTextGeneration extends WorkerEntrypoint<TextGenerationEnv> {

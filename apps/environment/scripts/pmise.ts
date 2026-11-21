@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off globalDateInEffect:off
+// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
 // SPI-1150's stage evidence (stage `pmise`): the Global mise config through the panel's API, laid down in the Containers
 // that start with it, and what every command path's environment carries. Run through the stage's `run`, which sets the
 // stage's service token and admin token (never printed):

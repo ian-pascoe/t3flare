@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off nodeBuiltinImport:off processEnv:off
+// @effect-diagnostics globalConsole:off nodeBuiltinImport:off
 // The launch video's beat 6 (tools/demo-video): relaunches its isolated T3 Code, "MacBook Pro", with a laptop agent,
 // t3's Pi provider on the Stage's Model endpoint (lib/laptopAgent.ts). models.json goes into the capture directory and
 // names the key's variable; the key itself only reaches the instance's environment. pi is linked into the instance's

@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off
+// @effect-diagnostics nodeBuiltinImport:off
 // T-page (plan §5; ADR-0035, plan D6, D10), M4 (SPI-1199): the Change page. Every kind of D10's table renders escaped,
 // and a hostile value (`<script>`, a bidi control) is inert; the POST's guards; a secret typed on the page reaches the
 // secret store and nothing else; a sign-in's authorization URL goes only in the page's own response; the page's CSP is

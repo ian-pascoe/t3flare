@@ -1,4 +1,4 @@
-// @effect-diagnostics asyncFunction:off globalDate:off globalTimers:off globalConsole:off
+// @effect-diagnostics globalDate:off globalTimers:off globalConsole:off
 // The Workspace DO's terminals (step 2b, ADR-0021): shells under the platform's PTY exec in the Workspace's Container,
 // their output pushed to the Environment DO in batches, their input, size and close from the Environment's PTY adapter.
 //

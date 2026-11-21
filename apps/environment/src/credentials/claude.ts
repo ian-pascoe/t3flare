@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off
 // A Claude subscription (Pro or Max) through Claude Code's OAuth sign-in (SPI-1165), in pi-ai 1.5.0's copy-code form
 // (`dist/auth/oauth/anthropic.js` `loginAnthropicCopyCode`): the owner opens claude.ai's authorize page, approves, and
 // Anthropic's page shows a code (`code#state`) that the owner pastes into the Settings page. The client, URLs and scopes are

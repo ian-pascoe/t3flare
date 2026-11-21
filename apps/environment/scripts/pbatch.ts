@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off globalJsonInEffect:off
+// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
 // The parity batch's stage harness (docs-archive-1:docs/steps/parity-batch.md): G7 (the PR review guide), G4 (scratch threads), G12
 // (task webhooks and the PR watch's wake), and the W† rows of docs/parity.md, each through t3's own client protocol as
 // the web client sends it. Evidence goes to .evidence/parity-batch/<part>.json, tokens and cookies redacted.

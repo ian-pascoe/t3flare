@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off globalTimers:off
+// @effect-diagnostics globalDate:off globalFetch:off
 // The acceptance test's Peer link part (step 3, `scripts/acceptance.ts --peer`): the harness plays the laptop
 // (`lib/peer.ts`, t3's `PeerLinks.signIn` and `PeerMcpClient` in TypeScript) against the stage, and proves the link
 // contract and the link fence at the MCP level (plan section 5.3):

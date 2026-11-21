@@ -2,7 +2,6 @@
 // mode script. Reads run; a write asks unless full access and may be accepted for the session; plan mode refuses
 // writes; a write cut off by a restart after it was sent is never sent again. Linked threads follow their own mode
 // (owner, 2026-11-12, back to stock).
-// @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off
 import { CodemodeSandbox } from "@earendil-works/pi-codemode";
 import { type AssistantMessage, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import type { InteractionMode, RuntimeMode } from "@t3flare/session-protocol";

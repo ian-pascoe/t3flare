@@ -1,4 +1,4 @@
-// @effect-diagnostics globalJsonInEffect:off globalDate:off globalConsole:off globalFetch:off globalTimers:off nodeBuiltinImport:off extendsNativeError:off
+// @effect-diagnostics globalDate:off globalFetch:off nodeBuiltinImport:off extendsNativeError:off
 // Step 3: a linking environment's side of a Peer link, in TypeScript, as t3's laptop does it (`PeerLinks.signIn`,
 // `PeerMcpClient`): the pairing code minted by the owner's session, the three MCP OAuth steps, and an MCP session on
 // `/mcp` with `T3-Mode-Limit`, 404 re-initialisation and waits in 50 s pieces. Used by `acceptance.ts --peer`, the M0

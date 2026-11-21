@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalTimers:off globalConsoleInEffect:off globalDateInEffect:off effectFnOpportunity:off globalJsonInEffect:off
+// @effect-diagnostics globalDate:off globalTimers:off
 // Step 4a M1's demo (stages only): the probe program through t3's own `ChildProcessSpawner` (the process router) in a
 // Workspace's Container, driven the way t3's CLI clients drive theirs. Admin `POST /_t3flare/agents/process-check`.
 //

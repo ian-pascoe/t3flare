@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off extendsNativeError:off
+// @effect-diagnostics extendsNativeError:off
 // The sealed credentials store (SPI-1162; step-2a2's design): a credential the Environment keeps for the owner (a Model
 // endpoint's API key today; the credential broker's sign-ins next, SPI-1164) is kept in the Environment DO's storage only
 // sealed, AES-256-GCM under a key derived (HKDF-SHA256) from the stage's credentials key `T3FLARE_CREDENTIALS_KEY`, with

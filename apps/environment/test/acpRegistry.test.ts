@@ -1,5 +1,7 @@
 // Parity G13 (SPI-1003): t3's ACP registry lists every agent with its standing here, and refuses every install.
+import { AcpRegistrySettings } from "@t3tools/provider-acp-registry/settings";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 
 import { annotated, refusingCatalog, standingOf } from "../src/provider/acpRegistry.ts";
@@ -55,7 +57,7 @@ describe("the ACP registry here", () => {
     const catalog = refusingCatalog(stock as never);
     const prepared = await Effect.runPromise(Effect.flip(catalog.prepare({ agentId: "claude-acp" })));
     expect(prepared.detail).toMatch(/add the Claude provider/);
-    const custom = await Effect.runPromise(Effect.flip(catalog.resolve({ agentId: "" } as never, "/w/x")));
+    const custom = await Effect.runPromise(Effect.scoped(Effect.flip(catalog.resolve(Schema.decodeSync(AcpRegistrySettings)({ source: "local" }), "/w/x"))));
     expect(custom.detail).toMatch(/custom ACP command/);
     expect(await Effect.runPromise(catalog.uninstallManagedBinary({ agentId: "gemini" }))).toEqual({ agentId: "gemini", removed: false });
   });

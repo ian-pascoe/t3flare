@@ -117,5 +117,7 @@ export const limitsSender =
     );
   };
 
-export const environmentStub = (namespace: DurableObjectNamespace): EnvironmentRpc =>
-  namespace.get(namespace.idFromName(ENVIRONMENT_NAME)) as unknown as EnvironmentRpc;
+/** The Environment DO as the agents Worker sees it: its RPC methods, branded so that its namespace types its stubs. */
+export type EnvironmentDO = EnvironmentRpc & Rpc.DurableObjectBranded;
+
+export const environmentStub = (namespace: DurableObjectNamespace<EnvironmentDO>): EnvironmentRpc => namespace.get(namespace.idFromName(ENVIRONMENT_NAME));

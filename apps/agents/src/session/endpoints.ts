@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalTimers:off globalDate:off
+// @effect-diagnostics globalConsole:off globalTimers:off
 // A Session's Model endpoints (SPI-1162): the endpoints it last took, kept secret-free in its storage so a restart has the
 // same providers; their providers installed in the Session's models in place; and their keys, asked of the Environment at
 // use time (ADR-0018) and kept in memory only, never in storage. A sign-in endpoint's access token (SPI-1164) comes the

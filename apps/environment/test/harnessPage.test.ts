@@ -204,7 +204,8 @@ describe("harness page", () => {
     expect(wait).not.toContain("codemode");
     expect(mcp).toContain('<option value="deferred" selected title="loaded by tool_search">deferred</option>');
     expect(mcp).toContain("<code>t3_attachment_upload</code>");
-    const empty = renderPage(fixturePage({ t3Tools: undefined }));
+    const { t3Tools: _listed, ...unlisted } = fixturePage();
+    const empty = renderPage(unlisted);
     expect(section(empty, "mcp")).toContain("Not listed yet: t3 lists its tools for each thread");
   });
 
@@ -250,7 +251,7 @@ describe("harness page", () => {
       csrf: hostile,
       // A stored `enabled` is not type-checked by the registry: a string must not reach an attribute raw.
       mcp: [row, { ...row, setting: { ...row.setting, enabled: hostile as unknown as boolean, auth: { kind: hostile } }, status: hostile }],
-      audit: [{ at: FIXTURE_NOW, caller: hostile, action: hostile, target: hostile, after: { note: hostile } }],
+      audit: [{ at: FIXTURE_NOW, entity: "harness", caller: hostile, action: hostile, target: hostile, after: { note: hostile } }],
       status: { [hostile]: hostile },
     });
     expect(page).not.toContain("<img");

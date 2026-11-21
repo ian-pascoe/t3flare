@@ -7,9 +7,9 @@
 // are Sessions of their own), so refs are the conversation's own; History is read in pages of stored entries, each in
 // its own read, `windows`/`list` keep only a short line per entry and `search` stops once its page is full, so a long
 // thread never holds its whole transcript in memory at once; the Notes' total size is bounded.
-// @effect-diagnostics asyncFunction:off preferEffectArray:off globalDate:off extendsNativeError:off
+// @effect-diagnostics globalDate:off extendsNativeError:off
 import type { Context } from "@earendil-works/chord";
-import { type ConversationId, defineTool, type EntryRecord, type ToolExecutionApi, type ToolRegistration } from "@earendil-works/pi-durable";
+import { type ConversationId, type Cursor, defineTool, type EntryRecord, type JsonObject, type ToolExecutionApi, type ToolRegistration } from "@earendil-works/pi-durable";
 import { int, obj, oneOf, opt, str } from "@earendil-works/pi-schema";
 
 import { callRange, describeEntry, entryRef, matchesFilter, PAGE_SIZE, parseRef, READ_CHARACTERS, search, type SearchItem, type SearchMatch, timestampOf } from "./history.ts";
@@ -38,7 +38,7 @@ export const CONTEXT_GUIDELINES = {
 export class Refusal extends Error {}
 
 /** The model reads the JSON text; scripts get the same value as an object. */
-const result = (data: Record<string, unknown>) => ({ output: [{ type: "text" as const, text: JSON.stringify(data) }], structuredOutput: data as never });
+const result = (data: JsonObject) => ({ output: [{ type: "text" as const, text: JSON.stringify(data) }], structuredOutput: data });
 
 /** Where the next page starts, or null after the last. */
 const nextOffset = (offset: number, shown: number, total: number) => (offset + shown < total ? offset + shown : null);
@@ -56,10 +56,10 @@ const SCAN_PAGE = 200;
 
 /** Every stored entry of conversation `conversationId`, oldest first, including those before a Handoff, a page at a time. */
 export async function* storedEntries(api: ToolExecutionApi, conversationId: ConversationId, context: Context): AsyncGenerator<EntryRecord> {
-  let cursor: unknown;
+  let cursor: Cursor | undefined;
   do {
-    // oxlint-disable-next-line no-await-in-loop -- one page at a time keeps memory bounded
-    const page = await api.commit((tx) => tx.scanEntries({ conversationId, order: "ascending" }, SCAN_PAGE, cursor as never), context);
+    // One page at a time keeps memory bounded.
+    const page = await api.commit((tx) => tx.scanEntries({ conversationId, order: "ascending" }, SCAN_PAGE, cursor), context);
     yield* page.items;
     cursor = page.next;
   } while (cursor !== undefined);

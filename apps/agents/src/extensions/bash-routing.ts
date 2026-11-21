@@ -15,7 +15,6 @@
 // module), the shell's built-ins, and a `git` over computer's isomorphic-git client. The sets below are that, copied: a
 // workerd test in apps/server runs every name in `WORKER_SHELL_COMMANDS` through the real Worker Shell, so an upgrade
 // that drops one fails there.
-// @effect-diagnostics asyncFunction:off preferEffectArray:off preferEffectRecord:off missingPipeableSignature:off
 import type { BashBackend } from "./coding-tools.ts";
 
 /** Where a command runs and why: the reason names the command that decided it. */

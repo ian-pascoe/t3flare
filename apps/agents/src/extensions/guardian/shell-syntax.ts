@@ -1,6 +1,5 @@
 // Copied from ian-pascoe/pi-extensions@a5e15d1:packages/pi-guardian/src/shell-syntax.ts (SPI-1058), unchanged but for this
 // header: pi-guardian's shell splitter, for Safe Commands and Command Rules.
-// @effect-diagnostics preferEffectArray:off
 /**
  * Just enough `bash` lexing to find where a command's simple commands start, for Safe Commands
  * and Command Rules. It is not a shell parser: it finds segment boundaries and leading words,

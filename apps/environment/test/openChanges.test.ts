@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off
 // T-open (plan §5; ADR-0035, plan D8, D16), M4 (SPI-1199): the Open change. Single use; expiry at 10 minutes and lazy
 // pruning two hours after closing (`CLOSED_KEPT_MS`); D8's answerer table, a wrong `sub`; a moved revision; two changes
 // against one revision; the record surviving an Environment reset; a skill whose digest changed at apply; every cap of

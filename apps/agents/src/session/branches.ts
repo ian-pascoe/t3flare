@@ -5,8 +5,11 @@
 // Durable Objects, copies the source's model context into a new conversation of the target. Either way the Session then
 // runs the new conversation (`SessionDO`'s conversation pointer); the old one stays in storage as history.
 import type { Context } from "@earendil-works/chord/context";
+import type { Message } from "@earendil-works/pi-ai";
 import type { Conversation, EntryId, Harness } from "@earendil-works/pi-durable";
 import type { ForkSourcePage, TurnState } from "@t3flare/session-protocol";
+
+import { entryIdOf } from "../durableIds.ts";
 
 /** The most a page of a fork's messages carries over DO RPC (its limit is 32 MiB). */
 export const FORK_PAGE_BYTES = 4 * 1024 * 1024;
@@ -51,7 +54,7 @@ export const rollbackPlan = (
 
 /** `current` as it was just before entry `boundary`: a fork at the entry before it, or a fresh conversation when none is. */
 export const rewind = async (harness: Harness, current: Conversation, boundary: number, context: Context): Promise<Conversation> => {
-  const before = (await current.entries({ maxEntryId: (boundary - 1) as EntryId, order: "descending" }, 1, undefined, context)).items[0];
+  const before = (await current.entries({ maxEntryId: entryIdOf(boundary - 1), order: "descending" }, 1, undefined, context)).items[0];
   return before === undefined ? freshConversation(harness, current, context) : current.fork(before.id, ownerless, context);
 };
 
@@ -69,7 +72,7 @@ export const forkPoint = async (
   if (input === undefined) throw new Error(`t3flare: turn ${providerTurnId} is not in this Session's conversation`);
   const later = Object.values(turns).flatMap((turn) => (turn.inputEntry !== undefined && Number(turn.inputEntry) > Number(input) ? [Number(turn.inputEntry)] : []));
   const next = later.length === 0 ? undefined : Math.min(...later);
-  const last = (await current.entries({ ...(next === undefined ? {} : { maxEntryId: (next - 1) as EntryId }), order: "descending" }, 1, undefined, context)).items[0];
+  const last = (await current.entries({ ...(next === undefined ? {} : { maxEntryId: entryIdOf(next - 1) }), order: "descending" }, 1, undefined, context)).items[0];
   if (last === undefined) throw new Error(`t3flare: turn ${providerTurnId} has no entries`);
   return last.id;
 };
@@ -92,12 +95,11 @@ export const forkPage = async (current: Conversation, at: EntryId, offset: numbe
 
 /** Writes `messages` into `target` as model context, in entries of about SEED_ENTRY_BYTES (one message at least). */
 export const seed = async (target: Conversation, messages: ReadonlyArray<unknown>, data: { readonly source: string; readonly at: string }, context: Context): Promise<void> => {
-  let batch: Array<unknown> = [];
+  let batch: Array<Message> = [];
   let size = 0;
   const flush = async () => {
     if (batch.length === 0) return;
-    // SAFETY: the messages are pi-ai messages, as the source's `Conversation.context()` gave them.
-    const submission = await target.submit({ type: "write", entry: { kind: FORK_ENTRY_KIND, model: batch as never, data } }, context);
+    const submission = await target.submit({ type: "write", entry: { kind: FORK_ENTRY_KIND, model: batch, data } }, context);
     await submission.wait(context);
     batch = [];
     size = 0;
@@ -105,7 +107,8 @@ export const seed = async (target: Conversation, messages: ReadonlyArray<unknown
   for (const message of messages) {
     const next = sizeOf(message);
     if (batch.length > 0 && size + next > SEED_ENTRY_BYTES) await flush();
-    batch.push(message);
+    // SAFETY: the messages are pi-ai messages, as the source's `Conversation.context()` gave them.
+    batch.push(message as Message);
     size += next;
   }
   await flush();

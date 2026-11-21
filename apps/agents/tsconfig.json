@@ -5,5 +5,5 @@
     "types": ["node", "@cloudflare/workers-types"],
     "lib": ["ESNext", "esnext.disposable"]
   },
-  "include": ["src", "test", "*.ts"]
+  "include": ["src", "test", "scripts", "*.ts"]
 }

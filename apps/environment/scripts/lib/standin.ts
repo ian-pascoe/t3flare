@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off globalTimers:off nodeBuiltinImport:off
+// @effect-diagnostics globalDate:off globalFetch:off nodeBuiltinImport:off
 // SPI-1061 (plan §8, D16, D21): the stage stand-in for the owner's laptop. A stock `t3` from npm at an exact version, in
 // a Docker container on this machine (never as the owner's user, never against his home), with t3's Pi provider on the
 // stage's Model endpoint (`laptopAgent.ts`), reachable from the cloud over the stage's named Cloudflare Tunnel (`T3FLARE_STANDIN=1` on deploy; its

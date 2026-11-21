@@ -1,5 +1,5 @@
 // Copied from cloudpid@93ba45a3:packages/extensions/src/web/html-parse.ts, unchanged but for its header (SPI-1054; see ./NOTICE.md).
-// @effect-diagnostics missingPipeableSignature:off extendsNativeError:off
+// @effect-diagnostics extendsNativeError:off
 // A depth limit for every htmlparser2 parse. The parser keeps its open elements in an array it prepends to, so a page
 // that opens elements without closing them (`<div><div><div>…`) costs time quadratic in its depth: 100,000 levels take
 // seconds, and the 5 MiB a fetch may read holds over a million. Conversion is synchronous, so nothing could interrupt

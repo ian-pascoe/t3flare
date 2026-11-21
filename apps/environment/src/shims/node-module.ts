@@ -1,4 +1,3 @@
-// @effect-diagnostics nodeBuiltinImport:off
 // `node:module` for t3's own modules. t3 loads some native packages with
 // `createRequire(import.meta.url)(name)` at module scope, which no bundler can follow;
 // in the DO those packages resolve to stubs that throw when used.

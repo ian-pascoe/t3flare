@@ -1,3 +1,4 @@
+// @effect-diagnostics globalTimers:off
 // SPI-1079: an MCP server's questions as t3 cards. The pure plans (`mcp/elicitation.ts`: card kinds, answers back, the
 // rules ported from cloudpid ADR-0041), the MCP host's live questions and Executor-style pauses over a fake engine, and
 // the Environment's fence on `t3_pending_request`.
