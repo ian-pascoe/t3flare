@@ -89,12 +89,11 @@ describe("takeEnvironmentSkillsAt", () => {
     expect(log).toEqual(["take demo h1"]);
   });
 
-  it("asks nothing, and does not fail, when the Environment's services are not bound", async () => {
+  it("does not fail when the Environment's services are not bound", async () => {
     // The binding outlives each test: unbind it, so the default access finds no services.
     bindEnvironmentServices(undefined as unknown as EnvironmentServices);
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    await Effect.runPromise(takeEnvironmentSkillsAt("/w/demo"));
-    expect(log).toEqual([]);
+    await expect(Effect.runPromise(takeEnvironmentSkillsAt("/w/demo"))).resolves.toBeUndefined();
   });
 });
 

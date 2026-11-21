@@ -130,4 +130,10 @@ describe("the Workspace DO's own Container commands", () => {
     expect(containerScript(patterns, "git status")).toBe(`${SKILLS_LOCK_SCRIPT}${dirs}git status`);
     expect(containerScript([], "git status")).toBe(`${SKILLS_LOCK_SCRIPT}git status`);
   });
+
+  it("are what the Workspace DO runs on the Container backend", () => {
+    // No harness drives the DO's `exec` on a Container, so the call site is pinned by its text until one does.
+    const source = fs.readFileSync(join(import.meta.dirname, "../src/workspace/WorkspaceDO.ts"), "utf8");
+    expect(source).toMatch(/backend === CONTAINER_BACKEND \? containerScript\(await this\.#containerPatterns\(\), body\) : body/);
+  });
 });
