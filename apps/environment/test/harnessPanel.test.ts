@@ -115,6 +115,10 @@ describe("Settings page", () => {
     expect(store.noteT3Tools({ ...listing, tools: [{ name: "a b", readOnly: true, asksForDirect: false }] })).toBe(false);
     expect(store.noteT3Tools({ ...listing, left: "device_list" })).toBe(false);
     expect(store.lastT3Tools()?.left).toEqual(["device_list"]);
+    // The latest listing wins: an older one (a Session waking on its kept catalog) does not replace it.
+    expect(store.noteT3Tools({ ...listing, listedAt: NOW - 1, left: [] })).toBe(false);
+    expect(store.noteT3Tools({ ...listing, listedAt: NOW + 1, left: [] })).toBe(true);
+    expect(store.lastT3Tools()?.left).toEqual([]);
   });
 
   it("refuses an invalid change with the registry's reason and stores nothing", async () => {

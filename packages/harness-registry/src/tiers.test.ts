@@ -191,6 +191,9 @@ describe("tierOf: tools", () => {
     expect(hinted(true)).toEqual({ tier: "asked", reasons: ["t3-code/t3_x: Exposure hidden to direct"] });
     expect(hinted(undefined).tier).toBe("asked");
     expect(hinted(false).tier).toBe("unchanged");
+    // Unknown, a narrowing judged at its worst case is still a move (so it applies), never `unchanged`.
+    const set = withTools({ t3: { exposure: "codemode", tools: { t3_x: "direct" } } });
+    expect(tierOf({ entity: "tools", stored: set, change: { t3: { tools: { t3_x: null } } } })).toEqual({ tier: "free", reasons: ["t3-code/t3_x (t3's hint unknown): Exposure direct to direct"] });
   });
 
   it("a preset is judged by every tool it moves; a change that moves nothing is unchanged", () => {

@@ -129,6 +129,9 @@ export const harnessStore = (kv: KvStorage): HarnessStore => ({
   noteT3Tools: (listing) => {
     const valid = t3ToolListing(listing);
     if (valid === undefined) return false;
+    // The latest listing wins: a Session waking on an older catalog does not replace a newer thread's.
+    const kept = t3ToolListing(kv.get<unknown>(T3_TOOLS_KEY));
+    if (kept !== undefined && kept.listedAt >= valid.listedAt) return false;
     kv.put(T3_TOOLS_KEY, valid);
     return true;
   },

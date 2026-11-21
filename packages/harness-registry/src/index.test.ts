@@ -156,7 +156,8 @@ describe("applyToolsChange", () => {
     const before = apply({ tools: { ask_user: "hidden", codemode: "hidden", grep: "codemode" }, t3: { tools: { t3_thread_read: "codemode", t3_thread_wait: "hidden" } } });
     const resolved = resolveHarness(apply({ preset: "codemode-only" }, before));
     expect(resolved.tools).toMatchObject({ ask_user: "hidden", codemode: "hidden", tool_search: "direct", grep: "deferred", read: "deferred", web_search: "hidden" });
-    expect(resolved.t3).toEqual({ exposure: "deferred", tools: { t3_thread_wait: "hidden" } });
+    // A t3 tool the owner set keeps an Exposure of its own, the preset's (one t3 asks for in every request stays so).
+    expect(resolved.t3).toEqual({ exposure: "deferred", tools: { t3_thread_read: "deferred", t3_thread_wait: "hidden" } });
     expect(resolveHarness(apply({ preset: "everything" }, before)).tools).toMatchObject({ read: "direct", grep: "direct", ask_user: "hidden" });
   });
 
@@ -167,11 +168,19 @@ describe("applyToolsChange", () => {
   });
 
   it("applies a preset to MCP servers: each server not hidden takes its Exposure, each tool's own goes back to it", () => {
-    const fixture = { kind: "direct" as const, url: "https://fixture.example/mcp", enabled: true, exposure: "direct" as const, toolExposure: { a: "codemode" as const, b: "hidden" as const } };
+    const fixture = { kind: "direct" as const, url: "https://fixture.example/mcp", enabled: true, exposure: "direct" as const, toolExposure: { a: "codemode" as const, b: "hidden" as const, d: "direct" as const } };
     const shut = { kind: "direct" as const, url: "https://shut.example/mcp", enabled: true, exposure: "hidden" as const, toolExposure: { c: "direct" as const } };
-    const before: StoredHarness = { ...EMPTY_HARNESS, mcp: { servers: { fixture, shut } } };
+    const scripts = { kind: "direct" as const, url: "https://scripts.example/mcp", enabled: true, exposure: "codemode" as const };
+    const before: StoredHarness = { ...EMPTY_HARNESS, mcp: { servers: { fixture, shut, scripts } } };
     const core = apply({ preset: "core" }, before);
-    expect(mcpServersOf(core)).toMatchObject({ fixture: { exposure: "deferred", toolExposure: { b: "hidden" } }, shut: { exposure: "hidden", toolExposure: { c: "deferred" } }, settings: { exposure: "deferred" } });
+    // Code mode only is left as the old wrap left it, a server's or a tool's.
+    expect(mcpServersOf(core)).toMatchObject({
+      fixture: { exposure: "deferred", toolExposure: { a: "codemode", b: "hidden" } },
+      shut: { exposure: "hidden", toolExposure: { c: "deferred" } },
+      scripts: { exposure: "codemode" },
+      settings: { exposure: "deferred" },
+    });
+    expect(mcpServersOf(core).fixture!.toolExposure).toEqual({ a: "codemode", b: "hidden" });
     // The implied Settings server's entry is stored only when the preset moves it.
     expect(core.mcp?.servers.settings).toBeUndefined();
     const everything = apply({ preset: "everything" }, before);

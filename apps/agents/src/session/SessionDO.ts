@@ -127,6 +127,8 @@ const PROXY_KEY = "t3flare:proxy";
 const T3_MCP_KEY = "t3flare:t3-mcp";
 /** The catalog the `t3-mcp` extension was built from (installed again at each start, before work resumes). */
 const T3_CATALOG_KEY = "t3flare:t3-mcp-catalog";
+/** When t3 listed that catalog; absent for one kept before it was noted (reported as listed at 0: unknown). */
+const T3_LISTED_AT_KEY = "t3flare:t3-mcp-listed-at";
 /** The harness settings the Session last took (ADR-0026), so a restart installs the same extensions before resuming. */
 const HARNESS_KEY = "t3flare:harness";
 /** The MCP tools the Session last installed (ADR-0028), in chunks (review M12): a restart installs the same first. */
@@ -333,10 +335,13 @@ export class SessionDO extends DurableObject<SessionEnv> {
   /** Whether this instance reported t3's catalog to the Environment (the panel's t3-code card). */
   #t3Noted = false;
 
-  /** The panel's t3-code card lists t3's tools as this thread was offered them; a failure only leaves the card older. */
-  #noteT3Tools(catalog: T3Catalog): void {
+  /**
+   * The panel's t3-code card lists t3's tools as this thread was offered them, when it listed them (the Environment keeps
+   * the latest listing); a failure only leaves the card older.
+   */
+  #noteT3Tools(catalog: T3Catalog, listedAt: number): void {
     this.#t3Noted = true;
-    this.ctx.waitUntil(environmentStub(this.env.ENVIRONMENT).noteT3Tools(t3ListingOf(catalog, Date.now())).then(() => undefined, () => undefined));
+    this.ctx.waitUntil(environmentStub(this.env.ENVIRONMENT).noteT3Tools(t3ListingOf(catalog, listedAt)).then(() => undefined, () => undefined));
   }
 
   /**
@@ -354,14 +359,16 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const kept = kv.get<T3Catalog>(T3_CATALOG_KEY);
     if (before?.authorization === credential.authorization && kept !== undefined) {
       // A catalog listed before this instance (or before the panel's card existed) is reported once per instance.
-      if (!this.#t3Noted) this.#noteT3Tools(kept);
+      if (!this.#t3Noted) this.#noteT3Tools(kept, kv.get<number>(T3_LISTED_AT_KEY) ?? 0);
       return;
     }
     try {
       const listed = await this.#t3.listTools();
       if (listed === undefined) return;
       const catalog = catalogOf(listed);
-      this.#noteT3Tools(catalog);
+      const listedAt = Date.now();
+      kv.put(T3_LISTED_AT_KEY, listedAt);
+      this.#noteT3Tools(catalog, listedAt);
       if (kv.get<T3Catalog>(T3_CATALOG_KEY)?.hash === catalog.hash) return;
       kv.put(T3_CATALOG_KEY, catalog);
       this.#registryWriter.install(this.#t3Extension(catalog));

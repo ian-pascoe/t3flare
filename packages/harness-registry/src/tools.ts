@@ -186,8 +186,8 @@ const withEntries = (before: Readonly<Record<string, Exposure>> | undefined, ent
 
 /**
  * `preset` over `layer`: every built-in tool that is not hidden and is not a switch takes the Exposure the preset gives
- * it, and so do t3's tools (their default, and each tool the owner set but did not hide). Hidden tools stay hidden. A
- * t3 tool's own Exposure goes back to the default, or, when the default is hidden, takes the preset's.
+ * it, and so do t3's tools (their default, and each tool the owner set but did not hide, kept as its own so a tool t3
+ * asks for in every request is not widened to direct). Hidden tools stay hidden.
  */
 const withPreset = (layer: HarnessLayer, preset: OfferedPreset): HarnessLayer => {
   const current = resolveTools(layer);
@@ -197,23 +197,28 @@ const withPreset = (layer: HarnessLayer, preset: OfferedPreset): HarnessLayer =>
   const t3Exposure = current.t3.exposure === "hidden" ? "hidden" : t3Preset;
   const t3Tools = Object.entries(current.t3.tools)
     .filter(([, exposure]) => exposure !== "hidden")
-    .map(([tool]) => [tool, t3Exposure === "hidden" ? t3Preset : null] as const);
+    .map(([tool]) => [tool, t3Preset] as const);
   return { ...layer, tools: withEntries(layer.tools, builtins), t3: { exposure: t3Exposure, tools: withEntries(layer.t3?.tools, t3Tools) } };
 };
 
 /** The Exposure `offered` gives an MCP server's tools: a preset names them by server, so any tool name stands for all. */
 const serverExposure = (offered: ReadonlyArray<string>, server: string): Exposure => offeredExposure(offered, `mcp__${server}__tool`);
 
+/** What a preset leaves on an MCP server: hidden, and code mode only, as the old preset's wrap did (it only deferred). */
+const KEPT_BY_PRESET: ReadonlyArray<Exposure> = ["hidden", "codemode"];
+
 /**
- * `preset` over one MCP server, as over t3's tools: its Exposure unless hidden, each tool's own back to it (or, when the
- * server is hidden, the preset's); hidden tools stay hidden.
+ * `preset` over one MCP server, as the old preset's wrap did: its Exposure unless hidden or code mode only, and each
+ * tool's own back to it (or, when the server keeps its own, the preset's); hidden and code-mode-only tools stay.
  */
 const presetServer = (offered: ReadonlyArray<string>, name: string, server: McpServerSetting): McpServerSetting => {
   const exposure = serverExposure(offered, name);
-  const hidden = server.exposure === "hidden";
-  const own = Object.entries(server.toolExposure ?? {}).flatMap(([tool, each]): Array<readonly [string, Exposure]> => (each === "hidden" ? [[tool, each]] : hidden ? [[tool, exposure]] : []));
+  const kept = KEPT_BY_PRESET.includes(server.exposure);
+  const own = Object.entries(server.toolExposure ?? {}).flatMap(([tool, each]): Array<readonly [string, Exposure]> =>
+    KEPT_BY_PRESET.includes(each) ? [[tool, each]] : kept ? [[tool, exposure]] : [],
+  );
   const { toolExposure: _toolExposure, ...rest } = server;
-  return { ...rest, exposure: hidden ? "hidden" : exposure, ...(own.length === 0 ? {} : { toolExposure: Object.fromEntries(own) }) };
+  return { ...rest, exposure: kept ? server.exposure : exposure, ...(own.length === 0 ? {} : { toolExposure: Object.fromEntries(own) }) };
 };
 
 /**
@@ -290,9 +295,12 @@ export const movedTools = (
   if (before.t3.exposure !== after.t3.exposure) moves.push({ tool: `${T3_SERVER} (tools without their own)`, before: before.t3.exposure, after: after.t3.exposure });
   for (const tool of [...new Set([...Object.keys(before.t3.tools), ...Object.keys(after.t3.tools)])].sort()) {
     const asks = asksForDirect(tool);
-    const from = ownEntry(before.t3.tools, tool) ?? (asks === true ? "direct" : before.t3.exposure);
-    const to = ownEntry(after.t3.tools, tool) ?? (asks !== false ? "direct" : after.t3.exposure);
+    const own = [ownEntry(before.t3.tools, tool), ownEntry(after.t3.tools, tool)] as const;
+    const from = own[0] ?? (asks === true ? "direct" : before.t3.exposure);
+    const to = own[1] ?? (asks !== false ? "direct" : after.t3.exposure);
     if (from !== to) moves.push({ tool: `${T3_SERVER}/${tool}`, before: from, after: to });
+    // Its hint unknown, a stored change judged as no move still moves something: shown, at its worst case.
+    else if (asks === undefined && own[0] !== own[1]) moves.push({ tool: `${T3_SERVER}/${tool} (t3's hint unknown)`, before: from, after: to });
   }
   return moves;
 };

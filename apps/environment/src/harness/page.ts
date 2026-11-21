@@ -223,7 +223,7 @@ const toolsRow = (resolved: ResolvedHarness, tools: ResolvedTools, entry: Extens
 
 const PRESET_WORDS: Readonly<Record<OfferedPreset, string>> = {
   core: "built-in and t3 tools direct, MCP servers' tools deferred",
-  "codemode-only": "every tool deferred, for code mode and tool search",
+  "codemode-only": "every tool deferred, for code mode and tool search (t3's tools it asks for in every request stay direct)",
   everything: "every tool direct, MCP servers' included",
 };
 
@@ -273,7 +273,7 @@ const t3Card = (resolved: ResolvedHarness, listing: T3ToolListing | undefined): 
             ? ""
             : `<p class="empty-tools">Not offered to Durable agents (ADR-0022): ${listing.left.map((name) => `<code>${escapeHtml(name)}</code>`).join(", ")}.</p>`
         }`;
-  const listed = listing === undefined ? "Not listed yet" : `${time(listing.listedAt)}, from a thread`;
+  const listed = listing === undefined ? "Not listed yet" : listing.listedAt === 0 ? "From a thread, before this card existed" : `${time(listing.listedAt)}, from a thread`;
   return `<article class="group server" aria-labelledby="mcp-t3-code">
 <div class="server-head"><div><div class="server-name"><h3 id="mcp-t3-code">${T3_SERVER}</h3><span class="tag">T3 Code</span></div><p class="desc">t3's own tools (ADR-0022). t3 decides which tools a thread has, and may ask for one in every request; the Exposures are yours.</p></div>
 <span class="state" title="Always on">${icon("lock")}Always on</span>
