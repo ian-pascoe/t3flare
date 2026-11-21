@@ -204,7 +204,8 @@ describe("harness page", () => {
     expect(wait).not.toContain("codemode");
     expect(mcp).toContain('<option value="deferred" selected title="loaded by tool_search">deferred</option>');
     expect(mcp).toContain("<code>t3_attachment_upload</code>");
-    const empty = renderPage(fixturePage({ t3Tools: undefined }));
+    const { t3Tools: _listed, ...unlisted } = fixturePage();
+    const empty = renderPage(unlisted);
     expect(section(empty, "mcp")).toContain("Not listed yet: t3 lists its tools for each thread");
   });
 

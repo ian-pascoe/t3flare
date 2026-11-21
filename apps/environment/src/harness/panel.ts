@@ -294,6 +294,8 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     if (body === undefined) return refused(400, "the body is one change: { preset?, tools?, t3? }");
     const { preset, tools, t3 } = changeOf(body);
     if ((tools !== undefined && (tools === null || typeof tools !== "object")) || (t3 !== undefined && (t3 === null || typeof t3 !== "object"))) return refused(400, "tools and t3 are objects");
+    // SAFETY: `applyToolsChange` judges each field as unknown input (the preset, every Exposure, every tool name), and
+    // refuses with its own reason; this only promises the shape, and the line above checks `tools` and `t3` are objects.
     return answer(changeTools(ops, { ...(preset === undefined ? {} : { preset }), ...(tools === undefined ? {} : { tools }), ...(t3 === undefined ? {} : { t3 }) } as ToolsChange, options));
   }
   if (path === `${SETTINGS_PAGE_PATH}/api/mcp/test`) {

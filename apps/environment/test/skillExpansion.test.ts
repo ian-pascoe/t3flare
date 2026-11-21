@@ -138,6 +138,7 @@ describe("the caller's switch", () => {
       return flavor.rewriteUserText === undefined
         ? Promise.resolve("(no rewrite)")
         : // Never spawns: the hooks' requirement is t3's, for flavors that run a process to rewrite.
+          // @effect-diagnostics-next-line unsafeEffectTypeAssertion:off -- OpenCode's rewrite never reaches the spawner the type requires.
           Effect.runPromise(flavor.rewriteUserText("$fruit-code", {} as ProviderAdapter.ProviderAdapterV2TurnInput).pipe(Effect.provideService(CliTurn, { cwd: "/w/proj" })) as Effect.Effect<string>);
     };
     // As OpenCode's skill tool returns it (cliSkillDispatch.test.ts pins the block).
@@ -157,7 +158,7 @@ describe("the caller's switch", () => {
       agents: { SESSIONS: { idFromName: (name: string) => name, get: () => session } },
       sql: { exec: () => ({ toArray: () => [] }) },
     } as unknown as EnvironmentServices);
-    const mcpSessions = { read: () => Effect.succeed(undefined) } as unknown as McpProviderSessions.McpProviderSessions["Service"];
+    const mcpSessions = { read: () => Effect.undefined } as unknown as McpProviderSessions.McpProviderSessions["Service"];
     const instanceId = ProviderInstanceId.make("piDurable");
     const access: SkillsAccess = { ...workspaceAccess(), environment: { entries: () => [], skillMd: () => undefined, hash: () => "env-hash" } };
     const adapter = makePiDurableAdapter(instanceId, mcpSessions, noFiles, access);

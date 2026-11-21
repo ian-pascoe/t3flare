@@ -13,10 +13,12 @@ import { nodeSqlStorage } from "./nodeSqlStorage.ts";
 
 vi.mock("cloudflare:workers", () => ({
   DurableObject: class {
-    constructor(
-      readonly ctx: unknown,
-      readonly env: unknown,
-    ) {}
+    readonly ctx: unknown;
+    readonly env: unknown;
+    constructor(ctx: unknown, env: unknown) {
+      this.ctx = ctx;
+      this.env = env;
+    }
   },
 }));
 
