@@ -1,8 +1,8 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalRandom:off
 // The second pi-harness ports' stage harness (SPI-1057 terminals, SPI-1058 guardian, SPI-1059 advisor;
-// docs/steps/pi-ports-2.md), after scripts/ports.ts: a Durable thread uses a Terminal in a real turn, the Guardian is
+// docs-archive-1:docs/steps/pi-ports-2.md), after scripts/ports.ts: a Durable thread uses a Terminal in a real turn, the Guardian is
 // switched on through the Settings page's API and blocks a destructive command with its reason in t3, and the Advisor is
-// switched on and gives advice t3 shows. Evidence goes to docs/steps/pi-ports-2/<file>.json, tokens and cookies redacted.
+// switched on and gives advice t3 shows. Evidence goes to .evidence/pi-ports-2/<file>.json, tokens and cookies redacted.
 //
 //   node scripts/stage.ts run ports2 ports2 turns   the three checks, each in its own turn of one thread
 import * as fs from "node:fs";
@@ -13,7 +13,7 @@ import { admin, dispatch, itemsOf, pair, projectionOf, runsOf, SETTLED, sendMess
 
 const SLUG = process.env.T3FLARE_PORTS_MODEL ?? "anthropic/claude-sonnet-5-5";
 const MODEL = { instanceId: "piDurable", model: SLUG, options: /claude/.test(SLUG) ? [{ id: "thinking", value: "low" }] : [] };
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/pi-ports-2");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../../.evidence/pi-ports-2");
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
 const accessHeaders = { "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID ?? "", "cf-access-client-secret": process.env.T3FLARE_ACCESS_CLIENT_SECRET ?? "" };
 
@@ -29,7 +29,7 @@ const redact = (value: unknown): unknown => {
 const writeEvidence = (name: string, value: unknown) => {
   fs.mkdirSync(EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(EVIDENCE, name), `${JSON.stringify(redact({ at: new Date().toISOString(), model: SLUG, ...(value as object) }), null, 1)}\n`);
-  console.log(`wrote docs/steps/pi-ports-2/${name}`);
+  console.log(`wrote .evidence/pi-ports-2/${name}`);
 };
 
 const harness = async (method: string, pathname: string, body?: unknown) => {

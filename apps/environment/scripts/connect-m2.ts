@@ -205,7 +205,7 @@ if (wants("j")) {
   check("j: the relay's refusal is recorded as rejected, by status", status?.publishes?.rejected === true && [401, 403].includes(status?.publishes?.lastFailure?.status), out.j);
 }
 
-writeEvidence(path.resolve(import.meta.dirname, "../../../docs/steps/step-3plus", outName), { stamp, projectId, failures, ...out });
+writeEvidence(path.resolve(import.meta.dirname, "../../../.evidence/step-3plus", outName), { stamp, projectId, failures, ...out });
 if (failures.length > 0) {
   console.error(failures.join("\n"));
   process.exit(1);

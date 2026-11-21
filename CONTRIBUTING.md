@@ -49,7 +49,8 @@ people up most:
   `node scripts/relock.ts` ([ADR-0030](docs/adr/0030-pnpm-installs-node-runs-scripts-and-vite-plus-runs-the-checks.md)).
 - **Test deploys go to a throwaway Stage of a Deployment of your own,** through
   [`apps/environment/scripts/stage.ts`](apps/environment/scripts/stage.ts). Deployment settings, and how to deploy, are in
-  [`docs/deploy.md`](docs/deploy.md).
+  [`docs/deploy.md`](docs/deploy.md). The stage scripts in `apps/environment/scripts/` write their evidence under
+  `.evidence/<name>/`, which git ignores; put the values that decide a change in its pull request.
 - **The Workspace image is never published.** Each Owner builds it
   ([ADR-0040](docs/adr/0040-the-workspace-image-is-built-by-each-owner-and-never-published.md)).
 

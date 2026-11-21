@@ -1,5 +1,5 @@
 // The CLI agents' built-in Slash commands (SPI-1151 §2): stock's static entries, each listed only where its stage run
-// worked on t3flare's path (docs/steps/spi-1151.md): `/compact` for Codex and pi (t3's adapters turn it into the CLI's
+// worked on t3flare's path (docs-archive-1:docs/steps/spi-1151.md): `/compact` for Codex and pi (t3's adapters turn it into the CLI's
 // own compaction) and Codex's `/goal`. Not for Claude Code and OpenCode: t3's ACP adapter answers `/compact` "This
 // provider does not support /compact" without a flavor that compacts (`supportsCompaction`, `compactSession`). Never
 // `/feedback`: t3flare refuses that upload (ADR-0015). The CLIs' dynamic command lists are not listed.

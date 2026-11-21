@@ -43,7 +43,7 @@ export type ContainerInstance = NamedContainerType | ContainerResources;
  * The Container sizes, by the name kept in the settings, smallest memory first. `cpu-1` is t3flare's size before this
  * setting (cloudpid's `cpu-1`: 1 vCPU, 3 GiB, 12 GB), a custom size started as its resources; the others are Cloudflare's
  * named types, started by name, with the resources its limits page gives
- * (docs/steps/spi-1001-research-container-sizes.md §2). Not offered: `lite` and `basic` (the runtime refuses `basic`),
+ * (docs-archive-1:docs/steps/spi-1001-research-container-sizes.md §2). Not offered: `lite` and `basic` (the runtime refuses `basic`),
  * and cloudpid's other custom sizes. A stored name never changes meaning: adding a size is free, removing one needs a
  * rename map.
  */

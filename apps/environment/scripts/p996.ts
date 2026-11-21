@@ -1,8 +1,8 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off globalDateInEffect:off
-// SPI-996's stage harness (parity G5; docs/steps/spi-996.md): on a Durable thread, a plan-mode turn ends with t3's
+// SPI-996's stage harness (parity G5; docs-archive-1:docs/steps/spi-996.md): on a Durable thread, a plan-mode turn ends with t3's
 // proposed plan and Implement starts a default-mode turn from it; a long command's output streams to t3's command item
 // while it runs (t3's own command-output subscription, as an expanded row reads it); with t3's labs flag on, a completed
-// turn gets a prompt suggestion. Evidence goes to docs/steps/spi-996/<file>.json, tokens and cookies redacted.
+// turn gets a prompt suggestion. Evidence goes to .evidence/spi-996/<file>.json, tokens and cookies redacted.
 //
 //   node scripts/stage.ts run p996 p996 turns [presentation|plan|streaming|streaming-worker|suggestion]
 import * as fs from "node:fs";
@@ -18,7 +18,7 @@ import { dispatch, itemsOf, pair, projectionOf, protocol, runsOf, SETTLED, sendM
 
 const SLUG = process.env.T3FLARE_P996_MODEL ?? "anthropic/claude-sonnet-5-5";
 const MODEL = { instanceId: "piDurable", model: SLUG, options: /claude/.test(SLUG) ? [{ id: "thinking", value: "low" }] : [] };
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/spi-996");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../../.evidence/spi-996");
 /** The web client's Implement prefix (t3code `apps/web/src/proposedPlan.ts`, `PLAN_IMPLEMENTATION_PROMPT_PREFIX`). */
 const IMPLEMENT_PREFIX = "PLEASE IMPLEMENT THIS PLAN:\n";
 
@@ -34,7 +34,7 @@ const redact = (value: unknown): unknown => {
 const writeEvidence = (name: string, value: unknown) => {
   fs.mkdirSync(EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(EVIDENCE, name), `${JSON.stringify(redact({ at: new Date().toISOString(), model: SLUG, ...(value as object) }), null, 1)}\n`);
-  console.log(`wrote docs/steps/spi-996/${name}`);
+  console.log(`wrote .evidence/spi-996/${name}`);
 };
 
 let cookie = "";

@@ -2,7 +2,7 @@
 // SPI-1169's evidence on its stage: OpenCode through the model relay.
 //
 //   node scripts/stage.ts deploy p1169
-//   node scripts/stage.ts run p1169 p1169 [--out ../../docs/steps/spi-1169/p1169.json]
+//   node scripts/stage.ts run p1169 p1169 [--out ../../.evidence/spi-1169/p1169.json]
 //
 // 1. Three Model endpoints saved through the Settings page's API, all Commissary's with the proxy key (SPI-1162's
 //    approach), one per API OpenCode speaks: `comm` (Anthropic Messages at <MODEL_PROXY_URL>), `oai` (OpenAI-compatible

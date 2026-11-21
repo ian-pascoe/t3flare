@@ -54,7 +54,7 @@ The owner chose A′. The CLI agents' key is `COMMISSARY_CONTAINER_API_KEY`, nev
 - **The route** answers only for the nonce of a CLI process that lives in that Workspace (`T3FLARE_MODEL_KEY_NONCE`, issued per spawn), a Codex nonce at most 3 times. Codex's shells never see the nonce (`shell_environment_policy.exclude`); pi's `bash` does, so for pi it is not a boundary. Every grant is logged without the value.
 - **CLI homes** are built fresh per spawn on the Container's own disk (`/var/lib/t3flare/cli/<key>`); only the session directories are synced (`/workspace/.t3flare/codex/sessions`, `/workspace/.t3flare/pi/sessions`). Codex's SQLite is Container-local; it resumes from the rollout alone, even after a torn last line. pi trusts no project (`--no-approve`, `defaultProjectTrust: never`), and `PI_CODING_AGENT_SESSION_DIR` overrides a repo's `sessionDir`. A repo's `.codex/config.toml` cannot set the provider (Codex ignores it there).
 - **The sync guard.** While a CLI process lives (and once after the last one), the files changed since the last scan are scanned in the Container before each pull, the scanner given each credential's prefix, length and SHA-256, never its value. A hit is moved to `/var/lib/t3flare/quarantine`, the Workspace's CLI processes are killed, and the key is flagged for rotation. Core dumps are off for CLI processes.
-- **Evidence** (`docs/steps/step-4a/m6-leak.json`, `m6-egress.json`): after Codex and Pi turns, no credential in the DO's files, the Container's files, or any process's environment or command line; a Pi agent made to write the key into the repo had the file quarantined before the pull, its CLI killed, the key flagged, and the DO's files and the turn's checkpoint stayed clean. Egress with the profiles' settings reaches only the proxy's host.
+- **Evidence** (`steps-evidence-1:docs/steps/step-4a/m6-leak.json`, `m6-egress.json`): after Codex and Pi turns, no credential in the DO's files, the Container's files, or any process's environment or command line; a Pi agent made to write the key into the repo had the file quarantined before the pull, its CLI killed, the key flagged, and the DO's files and the turn's checkpoint stayed clean. Egress with the profiles' settings reaches only the proxy's host.
 - **Residual.** Any process that can run the helper with a live nonce can get the key: the CLI's own agent, a prompt-injected command (pi's shells hold the nonce). Exposure is bounded by the key's own scope, spend limit and the guard; the owner rotates it (`docs/model-proxy.md`). computerd's own copy of the Workspace (`/var/lib/computerd/state.db`, Container disk, never synced) keeps a file's bytes written before the guard moved it; it goes with the Container. Not in 4a: a second user ID for CLI processes, a key per Container start.
 
 ## Consequences
@@ -90,11 +90,11 @@ The same holds for GitHub write access: no token that can write code enters a Co
 
 ## Refinement (tools step): tool handles, and no MCP credential in a Container
 
-CLI agents reach MCP tools with a **tool handle**: an opaque per-process bearer that the Workspace DO issues when the process starts and revokes when it exits. It is passed per process (argv, ACP `session/new`, or a per-home helper), never in a Container-wide file. Outside its Workspace or after its process it is useless, and the relay judges it as its own thread. Commissary's key and direct servers' headers and OAuth tokens never enter a Container: the Environment DO adds them outside (ADR-0028). t3's per-thread MCP bearer does, as stock t3 hands it to a CLI (owner, 2026-11-12, back to stock; ADR-0022's tools refinement): it reaches only t3's tools for that thread. Evidence: `docs/steps/tools/m5-relay-hostile.json`.
+CLI agents reach MCP tools with a **tool handle**: an opaque per-process bearer that the Workspace DO issues when the process starts and revokes when it exits. It is passed per process (argv, ACP `session/new`, or a per-home helper), never in a Container-wide file. Outside its Workspace or after its process it is useless, and the relay judges it as its own thread. Commissary's key and direct servers' headers and OAuth tokens never enter a Container: the Environment DO adds them outside (ADR-0028). t3's per-thread MCP bearer does, as stock t3 hands it to a CLI (owner, 2026-11-12, back to stock; ADR-0022's tools refinement): it reaches only t3's tools for that thread. Evidence: `steps-evidence-1:docs/steps/tools/m5-relay-hostile.json`.
 
 ## Refinement (parity batch 2, G13): ACP registry agents
 
-t3's ACP registry offers 45 agents. The rule above admits one that takes the proxy's base URL through its own setting **and** its key from a helper on demand (A′). Four do, and each is already a built-in provider of t3's own kind: Claude Agent, Codex, OpenCode and pi. The others either sign in with their vendor (refused, parity D3) or read their key only from their environment or a settings file (Gemini CLI, Qwen Code, goose, Mistral Vibe and most of the rest), which would put the Container key in the agent's environment, readable by every command it runs, with no grant count. They are listed with that reason and refused (`apps/environment/src/provider/acpRegistry.ts`); nothing is installed, at runtime or in the image. Admitting them is the owner's call (`docs/steps/parity-batch-2.md`, "For the owner").
+t3's ACP registry offers 45 agents. The rule above admits one that takes the proxy's base URL through its own setting **and** its key from a helper on demand (A′). Four do, and each is already a built-in provider of t3's own kind: Claude Agent, Codex, OpenCode and pi. The others either sign in with their vendor (refused, parity D3) or read their key only from their environment or a settings file (Gemini CLI, Qwen Code, goose, Mistral Vibe and most of the rest), which would put the Container key in the agent's environment, readable by every command it runs, with no grant count. They are listed with that reason and refused (`apps/environment/src/provider/acpRegistry.ts`); nothing is installed, at runtime or in the image. Admitting them is the owner's call (`docs-archive-1:docs/steps/parity-batch-2.md`, "For the owner").
 
 ## Refinement (SPI-1152): Variables are never credentials
 
@@ -108,7 +108,7 @@ Variable. These are guard rails for the owner, not a boundary against him.
 ## Refinement (SPI-1167, 2026-11-14): the model relay replaces the key helper for Model endpoints
 
 Part of **Model endpoints** (owner, 2026-11-13; [ADR-0034](0034-model-endpoints-are-the-owners-set-in-the-harness-panel.md)).
-Report: [`docs/steps/spi-1167.md`](../steps/spi-1167.md). The key helper (A′ above) stays for the Model proxy until the
+Report: [`docs-archive-1:docs/steps/spi-1167.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1167.md). The key helper (A′ above) stays for the Model proxy until the
 hard cut (SPI-1176); for Model endpoints it is replaced by a **model relay**, which is the original design's Handle
 (option B) without an intercept or a CA:
 
@@ -150,7 +150,7 @@ hard cut (SPI-1176); for Model endpoints it is replaced by a **model relay**, wh
 (`/proc/<pid>/environ`, the agent runs as root) can spend through the handle while its process lives. It cannot take
 the key out of the Container, and it ends with the process. The long-stream risk that sank option B in step 4a is
 measured: a stream of over 10 minutes with idle gaps up to 3 minutes completes through the relay
-(`docs/steps/spi-1167/p1167.json`). The handle cannot move the key by a header: the relay chooses the target, and
+(`steps-evidence-1:docs/steps/spi-1167/p1167.json`). The handle cannot move the key by a header: the relay chooses the target, and
 the Container's headers do not reach it. The allowlist covers **headers only**: the body and the query string pass
 unchanged by design (no protocol translation), so a gateway that routes on a body or query field (LiteLLM's
 `api_base`, say) can be steered from the Container. An endpoint at such a gateway is outside what the relay protects. Look-alikes an upstream would only resolve after
@@ -159,7 +159,7 @@ not refused.
 
 ## Refinement (SPI-1168, 2026-11-15): Claude Code through the model relay, and the model-routed URL
 
-Report: [`docs/steps/spi-1168.md`](../steps/spi-1168.md); evidence: `docs/steps/spi-1168/p1168.json`.
+Report: [`docs-archive-1:docs/steps/spi-1168.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1168.md); evidence: `steps-evidence-1:docs/steps/spi-1168/p1168.json`.
 
 1. **One base URL, every endpoint.** Claude Code takes one `ANTHROPIC_BASE_URL` per process (no per-model base URL;
    `modelOverrides` only maps ids), and t3 resumes a thread in the running process on a model change (SPI-1167's
@@ -209,7 +209,7 @@ Report: [`docs/steps/spi-1168.md`](../steps/spi-1168.md); evidence: `docs/steps/
 
 ## Refinement (SPI-1169, 2026-11-16): OpenCode through the model relay
 
-Report: [`docs/steps/spi-1169.md`](../steps/spi-1169.md); evidence: `docs/steps/spi-1169/p1169.json`.
+Report: [`docs-archive-1:docs/steps/spi-1169.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1169.md); evidence: `steps-evidence-1:docs/steps/spi-1169/p1169.json`.
 
 1. **A provider per endpoint, at its own path.** OpenCode takes a base URL per provider, so each endpoint whose API it
    speaks is its own provider, `t3flare-endpoint-<endpointId>` (prefixed as Codex's, so no endpoint id takes one of
@@ -254,7 +254,7 @@ Report: [`docs/steps/spi-1169.md`](../steps/spi-1169.md); evidence: `docs/steps/
 
 ## Refinement (SPI-1170, 2026-11-16): the pi CLI through the model relay
 
-Report: [`docs/steps/spi-1170.md`](../steps/spi-1170.md); evidence: `docs/steps/spi-1170/p1170.json`.
+Report: [`docs-archive-1:docs/steps/spi-1170.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1170.md); evidence: `steps-evidence-1:docs/steps/spi-1170/p1170.json`.
 
 1. **A provider per endpoint, every API.** pi takes a base URL per provider (`models.json`), so each endpoint the
    relay carries (no sign-in endpoint until SPI-1171, `relayedEndpoints`) that lists a model is its own provider, `t3flare-endpoint-<endpointId>` (prefixed, so no endpoint id changes one of pi's
@@ -311,7 +311,7 @@ Report: [`docs/steps/spi-1170.md`](../steps/spi-1170.md); evidence: `docs/steps/
 
 ## Refinement (SPI-1171, 2026-11-16): subscription sign-ins through the model relay
 
-Report: [`docs/steps/spi-1171.md`](../steps/spi-1171.md). A sign-in endpoint (ADR-0018) is carried by the relay like an
+Report: [`docs-archive-1:docs/steps/spi-1171.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1171.md). A sign-in endpoint (ADR-0018) is carried by the relay like an
 API-key one: the handle is swapped for the credential in the agents Worker, never in the Container.
 
 1. **Which CLI takes which sign-in** (the ticket's matrix, `RELAYED_SIGN_INS` in `@t3flare/models/relay`): Codex the
@@ -358,7 +358,7 @@ API-key one: the handle is swapped for the credential in the agents Worker, neve
 
 ## Refinement (SPI-1176, 2026-11-17): the hard cut
 
-Report: [`docs/steps/spi-1176.md`](../steps/spi-1176.md).
+Report: [`docs-archive-1:docs/steps/spi-1176.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1176.md).
 
 1. **The relay is the only way.** Every CLI's profile names only Model endpoints (`agents/cliProfiles.ts`,
    `acpProfiles.ts`); the Model proxy's provider (Codex's `t3flare-proxy`, pi's `anthropic` `models.json`, Claude Code's

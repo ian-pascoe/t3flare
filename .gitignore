@@ -7,9 +7,5 @@ dist/
 /bump-report.json
 .worktrees/
 apps/environment/test/docker/.work-*
-# Step evidence stays out of the tree (docs/steps/README.md): only the reports, and the directories that hold them.
-docs/steps/**
-!docs/steps/**/
-!docs/steps/**/*.md
-docs/steps/step-4a/out/
-docs/steps/step-4b/out/
+# The stage scripts' evidence (CONTRIBUTING.md) stays on the machine that made it.
+/.evidence/

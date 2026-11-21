@@ -45,7 +45,7 @@ const answeredBy = await until(cookie, askId, (p) => pendingOf(p).length === 0 |
 const done = await until(cookie, askId, settled);
 await sleep(12_000);
 const askEntries = await recent(askId);
-writeEvidence(path.resolve(import.meta.dirname, "../../../docs/steps/step-3plus/m3-deliveries.json"), {
+writeEvidence(path.resolve(import.meta.dirname, "../../../.evidence/step-3plus/m3-deliveries.json"), {
   complete: { threadId: completeId, published: delivered(completeEntries, "completed"), entries: completeEntries },
   ask: {
     threadId: askId,

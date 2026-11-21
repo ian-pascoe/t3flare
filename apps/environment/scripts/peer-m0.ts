@@ -2,7 +2,7 @@
 // Step 3, M0 R1: t3's MCP over HTTP in workerd. Signs in to the stage as a Peer link (`t3code-peer-link`) with a
 // pairing code bound to auto-accept-edits, then initialize, tools/list, t3_project_list, t3_thread_read, a 50 s
 // t3_thread_wait; the answers' shapes; a 404 and re-initialisation after an admin restart; a 403 with Linked
-// environments off. Writes docs/steps/step-3/m0-mcp.json.
+// environments off. Writes .evidence/step-3/m0-mcp.json.
 //
 //   node scripts/stage.ts run step3 peer-m0
 import { admin, createProjectAndThread, pair, sleep, updateSettings } from "./lib/client.ts";

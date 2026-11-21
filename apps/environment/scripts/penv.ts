@@ -13,7 +13,7 @@
 //   node scripts/stage.ts run penv penv safety          the new routes refused from outside (safety.json)
 //   node scripts/stage.ts run penv penv shoot           the panel's Environment section (environment-<desktop|phone>-<light|dark>.png)
 //
-// Evidence goes to docs/steps/environment-settings/. Screenshots are resized to at most 1400 px wide (sips).
+// Evidence goes to .evidence/environment-settings/. Screenshots are resized to at most 1400 px wide (sips).
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -23,7 +23,7 @@ import { admin, DEFAULT_MODEL, dispatch, itemsOf, pair, projectionOf, runsOf, se
 
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
 const T3 = process.env.T3_URL ?? "";
-const OUT = path.resolve(import.meta.dirname, "../../../docs/steps/environment-settings");
+const OUT = path.resolve(import.meta.dirname, "../../../.evidence/environment-settings");
 const accessHeaders = { "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID ?? "", "cf-access-client-secret": process.env.T3FLARE_ACCESS_CLIENT_SECRET ?? "" };
 const scriptHeaders = { ...accessHeaders, authorization: `Bearer ${process.env.T3FLARE_ADMIN_TOKEN ?? ""}` };
 const WORKSPACE = "penv-sizes";
@@ -41,7 +41,7 @@ const deployedCommit = async (): Promise<string | null> => (await admin("GET", "
 const writeEvidence = async (name: string, value: Record<string, unknown>) => {
   fs.mkdirSync(OUT, { recursive: true });
   fs.writeFileSync(path.join(OUT, name), `${JSON.stringify({ at: new Date().toISOString(), host: new URL(T3).host, commit: await deployedCommit(), ...value }, null, 1)}\n`);
-  console.log(`wrote docs/steps/environment-settings/${name} (ok: ${String(value.ok)})`);
+  console.log(`wrote .evidence/environment-settings/${name} (ok: ${String(value.ok)})`);
 };
 
 /** The panel's JSON API as a script calls it: the service token and the admin token. */

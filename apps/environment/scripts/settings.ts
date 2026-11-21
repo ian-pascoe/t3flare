@@ -1,12 +1,12 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off
-// The Settings server's stage harness (SPI-1195, docs/steps/settings-mcp.md "Evidence"): the parts of the M1-M6 stage
+// The Settings server's stage harness (SPI-1195, docs-archive-1:docs/steps/settings-mcp.md "Evidence"): the parts of the M1-M6 stage
 // runs that need no person at the keyboard. Own agents' turns are driven through t3's own protocol (as tools.ts and
 // spi1079.ts do), their cards answered by this script as the owner's paired session (`runtime-request.respond`); the
 // Owner-client endpoint is called as the stage's service token with the admin token (the scripted Owner client of
 // m6-stage-run.md items 1.4 and 5.1). What needs the owner (his Access login, the Change page for an own agent's change,
-// a real Owner client signing in) is docs/steps/settings-mcp/owner-stage-run.md.
+// a real Owner client signing in) is docs-archive-1:docs/steps/settings-mcp/owner-stage-run.md.
 //
-// Evidence goes to docs/steps/settings-mcp/<file>.json, one entry per item, merged into the file across runs, through the
+// Evidence goes to .evidence/settings-mcp/<file>.json, one entry per item, merged into the file across runs, through the
 // same redaction as the other harnesses (SECRET_KEYS); a secret's mark is kept as { set, setAt } only, a requestState or
 // session id as "present".
 //
@@ -41,7 +41,7 @@ const FIXTURE_URL = process.env.T3FLARE_FIXTURE_URL ?? workersDevUrl(`t3flare-mc
 const WORKERS = [`t3flare-environment-${STAGE}`, `t3flare-agents-${STAGE}`];
 const SLUG = process.env.T3FLARE_TOOLS_MODEL ?? "anthropic/claude-sonnet-5-5";
 const DURABLE = { instanceId: "piDurable", model: SLUG, options: /claude/.test(SLUG) ? [{ id: "thinking", value: "low" }] : [] };
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/settings-mcp");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../../.evidence/settings-mcp");
 const accessHeaders = { "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID ?? "", "cf-access-client-secret": process.env.T3FLARE_ACCESS_CLIENT_SECRET ?? "" };
 const adminBearer = `Bearer ${process.env.T3FLARE_ADMIN_TOKEN ?? ""}`;
 

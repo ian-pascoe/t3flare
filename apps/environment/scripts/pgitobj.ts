@@ -8,7 +8,7 @@
 //   … stopped                                           a primed Workspace, its Container stopped: the draft's reads start nothing (stopped.json)
 //   … fresh                                             a new clone, watched once, its Container stopped: the commit works, leftovers swept (fresh.json)
 //
-// Evidence goes to docs/steps/spi-1186/, each file naming the deployed commit.
+// Evidence goes to .evidence/spi-1186/, each file naming the deployed commit.
 import * as path from "node:path";
 
 import { ensureProject } from "./lib/cliTurn.ts";
@@ -16,7 +16,7 @@ import { admin, pair, sleep, wsCall } from "./lib/client.ts";
 import { writeEvidence } from "./lib/evidence.ts";
 import { committed, t3Commit, workspaceGit } from "./lib/t3Commit.ts";
 
-const OUT = path.resolve(import.meta.dirname, "../../../docs/steps/spi-1186");
+const OUT = path.resolve(import.meta.dirname, "../../../.evidence/spi-1186");
 const WORKSPACE = "pgitobj";
 const TMP = "/workspace/.t3flare/tmp";
 

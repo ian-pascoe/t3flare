@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalRandom:off
-// The pi-harness ports' stage harness (SPI-1054 web, SPI-1055 todo, SPI-1056 context; docs/steps/pi-ports-1.md): a
+// The pi-harness ports' stage harness (SPI-1054 web, SPI-1055 todo, SPI-1056 context; docs-archive-1:docs/steps/pi-ports-1.md): a
 // Durable thread uses each ported tool in real turns, and t3's own projection is read back for the items it shows.
-// Evidence goes to docs/steps/pi-ports-1/<file>.json, tokens and cookies redacted.
+// Evidence goes to .evidence/pi-ports-1/<file>.json, tokens and cookies redacted.
 //
 //   node scripts/stage.ts run ports ports settings   the Settings page's API: web search on, and the registry's entries
 //   node scripts/stage.ts run ports ports turns      web, todo, notes across turns, a rollover and a turn after it
@@ -13,7 +13,7 @@ import { admin, dispatch, itemsOf, pair, projectionOf, runsOf, SETTLED, sendMess
 
 const SLUG = process.env.T3FLARE_PORTS_MODEL ?? "anthropic/claude-sonnet-5-5";
 const MODEL = { instanceId: "piDurable", model: SLUG, options: /claude/.test(SLUG) ? [{ id: "thinking", value: "low" }] : [] };
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/pi-ports-1");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../../.evidence/pi-ports-1");
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
 const accessHeaders = { "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID ?? "", "cf-access-client-secret": process.env.T3FLARE_ACCESS_CLIENT_SECRET ?? "" };
 
@@ -29,7 +29,7 @@ const redact = (value: unknown): unknown => {
 const writeEvidence = (name: string, value: unknown) => {
   fs.mkdirSync(EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(EVIDENCE, name), `${JSON.stringify(redact({ at: new Date().toISOString(), model: SLUG, ...(value as object) }), null, 1)}\n`);
-  console.log(`wrote docs/steps/pi-ports-1/${name}`);
+  console.log(`wrote .evidence/pi-ports-1/${name}`);
 };
 
 const harness = async (method: string, pathname: string, body?: unknown) => {

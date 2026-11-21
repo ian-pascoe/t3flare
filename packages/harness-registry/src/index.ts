@@ -1,7 +1,7 @@
 // The harness registry (ADR-0026): every Pi Durable extension the Settings page shows, with its switch and its settings
 // schema, and how the stored settings resolve for a Session. Imported by the Environment Worker (the panel and its API
 // validate against it) and the agents Worker (the Session builds its registry from the resolved view). Later ports
-// (pi-parity: web, todo, context, guardian…) add an entry here and appear in the panel without panel work.
+// (docs/parity.md §6: web, todo, context, guardian…) add an entry here and appear in the panel without panel work.
 //
 import {
   defaultSettingsServer,

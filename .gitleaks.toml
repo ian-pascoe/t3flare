@@ -14,10 +14,6 @@ paths = [
 ]
 
 [[allowlists]]
-description = "Step evidence: Access audience tags, credential-store key names and caller ids, none of them secret"
-paths = ['''^docs/steps/''']
-
-[[allowlists]]
 description = "Values that look like keys but are public or fixed"
 regexTarget = "line"
 regexes = [

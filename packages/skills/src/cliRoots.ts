@@ -21,7 +21,7 @@ export interface SkillRoot {
   readonly cwdOnly: boolean;
   /**
    * SPI-1153: what the CLI does with a Skill here and an Environment skill of the same name (its M0 probe, one root at a
-   * time: `docs/steps/env-skills-cli/m0-probe.json`). The CLI's own rule, which can differ by root (OpenCode's); only
+   * time: `steps-evidence-1:docs/steps/env-skills-cli/m0-probe.json`). The CLI's own rule, which can differ by root (OpenCode's); only
    * pi's is t3flare's choice, by its flags' order. Absent: SPI-1147's Pi Durable roots, where the Environment wins.
    */
   readonly environment?: EnvironmentPrecedence;

@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off globalTimers:off nodeBuiltinImport:off
 // SPI-1061: the Outbound link on a stage, against the stand-in (plan §6, §8): a stock t3 in Docker on this machine,
 // reachable over the stage's named Cloudflare Tunnel (`T3FLARE_STANDIN=1` on deploy). Gates G1–G4 and checks C1–C7,
-// one phase per run; evidence in docs/steps/spi-1061/<phase>.json. Nothing secret is printed or written: bearers,
+// one phase per run; evidence in .evidence/spi-1061/<phase>.json. Nothing secret is printed or written: bearers,
 // pairing codes and the tunnel token stay in memory (and the leak scans compare them by name).
 //
 //   node scripts/stage.ts run link outbound --phase link        G1, and C1's link through the dialog flow
@@ -35,7 +35,7 @@ const arg = (name: string, fallback: string) => {
 };
 const phase = arg("phase", "link");
 const stage = base.hostname.split(".")[0]!.replace(/^t3flare-environment-/, "");
-const evidenceDir = path.resolve(import.meta.dirname, "../../../docs/steps/spi-1061");
+const evidenceDir = path.resolve(import.meta.dirname, "../../../.evidence/spi-1061");
 const stateFile = path.join(import.meta.dirname, "../.alchemy", `outbound-${stage}.state.json`);
 const stamp = Date.now().toString(36);
 const started = Date.now();

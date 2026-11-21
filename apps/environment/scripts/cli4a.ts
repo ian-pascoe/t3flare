@@ -22,7 +22,7 @@ const arg = (name: string) => {
   return index === -1 ? undefined : args[index + 1];
 };
 const flag = (name: string) => args.includes(`--${name}`);
-const evidence = (name: string, value: unknown) => writeAt(path.resolve(import.meta.dirname, "../../../docs/steps/step-4a", name), value);
+const evidence = (name: string, value: unknown) => writeAt(path.resolve(import.meta.dirname, "../../../.evidence/step-4a", name), value);
 const failures: Array<string> = [];
 const check = (name: string, ok: boolean, detail?: unknown) => {
   if (!ok) failures.push(`${name}${detail === undefined ? "" : `: ${JSON.stringify(detail).slice(0, 600)}`}`);

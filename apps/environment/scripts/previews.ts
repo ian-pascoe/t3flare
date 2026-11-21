@@ -1,6 +1,6 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off anyUnknownInErrorContext:off
-// G11's stage harness (docs/steps/previews.md): Browser Run, the Container previews and the hostile cases, on the
-// throwaway stage `previews`. Evidence goes to docs/steps/previews/<name>.json; no token, cookie or page URL beyond the
+// G11's stage harness (docs-archive-1:docs/steps/previews.md): Browser Run, the Container previews and the hostile cases, on the
+// throwaway stage `previews`. Evidence goes to .evidence/previews/<name>.json; no token, cookie or page URL beyond the
 // harness's own is written.
 //
 //   node scripts/stage.ts run previews previews <part>
@@ -20,12 +20,12 @@ setTimeout(() => {
 }, Number(process.env.PREVIEWS_GUARD_MS ?? 20 * 60_000)).unref();
 import { attachTerminal } from "./lib/terminal.ts";
 
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/previews");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../../.evidence/previews");
 
 const writeEvidence = (name: string, value: Record<string, unknown>) => {
   fs.mkdirSync(EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(EVIDENCE, `${name}.json`), `${JSON.stringify({ at: new Date().toISOString(), host: base.host, ...value }, null, 1)}\n`);
-  console.log(`${name}: ${value.ok === true ? "PASS" : "FAIL"} -> docs/steps/previews/${name}.json`);
+  console.log(`${name}: ${value.ok === true ? "PASS" : "FAIL"} -> .evidence/previews/${name}.json`);
   if (value.ok !== true) process.exitCode = 1;
 };
 

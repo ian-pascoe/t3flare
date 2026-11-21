@@ -42,7 +42,7 @@ Under Bun, every nightly bump re-translated t3code's pnpm settings into Bun's. C
 - **Wholesale `t3code/apps/*` and `t3code/packages/*` globs**: about 800 more packages (Electron, Expo) and native build gates we never run.
 - **`tsx` to run scripts**: we have no syntax that Node's stripping rejects.
 
-Evidence: `docs/steps/pnpm-plan.md` (with its review changelog), `docs/steps/pnpm.md` and `docs/steps/pnpm/`.
+Evidence: `docs-archive-1:docs/steps/pnpm-plan.md` (with its review changelog), `docs-archive-1:docs/steps/pnpm.md` and `steps-evidence-1:docs/steps/pnpm/`.
 
 ## Refinement (in-app updates, ADR-0037, 2026-11-17): a bump keeps t3flare's own resolutions
 

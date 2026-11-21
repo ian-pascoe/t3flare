@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off globalJsonInEffect:off
-// The parity batch's stage harness (docs/steps/parity-batch.md): G7 (the PR review guide), G4 (scratch threads), G12
+// The parity batch's stage harness (docs-archive-1:docs/steps/parity-batch.md): G7 (the PR review guide), G4 (scratch threads), G12
 // (task webhooks and the PR watch's wake), and the W† rows of docs/parity.md, each through t3's own client protocol as
-// the web client sends it. Evidence goes to docs/steps/parity-batch/<part>.json, tokens and cookies redacted.
+// the web client sends it. Evidence goes to .evidence/parity-batch/<part>.json, tokens and cookies redacted.
 //
 //   node scripts/stage.ts run pbatch pbatch <part> [args]
 //   parts: guide [pr] | scratch | webhook | schedule | prwatch-start [pr] | prwatch-check | threads | queue | keys | mcp | devices | notify
@@ -14,7 +14,7 @@ import { findSession } from "./lib/peerAcceptance.ts";
 import { McpClient, mintPairingCode, signIn } from "./lib/peer.ts";
 import { fixtureRepo } from "./lib/scriptSettings.ts";
 
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/parity-batch");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../../.evidence/parity-batch");
 const FIXTURE = fixtureRepo();
 const PROJECT = "pbatch-fixture";
 const DURABLE = { instanceId: "piDurable", model: "anthropic/claude-haiku-5-5", options: [] };
@@ -34,7 +34,7 @@ const redact = (value: unknown): unknown => {
 const writeEvidence = (name: string, value: Record<string, unknown>) => {
   fs.mkdirSync(EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(EVIDENCE, `${name}.json`), `${JSON.stringify(redact({ at: new Date().toISOString(), host: base.host, ...value }), null, 1)}\n`);
-  console.log(`${name}: ${value.ok === true ? "PASS" : "FAIL"} -> docs/steps/parity-batch/${name}.json`);
+  console.log(`${name}: ${value.ok === true ? "PASS" : "FAIL"} -> .evidence/parity-batch/${name}.json`);
   if (value.ok !== true) process.exitCode = 1;
 };
 

@@ -6,7 +6,7 @@
 //   node scripts/stage.ts run pmise pmise variables   the guard variables from every command path (variables.json; first)
 //   … install | override | git-gh | hold | restart | invalid | size | cost | empty | late | passive-first | passive-spawn   (<case>.json)
 //
-// Evidence goes to docs/steps/global-mise/, each file naming the deployed commit.
+// Evidence goes to .evidence/global-mise/, each file naming the deployed commit.
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -17,7 +17,7 @@ import { attachTerminal, stripAnsi } from "./lib/terminal.ts";
 
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
 const T3 = process.env.T3_URL ?? "";
-const OUT = path.resolve(import.meta.dirname, "../../../docs/steps/global-mise");
+const OUT = path.resolve(import.meta.dirname, "../../../.evidence/global-mise");
 const accessHeaders = { "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID ?? "", "cf-access-client-secret": process.env.T3FLARE_ACCESS_CLIENT_SECRET ?? "" };
 const scriptHeaders = { ...accessHeaders, authorization: `Bearer ${process.env.T3FLARE_ADMIN_TOKEN ?? ""}` };
 const WORKSPACE = "pmise";
@@ -38,7 +38,7 @@ const deployedCommit = async (): Promise<string | null> => (await admin("GET", "
 const writeEvidence = async (name: string, value: Record<string, unknown>) => {
   fs.mkdirSync(OUT, { recursive: true });
   fs.writeFileSync(path.join(OUT, name), `${JSON.stringify({ at: new Date().toISOString(), host: new URL(T3).host, commit: await deployedCommit(), ...value }, null, 1)}\n`);
-  console.log(`wrote docs/steps/global-mise/${name} (ok: ${String(value.ok)})`);
+  console.log(`wrote .evidence/global-mise/${name} (ok: ${String(value.ok)})`);
 };
 
 /** The panel's JSON API as a script calls it: the service token and the admin token. */

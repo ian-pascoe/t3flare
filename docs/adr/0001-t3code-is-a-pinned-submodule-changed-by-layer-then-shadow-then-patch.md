@@ -17,7 +17,7 @@ Most of the Node-only code (`server.ts`, the platform Layers) is never imported,
 
 ## Refinement (step 2a, M2)
 
-The order is a preference by default, not a rule over size: **a Patch beats a large Shadow when the change is tiny**, because `git apply --check` flags drift in the lines the Patch touches on every bump, while a Shadow of a large module silently freezes all of it. Step 2a's `0002-new-project-root-is-w.patch` changes one line of `ManagedProjectFolders` (the named-projects root becomes `/w`); the Shadow it replaces would have copied 472 lines. Evidence: `docs/steps/step-2a/m2-new-project.png` (New project creates `/w/<name>` with an initial commit), the bump's `git apply --check`. Counts after step 2a part 1: Shadows 1 (`builtInDrivers`), Patches 2.
+The order is a preference by default, not a rule over size: **a Patch beats a large Shadow when the change is tiny**, because `git apply --check` flags drift in the lines the Patch touches on every bump, while a Shadow of a large module silently freezes all of it. Step 2a's `0002-new-project-root-is-w.patch` changes one line of `ManagedProjectFolders` (the named-projects root becomes `/w`); the Shadow it replaces would have copied 472 lines. Evidence: `steps-evidence-1:docs/steps/step-2a/m2-new-project.png` (New project creates `/w/<name>` with an initial commit), the bump's `git apply --check`. Counts after step 2a part 1: Shadows 1 (`builtInDrivers`), Patches 2.
 
 ## Counts after step 4a
 
@@ -29,11 +29,11 @@ Unchanged: Shadows 2 (`builtInDrivers` registers Claude Code and OpenCode too; `
 
 ## Counts after the parity batch (G7, G4, G12)
 
-Shadows 2 (unchanged), Patches 4: `0004-scratch-root-is-a-workspace.patch` (parity G4) changes one line of `ManagedProjectFolders`, the No project folder, to `/w/t3-scratch`, so scratch threads run in a Workspace. A Layer could not do it: `ManagedProjectFolders` is built inside t3's private runtime graph (`orchestration-v2/runtimeLayer.ts`) from the one `ServerConfig`, whose `baseDir` everything else reads too, and the Shadow would copy 515 lines. The review guide's scratch checkout (G7) and the webhook origin and PR-watch wake (G12) are Layers and our own code. Evidence: `docs/steps/parity-batch.md`.
+Shadows 2 (unchanged), Patches 4: `0004-scratch-root-is-a-workspace.patch` (parity G4) changes one line of `ManagedProjectFolders`, the No project folder, to `/w/t3-scratch`, so scratch threads run in a Workspace. A Layer could not do it: `ManagedProjectFolders` is built inside t3's private runtime graph (`orchestration-v2/runtimeLayer.ts`) from the one `ServerConfig`, whose `baseDir` everything else reads too, and the Shadow would copy 515 lines. The review guide's scratch checkout (G7) and the webhook origin and PR-watch wake (G12) are Layers and our own code. Evidence: `docs-archive-1:docs/steps/parity-batch.md`.
 
 ## Counts after parity batch 2 (G8, G13, the Storage page, OTLP)
 
-Shadows 2 (unchanged; `builtInDrivers` now also lists usage readers in `BUILT_IN_USAGE_DRIVERS`), Patches 4 (unchanged). The rest are Layers over t3's services (`UsageLimitSources`, `AcpRegistryCatalog`, `DatabaseStorage`) and `ServerConfig` fields built from t3's own settings parser. Evidence: `docs/steps/parity-batch-2.md`.
+Shadows 2 (unchanged; `builtInDrivers` now also lists usage readers in `BUILT_IN_USAGE_DRIVERS`), Patches 4 (unchanged). The rest are Layers over t3's services (`UsageLimitSources`, `AcpRegistryCatalog`, `DatabaseStorage`) and `ServerConfig` fields built from t3's own settings parser. Evidence: `docs-archive-1:docs/steps/parity-batch-2.md`.
 
 ## Counts after G11 (previews)
 
@@ -42,12 +42,12 @@ Shadows 4, Patches 5.
 - Shadow `apps/server/src/htmlRender/publicProxy.ts`: workerd has no `node:net` server, and Browser Run's egress stands in for its guard. It replaces the plan's Shadow of `headlessChrome.ts` (638 lines), which stays stock behind a CDP bridge in our process router (a Layer).
 - Patch `0005-server-browser-context-thread.patch`: one argument at the one `contextFor` call, the tab's thread. A Shadow of the 3,011-line `ServerBrowser.ts` would be far worse.
 
-Port discovery, `PreviewBrowser` and agent browser access are Layers, or the removal of ours. Evidence: `docs/steps/previews.md`.
+Port discovery, `PreviewBrowser` and agent browser access are Layers, or the removal of ours. Evidence: `docs-archive-1:docs/steps/previews.md`.
 
 ## Counts after SPI-1162 (Model endpoints)
 
 Shadows 4 (unchanged), Patches 6.
-- Patch `0006-endpoint-models-are-not-retained.patch`: one line at the top of `ProviderRegistry.ts`'s `shouldRetainMissingProviderModels`, so `piDurable` and the CLI drivers (`codex`, `claudeAgent`, `opencode`, `pi`, since SPI-1176) retain no model they stopped listing: a removed Model endpoint's models leave the picker, and a provider in the setup state lists none. No Layer reaches the registry's merge, and a Shadow would copy the 1,194-line file. Evidence: `docs/steps/spi-1162.md`.
+- Patch `0006-endpoint-models-are-not-retained.patch`: one line at the top of `ProviderRegistry.ts`'s `shouldRetainMissingProviderModels`, so `piDurable` and the CLI drivers (`codex`, `claudeAgent`, `opencode`, `pi`, since SPI-1176) retain no model they stopped listing: a removed Model endpoint's models leave the picker, and a provider in the setup state lists none. No Layer reaches the registry's merge, and a Shadow would copy the 1,194-line file. Evidence: `docs-archive-1:docs/steps/spi-1162.md`.
 
 ## Counts after the Settings server (SPI-1195)
 

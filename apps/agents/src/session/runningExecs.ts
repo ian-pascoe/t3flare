@@ -3,7 +3,7 @@
 // timeout); the ids are kept in the Session's storage, so a Session that dies mid-call still knows them when it opens.
 //
 // A stopped command's processes are killed by its exec id (the Workspace's `killExecs`, apps/sandbox-image/src/kill.ts):
-// computerd's own kill leaves them running (docs/steps/step-2a-part2.md, M0). An id is forgotten only when its command
+// computerd's own kill leaves them running (docs-archive-1:docs/steps/step-2a-part2.md, M0). An id is forgotten only when its command
 // ended by itself or a kill found none of its processes left; otherwise the kill is tried again from the Session's
 // alarm, and given up after `MAX_ATTEMPTS`. A background process of a command that completed is left alone.
 // @effect-diagnostics globalTimers:off globalConsole:off newPromise:off

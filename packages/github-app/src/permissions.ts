@@ -56,7 +56,7 @@ export const ENVIRONMENT_GITHUB_PERMISSIONS = {
 /**
  * The Environment DO's token for reading Environment skills from GitHub (SPI-1148, ADR-0033): one repo's contents, read
  * only, used for the fetch's own requests and dropped. Scoped to an installed repo, it also reads public repos outside
- * the installation (docs/steps/spi-1001-env-plan.md §1, R1).
+ * the installation (docs-archive-1:docs/steps/spi-1001-env-plan.md §1, R1).
  */
 export const SKILL_FETCH_GITHUB_PERMISSIONS = {
   contents: "read",

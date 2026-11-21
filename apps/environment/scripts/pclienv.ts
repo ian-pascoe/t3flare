@@ -1,5 +1,5 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off globalDateInEffect:off
-// SPI-1153's stage harness (Environment skills for the CLI agents; docs/steps/env-skills-cli.md), through t3's own
+// SPI-1153's stage harness (Environment skills for the CLI agents; docs-archive-1:docs/steps/env-skills-cli.md), through t3's own
 // calls as the web client makes them, and the Settings page's API as a script calls it. The Repo fixture
 // (apps/environment/test/fixtures/cli-skills/, and a `pair-<word>` Skill in each CLI Repo root, `PAIRS`) is written,
 // uncommitted, into a clone of the fixture project; the Environment skills come from the fixture repo's branch
@@ -7,7 +7,7 @@
 // (the same-named pairs: the Repo's says REPO-<WORD>, the Environment's ENV-<WORD>) and, apart, late-code (LATE-8),
 // installed and removed while a CLI's process runs.
 //
-// Per CLI (codex, pi, claude, opencode), into docs/steps/env-skills-cli/<cli>.json:
+// Per CLI (codex, pi, claude, opencode), into .evidence/env-skills-cli/<cli>.json:
 // - composer: the snapshot lists env-code with scope `user` at the mount, and each pair in the CLI's Repo roots as the
 //   CLI keeps it by that root (`CLI_ROOTS`' `environment`), with the Container stopped before and after;
 // - described: on a fresh thread, "what is the environment code?" reads env-code and answers MANGO-5;
@@ -54,7 +54,7 @@ const PAIRS: Readonly<Record<string, string>> = {
 };
 const T3 = process.env.T3_URL ?? "";
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/env-skills-cli");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../../.evidence/env-skills-cli");
 const REPO_FIXTURE = path.resolve(import.meta.dirname, "../test/fixtures/cli-skills");
 const SETTLED = new Set(["completed", "failed", "interrupted", "cancelled"]);
 const FIXTURE_REPO = fixtureRepo();
@@ -76,7 +76,7 @@ const deployedCommit = async (): Promise<string | null> => (await admin("GET", "
 const writeEvidence = async (name: string, value: Record<string, unknown>) => {
   fs.mkdirSync(EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(EVIDENCE, name), `${JSON.stringify(redact({ at: new Date().toISOString(), host: new URL(T3).host, commit: await deployedCommit(), ...value }), null, 1)}\n`);
-  console.log(`wrote docs/steps/env-skills-cli/${name} (ok: ${String(value.ok)})`);
+  console.log(`wrote .evidence/env-skills-cli/${name} (ok: ${String(value.ok)})`);
 };
 
 // ── The fixture repo's branch ────────────────────────────────────────────────────────────────────────────────────────

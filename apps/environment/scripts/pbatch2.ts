@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off anyUnknownInErrorContext:off
-// Parity batch 2's stage harness (docs/steps/parity-batch-2.md), through t3's own client protocol as the web client sends
+// Parity batch 2's stage harness (docs-archive-1:docs/steps/parity-batch-2.md), through t3's own client protocol as the web client sends
 // it, against a stage deployed with `T3FLARE_PROBE=1` (its probe Worker: an OTLP receiver).
-// Evidence goes to docs/steps/parity-batch-2/<part>.json, tokens and keys redacted.
+// Evidence goes to .evidence/parity-batch-2/<part>.json, tokens and keys redacted.
 //
 //   node scripts/stage.ts run pbatch2 pbatch2 <part>
 //   parts: registry | storage | otlp | otlp-off
@@ -11,7 +11,7 @@ import * as path from "node:path";
 import { admin, base, pair, sleep, wsCall, wsFirst } from "./lib/client.ts";
 import { workersDevUrl } from "./lib/scriptSettings.ts";
 
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/parity-batch-2");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../../.evidence/parity-batch-2");
 const PROBE = workersDevUrl("t3flare-probe-pbatch2");
 const PROBE_KEY = process.env.T3FLARE_PROBE_KEY ?? "";
 
@@ -29,7 +29,7 @@ const redact = (value: unknown): unknown => {
 const writeEvidence = (name: string, value: Record<string, unknown>) => {
   fs.mkdirSync(EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(EVIDENCE, `${name}.json`), `${JSON.stringify(redact({ at: new Date().toISOString(), host: base.host, ...value }), null, 1)}\n`);
-  console.log(`${name}: ${value.ok === true ? "PASS" : "FAIL"} -> docs/steps/parity-batch-2/${name}.json`);
+  console.log(`${name}: ${value.ok === true ? "PASS" : "FAIL"} -> .evidence/parity-batch-2/${name}.json`);
   if (value.ok !== true) process.exitCode = 1;
 };
 

@@ -1,6 +1,6 @@
 # The Outbound link is t3's own, unchanged; t3flare adds only reachability
 
-Status: accepted (owner decision, 2026-11-12; built in SPI-1061). Plan: [`docs/steps/spi-1061-plan.md`](../steps/spi-1061-plan.md).
+Status: accepted (owner decision, 2026-11-12; built in SPI-1061). Plan: [`docs-archive-1:docs/steps/spi-1061-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1061-plan.md).
 
 The Cloud Environment links to the owner's laptop with t3's Peer link exactly as a stock t3 server would. The owner makes the link in the stock client's Linked environments dialog, or an agent asks for it through t3's own link card; the access he picks there, and t3's own Link fence below full access, are the only limits on what cloud agents then do on the laptop. t3flare puts no gate, cap, allowlist or approval of its own on the link. It adds only what a Worker and a Durable Object need for the stock behaviour to work:
 
@@ -12,7 +12,7 @@ The link tools `t3_environment_link` and `t3_environment_unlink`, withheld since
 
 ## Considered options
 
-A gated design was drawn first and reviewed (`docs/steps/spi-1061-plan-review.md`; the plan at `e5cd0a2`). It treated the cloud as the less trusted side, because cloud agents read untrusted text and the laptop holds the owner's files. The owner dropped all of it on 2026-11-12: t3's own settings and link access levels govern, as on stock t3, and prompt injection is not a design driver.
+A gated design was drawn first and reviewed (`docs-archive-1:docs/steps/spi-1061-plan-review.md`; the plan at `e5cd0a2`). It treated the cloud as the less trusted side, because cloud agents read untrusted text and the laptop holds the owner's files. The owner dropped all of it on 2026-11-12: t3's own settings and link access levels govern, as on stock t3, and prompt injection is not a design driver.
 
 - **A card of ours for every message sent to the laptop,** with a permit matched where the call leaves. Dropped.
 - **A hard cap of Supervised** on the link and on every call. Dropped: the access is what the owner picks.
@@ -39,4 +39,4 @@ These follow from t3's design and are accepted with it.
 - **Pre-B is gone.** `apps/environment/src/t3/peerLinks.ts` keeps one Layer, `layerPeerLinksWithoutCause`: every `PeerLinks` method is t3's, and its errors carry t3's reason and message without `cause`. `PeerForwarding` and `PeerLinkRequests` are t3's own layers again; `t3_environment_link` and `t3_environment_unlink` left `T3_TOOL_DENYLIST`; our "cannot link" guidance line is deleted.
 - **Remote tasks** (`host/idle.ts`): the idle check reads t3's open Remote tasks with `getOpenRemoteDelegatedTasks`' predicate, joined to `peer_environment_links.last_error`. A task whose machine answered t3's last call is work; one whose machine did not lets the Environment reset, with the retry (`t3flare:remote-task-retry`, 5, 15, then every 30 minutes) in DO storage and merged into the one alarm. While any task is open and t3 is up, an alarm stands at most 5 minutes ahead, so a deploy or an eviction brings t3 back to follow it. Reads fail safe (U2, U48).
 - **Leak hygiene:** the link's bearers (`peer-link-*`) are canaries of `/_t3flare/check/peer-leak` and `/_t3flare/check/connect-leak`. Forced transport errors showed nothing for the console redaction to add.
-- **Proved** on a stage against a stock t3 in Docker behind a named Cloudflare Tunnel the stage's stack makes (`T3FLARE_STANDIN=1`): `docs/steps/spi-1061.md`. T3 Connect, Tailscale Funnel and the same-zone path wait for the owner's proof (`docs/outbound-link.md`).
+- **Proved** on a stage against a stock t3 in Docker behind a named Cloudflare Tunnel the stage's stack makes (`T3FLARE_STANDIN=1`): `docs-archive-1:docs/steps/spi-1061.md`. T3 Connect, Tailscale Funnel and the same-zone path wait for the owner's proof (`docs/outbound-link.md`).

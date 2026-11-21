@@ -1,6 +1,6 @@
 # Pi Durable harness settings live in the Environment, and an owner-only panel edits them
 
-Status: accepted (tools step, 2026-11-12). Plan: [`docs/steps/tools-plan.md`](../steps/tools-plan.md) §6, with its review changelog (H4, M4, LOW CSRF, LOW secret hashes).
+Status: accepted (tools step, 2026-11-12). Plan: [`docs-archive-1:docs/steps/tools-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/tools-plan.md) §6, with its review changelog (H4, M4, LOW CSRF, LOW secret hashes).
 
 Pi Durable's harness has things the owner should switch: code mode, which tools are offered without a search, tool search, and the MCP servers whose tools agents get. t3 has no surface for any of them. A Shadow or Layer on t3's settings would be the wrong layer (ADR-0001): t3's contracts have no such fields, and its clients would show nothing.
 
@@ -33,11 +33,11 @@ So t3flare has its own **Harness panel**:
 - The panel shares t3's origin. A script running on t3's web origin with the owner's Access session could call the panel's API; it would still need the CSRF token, which only the panel's page carries (H4's residual, accepted by the owner).
 - The direct servers' OAuth callback and client document are public paths outside `/_t3flare` (`/t3flare/oauth/callback`, `/t3flare/oauth/client.json`), like `/mcp`, with no Access application of their own (ADR-0010's tools refinement).
 - An owner assertion without the admin token now reaches something. That is only the harness routes; every other admin route still needs the token (`m3-panel-safety.json`).
-- The panel is the place where later pi-harness ports (`docs/pi-parity.md`) get their switches, without panel work.
+- The panel is the place where later pi-harness ports (`docs/parity.md` §6) get their switches, without panel work.
 
 ## Back to stock (owner, 2026-11-12)
 
-The owner chose to stay close to stock t3 (`docs/scope-audit.md`). Removed from this decision, each "owner, 2026-11-12, back to stock":
+The owner chose to stay close to stock t3 (`docs-archive-1:docs/scope-audit.md`). Removed from this decision, each "owner, 2026-11-12, back to stock":
 
 - the dedicated admin host: the `HarnessAdmin` entrypoint, the forwarder Worker `t3flare-admin-<stage>`, the admin domain, the harness Access application and the OAuth Bypass application. The panel is `/_t3flare/harness` on the t3 host behind the `/_t3flare` Access application. Re-checked on stage in `m3-panel-safety.json` (12/12), including the Container, linked-laptop and code mode cases.
 - the per-server "offered to linked threads" switch (ADR-0028).

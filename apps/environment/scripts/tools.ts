@@ -1,6 +1,6 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
-// The tools step's stage harness (docs/steps/tools-plan.md §7): code mode on a Durable thread, its probes, the hostile
-// scripts, and the Settings page's API and safety. Each case writes its evidence to docs/steps/tools/<file>.json, with
+// The tools step's stage harness (docs-archive-1:docs/steps/tools-plan.md §7): code mode on a Durable thread, its probes, the hostile
+// scripts, and the Settings page's API and safety. Each case writes its evidence to .evidence/tools/<file>.json, with
 // tokens, cookies and handles redacted.
 //
 //   node scripts/stage.ts run tools tools m1            a script that reads, greps, edits and runs a test (m1-codemode.json)
@@ -25,7 +25,7 @@ const FIXTURE = fixtureRepo();
 const SLUG = process.env.T3FLARE_TOOLS_MODEL ?? "anthropic/claude-sonnet-5-5";
 const MODEL = { instanceId: "piDurable", model: SLUG, options: /claude/.test(SLUG) ? [{ id: "thinking", value: "low" }] : [] };
 // T3FLARE_EVIDENCE_DIR (repo-relative) sends the evidence elsewhere: the Settings server's runs re-use `panel` and `cli-mcp`.
-const EVIDENCE = path.resolve(import.meta.dirname, "../../..", process.env.T3FLARE_EVIDENCE_DIR ?? "docs/steps/tools");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../..", process.env.T3FLARE_EVIDENCE_DIR ?? ".evidence/tools");
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
 const accessHeaders = { "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID ?? "", "cf-access-client-secret": process.env.T3FLARE_ACCESS_CLIENT_SECRET ?? "" };
 

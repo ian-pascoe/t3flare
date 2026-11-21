@@ -1,6 +1,6 @@
 # The Durable agent has code mode in a sandbox Worker, and its guards live in the tools
 
-Status: accepted (tools step, 2026-11-12). Plan: [`docs/steps/tools-plan.md`](../steps/tools-plan.md) §2, with its review changelog (M2, M6, M8).
+Status: accepted (tools step, 2026-11-12). Plan: [`docs-archive-1:docs/steps/tools-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/tools-plan.md) §2, with its review changelog (M2, M6, M8).
 
 pi-durable's `codemode` tool lets the model write one short JavaScript program that calls its tools as functions. It fans out reads, reduces a large result before it reaches the Context Window, and saves model turns. Its scripts run in pi-codemode's QuickJS sandbox, which on Cloudflare is a Durable Object.
 

@@ -1,5 +1,5 @@
 // Where the Owner-client endpoint lives: ADR-0036 (layout (B), its Access application, and when to move to (C)); plan
-// D13; M5a (SPI-1200), chosen by M0 (SPI-1196, `docs/steps/settings-mcp/m0-access-oauth.json`). Everything that knows
+// D13; M5a (SPI-1200), chosen by M0 (SPI-1196, `steps-evidence-1:docs/steps/settings-mcp/m0-access-oauth.json`). Everything that knows
 // the layout is here, in `worker.ts`'s one branch, and in `alchemy.run.ts`'s `SettingsAccess` application, so layout
 // (C) (a Worker on its own host serving its own well-known documents, which calls `EnvironmentDO.settingsMcp` the same
 // way) would replace these and nothing else: the DO takes an already-verified caller either way, and moving costs only
@@ -10,7 +10,7 @@
 // application's and `/_t3flare/mcpx` stays the panel's; each application gets its own path cookie; Access answers no
 // root or path-inserted well-known document, so clients discover it from the 401's `resource_metadata`). That a token of
 // one application is refused at the other's paths was tested with a service-token stand-in, then with a real OAuth
-// bearer: owner step 1 passed on 2026-11-15 (P6, P11 at 900 s, P12, P13 the same `sub`; `docs/steps/settings-mcp/m5a-stage-run.md`
+// bearer: owner step 1 passed on 2026-11-15 (P6, P11 at 900 s, P12, P13 the same `sub`; `docs-archive-1:docs/steps/settings-mcp/m5a-stage-run.md`
 // items 1-4). Prod and the t3 bump's `bump` stay out of layout (B) (`OWNER_ENDPOINT_EXCLUDED_STAGES`) until the owner turns it on.
 
 /**
@@ -18,7 +18,7 @@
  * application exactly as before layout (B) (no path-cookie attribute), and no `T3FLARE_ACCESS_SETTINGS_AUD`, so
  * `/_t3flare/mcp` stays under the admin application and the Worker answers it 404 `not_configured` (src/access.ts).
  * Prod is here until the owner turns the endpoint on (owner step 1 passed and M5a's stage evidence is recorded,
- * `docs/steps/settings-mcp/m5a-stage-run.md` items 1-4); enabling prod is removing it from this list. `bump` is here for good (SPI-1195 review): the t3
+ * `docs-archive-1:docs/steps/settings-mcp/m5a-stage-run.md` items 1-4); enabling prod is removing it from this list. `bump` is here for good (SPI-1195 review): the t3
  * bump deploys it with the CI token `t3flare-ci-bump`, which is not known to be allowed to create a managed-OAuth Access
  * application, and a failure there would break the t3 bump; its acceptance test never calls the endpoint.
  */

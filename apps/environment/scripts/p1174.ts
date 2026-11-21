@@ -2,7 +2,7 @@
 // SPI-1174's evidence on its stage: t3's limit meters for subscription endpoints, from the limit headers of their answers.
 //
 //   T3FLARE_PROBE=1 node scripts/stage.ts deploy p1174
-//   node scripts/stage.ts run p1174 p1174 [--out ../../docs/steps/spi-1174/p1174.json] [--stale-wait-min 31]
+//   node scripts/stage.ts run p1174 p1174 [--out ../../.evidence/spi-1174/p1174.json] [--stale-wait-min 31]
 //
 // No subscription is signed in (the owner's decision): the stage's probe Worker stands in for both vendors. Its Anthropic
 // Messages stand-in answers with Claude's unified limit headers (five-hour share growing with each request, seven-day

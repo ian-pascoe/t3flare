@@ -3,7 +3,7 @@
 For the owner to send to t3code (pingdotgg/t3code), as issues or one discussion. Each ask removes a Patch,
 a Build shim or a piece of our composition. Pinned at `v0.1.9-nightly.20261110.4478`; paths are from that tag.
 Context: we run t3's server core unchanged inside a Cloudflare Durable Object (workerd), with our own
-composition root and platform Layers (step 0 report: `docs/spike/step-0.md`; step 1: `docs/steps/step-1.md`).
+composition root and platform Layers (step 0 report: `docs-archive-1:docs/spike/step-0.md`; step 1: `docs-archive-1:docs/steps/step-1.md`).
 
 ## 1. No randomness or timers at module scope
 

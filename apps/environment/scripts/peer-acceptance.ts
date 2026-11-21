@@ -1,6 +1,6 @@
 // @effect-diagnostics globalConsole:off
 // Step 3: the Peer link acceptance rows alone (`lib/peerAcceptance.ts`), with F11, against a stage. `--only F1,F2` runs
-// those rows; `--out <file>` names the evidence file in docs/steps/step-3/.
+// those rows; `--out <file>` names the evidence file in .evidence/step-3/.
 //
 //   node scripts/stage.ts run step3 peer-acceptance [--only launch,F5] [--out m1-acceptance-peer.json]
 import { admin, pair } from "./lib/client.ts";
