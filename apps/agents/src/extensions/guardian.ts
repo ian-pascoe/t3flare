@@ -18,7 +18,7 @@
 // @effect-diagnostics globalConsole:off
 import type { Context as ChordContext } from "@earendil-works/chord";
 import type { Api, Model } from "@earendil-works/pi-ai";
-import { defineExtension, type Extension, type Harness, hook, type HookApi, type JsonObject, type ToolHookCall, ToolTask } from "@earendil-works/pi-durable";
+import { type Cursor, defineExtension, type Extension, type Harness, hook, type HookApi, type JsonObject, type ToolHookCall, ToolTask } from "@earendil-works/pi-durable";
 import { parseEndpointSlug } from "@t3flare/models/endpoints";
 
 import { type Assessment, rejectionReason, riskLabel, statedRationale, validRiskCategories } from "./guardian/assessment.ts";
@@ -82,9 +82,9 @@ const decisionOf = (review: ReviewResult): Decision => {
 /** The response holding `callId` (a nested call's: its issuing call's), its other calls and the issuing call. */
 const callContext = async (api: Pick<HookApi, "entries">, call: ToolHookCall, context: ChordContext) => {
   const own = call.parent?.callId ?? call.id;
-  let cursor: unknown;
+  let cursor: Cursor | undefined;
   for (let read = 0; read < 1_000; ) {
-    const page = await api.entries({ order: "descending" }, 100, cursor as never, context);
+    const page = await api.entries({ order: "descending" }, 100, cursor, context);
     for (const entry of page.items) {
       const calls = toolCallsOf(entry);
       const found = calls.find((candidate) => candidate.id === own);

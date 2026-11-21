@@ -360,6 +360,9 @@ export const cutOffResult = () => ({
   isError: true,
 });
 
+/** Run any wrapped tool: a `ToolRegistration` takes whatever arguments its schema validated. */
+const runTool = (tool: ToolRegistration, args: Record<string, unknown>, api: ToolExecutionApi, context: Context) => tool.execute(args, api, context);
+
 /** `tool`, asking before it runs when the mode says so. */
 const guarded = <T extends ToolRegistration>(host: PermissionsHost, tool: T): T => {
   const unsafe = tool.replay !== "safe";
@@ -368,7 +371,7 @@ const guarded = <T extends ToolRegistration>(host: PermissionsHost, tool: T): T 
     replay: "safe",
     async execute(args: Record<string, unknown>, api: ToolExecutionApi, context: Context) {
       if (unsafe && (await api.memo<boolean>(STARTED_MEMO, context)) === true) return cutOffResult();
-      if (typesNothing(tool.name, args)) return tool.execute(args as never, api as never, context);
+      if (typesNothing(tool.name, args)) return runTool(tool, args, api, context);
       const kind = kindOf(tool.name);
       const plan = host.interaction() === "plan";
       // Plan mode is read-only: no file change runs, and every command asks (a command cannot be classified as reading).
@@ -378,7 +381,7 @@ const guarded = <T extends ToolRegistration>(host: PermissionsHost, tool: T): T 
         if (declined !== undefined) return declined;
       }
       if (unsafe) await api.memo(STARTED_MEMO, true, context);
-      return tool.execute(args as never, api as never, context);
+      return runTool(tool, args, api, context);
     },
   } as T;
 };
@@ -394,7 +397,7 @@ const translated = <T extends ToolRegistration>(host: PermissionsHost, tool: T, 
   async execute(args: Record<string, unknown>, api: ToolExecutionApi, context: Context) {
     const value = args[field];
     const next = typeof value === "string" ? { ...args, [field]: toToolPath(value, host.workspaceId()) } : args;
-    return tool.execute(next as never, api as never, context);
+    return runTool(tool, next, api, context);
   },
 });
 
@@ -406,7 +409,7 @@ const noted = <T extends ToolRegistration>(host: PermissionsHost, tool: T): T =>
   async execute(args: Record<string, unknown>, api: ToolExecutionApi, context: Context) {
     host.store.noteScript(api.callId, textOf(args.code));
     try {
-      return await tool.execute(args as never, api as never, context);
+      return await runTool(tool, args, api, context);
     } finally {
       host.store.forgetScript(api.callId);
     }

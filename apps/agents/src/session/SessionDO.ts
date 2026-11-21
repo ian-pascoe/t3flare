@@ -11,10 +11,15 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import {
   type Conversation,
+  type ConversationId,
   type ConversationWatch,
   createRegistry,
+  type Cursor,
+  type EntryId,
+  type EntryRecord,
   Harness,
   type RegistryReader,
+  type SubmissionId,
 } from "@earendil-works/pi-durable";
 import type { CodemodeNamespace } from "@earendil-works/pi-durable/codemode";
 import { openDurableObjectSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/cloudflare";
@@ -54,15 +59,15 @@ import {
   type ProxyRecord,
   type TurnState,
 } from "@t3flare/session-protocol";
-import { ComputerExecutionEnv, ComputerFiles, type ComputerWorkspaceStub } from "@t3flare/computer-env";
+import { ComputerExecutionEnv, ComputerFiles } from "@t3flare/computer-env";
 import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
 import { type SkillsTaker, takeSkillsForTurn } from "@t3flare/skills";
-import { REPO_ROOT } from "@t3flare/workspace-client";
+import { type AgentTerminalRequest, type AgentTerminalResult, REPO_ROOT } from "@t3flare/workspace-client";
 import { DurableObject } from "cloudflare:workers";
 
 import { EMPTY_HARNESS, extensionOf, ownEntry, resolvedToolsOf, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
 
-import { environmentStub, limitsSender, usageSender } from "../environment.ts";
+import { type EnvironmentDO, environmentStub, limitsSender, usageSender } from "../environment.ts";
 import { type CodemodeSandboxNamespace, codemodeExtension, offeredToolsExtension, remoteSandbox, toolSearchExtension } from "../extensions/codemode.ts";
 import { mcpExtension, mcpNamespaces, type McpView } from "../extensions/mcp.ts";
 import { codingTools } from "../extensions/coding-tools.ts";
@@ -92,13 +97,14 @@ import { suggestionModelOf, suggestPrompt } from "./promptSuggestion.ts";
 import { armFault, compactionLimits, type Fault, modelLimits, type ModelLimitsOptions, recordingFetch, sessionLimits } from "./modelLimits.ts";
 import { KILL_RETRY_MS, RunningExecs } from "./runningExecs.ts";
 import { FORK_PAGE_BYTES, forkPage, forkPoint, freshConversation, rewind, rollbackPlan, seed } from "./branches.ts";
+import type { WorkspaceDO } from "../workspace/WorkspaceDO.ts";
 import { liveOf, pushedEntry, turnDetail, turnOfEntry, usageOf } from "./state.ts";
 import { alarmWork, nextAlarm } from "./alarmPlan.ts";
 
 export interface SessionEnv {
-  readonly ENVIRONMENT: DurableObjectNamespace;
+  readonly ENVIRONMENT: DurableObjectNamespace<EnvironmentDO>;
   /** The Workspace DOs (this Worker's own): the agent's tools work on the thread's Workspace. */
-  readonly WORKSPACES: DurableObjectNamespace;
+  readonly WORKSPACES: DurableObjectNamespace<WorkspaceDO>;
   /** "1" on a test stage (never prod): the model fault route is accepted. */
   readonly T3FLARE_FAULTS?: string;
   /** Overrides TURN_DEADLINE_MS (tests and the stage's deadline check). */
@@ -106,10 +112,12 @@ export interface SessionEnv {
   /** Code mode's sandbox objects (ADR-0027), from the codemode Worker; absent in a deploy's bootstrap pass. */
   readonly CODEMODE_SANDBOX?: CodemodeSandboxNamespace;
   /** The Session DOs (this class's own namespace): a fork reads its source Session's conversation (G6). */
-  readonly SESSIONS?: DurableObjectNamespace;
+  readonly SESSIONS?: DurableObjectNamespace<SessionDO>;
 }
 
 const context = BACKGROUND_CONTEXT;
+/** A turn's stored submission id (`TurnState` keeps pi-durable's ids as decimal strings) as pi-durable's id. */
+const submissionIdOf = (stored: string): SubmissionId => Number(stored) as SubmissionId;
 const HEARTBEAT_MS = 60_000;
 const META_KEY = "t3flare:session";
 const TURNS_KEY = "t3flare:turns";
@@ -532,14 +540,14 @@ export class SessionDO extends DurableObject<SessionEnv> {
       owner: () => sessionName,
       viewport: () => viewport,
       toToolPath: (text) => toToolPath(text, this.#meta()?.workspaceId ?? null),
-      call: async (request) => {
+      call: async <R extends AgentTerminalRequest>(request: R): Promise<AgentTerminalResult<R["op"]>> => {
         const id = this.#meta()?.workspaceId;
         if (id === undefined || id === null) return { ok: false, error: "This thread has no Workspace, so it has no container to run a Terminal in." };
-        // SAFETY: the Workspace DO answers `agentTerminal` (WorkspaceDO.ts); a stub's RPC types only rewrite its declared type.
-        const workspace = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id)) as unknown as { agentTerminal(request: unknown): Promise<unknown> };
-        const answer = (await workspace.agentTerminal(request)) as Awaited<ReturnType<TermctrlHost["call"]>>;
+        // The stub's RPC typing drops `agentTerminal`'s type parameter (its answer is the union of every op's); the
+        // Workspace DO's own signature ties the answer to `request.op`.
+        const answer = (await this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id)).agentTerminal(request)) as AgentTerminalResult<R["op"]>;
         if (request.op === "start" && answer.ok) this.ctx.storage.kv.put(TERMCTRL_USED_KEY, true);
-        return answer as never;
+        return answer;
       },
     };
   }
@@ -668,20 +676,19 @@ export class SessionDO extends DurableObject<SessionEnv> {
     return Number.isFinite(value) && value > 0 ? value : TURN_DEADLINE_MS;
   }
 
-  /** The Workspace DO of the thread's Workspace, as computer's stub; undefined without one. */
-  #workspaceStub(): ComputerWorkspaceStub | undefined {
+  /** The Workspace DO of the thread's Workspace, also computer's `ComputerWorkspaceStub`; undefined without one. */
+  #workspaceStub(): DurableObjectStub<WorkspaceDO> | undefined {
     const id = this.#meta()?.workspaceId;
     if (id === undefined || id === null) return undefined;
-    // SAFETY: the Workspace DO answers `fileOperation`, `skills`, `prompts`, `instructions` and `__getWorkspaceStub`.
-    return this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id)) as unknown as ComputerWorkspaceStub;
+    return this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id));
   }
 
   /** The thread's Workspace DO as a taker of the Environment skill set (SPI-1148); undefined without one. */
   #skillsTaker(): SkillsTaker | undefined {
     const id = this.#meta()?.workspaceId;
     if (id === undefined || id === null) return undefined;
-    // SAFETY: the Workspace DO answers `takeEnvironmentSkills` (WorkspaceDO.ts); an older one rejects, which is logged.
-    return this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id)) as unknown as SkillsTaker;
+    // An older Workspace DO rejects `takeEnvironmentSkills`, which is logged.
+    return this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id));
   }
 
   /** The agent's environment: its Workspace's files and commands, in `cwd` (the repo by default). */
@@ -699,8 +706,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
       // discovery attributes a server the agent starts to its thread by it.
       containerEnv: threadId === undefined ? COMMAND_ENV : { ...COMMAND_ENV, T3CODE_THREAD_ID: threadId },
       // What a command cut off before it started waited for: the Global mise config's install (SPI-1150).
-      // SAFETY: the Workspace DO answers `containerStartingNote` over RPC.
-      startingNote: async () => (await (workspace as unknown as { containerStartingNote(): Promise<string | undefined> }).containerStartingNote()) ?? undefined,
+      startingNote: async () => (await workspace.containerStartingNote()) ?? undefined,
       ledger: {
         started: (execId) => this.#execs.started(execId),
         ended: (execId) => this.#execs.ended(execId),
@@ -719,10 +725,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
   async #killExecs(execIds: ReadonlyArray<string>): Promise<{ readonly survivors: number }> {
     const id = this.#meta()?.workspaceId;
     if (id === undefined || id === null) return { survivors: 0 };
-    // SAFETY: the Workspace DO answers `killExecs` (WorkspaceDO.ts); a stub's RPC types only rewrite its declared type.
-    const workspace = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id)) as unknown as {
-      killExecs(ids: ReadonlyArray<string>): Promise<{ readonly running: boolean; readonly signalled: number; readonly survivors: number }>;
-    };
+    const workspace = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id));
     const answer = await workspace.killExecs(execIds);
     console.log(JSON.stringify({ t3flare: "kill-execs", count: execIds.length, ...answer }));
     return answer;
@@ -741,7 +744,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const harness = await this.#opening;
     const moved = this.ctx.storage.kv.get<number>(CONVERSATION_KEY);
     if (moved !== undefined) {
-      const conversation = await harness.conversation(moved as never, context);
+      const conversation = await harness.conversation(moved as ConversationId, context);
       if (conversation !== undefined) return conversation;
       console.error(JSON.stringify({ t3flare: "session-conversation-missing", conversation: moved }));
     }
@@ -939,7 +942,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const harness = await this.#opening;
     const turn = this.#turns()[providerTurnId];
     if (turn === undefined) return;
-    const record = turn.submissionId === "" ? undefined : await harness.submission(turn.submissionId as never, context);
+    const record = turn.submissionId === "" ? undefined : await harness.submission(submissionIdOf(turn.submissionId), context);
     const status = record === undefined ? undefined : (await record.status(context)).status;
     if (record !== undefined && status === "queued") await record.abort(context);
     else if (status === "placed") {
@@ -992,13 +995,13 @@ export class SessionDO extends DurableObject<SessionEnv> {
     if (turn?.status !== "answered" || turn.inputEntry === undefined) return { text: "" };
     if (Object.values(this.#turns()).some(isLive)) return { text: "" };
     const conversation = await this.#conversation();
-    const textOf = (entry: unknown): { readonly role: string; readonly text: string } => {
-      const pushed = pushedEntry(entry as never, null);
+    const textOf = (entry: EntryRecord): { readonly role: string; readonly text: string } => {
+      const pushed = pushedEntry(entry, null);
       return { role: pushed.role, text: pushed.content.flatMap((block) => (block.type === "text" && typeof block.text === "string" ? [block.text] : [])).join("") };
     };
-    const first = (await conversation.entries({ minEntryId: Number(turn.inputEntry) as never, order: "ascending" }, 1, undefined, context)).items[0];
+    const first = (await conversation.entries({ minEntryId: Number(turn.inputEntry) as EntryId, order: "ascending" }, 1, undefined, context)).items[0];
     const user = first === undefined ? "" : textOf(first);
-    const newest = await conversation.entries({ minEntryId: Number(turn.inputEntry) as never, order: "descending" }, 20, undefined, context);
+    const newest = await conversation.entries({ minEntryId: Number(turn.inputEntry) as EntryId, order: "descending" }, 20, undefined, context);
     const answer = newest.items.map(textOf).find((entry) => entry.role === "assistant" && entry.text.trim() !== "");
     if (user === "" || user.role !== "user" || answer === undefined) return { text: "" };
     const models = this.#endpoints.sideModels();
@@ -1068,8 +1071,9 @@ export class SessionDO extends DurableObject<SessionEnv> {
     if (input.source === (this.ctx.id.name ?? "")) throw new Error("t3flare: a Session cannot fork itself");
     const sessions = this.env.SESSIONS;
     if (sessions === undefined) throw new Error("t3flare: this Worker has no SESSIONS binding");
-    // SAFETY: the Session DO answers `forkSource` (below); a stub's RPC types only rewrite its declared type.
-    const source = sessions.get(sessions.idFromName(input.source)) as unknown as { forkSource(input: ForkSourceInput): Promise<ForkSourcePage> };
+    // Typed as the class's own method: the stub's RPC typing resolves `ForkSourcePage` (its `ReadonlyArray<unknown>`
+    // messages are not `Serializable`) to `never`, which the annotation's return type accepts.
+    const source: Pick<SessionDO, "forkSource"> = sessions.get(sessions.idFromName(input.source));
     const harness = await this.#opening;
     const target = await freshConversation(harness, await this.#conversation(), context);
     let messages = 0;
@@ -1095,7 +1099,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
   async forkSource(input: ForkSourceInput): Promise<ForkSourcePage> {
     await this.#refreshTurns();
     const conversation = await this.#conversation();
-    const at = input.at === undefined ? await forkPoint(conversation, this.#turns(), input.providerTurnId, context) : (Number(input.at) as never);
+    const at = input.at === undefined ? await forkPoint(conversation, this.#turns(), input.providerTurnId, context) : (Number(input.at) as EntryId);
     return forkPage(conversation, at, input.offset, FORK_PAGE_BYTES, context);
   }
 
@@ -1177,13 +1181,13 @@ export class SessionDO extends DurableObject<SessionEnv> {
     let changed = false;
     for (const [id, turn] of Object.entries(turns)) {
       if (!isLive(turn) || turn.submissionId === "") continue;
-      const submission = await harness.submission(turn.submissionId as never, context);
+      const submission = await harness.submission(submissionIdOf(turn.submissionId), context);
       if (submission === undefined) continue;
       const status = await submission.status(context);
       // A steer still queued or placed keeps the turn running, whatever its own submission says.
       let steering = false;
       for (const steer of turn.steers ?? []) {
-        const record = await harness.submission(steer as never, context);
+        const record = await harness.submission(submissionIdOf(steer), context);
         const steerStatus = record === undefined ? undefined : (await record.status(context)).status;
         if (steerStatus === "queued" || steerStatus === "placed") steering = true;
       }
@@ -1232,16 +1236,16 @@ export class SessionDO extends DurableObject<SessionEnv> {
     let bytes = 0;
     let more = false;
     let lastEntry: number | undefined;
-    let cursor: unknown;
+    let cursor: Cursor | undefined;
     do {
       const page = await conversation.entries(
-        { ...(fromEntry === undefined ? {} : { minEntryId: fromEntry as never }), order: "ascending" },
+        { ...(fromEntry === undefined ? {} : { minEntryId: fromEntry as EntryId }), order: "ascending" },
         100,
-        cursor as never,
+        cursor,
         context,
       );
       for (const entry of page.items) {
-        const pushed = pushedEntry(entry as never, turnOfEntry(Number(entry.id), turns));
+        const pushed = pushedEntry(entry, turnOfEntry(Number(entry.id), turns));
         const size = JSON.stringify(pushed).length;
         if (bytes + size > bound && entries.length > 0) {
           more = true;

@@ -45,7 +45,7 @@ import * as git from "isomorphic-git";
 
 import { CREDENTIAL_HELPER, CREDENTIAL_PATH } from "./credentialHelper.ts";
 import { BUDGET_NAME, type ContainerBudget, RENEW_EVERY_MS } from "../budget.ts";
-import { environmentStub } from "../environment.ts";
+import { type EnvironmentDO, environmentStub } from "../environment.ts";
 import { EMPTY_ENVIRONMENT, fitVariables, type McpRelayAnswer, type ResolvedEnvironment, resolveEnvironment } from "@t3flare/harness-registry";
 import { changedBetween, currentRevision, repoFileSizes } from "./changeLog.ts";
 import { type ContainerLaunch, ENVIRONMENT_READ_MS, launchOf, shownLaunch, takeEnvironment, withGlobalMise } from "./containerLaunch.ts";
@@ -107,9 +107,9 @@ import {
 export interface WorkspaceEnv {
   readonly LOADER: WorkerLoader;
   /** This namespace: a worktree Workspace reads its project's bundle from the project's object (step 2b). */
-  readonly WORKSPACES: DurableObjectNamespace;
+  readonly WORKSPACES: DurableObjectNamespace<WorkspaceDO>;
   /** The Environment DO, the token broker (ADR-0018): the credential helper's tokens come from it. */
-  readonly ENVIRONMENT: DurableObjectNamespace;
+  readonly ENVIRONMENT: DurableObjectNamespace<EnvironmentDO>;
   /** The identity of commits the agent makes (step 2a; defaults below). */
   readonly T3FLARE_GIT_NAME?: string;
   readonly T3FLARE_GIT_EMAIL?: string;
@@ -355,7 +355,7 @@ export class WorkspaceDO extends ContainerHost {
         await writer?.write(new TextEncoder().encode(stdin));
         await writer?.close();
         return {
-          output: Promise.all([process.output(), process.exitCode.catch(() => null)]).then(([output, exitCode]) => ({ stdout: new TextDecoder().decode(output.stdout as unknown as Uint8Array), exitCode })),
+          output: Promise.all([process.output(), process.exitCode.catch(() => null)]).then(([output, exitCode]) => ({ stdout: new TextDecoder().decode(output.stdout), exitCode })),
           kill: () => process.kill(9),
         };
       },
@@ -533,11 +533,11 @@ export class WorkspaceDO extends ContainerHost {
     if (patterns.length === 0) return undefined;
     const process = await container.exec([...leakScanArgv({ ...input, patterns })], { stdout: "pipe", stderr: "pipe" });
     const output = await process.output();
-    const text = new TextDecoder().decode(output.stdout as unknown as Uint8Array);
+    const text = new TextDecoder().decode(output.stdout);
     try {
       return JSON.parse(text.trim().split("\n").at(-1) ?? "") as LeakScanAnswer;
     } catch {
-      console.warn(JSON.stringify({ t3flare: "leakscan-failed", workspace: this.#workspaceId() ?? null, stderr: new TextDecoder().decode(output.stderr as unknown as Uint8Array).slice(0, 300) }));
+      console.warn(JSON.stringify({ t3flare: "leakscan-failed", workspace: this.#workspaceId() ?? null, stderr: new TextDecoder().decode(output.stderr).slice(0, 300) }));
       return undefined;
     }
   }
@@ -576,7 +576,7 @@ export class WorkspaceDO extends ContainerHost {
     if (process === undefined) return;
     const output = await process.output();
     try {
-      const answer = JSON.parse(new TextDecoder().decode(output.stdout as unknown as Uint8Array)) as LeakScanAnswer;
+      const answer = JSON.parse(new TextDecoder().decode(output.stdout)) as LeakScanAnswer;
       if (answer.hits.length > 0) await this.#onLeak(answer.hits);
     } catch {
       // No answer: the command's scan did not run.
@@ -849,12 +849,8 @@ export class WorkspaceDO extends ContainerHost {
    * did for this start to fit.
    */
   async #reclaimFrom(holders: ReadonlyArray<string>, max: number): Promise<boolean> {
-    // SAFETY: a holder is a Workspace DO's id (`#budgeted`); `reclaimable` and `releaseIfIdle` are its RPC.
-    const stub = (holder: string) =>
-      this.env.WORKSPACES.get(this.env.WORKSPACES.idFromString(holder)) as unknown as {
-        reclaimable(): Promise<boolean>;
-        releaseIfIdle(): Promise<{ readonly released: boolean; readonly reason: string }>;
-      };
+    // A holder is a Workspace DO's id (`#budgeted`).
+    const stub = (holder: string) => this.env.WORKSPACES.get(this.env.WORKSPACES.idFromString(holder));
     const failed = (holder: string) => (error: unknown) => {
       console.warn(JSON.stringify({ t3flare: "container-reclaim-failed", from: holder, error: String(error).slice(0, 200) }));
       return false;
@@ -1424,8 +1420,8 @@ export class WorkspaceDO extends ContainerHost {
   }
 
   /** Another Workspace DO of this namespace, by its Workspace id. */
-  #peer(id: string): WorkspaceDO {
-    return this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id)) as unknown as WorkspaceDO;
+  #peer(id: string): DurableObjectStub<WorkspaceDO> {
+    return this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id));
   }
 
   /** Copies a file of Workspace `from`'s own files into this one's, object to object in 4 MiB chunks; the error, if any. */

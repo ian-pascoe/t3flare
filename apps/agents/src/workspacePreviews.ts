@@ -14,8 +14,6 @@ interface PreviewsEnv {
 export class WorkspaceContainerPreviews extends WorkerEntrypoint<PreviewsEnv> {
   async containerPreview(workspace: string, request: Request, port: number): Promise<Response> {
     if (!isAnyWorkspaceId(workspace) || !Number.isInteger(port)) return new Response("Not found", { status: 404 });
-    // SAFETY: the Workspace DO answers `containerPreview` (WorkspaceDO.ts); the stub's RPC type only rewrites its declared type.
-    const stub = this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(workspace)) as unknown as Pick<WorkspaceDO, "containerPreview">;
-    return stub.containerPreview(request, port);
+    return this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(workspace)).containerPreview(request, port);
   }
 }

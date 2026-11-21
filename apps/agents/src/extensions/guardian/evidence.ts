@@ -8,7 +8,7 @@
 // untrusted, and the untrusted window is the newest that fits a character budget, not pi-guardian's anchored window
 // (no token calibration here). There are no Skills, delegations or User Overrides to carry.
 import type { Context as ChordContext } from "@earendil-works/chord";
-import type { EntryRecord, HookApi } from "@earendil-works/pi-durable";
+import type { Cursor, EntryRecord, HookApi } from "@earendil-works/pi-durable";
 
 import { ADVISOR_CONTINUATION } from "../advisor.ts";
 
@@ -81,10 +81,10 @@ export const selectEvidence = async (
 ): Promise<ReadonlyArray<string>> => {
   const budget = options.budget ?? EVIDENCE_CHARACTERS;
   const newestFirst: Array<EvidenceEntry> = [];
-  let cursor: unknown;
+  let cursor: Cursor | undefined;
   let read = 0;
   do {
-    const page = await api.entries({ order: "descending" }, PAGE, cursor as never, context);
+    const page = await api.entries({ order: "descending" }, PAGE, cursor, context);
     for (const entry of page.items) {
       const evidence = entryEvidence(entry, options.trustUser, options.skipCalls);
       if (evidence !== undefined) newestFirst.push(evidence);

@@ -5,6 +5,7 @@
 // Durable Objects, copies the source's model context into a new conversation of the target. Either way the Session then
 // runs the new conversation (`SessionDO`'s conversation pointer); the old one stays in storage as history.
 import type { Context } from "@earendil-works/chord/context";
+import type { Message } from "@earendil-works/pi-ai";
 import type { Conversation, EntryId, Harness } from "@earendil-works/pi-durable";
 import type { ForkSourcePage, TurnState } from "@t3flare/session-protocol";
 
@@ -92,12 +93,11 @@ export const forkPage = async (current: Conversation, at: EntryId, offset: numbe
 
 /** Writes `messages` into `target` as model context, in entries of about SEED_ENTRY_BYTES (one message at least). */
 export const seed = async (target: Conversation, messages: ReadonlyArray<unknown>, data: { readonly source: string; readonly at: string }, context: Context): Promise<void> => {
-  let batch: Array<unknown> = [];
+  let batch: Array<Message> = [];
   let size = 0;
   const flush = async () => {
     if (batch.length === 0) return;
-    // SAFETY: the messages are pi-ai messages, as the source's `Conversation.context()` gave them.
-    const submission = await target.submit({ type: "write", entry: { kind: FORK_ENTRY_KIND, model: batch as never, data } }, context);
+    const submission = await target.submit({ type: "write", entry: { kind: FORK_ENTRY_KIND, model: batch, data } }, context);
     await submission.wait(context);
     batch = [];
     size = 0;
@@ -105,7 +105,8 @@ export const seed = async (target: Conversation, messages: ReadonlyArray<unknown
   for (const message of messages) {
     const next = sizeOf(message);
     if (batch.length > 0 && size + next > SEED_ENTRY_BYTES) await flush();
-    batch.push(message);
+    // SAFETY: the messages are pi-ai messages, as the source's `Conversation.context()` gave them.
+    batch.push(message as Message);
     size += next;
   }
   await flush();

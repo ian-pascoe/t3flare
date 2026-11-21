@@ -136,7 +136,7 @@ export const todoTool = (): ToolRegistration =>
       if (!applied.outcome.ok) throw new Error(applied.outcome.message);
       return {
         output: [{ type: "text" as const, text: textOf(applied.outcome, applied.text) }],
-        structuredOutput: applied.outcome.output as never,
+        structuredOutput: applied.outcome.output,
         details: { [SHOWN_REV]: applied.rev },
       };
     },

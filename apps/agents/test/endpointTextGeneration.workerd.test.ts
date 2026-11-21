@@ -12,11 +12,11 @@ const environment = () => {
     modelEndpoints: async () => (calls.push("modelEndpoints"), { revision: 1, endpoints: [] }),
     endpointCredential: async () => (calls.push("endpointCredential"), { apiKey: null }),
   };
-  const namespace = { idFromName: (name: string) => name, get: () => stub } as unknown as DurableObjectNamespace;
+  const namespace = { idFromName: (name: string) => name, get: () => stub } as unknown as TextGenerationEnv["ENVIRONMENT"];
   return { calls, namespace };
 };
 
-const entrypoint = (namespace: DurableObjectNamespace) =>
+const entrypoint = (namespace: TextGenerationEnv["ENVIRONMENT"]) =>
   // SAFETY: a WorkerEntrypoint is constructed with the execution context and its env, as workerd does.
   new (EndpointTextGeneration as unknown as new (ctx: ExecutionContext, env: TextGenerationEnv) => EndpointTextGeneration)({ waitUntil: () => undefined, passThroughOnException: () => undefined, props: {} } as unknown as ExecutionContext, { ENVIRONMENT: namespace });
 

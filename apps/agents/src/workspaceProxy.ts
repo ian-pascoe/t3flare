@@ -14,15 +14,15 @@
 // Addressed as computer's proxy addresses its host.
 import { WorkspaceProxy as ComputerWorkspaceProxy } from "@cloudflare/computer";
 
-import { environmentStub, limitsSender, usageSender } from "./environment.ts";
+import { type EnvironmentDO, environmentStub, limitsSender, usageSender } from "./environment.ts";
 import { handleRelayRequest, isRelayPath } from "./workspace/mcpRelay.ts";
 import { handleModelRelay, isModelRelayPath, workspaceRelayDeps } from "./workspace/modelRelay.ts";
 import { CREDENTIAL_PATH, type WorkspaceDO } from "./workspace/WorkspaceDO.ts";
 
-interface ProxyProps {
-  readonly binding: string;
-  readonly id: string;
-  readonly name?: string;
+/** The Worker's bindings the proxy reads: computer's `WorkspaceProxy` types its `env` as `unknown`. */
+interface ProxyEnv {
+  readonly ENVIRONMENT: DurableObjectNamespace<EnvironmentDO>;
+  readonly [binding: string]: unknown;
 }
 
 export class WorkspaceProxy extends ComputerWorkspaceProxy {
@@ -31,26 +31,26 @@ export class WorkspaceProxy extends ComputerWorkspaceProxy {
     const relay = isRelayPath(pathname);
     const modelRelay = isModelRelayPath(pathname);
     if (pathname !== CREDENTIAL_PATH && !relay && !modelRelay) return super.fetch(request);
-    const { binding, id, name } = (this.ctx as unknown as { props: ProxyProps }).props;
-    const namespace = (this.env as Record<string, DurableObjectNamespace | undefined>)[binding];
+    const { binding, id, name } = this.ctx.props;
+    const env = this.env as ProxyEnv;
+    // The binding computer's props name is the Workspace DOs' (`WORKSPACE_BINDING`).
+    const namespace = env[binding] as DurableObjectNamespace<WorkspaceDO> | undefined;
     if (namespace === undefined) return new Response("", { status: 500 });
     const named = name === undefined || name === "" ? undefined : namespace.idFromName(name);
     const target = named !== undefined && named.toString() === id ? named : namespace.idFromString(id);
     const workspace = namespace.get(target);
     if (modelRelay) {
-      // SAFETY: the Workspace DO answers `modelRelay` (WorkspaceDO.ts).
-      const rpc = workspace as unknown as Pick<WorkspaceDO, "modelRelay" | "modelRelayOutcome">;
       // SPI-1172: each answer reported to the Workspace DO, for the CLI wrapper's view of a failed turn.
       return handleModelRelay(
         request,
-        workspaceRelayDeps(rpc, {
+        workspaceRelayDeps(workspace, {
           fetch: (upstream) => fetch(upstream),
           log: (event) => console.log(JSON.stringify(event)),
           now: () => Date.now(),
           // Each answer's usage, kept by the Environment for t3's Usage page (SPI-1173).
-          usage: usageSender(this.ctx, () => environmentStub((this.env as { readonly ENVIRONMENT: DurableObjectNamespace }).ENVIRONMENT)),
+          usage: usageSender(this.ctx, () => environmentStub(env.ENVIRONMENT)),
           // Each answer's limit windows (its rate-limit headers), kept by the Environment for t3's limit meters (SPI-1174).
-          limits: limitsSender(this.ctx, () => environmentStub((this.env as { readonly ENVIRONMENT: DurableObjectNamespace }).ENVIRONMENT)),
+          limits: limitsSender(this.ctx, () => environmentStub(env.ENVIRONMENT)),
         }),
       ).catch((error: unknown) => {
         // The route logs its own failures; this is what escaped it, with what the path names (never a value).
@@ -60,11 +60,9 @@ export class WorkspaceProxy extends ComputerWorkspaceProxy {
       });
     }
     if (relay) {
-      // SAFETY: the Workspace DO answers `mcpRelay` and `cancelMcpAsk` (WorkspaceDO.ts).
-      const rpc = workspace as unknown as Pick<WorkspaceDO, "mcpRelay" | "cancelMcpAsk">;
       return handleRelayRequest(request, {
-        relay: (input) => rpc.mcpRelay(input),
-        cancel: (askId) => void rpc.cancelMcpAsk({ askId }).catch(() => undefined),
+        relay: (input) => workspace.mcpRelay(input),
+        cancel: (askId) => void workspace.cancelMcpAsk({ askId }).catch(() => undefined),
         newId: () => crypto.randomUUID(),
       }).catch((error: unknown) => {
         console.warn(JSON.stringify({ t3flare: "mcp-relay-failed", error: String(error).slice(0, 300) }));

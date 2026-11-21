@@ -10,10 +10,10 @@ import type { EndpointTextAnswer } from "@t3flare/models/endpoints";
 import { WorkerEntrypoint } from "cloudflare:workers";
 
 import { generateEndpointText } from "./endpointText.ts";
-import { environmentStub, limitsSender, usageSender } from "./environment.ts";
+import { type EnvironmentDO, environmentStub, limitsSender, usageSender } from "./environment.ts";
 
 export interface TextGenerationEnv {
-  readonly ENVIRONMENT: DurableObjectNamespace;
+  readonly ENVIRONMENT: DurableObjectNamespace<EnvironmentDO>;
 }
 
 export class EndpointTextGeneration extends WorkerEntrypoint<TextGenerationEnv> {
