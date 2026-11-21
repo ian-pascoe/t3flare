@@ -11,12 +11,7 @@
  * - **The validator** checks the owner's values against the form, in the web before Submit and again in the Session.
  */
 // @effect-diagnostics missingPipeableSignature:off preferEffectArray:off preferEffectRecord:off -- plain functions over values, with loops that end early.
-import {
-  type ElicitationContent,
-  type ElicitationField,
-  type ElicitationForm,
-  type ElicitationOption,
-} from "@t3flare/protocol";
+import { type ElicitationContent, type ElicitationField, type ElicitationForm, type ElicitationOption } from "./elicitation-form.ts";
 import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";

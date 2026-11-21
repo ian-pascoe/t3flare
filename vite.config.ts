@@ -47,7 +47,7 @@ export default defineConfig({
           ...each("@t3flare/codemode-sandbox", "typecheck", "lint"),
           // check.ts never typechecked these three (plan D8), nor linted them; they have no tests.
           ...["sandbox-image", "models", "session-protocol"].flatMap((name) => each(`@t3flare/${name}`, "typecheck", "lint")),
-          ...["effect-durable", "computer-env", "github-app", "workspace-client", "harness-registry", "skills", "mcp", "protocol", "config"].flatMap((name) =>
+          ...["effect-durable", "computer-env", "github-app", "workspace-client", "harness-registry", "skills", "mcp"].flatMap((name) =>
             each(`@t3flare/${name}`, "typecheck", "lint", "test"),
           ),
         ],

@@ -26,6 +26,8 @@ export * from "./deadline.ts";
 
 export * from "./elicitation.ts";
 
+export * from "./elicitation-form.ts";
+
 export * from "./host.ts";
 
 export * from "./log.ts";

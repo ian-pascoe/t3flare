@@ -4,7 +4,7 @@
  * bounds, and the owner's values checked against the form.
  */
 // @effect-diagnostics preferEffectArray:off preferEffectRecord:off
-import type { ElicitationForm } from "@t3flare/protocol";
+import type { ElicitationForm } from "./elicitation-form.ts";
 import * as Result from "effect/Result";
 import type * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";

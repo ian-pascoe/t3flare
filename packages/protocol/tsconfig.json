@@ -1,4 +1,0 @@
-{
-  "extends": "@t3flare/config/tsconfig/base.json",
-  "include": ["src", "*.ts"]
-}
