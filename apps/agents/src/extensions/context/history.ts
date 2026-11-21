@@ -8,6 +8,8 @@ import * as DateTime from "effect/DateTime";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
 
+import { conversationIdOf, entryIdOf } from "../../durableIds.ts";
+
 /** Lists and searches return at most this many items per page. */
 export const PAGE_SIZE = 20;
 
@@ -34,13 +36,11 @@ export const parseRef = (ref: string): ParsedRef | undefined => {
 
   if (match === null) return undefined;
 
-  // SAFETY: the pattern's first group is digits: a conversation ID as `entryRef` and `noteRef` write it.
-  const conversationId = Number(match[1]) as ConversationId;
+  const conversationId = conversationIdOf(match[1]!);
 
   return match[2] !== undefined
     ? { type: "note", conversationId, name: match[2] }
-    : // SAFETY: the third group is digits: an entry ID as `entryRef` writes it.
-      { type: "entry", conversationId, entryId: Number(match[3]) as EntryId };
+    : { type: "entry", conversationId, entryId: entryIdOf(match[3]!) };
 };
 
 /** A Context Window: the entries from one head marker (a Handoff or a compaction) to the next. */

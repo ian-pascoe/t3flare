@@ -27,6 +27,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { type Conversation, type ConversationId, type Cursor, defineExtension, type EntryId, type Extension, GenerationTask, type Harness, hook, type HookApi, type JsonObject } from "@earendil-works/pi-durable";
 import { isRetiredSlug, parseEndpointSlug } from "@t3flare/models/endpoints";
 
+import { conversationIdOf, entryIdOf } from "../durableIds.ts";
 import { type EvidenceMessage, evidenceRefs, projectEntry, selectContextSeed } from "./advisor/evidence.ts";
 
 export const ADVISOR_EXTENSION = "advisor";
@@ -263,7 +264,7 @@ export class AdvisorObserver {
     const key = JSON.stringify([model, this.#settings.thinkingLevel]);
     const stored = this.#storage.get<Stored>(STATE_KEY);
     if (stored !== undefined && stored.key === key && stored.characters < SESSION_CHARACTERS) {
-      const conversation = await harness.conversation(stored.conversation as ConversationId, context);
+      const conversation = await harness.conversation(conversationIdOf(stored.conversation), context);
       if (conversation !== undefined) return { conversation, stored, fresh: false };
     }
     const conversation = await harness.createConversation(
@@ -297,7 +298,7 @@ export class AdvisorObserver {
     let last = stored.supplied;
     let cursor: Cursor | undefined;
     do {
-      const page = await observed.entries({ order: "ascending", ...(fresh ? {} : { minEntryId: (stored.supplied + 1) as EntryId }) }, 200, cursor, context);
+      const page = await observed.entries({ order: "ascending", ...(fresh ? {} : { minEntryId: entryIdOf(stored.supplied + 1) }) }, 200, cursor, context);
       for (const entry of page.items) {
         const projected = projectEntry(entry);
         if (projected !== undefined) messages.push(projected);

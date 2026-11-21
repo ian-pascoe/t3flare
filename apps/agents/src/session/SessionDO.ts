@@ -11,15 +11,12 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import {
   type Conversation,
-  type ConversationId,
   type ConversationWatch,
   createRegistry,
   type Cursor,
-  type EntryId,
   type EntryRecord,
   Harness,
   type RegistryReader,
-  type SubmissionId,
 } from "@earendil-works/pi-durable";
 import type { CodemodeNamespace } from "@earendil-works/pi-durable/codemode";
 import { openDurableObjectSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/cloudflare";
@@ -59,6 +56,7 @@ import {
   type ProxyRecord,
   type TurnState,
 } from "@t3flare/session-protocol";
+import { conversationIdOf, entryIdOf, submissionIdOf } from "../durableIds.ts";
 import { ComputerExecutionEnv, ComputerFiles } from "@t3flare/computer-env";
 import { COMMAND_ENV } from "@t3flare/sandbox-image/env";
 import { type SkillsTaker, takeSkillsForTurn } from "@t3flare/skills";
@@ -116,8 +114,6 @@ export interface SessionEnv {
 }
 
 const context = BACKGROUND_CONTEXT;
-/** A turn's stored submission id (`TurnState` keeps pi-durable's ids as decimal strings) as pi-durable's id. */
-const submissionIdOf = (stored: string): SubmissionId => Number(stored) as SubmissionId;
 const HEARTBEAT_MS = 60_000;
 const META_KEY = "t3flare:session";
 const TURNS_KEY = "t3flare:turns";
@@ -543,8 +539,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
       call: async <R extends AgentTerminalRequest>(request: R): Promise<AgentTerminalResult<R["op"]>> => {
         const id = this.#meta()?.workspaceId;
         if (id === undefined || id === null) return { ok: false, error: "This thread has no Workspace, so it has no container to run a Terminal in." };
-        // The stub's RPC typing drops `agentTerminal`'s type parameter (its answer is the union of every op's); the
-        // Workspace DO's own signature ties the answer to `request.op`.
+        // SAFETY: the stub's RPC typing drops `agentTerminal`'s type parameter (its answer is the union of every op's);
+        // the Workspace DO's own signature ties the answer to `request.op`.
         const answer = (await this.env.WORKSPACES.get(this.env.WORKSPACES.idFromName(id)).agentTerminal(request)) as AgentTerminalResult<R["op"]>;
         if (request.op === "start" && answer.ok) this.ctx.storage.kv.put(TERMCTRL_USED_KEY, true);
         return answer;
@@ -744,7 +740,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const harness = await this.#opening;
     const moved = this.ctx.storage.kv.get<number>(CONVERSATION_KEY);
     if (moved !== undefined) {
-      const conversation = await harness.conversation(moved as ConversationId, context);
+      const conversation = await harness.conversation(conversationIdOf(moved), context);
       if (conversation !== undefined) return conversation;
       console.error(JSON.stringify({ t3flare: "session-conversation-missing", conversation: moved }));
     }
@@ -999,9 +995,9 @@ export class SessionDO extends DurableObject<SessionEnv> {
       const pushed = pushedEntry(entry, null);
       return { role: pushed.role, text: pushed.content.flatMap((block) => (block.type === "text" && typeof block.text === "string" ? [block.text] : [])).join("") };
     };
-    const first = (await conversation.entries({ minEntryId: Number(turn.inputEntry) as EntryId, order: "ascending" }, 1, undefined, context)).items[0];
+    const first = (await conversation.entries({ minEntryId: entryIdOf(turn.inputEntry), order: "ascending" }, 1, undefined, context)).items[0];
     const user = first === undefined ? "" : textOf(first);
-    const newest = await conversation.entries({ minEntryId: Number(turn.inputEntry) as EntryId, order: "descending" }, 20, undefined, context);
+    const newest = await conversation.entries({ minEntryId: entryIdOf(turn.inputEntry), order: "descending" }, 20, undefined, context);
     const answer = newest.items.map(textOf).find((entry) => entry.role === "assistant" && entry.text.trim() !== "");
     if (user === "" || user.role !== "user" || answer === undefined) return { text: "" };
     const models = this.#endpoints.sideModels();
@@ -1071,9 +1067,10 @@ export class SessionDO extends DurableObject<SessionEnv> {
     if (input.source === (this.ctx.id.name ?? "")) throw new Error("t3flare: a Session cannot fork itself");
     const sessions = this.env.SESSIONS;
     if (sessions === undefined) throw new Error("t3flare: this Worker has no SESSIONS binding");
-    // Typed as the class's own method: the stub's RPC typing resolves `ForkSourcePage` (its `ReadonlyArray<unknown>`
-    // messages are not `Serializable`) to `never`, which the annotation's return type accepts.
-    const source: Pick<SessionDO, "forkSource"> = sessions.get(sessions.idFromName(input.source));
+    // SAFETY: the stub's RPC typing resolves `forkSource` to `never`, because `ForkSourcePage`'s `ReadonlyArray<unknown>`
+    // messages are not `Serializable`; the call itself is a plain RPC, and the messages are JSON that structured clone
+    // carries. The class's own signature is the one that holds.
+    const source = sessions.get(sessions.idFromName(input.source)) as Pick<SessionDO, "forkSource">;
     const harness = await this.#opening;
     const target = await freshConversation(harness, await this.#conversation(), context);
     let messages = 0;
@@ -1099,7 +1096,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
   async forkSource(input: ForkSourceInput): Promise<ForkSourcePage> {
     await this.#refreshTurns();
     const conversation = await this.#conversation();
-    const at = input.at === undefined ? await forkPoint(conversation, this.#turns(), input.providerTurnId, context) : (Number(input.at) as EntryId);
+    const at = input.at === undefined ? await forkPoint(conversation, this.#turns(), input.providerTurnId, context) : entryIdOf(input.at);
     return forkPage(conversation, at, input.offset, FORK_PAGE_BYTES, context);
   }
 
@@ -1239,7 +1236,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     let cursor: Cursor | undefined;
     do {
       const page = await conversation.entries(
-        { ...(fromEntry === undefined ? {} : { minEntryId: fromEntry as EntryId }), order: "ascending" },
+        { ...(fromEntry === undefined ? {} : { minEntryId: entryIdOf(fromEntry) }), order: "ascending" },
         100,
         cursor,
         context,

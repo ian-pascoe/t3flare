@@ -9,6 +9,8 @@ import type { Message } from "@earendil-works/pi-ai";
 import type { Conversation, EntryId, Harness } from "@earendil-works/pi-durable";
 import type { ForkSourcePage, TurnState } from "@t3flare/session-protocol";
 
+import { entryIdOf } from "../durableIds.ts";
+
 /** The most a page of a fork's messages carries over DO RPC (its limit is 32 MiB). */
 export const FORK_PAGE_BYTES = 4 * 1024 * 1024;
 /** The most one seeded entry holds, well under a Durable Object SQLite row's 2 MB. */
@@ -52,7 +54,7 @@ export const rollbackPlan = (
 
 /** `current` as it was just before entry `boundary`: a fork at the entry before it, or a fresh conversation when none is. */
 export const rewind = async (harness: Harness, current: Conversation, boundary: number, context: Context): Promise<Conversation> => {
-  const before = (await current.entries({ maxEntryId: (boundary - 1) as EntryId, order: "descending" }, 1, undefined, context)).items[0];
+  const before = (await current.entries({ maxEntryId: entryIdOf(boundary - 1), order: "descending" }, 1, undefined, context)).items[0];
   return before === undefined ? freshConversation(harness, current, context) : current.fork(before.id, ownerless, context);
 };
 
@@ -70,7 +72,7 @@ export const forkPoint = async (
   if (input === undefined) throw new Error(`t3flare: turn ${providerTurnId} is not in this Session's conversation`);
   const later = Object.values(turns).flatMap((turn) => (turn.inputEntry !== undefined && Number(turn.inputEntry) > Number(input) ? [Number(turn.inputEntry)] : []));
   const next = later.length === 0 ? undefined : Math.min(...later);
-  const last = (await current.entries({ ...(next === undefined ? {} : { maxEntryId: (next - 1) as EntryId }), order: "descending" }, 1, undefined, context)).items[0];
+  const last = (await current.entries({ ...(next === undefined ? {} : { maxEntryId: entryIdOf(next - 1) }), order: "descending" }, 1, undefined, context)).items[0];
   if (last === undefined) throw new Error(`t3flare: turn ${providerTurnId} has no entries`);
   return last.id;
 };

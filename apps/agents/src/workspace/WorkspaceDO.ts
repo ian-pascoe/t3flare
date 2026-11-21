@@ -535,6 +535,7 @@ export class WorkspaceDO extends ContainerHost {
     const output = await process.output();
     const text = new TextDecoder().decode(output.stdout);
     try {
+      // SAFETY: the last line of `leakscan`'s output is its `LeakScanAnswer`; anything else is the "scan failed" below.
       return JSON.parse(text.trim().split("\n").at(-1) ?? "") as LeakScanAnswer;
     } catch {
       console.warn(JSON.stringify({ t3flare: "leakscan-failed", workspace: this.#workspaceId() ?? null, stderr: new TextDecoder().decode(output.stderr).slice(0, 300) }));
@@ -576,6 +577,8 @@ export class WorkspaceDO extends ContainerHost {
     if (process === undefined) return;
     const output = await process.output();
     try {
+      // SAFETY: `last-scan.json` is the `leakscan` command's answer, which writes a `LeakScanAnswer`; anything else
+      // throws in `answer.hits` below and is the same "no answer" as unparsable output.
       const answer = JSON.parse(new TextDecoder().decode(output.stdout)) as LeakScanAnswer;
       if (answer.hits.length > 0) await this.#onLeak(answer.hits);
     } catch {

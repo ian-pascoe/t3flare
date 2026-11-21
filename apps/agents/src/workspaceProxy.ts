@@ -32,8 +32,10 @@ export class WorkspaceProxy extends ComputerWorkspaceProxy {
     const modelRelay = isModelRelayPath(pathname);
     if (pathname !== CREDENTIAL_PATH && !relay && !modelRelay) return super.fetch(request);
     const { binding, id, name } = this.ctx.props;
+    // SAFETY: computer types the proxy's `env` as `unknown`; it is this Worker's env, which `ProxyEnv` describes.
     const env = this.env as ProxyEnv;
-    // The binding computer's props name is the Workspace DOs' (`WORKSPACE_BINDING`).
+    // SAFETY: the binding computer's props name is the Workspace DOs' (`WORKSPACE_BINDING`), a namespace of `WorkspaceDO`
+    // when the Worker binds it, else absent.
     const namespace = env[binding] as DurableObjectNamespace<WorkspaceDO> | undefined;
     if (namespace === undefined) return new Response("", { status: 500 });
     const named = name === undefined || name === "" ? undefined : namespace.idFromName(name);
