@@ -7,12 +7,12 @@ import { applyEnvironmentChange, containerInstance, EMPTY_ENVIRONMENT, resolveEn
 
 describe("resolveEnvironment", () => {
   it("gives the defaults for empty settings: cpu-1 and a 2-minute idle time, at revision 0", () => {
-    expect(resolveEnvironment(EMPTY_ENVIRONMENT)).toEqual({ revision: 0, containerSize: "cpu-1", containerIdleMinutes: 2, containerBudget: 3, variables: {}, globalMiseConfig: "" });
+    expect(resolveEnvironment(EMPTY_ENVIRONMENT)).toEqual({ revision: 0, containerSize: "cpu-1", containerIdleMinutes: 2, containerBudget: 3, variables: {}, globalMiseConfig: "", sweepPurges: true, graceDays: 7 });
   });
 
   it("reads a stored size it no longer offers, or an idle time out of bounds, as the default", () => {
-    expect(resolveEnvironment({ revision: 4, settings: { containerSize: "mem-8", containerIdleMinutes: 0, containerBudget: 11 } })).toEqual({ revision: 4, containerSize: "cpu-1", containerIdleMinutes: 2, containerBudget: 3, variables: {}, globalMiseConfig: "" });
-    expect(resolveEnvironment({ revision: 5, settings: { containerSize: "standard-3", containerIdleMinutes: 15, containerBudget: 5 } })).toEqual({ revision: 5, containerSize: "standard-3", containerIdleMinutes: 15, containerBudget: 5, variables: {}, globalMiseConfig: "" });
+    expect(resolveEnvironment({ revision: 4, settings: { containerSize: "mem-8", containerIdleMinutes: 0, containerBudget: 11 } })).toEqual({ revision: 4, containerSize: "cpu-1", containerIdleMinutes: 2, containerBudget: 3, variables: {}, globalMiseConfig: "", sweepPurges: true, graceDays: 7 });
+    expect(resolveEnvironment({ revision: 5, settings: { containerSize: "standard-3", containerIdleMinutes: 15, containerBudget: 5 } })).toEqual({ revision: 5, containerSize: "standard-3", containerIdleMinutes: 15, containerBudget: 5, variables: {}, globalMiseConfig: "", sweepPurges: true, graceDays: 7 });
   });
 });
 
@@ -21,10 +21,10 @@ describe("applyEnvironmentChange", () => {
     const applied = applyEnvironmentChange(EMPTY_ENVIRONMENT, { settings: { containerSize: "standard-4", containerIdleMinutes: 10 } });
     if (!applied.ok) throw new Error(applied.error);
     expect(applied.environment.revision).toBe(1);
-    expect(resolveEnvironment(applied.environment)).toEqual({ revision: 1, containerSize: "standard-4", containerIdleMinutes: 10, containerBudget: 3, variables: {}, globalMiseConfig: "" });
+    expect(resolveEnvironment(applied.environment)).toEqual({ revision: 1, containerSize: "standard-4", containerIdleMinutes: 10, containerBudget: 3, variables: {}, globalMiseConfig: "", sweepPurges: true, graceDays: 7 });
     const again = applyEnvironmentChange(applied.environment, { settings: { containerIdleMinutes: 5 } });
     if (!again.ok) throw new Error(again.error);
-    expect(resolveEnvironment(again.environment)).toEqual({ revision: 2, containerSize: "standard-4", containerIdleMinutes: 5, containerBudget: 3, variables: {}, globalMiseConfig: "" });
+    expect(resolveEnvironment(again.environment)).toEqual({ revision: 2, containerSize: "standard-4", containerIdleMinutes: 5, containerBudget: 3, variables: {}, globalMiseConfig: "", sweepPurges: true, graceDays: 7 });
   });
 
   it("stores and bumps the revision for the settings that moved only; a save that moves none changes nothing", () => {
@@ -46,6 +46,20 @@ describe("applyEnvironmentChange", () => {
   it("keeps the Container budget between 1 and 10 whole Containers", () => {
     for (const budget of [1, 10]) expect(applyEnvironmentChange(EMPTY_ENVIRONMENT, { settings: { containerBudget: budget } })).toMatchObject({ ok: true });
     for (const budget of [0, 11, 2.5, "3"]) expect(applyEnvironmentChange(EMPTY_ENVIRONMENT, { settings: { containerBudget: budget } })).toMatchObject({ ok: false });
+  });
+
+  it("keeps the Grace a whole number of days from 1 (no zero: at once is the Owner's Purge, ADR-0043), and purging a switch", () => {
+    for (const days of [1, 7, 3650]) expect(applyEnvironmentChange(EMPTY_ENVIRONMENT, { settings: { graceDays: days } })).toMatchObject({ ok: true });
+    expect(applyEnvironmentChange(EMPTY_ENVIRONMENT, { settings: { graceDays: 0 } })).toEqual({ ok: false, error: "graceDays: at least 1" });
+    expect(applyEnvironmentChange(EMPTY_ENVIRONMENT, { settings: { graceDays: 1.5 } })).toEqual({ ok: false, error: "graceDays: an integer" });
+    for (const days of [-1, 3651, "7", null]) expect(applyEnvironmentChange(EMPTY_ENVIRONMENT, { settings: { graceDays: days } })).toMatchObject({ ok: false });
+    expect(applyEnvironmentChange(EMPTY_ENVIRONMENT, { settings: { sweepPurges: false } })).toMatchObject({ ok: true, changed: ["sweepPurges"] });
+    expect(applyEnvironmentChange(EMPTY_ENVIRONMENT, { settings: { sweepPurges: "no" } })).toEqual({ ok: false, error: "sweepPurges: true or false" });
+  });
+
+  it("reads a stored Grace that no longer fits as 7 days, and purging on", () => {
+    expect(resolveEnvironment({ revision: 3, settings: { graceDays: 0, sweepPurges: "1" } })).toMatchObject({ graceDays: 7, sweepPurges: true });
+    expect(resolveEnvironment({ revision: 3, settings: { graceDays: 30, sweepPurges: false } })).toMatchObject({ graceDays: 30, sweepPurges: false });
   });
 
   it("refuses a size it does not offer, an unknown setting and an empty change, with the setting named", () => {

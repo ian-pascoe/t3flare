@@ -29,9 +29,10 @@ export type EnvironmentValue = SettingValue | Readonly<Record<string, string>>;
 
 /**
  * A setting's Change tier rule (ADR-0035 §3, plan D5): `free` in either direction; `down-free` free when a boolean is
- * set to false or an integer lowered, asked the other way. Absent: every change to it is asked.
+ * set to false or an integer lowered, asked the other way; `up-free` free when an integer is raised, asked when it is
+ * lowered (ADR-0043 §6: the Grace, which destroys sooner when shorter). Absent: every change to it is asked.
  */
-export type SettingTier = "free" | "down-free";
+export type SettingTier = "free" | "down-free" | "up-free";
 
 export interface SettingEntry {
   readonly title: string;
