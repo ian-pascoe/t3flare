@@ -17,11 +17,11 @@
 // own Access identity passes, never the stage's service token, which CI also holds.
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
 import type * as CliTokenManager from "t3/src/cloud/CliTokenManager.ts";
 import { cloudCliOAuthConfig, relayUrlConfig } from "t3/src/cloud/publicConfig.ts";
 
 import { ADMIN_CALLER_HEADER } from "../access.ts";
+import { decodeJsonObject } from "../platform/json.ts";
 import type { EnvironmentDO } from "../environmentDO.ts";
 import { Connect, type ConnectError } from "./service.ts";
 
@@ -57,8 +57,6 @@ const parseToken = (body: unknown): CliTokenManager.PersistedToken | undefined =
   if (typeof accessToken !== "string" || typeof refreshToken !== "string" || typeof expiresAtEpochMs !== "number") return undefined;
   return { accessToken, refreshToken, expiresAtEpochMs };
 };
-
-const decodeJsonObject = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)));
 
 const probe = Effect.gen(function* () {
   const relayUrl = yield* relayUrlConfig;

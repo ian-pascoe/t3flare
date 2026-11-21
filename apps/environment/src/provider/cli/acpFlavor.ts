@@ -23,6 +23,8 @@ import * as Effect from "effect/Effect";
 import type * as EffectAcpSchema from "effect-acp/compat";
 import type * as EffectAcpErrors from "effect-acp/errors";
 
+import { workersLog } from "../../platform/workersLog.ts";
+
 export type AcpCli = "claude" | "opencode";
 
 /** The asking mode each agent is pinned to (plan §5.1). */
@@ -164,8 +166,7 @@ export const guardedRuntime = (cli: AcpCli, runtime: Runtime): Runtime => {
     setMode: (modeId) =>
       Effect.gen(function* () {
         if (modeId !== CLAUDE_AUTO_MODE || (yield* offersMode(modeId))) return yield* runtime.setMode(modeId);
-        // @effect-diagnostics-next-line globalConsoleInEffect:off globalJsonInEffect:off -- a structured Workers log line (its JSON shape is what the logs are queried by); plain data, so stringify cannot throw
-        console.warn(JSON.stringify({ t3flare: "acp-auto-unavailable", cli, fallback: PINNED_MODE[cli] }));
+        workersLog("warn", { t3flare: "acp-auto-unavailable", cli, fallback: PINNED_MODE[cli] });
         return yield* runtime.setMode(PINNED_MODE[cli]);
       }),
     prompt: (payload, options) =>

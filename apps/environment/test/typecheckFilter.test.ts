@@ -2,7 +2,7 @@
 // files that only this program's configuration sees.
 import { describe, expect, it } from "vitest";
 
-import { parseDiagnostics, T3_ERRORS_COUNT, t3ErrorsHeading, typecheckVerdict } from "../scripts/lib/typecheckFilter.ts";
+import { packagePath, parseDiagnostics, T3_ERRORS_COUNT, t3ErrorsHeading, typecheckVerdict, workerdOwnership } from "../scripts/lib/typecheckFilter.ts";
 
 const cwd = "/repo/apps/environment";
 const t3Root = "/repo/t3code";
@@ -63,6 +63,21 @@ describe("the typecheck's verdict", () => {
     expect(verdict.t3Errors.map((d) => d.text)).toEqual([T3_ERROR]);
     expect(typecheckVerdict(2, `${OUR_ERROR}\n`, cwd, t3Root, isOurs)).toMatchObject({ ok: true });
     expect(typecheckVerdict(2, `${OUR_ERROR}\n${workerdError}\n`, cwd, t3Root, isOurs)).toMatchObject({ ok: false });
+  });
+
+  it("judges the workerd program's files on the resolved path, however the compiler prints it", () => {
+    for (const file of ["test/stateStore.workerd.test.ts", "./test/stateStore.workerd.test.ts", `${cwd}/test/stateStore.workerd.test.ts`, "test\\stateStore.workerd.test.ts"]) {
+      expect(packagePath(file, cwd)).toBe("test/stateStore.workerd.test.ts");
+      expect(typecheckVerdict(2, `${file}(3,1): error TS2322: no.\n`, cwd, t3Root, workerdOwnership)).toMatchObject({ ok: false, ours: [{ file }] });
+    }
+    for (const file of ["src/shims/node-fs.ts", "./src/shims/node-fs.ts", `${cwd}/src/shims/node-fs.ts`]) {
+      expect(typecheckVerdict(2, `${file}(18,54): error TS18046: no.\n`, cwd, t3Root, workerdOwnership)).toMatchObject({ ok: true, ours: [], elsewhereErrors: [{ file }] });
+    }
+  });
+
+  it("fails on an error in a file the program cannot place", () => {
+    const outside = "../../packages/harness-registry/src/index.ts(1,1): error TS2322: no.";
+    expect(typecheckVerdict(2, `${outside}\n${T3_ERROR}\n`, cwd, t3Root, workerdOwnership)).toMatchObject({ ok: false, reason: expect.stringMatching(/no program owns/) });
   });
 
   it("counts a file as t3's only inside the submodule", () => {

@@ -58,6 +58,7 @@ import { refreshOnEndpointsChanged } from "../../endpoints/changes.ts";
 import type { ModelEndpoints } from "@t3flare/models/endpoints";
 import { CliSpawn, CliTurn, type CliSessions, wrapCliAdapter } from "./wrapper.ts";
 import { relayUrl } from "../../agents/cliProfiles.ts";
+import { workersLog } from "../../platform/workersLog.ts";
 
 export type AcpCliDriverEnv =
   | ChildProcessSpawner.ChildProcessSpawner
@@ -118,8 +119,7 @@ const spawnRuntime = (cli: AcpCli) => (input: AcpAdapterV2RuntimeInput) =>
         requestLogger: (event) =>
           Effect.andThen(
             LIFECYCLE.has(event.method) && event.status !== "started"
-              // @effect-diagnostics-next-line globalConsoleInEffect:off globalJsonInEffect:off -- a structured Workers log line (its JSON shape is what the logs are queried by); plain data, so stringify cannot throw
-              ? Effect.sync(() => console.log(JSON.stringify({ t3flare: "acp-request", cli, method: event.method, status: event.status })))
+              ? Effect.sync(() => workersLog("log", { t3flare: "acp-request", cli, method: event.method, status: event.status }))
               : Effect.void,
             options.requestLogger?.(event) ?? Effect.void,
           ),

@@ -43,6 +43,7 @@ import { cliSnapshotForCwdOf } from "../skills.ts";
 import { CLI_BUILT_IN_COMMANDS } from "./builtInCommands.ts";
 import { t3McpForCli } from "./relayedMcp.ts";
 import { type CliSession, type CliSessions, sessionFor, wrapCliAdapter } from "./wrapper.ts";
+import { workersLog } from "../../platform/workersLog.ts";
 
 export const CODEX_DRIVER = ProviderDriverKind.make("codex");
 
@@ -92,15 +93,14 @@ export const guardClient = (client: CodexClient.CodexAppServerClient["Service"],
   const guarded = <A, E>(method: string, params: unknown, send: (params: never) => Effect.Effect<A, E>) => {
     const answer = guardRequest(method, params, context());
     if ("refused" in answer) {
-      console.warn(JSON.stringify({ t3flare: "codex-request-refused", method }));
+      workersLog("warn", { t3flare: "codex-request-refused", method });
       return Effect.fail(refusedError(method, answer.refused));
     }
     const opened = send(answer.params as never);
     const sent = THREAD_OPENERS.has(method) ? opened.pipe(Effect.tap((result) => Effect.sync(() => remember(result)))) : opened;
     if (method === "turn/start") {
       // SPI-1167: a turn Codex refuses to start names why in the Environment's log (t3 shows a generic failure).
-      // @effect-diagnostics-next-line globalConsoleInEffect:off globalJsonInEffect:off -- a structured Workers log line (its JSON shape is what the logs are queried by); plain data, so stringify cannot throw
-      return sent.pipe(Effect.tapError((error) => Effect.sync(() => console.warn(JSON.stringify({ t3flare: "codex-turn-start-failed", error: String(error).slice(0, 300) })))));
+      return sent.pipe(Effect.tapError((error) => Effect.sync(() => workersLog("warn", { t3flare: "codex-turn-start-failed", error: String(error).slice(0, 300) }))));
     }
     // The resume proof (M5): Codex resumed this native thread itself, not a handoff.
     if (method !== "thread/resume") return sent;

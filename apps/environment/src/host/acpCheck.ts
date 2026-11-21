@@ -6,18 +6,15 @@
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 
 import { spawn } from "../agents/processRouter.ts";
+import { decodeJsonObject } from "../platform/json.ts";
 import { countMarker } from "./processCheck.ts";
 
 const encoder = new TextEncoder();
-
-/** One stdout line as a JSON object, or none. */
-const decodeJsonObject = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)));
 
 export interface AcpCheckInput {
   readonly cli: "claude" | "opencode";

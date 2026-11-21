@@ -7,14 +7,14 @@
 import { spawnSync } from "node:child_process";
 import * as path from "node:path";
 
-import { type Diagnostic, t3ErrorsHeading, typecheckVerdict } from "./lib/typecheckFilter.ts";
+import { type Diagnostic, type Ownership, t3ErrorsHeading, typecheckVerdict, workerdOwnership } from "./lib/typecheckFilter.ts";
 
 const cwd = path.resolve(import.meta.dirname, "..");
 const t3Root = path.resolve(cwd, "../../t3code");
 
-const programs: ReadonlyArray<{ readonly project: string; readonly isOurs?: (file: string) => boolean }> = [
+const programs: ReadonlyArray<{ readonly project: string; readonly isOurs?: Ownership }> = [
   { project: "tsconfig.json" },
-  { project: "test/tsconfig.workerd.json", isOurs: (file) => /^test\/(.+\.workerd\.test|workerd\.fixture)\.ts$/.test(file) },
+  { project: "test/tsconfig.workerd.json", isOurs: workerdOwnership },
 ];
 
 let ok = true;

@@ -49,6 +49,7 @@ import type { ChannelProcess } from "../../agents/processChannel.ts";
 import { type CliAnswer, type CliAsk, registerCliAsker } from "./cliAsk.ts";
 import { takeEnvironmentSkillsAt } from "./environmentSkillsTake.ts";
 import { failureOf, withRelayFailure } from "./relayFailure.ts";
+import { workersLog } from "../../platform/workersLog.ts";
 
 /** ADR-0015: a CLI turn longer than this ends its process. */
 export const TURN_CAP_MS = 2 * 60 * 60_000;
@@ -364,8 +365,7 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               session.capFiber = yield* Effect.sleep(TURN_CAP_MS).pipe(
                 Effect.andThen(
                   Effect.sync(() => {
-                    // @effect-diagnostics-next-line globalConsoleInEffect:off globalJsonInEffect:off -- a structured Workers log line (its JSON shape is what the logs are queried by); plain data, so stringify cannot throw
-                    console.warn(JSON.stringify({ t3flare: "cli-turn-cap", providerSessionId: input.providerSessionId, key: session.process?.key ?? null }));
+                    workersLog("warn", { t3flare: "cli-turn-cap", providerSessionId: input.providerSessionId, key: session.process?.key ?? null });
                     session.process?.kill();
                   }),
                 ),

@@ -12,8 +12,8 @@
 //   boot and at the next press. A failed run's reason and URL go to the client as `ready` again, with its original `at`
 //   and a failed `updateOutcome` (ServerLifecycleEvents replays the newest `ready` to every subscriber).
 import { ServerSelfUpdateError, type ServerLifecycleStreamEvent, type ServerSelfUpdateOutcome } from "@t3tools/contracts";
-import * as Duration from "effect/Duration";
 import * as Clock from "effect/Clock";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
