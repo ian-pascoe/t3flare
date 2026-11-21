@@ -114,6 +114,8 @@ publishes a prebuilt image ([ADR-0040](docs/adr/0040-the-workspace-image-is-buil
 - Vulnerabilities: privately, as [`SECURITY.md`](SECURITY.md) says, never in a public issue.
 - Changes: [`CONTRIBUTING.md`](CONTRIBUTING.md). Everyone taking part follows the
   [Code of Conduct](CODE_OF_CONDUCT.md).
+- Funding: sponsor [@ian-pascoe](https://github.com/sponsors/ian-pascoe) or
+  [@spiritledsoftware](https://github.com/sponsors/spiritledsoftware) on GitHub Sponsors.
 
 ## Documentation
 
