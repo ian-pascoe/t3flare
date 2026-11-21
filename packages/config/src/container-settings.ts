@@ -265,7 +265,7 @@ export const MAX_VARIABLE_VALUE_LENGTH = 4096;
 
 /**
  * The names a variable may not have: what the Container sets for every command itself (`toolchainEnv` in
- * `@cloudpid/sandbox-image/toolchains`, which this package cannot import: a test there checks each of its names is here,
+ * `@t3flare/sandbox-image/toolchains`, which this package cannot import: a test there checks each of its names is here,
  * and what computerd starts a command with),
  * which a variable would otherwise override, and `CLOUDPID_`'s prefix, which is cloudpid's own.
  */

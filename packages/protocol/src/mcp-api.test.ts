@@ -33,7 +33,6 @@ import {
 // The helper feeds malformed and future members to a schema, which is what it tests.
 const read = <S extends Schema.Top & { readonly DecodingServices: never }>(
   schema: S,
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters
   input: unknown,
 ) => Effect.runSync(Schema.decodeUnknownEffect(schema)(input));
 

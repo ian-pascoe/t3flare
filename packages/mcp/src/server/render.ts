@@ -9,7 +9,7 @@ import type {
   McpSessionOrigin,
   McpSessionSummary,
   WaitingRequest,
-} from "@cloudpid/protocol/mcp-api";
+} from "@t3flare/protocol/mcp-api";
 import type {
   EnvironmentsListResult,
   SessionGetResult,
@@ -23,7 +23,7 @@ import type {
   SessionStopResult,
   SessionTranscriptResult,
   SessionWaitResult,
-} from "@cloudpid/protocol/mcp-tools";
+} from "@t3flare/protocol/mcp-tools";
 import * as Arr from "effect/Array";
 import * as Match from "effect/Match";
 import * as Record from "effect/Record";

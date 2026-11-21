@@ -3,12 +3,12 @@
  * server says, never a key, a number or the engine's own fields, and never a name, which is left out instead.
  */
 // @effect-diagnostics asyncFunction:off preferEffectArray:off schemaSync:off globalDate:off
-import { type FakeServer, fetchTo, hostileServer, modernServer } from "@cloudpid/mcp/testing";
+import { type FakeServer, fetchTo, hostileServer, modernServer } from "@t3flare/mcp/testing";
 import {
   type McpEngineRequestEncoded,
   McpEngineDiscoverResult,
   McpEngineRequestResult,
-} from "@cloudpid/mcp/types";
+} from "@t3flare/mcp/types";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";

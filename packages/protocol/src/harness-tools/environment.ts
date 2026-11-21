@@ -4,7 +4,7 @@
 // sentences name neither this Session's own Environment nor a tool the endpoint does not serve, whose `environment_get`
 // takes `field` and `offset`, and whose values are cut harder (`packages/extensions/src/environment-reads.ts`).
 // @effect-diagnostics missingPipeableSignature:off
-import { MAX_VARIABLES } from "@cloudpid/config";
+import { MAX_VARIABLES } from "@t3flare/config";
 import * as Schema from "effect/Schema";
 import {
   ENVIRONMENT_FIELD_WORDS,

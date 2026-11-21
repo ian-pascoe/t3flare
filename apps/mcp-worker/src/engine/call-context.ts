@@ -5,7 +5,7 @@
  * `auth` asks the host, and every token it gives is remembered so the result can be scrubbed of it.
  */
 // @effect-diagnostics globalFetch:off -- the engine reaches remote servers with the Worker's own `fetch`, under the core's tap.
-import type { McpDeps, RowStore } from "@cloudpid/mcp";
+import type { McpDeps, RowStore } from "@t3flare/mcp";
 import {
   MCP_PROGRESS_PER_SECOND,
   McpInputAnswer,
@@ -17,7 +17,7 @@ import {
   type McpInputRequest,
   type McpLogEntry,
   type McpProgress,
-} from "@cloudpid/mcp/types";
+} from "@t3flare/mcp/types";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";

@@ -7,7 +7,7 @@ import {
   ModelCatalog,
   Settings,
   SettingsError,
-} from "@cloudpid/config";
+} from "@t3flare/config";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Rpc from "effect/rpc/Rpc";
@@ -401,7 +401,7 @@ export const SettingsState = Schema.Struct({
   /** The part of `problem` that lies in an MCP server's entry, structured; left out with none, or by an older Registry. */
   mcpProblems: McpSettingsProblem.pipe(Schema.Array, Schema.optionalKey),
   /**
-   * By field (`@cloudpid/config` → `overrideFields`: `model`, `roles.small`, `extensions.<extension>.<key>`), the
+   * By field (`@t3flare/config` → `overrideFields`: `model`, `roles.small`, `extensions.<extension>.<key>`), the
    * Environments that override it, newest first, so a change at Global does nothing for them. A field none overrides
    * is left out.
    */
@@ -501,7 +501,7 @@ export const MAX_AGENT_CHANGES = 200;
 
 /**
  * The scope of the Settings' Agent changes, where an Environment's are kept under its id (`default`, or eight hex
- * digits). A change's `field` is then a settings field (`settingsFieldPath` in `@cloudpid/config`).
+ * digits). A change's `field` is then a settings field (`settingsFieldPath` in `@t3flare/config`).
  */
 export const SETTINGS_SCOPE = "settings";
 

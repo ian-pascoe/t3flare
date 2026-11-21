@@ -15,7 +15,7 @@ import {
   MAX_IGNORE_PATTERNS,
   MAX_SCRIPT_BYTES,
   MAX_TOOLCHAINS_BYTES,
-} from "@cloudpid/config";
+} from "@t3flare/config";
 import * as Arr from "effect/Array";
 import * as Schema from "effect/Schema";
 import {

@@ -2,7 +2,7 @@
 // `structuredContent` carries, and the `api` operation that serves it. Effect Schemas shared by `McpServer` (which turns
 // them into the SDK's tool definitions) and `packages/pi-cloudpid`. The four read tools come first; the rest join as their
 // operations do. Nothing here imports the MCP SDK or a Worker API.
-import { THINKING_LEVELS } from "@cloudpid/config";
+import { THINKING_LEVELS } from "@t3flare/config";
 import * as Schema from "effect/Schema";
 import {
   DEFAULT_SESSIONS_PAGE,

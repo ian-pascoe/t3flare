@@ -49,7 +49,6 @@ const declared = (server: FakeServer) => {
   return (
     initialize?.rpc?.params?.["capabilities"] ??
     // SAFETY: the SDK's own `_meta`, a JSON object whose capabilities key is read here.
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- a JSON object read by one key.
     (meta as Record<string, unknown> | undefined)?.["io.modelcontextprotocol/clientCapabilities"]
   );
 };

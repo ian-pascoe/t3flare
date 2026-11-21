@@ -1,6 +1,6 @@
 // SHA-256, synchronous and pure, in a module of its own that imports only `effect/Array`: the MCP keys
 // (`mcp-connection.ts`) hash with it inside Durable Object transactions, and the main Worker's props import it
-// (`@cloudpid/config/sha256`, for the Self-use redirect URI) without the rest of this package, which the Worker's global
+// (`@t3flare/config/sha256`, for the Self-use redirect URI) without the rest of this package, which the Worker's global
 // scope must not evaluate (`docs/development/workers.md` → Startup).
 // @effect-diagnostics missingPipeableSignature:off -- a hash of a string, not a combinator.
 import * as Arr from "effect/Array";

@@ -20,14 +20,14 @@
  *   (`docs/architecture/mcp-in-a-session.md` → Resource watches, Stdio).
  */
 // @effect-diagnostics asyncFunction:off newPromise:off missingPipeableSignature:off globalTimers:off -- the bridge is reached with Promises, over Requests and Responses, and a status read is bounded by a timer.
-import type { McpDeps } from "@cloudpid/mcp";
+import type { McpDeps } from "@t3flare/mcp";
 import {
   Cut,
   MCP_CONTAINER_STOPPED_CUT,
   type McpEngineStdioTarget,
   Unreachable,
   Unsupported,
-} from "@cloudpid/mcp/types";
+} from "@t3flare/mcp/types";
 import {
   MCP_BRIDGE_CONFIG_HEADER,
   MCP_BRIDGE_CONTAINER_HEADER,
@@ -40,7 +40,7 @@ import {
   mcpBridgeConfigHeader,
   mcpBridgeKey,
   mcpBridgeRefusalCode,
-} from "@cloudpid/sandbox-image/mcp-bridge";
+} from "@t3flare/sandbox-image/mcp-bridge";
 import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";

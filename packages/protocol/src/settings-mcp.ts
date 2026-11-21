@@ -15,7 +15,7 @@ import type {
   McpResolvedServer,
   McpSource,
   McpWidening,
-} from "@cloudpid/config";
+} from "@t3flare/config";
 import type * as Schema from "effect/Schema";
 import type { McpRepoFileView } from "./mcp-repo-files.ts";
 

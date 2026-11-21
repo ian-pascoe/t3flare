@@ -5,7 +5,7 @@
 // the owner as `environment_container_size_limit_set` does (`./approvals.ts`) and answers `pending`; every other setting
 // is reset at once.
 // @effect-diagnostics missingPipeableSignature:off
-import { CONTAINER_SETTING_NAMES, type ContainerSettings } from "@cloudpid/config";
+import { CONTAINER_SETTING_NAMES, type ContainerSettings } from "@t3flare/config";
 import * as Arr from "effect/Array";
 import * as Schema from "effect/Schema";
 import { ApprovalRequestFields } from "./approvals.ts";

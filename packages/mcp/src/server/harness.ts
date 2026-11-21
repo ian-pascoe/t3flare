@@ -1,6 +1,6 @@
 /**
  * The management tools as the SDK is given them (`docs/architecture/mcp-endpoint.md` → Environment and Settings tools →
- * The dispatcher and `describe().harness`): each tool the shared declarations (`@cloudpid/protocol/harness-tools`) know,
+ * The dispatcher and `describe().harness`): each tool the shared declarations (`@t3flare/protocol/harness-tools`) know,
  * offered only when `describe().harness` lists it. `McpServer` knows a tool's name, description, schemas and annotations;
  * the main Worker's `harness` operation runs its core and answers `{text, structured}`. This wraps them as the session tools'
  * are: the text is the core's (the same words as in a Session, cut for the endpoint) with the `next` sentence added as its
@@ -19,14 +19,14 @@ import {
   type HarnessToolName,
   isApprovalFollowTool,
   MAX_PAGE_CHARS,
-} from "@cloudpid/protocol/harness-tools";
+} from "@t3flare/protocol/harness-tools";
 import {
   ApiResult,
   apiFailure,
   ApprovalState,
   HarnessAnswer,
   harnessServed,
-} from "@cloudpid/protocol/mcp-api";
+} from "@t3flare/protocol/mcp-api";
 import * as Arr from "effect/Array";
 import type * as Exit from "effect/Exit";
 import * as Option from "effect/Option";

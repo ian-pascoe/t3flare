@@ -7,7 +7,7 @@ import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import * as Struct from "effect/Struct";
-import { ModelId, ThinkingLevel } from "@cloudpid/config";
+import { ModelId, ThinkingLevel } from "@t3flare/config";
 import { ApprovalStateOutput } from "./harness-tools/approvals.ts";
 import { openLiterals } from "./open-literals.ts";
 import { WhenBusy } from "./session.ts";
@@ -348,7 +348,7 @@ export type HarnessRequest = typeof HarnessRequest.Type;
 
 /**
  * What `harness` answers: the tool's result text and its structured value, which `McpServer` only wraps. The structured
- * value is a flat object (`@cloudpid/protocol/harness-tools`), so both MCP lanes carry the same shape.
+ * value is a flat object (`@t3flare/protocol/harness-tools`), so both MCP lanes carry the same shape.
  */
 export const HarnessAnswer = Schema.Struct({
   text: Schema.String,

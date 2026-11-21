@@ -8,8 +8,8 @@
 // @effect-diagnostics globalJsonInEffect:off -- a server's answer, already decoded by the SDK, serialized to bytes once.
 // @effect-diagnostics globalTimers:off -- a stream's expiry timer, in the invocation that made it.
 // @effect-diagnostics missingPipeableSignature:off -- `byteStream` is a plain function over bytes, not a combinator.
-import type { ListItems, ListKind, McpConnection } from "@cloudpid/mcp";
-import { McpErrorWire, type McpEngineValue, ProtocolViolation } from "@cloudpid/mcp/types";
+import type { ListItems, ListKind, McpConnection } from "@t3flare/mcp";
+import { McpErrorWire, type McpEngineValue, ProtocolViolation } from "@t3flare/mcp/types";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { STREAM_HOLD_MS } from "./budget.ts";

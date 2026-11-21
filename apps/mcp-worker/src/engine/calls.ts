@@ -1,5 +1,5 @@
 /**
- * What `McpEngine`'s methods do, over `@cloudpid/mcp` (`docs/architecture/mcp-connections.md` → The engine; #382 D1,
+ * What `McpEngine`'s methods do, over `@t3flare/mcp` (`docs/architecture/mcp-connections.md` → The engine; #382 D1,
  * D9, D13.2). Each call connects from the host's `prior` rows and its hooks, does its work, and returns its result
  * with the rows it changed, encoded for RPC; it keeps nothing once it ends.
  *
@@ -23,7 +23,7 @@ import {
   type McpConnection,
   type McpConnectionStats,
   type McpTarget,
-} from "@cloudpid/mcp";
+} from "@t3flare/mcp";
 import {
   Cut,
   MCP_CLIENT_CREDENTIALS_CAPABILITY,
@@ -60,7 +60,7 @@ import {
   type McpToolProblem,
   ServerError,
   Unsupported,
-} from "@cloudpid/mcp/types";
+} from "@t3flare/mcp/types";
 import * as Arr from "effect/Array";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";

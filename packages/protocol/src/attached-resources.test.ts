@@ -96,7 +96,6 @@ describe("a resource's label and its refusal", () => {
 
 /** An owner's entry as the Session places it, with the block the model got. */
 const entry = (resources: ReadonlyArray<object>, parts: ReadonlyArray<object>): EntryRecord =>
-  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: the fields of an entry the projection reads.
   ({
     id: 5,
     kind: USER_ENTRY_KIND,

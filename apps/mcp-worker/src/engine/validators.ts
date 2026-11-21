@@ -14,8 +14,8 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import type { McpConnection } from "@cloudpid/mcp";
-import type { McpStructuredOutput, McpToolDefinition, McpToolProblem } from "@cloudpid/mcp/types";
+import type { McpConnection } from "@t3flare/mcp";
+import type { McpStructuredOutput, McpToolDefinition, McpToolProblem } from "@t3flare/mcp/types";
 import { Compile, type Validator, type XSchema } from "typebox/schema";
 import { Settings } from "typebox/system";
 

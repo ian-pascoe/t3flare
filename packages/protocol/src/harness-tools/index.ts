@@ -2,7 +2,7 @@
 // Environment and Settings tools → Shared definitions and the core/wrapper split): each tool's name,
 // annotations, and, for the Session surface and the endpoint surface, its description, input schema and output schema.
 // `packages/extensions` builds each tool's core and wrapper from one declaration, and `McpServer` turns the endpoint's
-// into MCP tool definitions. This subpath imports only `effect`, `@cloudpid/config` and its own files, so McpWorker can
+// into MCP tool definitions. This subpath imports only `effect`, `@t3flare/config` and its own files, so McpWorker can
 // import it without pi-durable (`packages/protocol/.oxlintrc.json`).
 //
 // The tools join `HARNESS_TOOLS` as the stage that serves them declares them. The Self-use rule reads its names: the

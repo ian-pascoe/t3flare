@@ -25,7 +25,6 @@ const annotation: Annotation = {
 const reviewEntry = (summary: string): EntryRecord => {
   const { markdown, data } = renderReview([annotation]);
 
-  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: the fields of an entry the projection reads.
   return {
     id: 7,
     kind: USER_ENTRY_KIND,
@@ -73,7 +72,6 @@ describe("a Review in the transcript", () => {
 
     const { markdown, data } = renderReview([annotation, page]);
 
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: the fields of an entry the projection reads.
     const entry = {
       id: 8,
       kind: USER_ENTRY_KIND,
@@ -110,7 +108,6 @@ describe("a Review in the transcript", () => {
 
 describe("App messages in the transcript", () => {
   const entryWith = (app: ReadonlyArray<object> | string, typed: string): EntryRecord =>
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: the fields of an entry the projection reads.
     ({
       id: 3,
       kind: USER_ENTRY_KIND,
@@ -169,7 +166,6 @@ describe("a Trigger's webhook payload in the transcript", () => {
   });
 
   const entry = (data: { readonly triggerPayload: unknown }): EntryRecord =>
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: the fields of an entry the projection reads.
     ({
       id: 3,
       kind: USER_ENTRY_KIND,

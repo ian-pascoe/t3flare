@@ -19,8 +19,8 @@ const check = process.argv.includes("--check");
 
 // The t3 packages we import; their workspace dependencies are added transitively.
 const T3_ROOTS = ["t3", "@t3tools/web"];
-// Our own workspace globs, vendored packages included (vendor/cloudpid/README.md).
-const OUR_WORKSPACES = ["apps/*", "packages/*", "vendor/cloudpid/*", "infra"];
+// Our own workspace globs.
+const OUR_WORKSPACES = ["apps/*", "packages/*", "infra"];
 
 // t3's top-level settings, by how they reach our root. Anything else fails the script.
 const COPIED = [
@@ -37,9 +37,6 @@ const ADJUSTED = ["packages", "patchedDependencies", "allowBuilds"] as const;
 
 // Ours, merged into t3's overrides.
 const OUR_OVERRIDES: Record<string, string> = {
-  // The vendored packages ask for each other as "*" (vendor/ is not edited); pnpm would fetch those from the registry.
-  "@cloudpid/protocol": "workspace:*",
-  "@cloudpid/config": "workspace:*",
   // Our core packages stay where Bun's per-name pins held them (plan §2.6's no-move rule; steps-evidence-1:docs/steps/pnpm/lock-diff.ts).
   // wrangler and miniflare (tests only) ask for a newer workerd; the deploy uses @alchemy.run/cloudflare-runtime's.
   workerd: "1.20261026.1",

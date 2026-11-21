@@ -8,7 +8,7 @@
 // `pending`, so these tools' endpoint output gains the request's optional keys (`McpChangeAskOutput`); one that narrows is
 // made at once. The endpoint's words name the owner.
 // @effect-diagnostics missingPipeableSignature:off
-import { MCP_EXPOSURES } from "@cloudpid/config";
+import { MCP_EXPOSURES } from "@t3flare/config";
 import * as Schema from "effect/Schema";
 import { ApprovalRequestFields } from "./approvals.ts";
 import { ChangeEndpointOutput, ChangeOutput } from "./change-output.ts";

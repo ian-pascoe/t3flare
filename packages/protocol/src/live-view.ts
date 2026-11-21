@@ -2,7 +2,7 @@
 // The names a Browser Handoff's Live View is known by on both sides of the Session socket (`docs/architecture/browser.md`):
 // its Pane's key and the query that opens it, and the words `live_view` fails with once the handoff is over; and the
 // words `owner_tab_view` fails with when the Browser Pane's Owner tab is gone. No imports, so the browser host's Worker
-// can take this module alone (`@cloudpid/protocol/live-view`).
+// can take this module alone (`@t3flare/protocol/live-view`).
 
 /** What `live_view` fails with once its handoff has ended (or for a handoff the Session does not have), exactly. */
 export const LIVE_VIEW_HANDOFF_OVER = "the handoff is over";

@@ -1,5 +1,5 @@
 {
-  "extends": "@cloudpid/config/tsconfig/base.json",
+  "extends": "@t3flare/config/tsconfig/base.json",
   "compilerOptions": { "erasableSyntaxOnly": true, "types": ["@cloudflare/workers-types", "node"] },
   "include": ["src", "test", "*.ts"]
 }

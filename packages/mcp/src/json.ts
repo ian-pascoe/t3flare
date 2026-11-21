@@ -1,5 +1,5 @@
 // JSON values as the host and the core read them: the JSON object's Schema and type, and a guard for one, so every
-// reader tells one from an array and from `null` the same way. SDK-free, so `@cloudpid/mcp/types` exports them.
+// reader tells one from an array and from `null` the same way. SDK-free, so `@t3flare/mcp/types` exports them.
 import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";

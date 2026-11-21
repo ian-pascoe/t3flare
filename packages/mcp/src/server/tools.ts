@@ -5,7 +5,7 @@
  * with their operations, the four import tools (for programs, never a model) last. `McpServer` owns all of this, and the main Worker's `api` none of it.
  */
 // @effect-diagnostics preferEffectArray:off missingPipeableSignature:off -- short plain lists of sentences and tool specs.
-import type { HarnessToolName } from "@cloudpid/protocol/harness-tools";
+import type { HarnessToolName } from "@t3flare/protocol/harness-tools";
 import {
   type ApiDescription,
   ApiResult,
@@ -17,7 +17,7 @@ import {
   type McpApi,
   type McpToolName,
   type Via,
-} from "@cloudpid/protocol/mcp-api";
+} from "@t3flare/protocol/mcp-api";
 import {
   MCP_TOOL_OPERATIONS,
   EnvironmentsListInput,
@@ -44,7 +44,7 @@ import {
   SessionTranscriptResult,
   SessionWaitInput,
   SessionWaitResult,
-} from "@cloudpid/protocol/mcp-tools";
+} from "@t3flare/protocol/mcp-tools";
 import type * as Exit from "effect/Exit";
 import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";

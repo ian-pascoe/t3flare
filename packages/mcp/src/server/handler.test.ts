@@ -7,14 +7,14 @@ import {
   HARNESS_TOOLS,
   type HarnessToolName,
   MAX_PAGE_CHARS,
-} from "@cloudpid/protocol/harness-tools";
+} from "@t3flare/protocol/harness-tools";
 import {
   apiFailure,
   apiOk,
   MAX_MCP_RUNNING,
   MCP_API_LIMITS,
   MCP_TOOL_NAMES,
-} from "@cloudpid/protocol/mcp-api";
+} from "@t3flare/protocol/mcp-api";
 import type * as Schema from "effect/Schema";
 import { describe, expect, it, vi } from "vitest";
 import { clientOf } from "./caller.ts";

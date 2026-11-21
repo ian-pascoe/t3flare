@@ -1,5 +1,5 @@
 /**
- * `McpHost`'s RPC types, re-exported by `@cloudpid/mcp/types` (`docs/architecture/mcp-connections.md` → RPC, Storage;
+ * `McpHost`'s RPC types, re-exported by `@t3flare/mcp/types` (`docs/architecture/mcp-connections.md` → RPC, Storage;
  * `docs/architecture/mcp-configuration.md` → From the Registry to the host). Like everything in `./types`, this never
  * loads the SDK.
  *
@@ -37,7 +37,7 @@ export type McpSetSource = typeof McpSetSource.Type;
 /**
  * One MCP server of the set as the Registry hands it over: its entry in force with every default applied and `${NAME}`
  * unresolved (so no resolved value is here, in a hash, or in the host's storage), and three hashes of it, which the
- * Registry computes with `@cloudpid/config` so the host never needs to.
+ * Registry computes with `@t3flare/config` so the host never needs to.
  */
 export const McpSetEntry = Schema.Struct({
   /** The name as the entry spells it. */
@@ -266,7 +266,6 @@ const OtherHostFailureFromWire = Schema.Struct({
           tag: _tag,
         }),
       // The wire shape: the tag it came with, or `HostFailed` when it had none of its own.
-      // oxlint-disable-next-line anti-slop-effect/no-manual-tagged-construction -- the encoded side is a plain wire object
       encode: ({ message, tag }) => ({ _tag: tag ?? "HostFailed", message }),
     }),
   ),

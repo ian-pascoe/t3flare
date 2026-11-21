@@ -1,4 +1,4 @@
-import type { McpBridgeOptions } from "@cloudpid/sandbox-image/mcp-bridge";
+import type { McpBridgeOptions } from "@t3flare/sandbox-image/mcp-bridge";
 import type { RpcTarget } from "cloudflare:workers";
 
 /** The name `Server` binds `McpWorker`'s `McpEngine` entrypoint under, for `McpHost` (ADR-0038). */

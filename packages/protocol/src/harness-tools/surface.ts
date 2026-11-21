@@ -1,5 +1,5 @@
 // The two places a harness tool is served from (`docs/architecture/mcp-endpoint.md` → Environment and Settings tools →
-// Names and surfaces): a Session's own tools, and the MCP endpoint. Only `effect` and `@cloudpid/config` may be imported
+// Names and surfaces): a Session's own tools, and the MCP endpoint. Only `effect` and `@t3flare/config` may be imported
 // below `harness-tools/`, so that McpWorker can import the declarations without pi-durable (`packages/protocol/.oxlintrc.json`).
 // @effect-diagnostics missingPipeableSignature:off
 

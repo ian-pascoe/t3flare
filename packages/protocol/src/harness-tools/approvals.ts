@@ -7,7 +7,7 @@
 // MCP servers' definition tools (`settings_mcp_add`, `_update`, `_enable`) are here: they always ask. The ones that ask only
 // when they widen (`settings_mcp_exposure_set` and the others) keep their declarations in `./settings-mcp-changes.ts`.
 // @effect-diagnostics missingPipeableSignature:off
-import { InstanceType, MAX_INSTRUCTIONS_BYTES } from "@cloudpid/config";
+import { InstanceType, MAX_INSTRUCTIONS_BYTES } from "@t3flare/config";
 import * as Arr from "effect/Array";
 import * as Schema from "effect/Schema";
 import { NextField } from "./field-page.ts";

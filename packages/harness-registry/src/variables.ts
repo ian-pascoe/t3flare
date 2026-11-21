@@ -1,7 +1,7 @@
 // Variables (SPI-1152, ADR-0032's Variables refinement): plain `NAME=value` pairs every command in a Workspace starts
 // with, kept in the Environment settings. A Variable is agent-readable by definition, so it is never a credential
 // (ADR-0016 A′): the refusals below are guard rails for the owner, not a boundary against him. Limits as cloudpid's
-// (`@cloudpid/config`'s `container-settings.ts`, `variableNameProblem`).
+// (`@t3flare/config`'s `container-settings.ts`, `variableNameProblem`).
 
 /** The most Variables the Environment may have. */
 export const MAX_VARIABLES = 50;

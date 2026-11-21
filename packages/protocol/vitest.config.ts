@@ -1,3 +1,3 @@
-import config from "@cloudpid/config/vitest";
+import config from "@t3flare/config/vitest";
 
 export default config;

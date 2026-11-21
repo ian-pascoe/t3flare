@@ -19,7 +19,6 @@ interface Spec {
   readonly reserved: boolean;
 }
 
-// oxlint-disable-next-line anti-slop/no-known-value-widening -- looked up by the operator character of a template
 const OPERATORS: Readonly<Record<string, Spec>> = {
   "": { first: "", sep: ",", named: false, ifEmpty: "", reserved: false },
   "+": { first: "", sep: ",", named: false, ifEmpty: "", reserved: true },
@@ -112,7 +111,6 @@ export const uriTemplateVariables = (template: string): ReadonlyArray<UriTemplat
   const found = new Map<string, boolean>();
 
   for (const piece of piecesOf(template)) {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- a piece is a literal or an expression
     if (typeof piece === "string") continue;
 
     const optional = isOptionalOperator(piece.expression.operator);
@@ -189,7 +187,6 @@ export const expandUriTemplate = (
   let out = "";
 
   for (const piece of piecesOf(template)) {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- a piece is a literal or an expression
     if (typeof piece === "string") {
       out += piece;
       continue;

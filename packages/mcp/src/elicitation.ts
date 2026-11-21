@@ -5,7 +5,7 @@
  *
  * - **The question's shape:** `McpInputRequest` is what the core hands the call's `onInput`, `McpInputAnswer` what it
  *   gets back; an elicitation's answer is the spec's own `ElicitResult`.
- * - **The normalizer** makes cloudpid's own `ElicitationForm` (`@cloudpid/protocol`) of the server's `requestedSchema`,
+ * - **The normalizer** makes cloudpid's own `ElicitationForm` (`@t3flare/protocol`) of the server's `requestedSchema`,
  *   checking it against the spec's flat subset, its bounds and the credential rule, so the web never reads raw JSON
  *   Schema and a form that is malformed or asks for a credential is refused without being shown.
  * - **The validator** checks the owner's values against the form, in the web before Submit and again in the Session.
@@ -16,7 +16,7 @@ import {
   type ElicitationField,
   type ElicitationForm,
   type ElicitationOption,
-} from "@cloudpid/protocol";
+} from "@t3flare/protocol";
 import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
@@ -55,7 +55,7 @@ export const MCP_INTERNAL_ERROR = -32603;
 
 /**
  * The Protocol era of the server that asked a question: Legacy (`2025-11-25` or earlier) or Modern (`2026-07-28` or
- * later). The client protocol's own `McpEra` (`@cloudpid/protocol/mcp-api`) is an open set that adds `unknown`.
+ * later). The client protocol's own `McpEra` (`@t3flare/protocol/mcp-api`) is an open set that adds `unknown`.
  */
 export const McpEra = Schema.Literals(["legacy", "modern"]);
 

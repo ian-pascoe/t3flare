@@ -3,7 +3,7 @@
 // (a kind, a source, an outcome), so each reads a member it does not know as a fallback (`docs/development/workers.md` →
 // Bindings).
 // @effect-diagnostics globalDate:off missingPipeableSignature:off -- plain functions that format times in a zone.
-import { ThinkingLevel } from "@cloudpid/config";
+import { ThinkingLevel } from "@t3flare/config";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";

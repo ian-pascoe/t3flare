@@ -3,7 +3,7 @@
 //
 // Every answer only gains (`docs/architecture/mcp.md` → Deploys): a state is a string and one this build does not know
 // reads as `unknown` (`readMcpRepoFileState`); an answer of a tag this build does not know reads as `Unavailable`.
-import type { McpRepoLayer } from "@cloudpid/config";
+import type { McpRepoLayer } from "@t3flare/config";
 import * as Schema from "effect/Schema";
 import { McpNoEnvironment, McpUnavailable, OtherAnswerFromWire } from "./mcp-status.ts";
 

@@ -8,7 +8,7 @@
  * wraps it, and the conformance run serves it over `node:http`. Only this package imports the SDK.
  */
 // @effect-diagnostics asyncFunction:off preferEffectArray:off missingPipeableSignature:off missedPipeableOpportunity:off globalDate:off globalTimers:off -- Promise seams (fetch, RPC) over short native lists, and the timer of a call that waits.
-import { type ApiError, ApiDescription, apiFailure } from "@cloudpid/protocol/mcp-api";
+import { type ApiError, ApiDescription, apiFailure } from "@t3flare/protocol/mcp-api";
 import {
   type CallToolResult,
   createMcpHandler,
@@ -25,7 +25,7 @@ import {
   HARNESS_TOOL_NAMES,
   HARNESS_TOOLS,
   isApprovalFollowTool,
-} from "@cloudpid/protocol/harness-tools";
+} from "@t3flare/protocol/harness-tools";
 import * as Exit from "effect/Exit";
 import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
@@ -303,7 +303,6 @@ export const instructionsFor = (enabled: Enabled): string => {
 };
 
 /** An object schema with nothing to say about its members reads as one with none, which clients take without a fuss. */
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- the SDK's own type for a JSON Schema.
 const plain = (schema: Record<string, unknown>): Record<string, unknown> =>
   schema["not"] !== undefined && schema["properties"] === undefined
     ? { type: "object", properties: {} }

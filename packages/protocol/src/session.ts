@@ -3,7 +3,7 @@
 // Effect `Schema`: commands carry an optional `id` that a `result` or `error` answers, and every watched conversation
 // streams pi's conversation view (`view`) and then its operations (`ops`), which a client merges into its transcript
 // (`mirror.ts`) and pages with `entries`.
-import { InstanceType, ModelId, ThinkingLevel } from "@cloudpid/config";
+import { InstanceType, ModelId, ThinkingLevel } from "@t3flare/config";
 import { assertValidOp, type Op } from "@earendil-works/chord/delta";
 import type {
   ConversationView,
@@ -1356,7 +1356,7 @@ export const TaskGraphMessage = Schema.Struct({
   ...TaskGraphSummary.fields,
 });
 
-/** What a Container of one size costs per second, in US dollars (`containerRates` of `@cloudpid/config`). */
+/** What a Container of one size costs per second, in US dollars (`containerRates` of `@t3flare/config`). */
 export const ContainerRates = Schema.Struct({
   memory: Schema.Finite,
   disk: Schema.Finite,

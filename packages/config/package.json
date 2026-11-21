@@ -1,5 +1,5 @@
 {
-  "name": "@cloudpid/config",
+  "name": "@t3flare/config",
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
@@ -11,8 +11,8 @@
     "./tsconfig/base.json": "./tsconfig/base.json"
   },
   "scripts": {
-    "typecheck": "effect-tsgo tsrs",
-    "lint": "oxlint",
+    "typecheck": "effect-tsgo tsrs --noEmit",
+    "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives-severity error src vitest.config.ts",
     "test": "vitest run"
   },
   "dependencies": {

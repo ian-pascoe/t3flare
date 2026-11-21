@@ -12,14 +12,14 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@cloudpid/mcp": "workspace:*",
-    "@cloudpid/sandbox-image": "workspace:*",
+    "@t3flare/mcp": "workspace:*",
+    "@t3flare/sandbox-image": "workspace:*",
     "effect": "catalog:",
     "typebox": "1.4.4"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261104.1",
-    "@cloudpid/config": "workspace:*",
+    "@t3flare/config": "workspace:*",
     "@types/node": "catalog:",
     "rolldown": "1.2.13",
     "vitest": "5.0.5",

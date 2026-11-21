@@ -639,7 +639,6 @@ const fakeMcp = (
 
       const { values, total, hasMore } = completions.complete(request.params);
 
-      // oxlint-disable-next-line anti-slop/no-known-value-widening -- the optional keys are added below, as the fake was told
       const completion: { values: string[]; total?: number; hasMore?: boolean } = {
         values: [...values],
       };

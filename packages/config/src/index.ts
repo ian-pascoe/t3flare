@@ -1,4 +1,4 @@
-export const packageName = "@cloudpid/config";
+export const packageName = "@t3flare/config";
 
 export * from "./settings.ts";
 

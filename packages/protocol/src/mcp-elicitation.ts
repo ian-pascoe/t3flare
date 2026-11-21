@@ -1,7 +1,7 @@
 // An MCP server's form as the owner sees it (`docs/architecture/mcp-server-requests.md` → Elicitation requests, The
 // form): cloudpid's own `ElicitationForm`, which the Session makes of the server's `requestedSchema` and the web draws,
 // so the web never reads raw JSON Schema. The normalizer that makes one and the validator that checks an answer against
-// it are in `@cloudpid/mcp/types` (`elicitation.ts`); the schemas are here because the socket's messages carry them.
+// it are in `@t3flare/mcp/types` (`elicitation.ts`); the schemas are here because the socket's messages carry them.
 import * as Schema from "effect/Schema";
 import { ConversationId } from "./conversation-id.ts";
 import { openLiterals } from "./open-literals.ts";

@@ -1,6 +1,6 @@
 /**
  * `xMcpHeaderProblems`: what is wrong with a tool's `x-mcp-header` declarations (SEP-2243, `2026-07-28` Streamable
- * HTTP, "Schema Extension"), re-exported by `@cloudpid/mcp/types`, so it never loads the SDK.
+ * HTTP, "Schema Extension"), re-exported by `@t3flare/mcp/types`, so it never loads the SDK.
  *
  * A Modern client MUST leave out a tool whose declarations break the spec's rules, so `McpHost`'s discovery does not
  * register one, and lists why as the tool's problem (`docs/architecture/mcp-connections.md` → Discovery and the MCP

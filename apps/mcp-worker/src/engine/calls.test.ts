@@ -3,8 +3,8 @@
  * status, the server's name and origin, and no value (header, token, URL path or query, argument, result, log).
  */
 // @effect-diagnostics asyncFunction:off preferEffectArray:off strictEffectProvide:off schemaSync:off
-import { type FakeServer, fetchTo, modernServer } from "@cloudpid/mcp/testing";
-import { McpEngineDiscoverResult } from "@cloudpid/mcp/types";
+import { type FakeServer, fetchTo, modernServer } from "@t3flare/mcp/testing";
+import { McpEngineDiscoverResult } from "@t3flare/mcp/types";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Record from "effect/Record";

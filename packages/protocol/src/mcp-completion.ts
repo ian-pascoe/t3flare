@@ -119,7 +119,6 @@ export const completionValues = (completion: {
   const given: ReadonlyArray<unknown> = Array.isArray(completion.values) ? completion.values : [];
 
   for (const value of given) {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the server's own reply, read value by value
     if (typeof value !== "string" || value.length > MAX_MCP_COMPLETION_VALUE_CHARS) continue;
 
     if (seen.has(value)) continue;
@@ -130,7 +129,6 @@ export const completionValues = (completion: {
   }
 
   const total =
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the server's own reply, read value by value
     typeof completion.total === "number" && Number.isSafeInteger(completion.total)
       ? completion.total
       : undefined;

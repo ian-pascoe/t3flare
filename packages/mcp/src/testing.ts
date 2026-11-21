@@ -1,5 +1,5 @@
 /**
- * `@cloudpid/mcp/testing`: the fake MCP servers of both Protocol eras, on the SDK server, for the tests of the packages
+ * `@t3flare/mcp/testing`: the fake MCP servers of both Protocol eras, on the SDK server, for the tests of the packages
  * that use the core (`docs/architecture/mcp.md` → Testing and tracing). `McpWorker`'s engine tests run them as an
  * auxiliary Worker. It loads the SDK, so only tests import it.
  */

@@ -32,7 +32,7 @@ import {
   type McpEngineRequestEncoded,
   type McpEngineRequestResult,
   type McpEngineTargetEncoded,
-} from "@cloudpid/mcp/types";
+} from "@t3flare/mcp/types";
 import type { McpAsker, McpQuestionAnswer } from "@t3flare/session-protocol";
 import { sha256Hex } from "@t3flare/skills";
 

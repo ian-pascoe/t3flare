@@ -1,6 +1,6 @@
 // The Environment section's cost table (SPI-1149): each Container size's resources and the worst-case hourly cost of the
 // Container budget's Containers (the setting, 3 by default), all at full CPU, at Cloudflare's Workers Paid list prices (the vendored
-// `@cloudpid/config` prices). Expected figures are the research's worked example (docs-archive-1:docs/steps/spi-1001-research-
+// `@t3flare/config` prices). Expected figures are the research's worked example (docs-archive-1:docs/steps/spi-1001-research-
 // container-sizes.md §5: a standard-4 hour at full CPU is $0.288 CPU + $0.108 memory + $0.00504 disk), worked by hand for
 // the others.
 import { describe, expect, it } from "vitest";

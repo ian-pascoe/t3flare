@@ -4,7 +4,7 @@
 // the Workspace that the block names. The chip in the transcript is what the owner's entry keeps of it
 // (`UserEntryData.trigger`). Pure: the Session writes the file and redacts the Secrets it holds.
 // @effect-diagnostics missingPipeableSignature:off preferEffectArray:off -- plain string functions and Schemas.
-import { sha256Hex } from "@cloudpid/config/sha256";
+import { sha256Hex } from "@t3flare/config/sha256";
 import * as Schema from "effect/Schema";
 import type * as Types from "effect/Types";
 import { cleanText, escapePageText } from "./attached-pages.ts";

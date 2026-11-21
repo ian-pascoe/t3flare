@@ -14,7 +14,7 @@ import {
   registerClient,
   selectResource,
   startAuthorization,
-} from "@cloudpid/mcp/oauth";
+} from "@t3flare/mcp/oauth";
 import { WorkerEntrypoint } from "cloudflare:workers";
 
 import { guardedFetch } from "./oauthFetch.ts";

@@ -393,7 +393,6 @@ describe("an input sent over the endpoint", () => {
       model: [{ role: "user", content: "hello", timestamp: at }],
     };
 
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: the fields of an entry the projection reads.
     const [message] = projectEntries([entry as unknown as EntryRecord]);
 
     expect(message?.via).toEqual({ auth: "service_token", client: { name: "pi" } });

@@ -27,7 +27,7 @@
 // @effect-diagnostics globalTimers:off -- a waiting call's own timer, in its own invocation, takes back expired leases.
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
-import { MCP_STREAM_HOLD_MS } from "@cloudpid/mcp/types";
+import { MCP_STREAM_HOLD_MS } from "@t3flare/mcp/types";
 import { MiB } from "./units.ts";
 
 /** A call's charges in the pool stop at this; past it the call takes the large slot. */

@@ -24,7 +24,6 @@ type Fixture = { readonly [key: string]: FixtureValue };
 
 // The views and entries below are the parts of pi's shapes the projection reads.
 // SAFETY: a fixture holds only the fields the projection reads; the other fields of pi's types are never looked at.
-// oxlint-disable-next-line anti-slop/no-chained-type-assertions
 const asEntry = (entry: Fixture): EntryRecord => entry as unknown as EntryRecord;
 
 const usage = {
@@ -113,7 +112,6 @@ const conversationView = ({
 
   if (before !== undefined) view.before = before;
 
-  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: as `asEntry`: the fixture holds what the projection and the transcript read.
   return view as unknown as ConversationView;
 };
 

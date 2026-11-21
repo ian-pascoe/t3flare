@@ -1,7 +1,6 @@
 // docs/architecture/visuals.md → Testing: the protocol's types and messages, the list and its CSP, the library table (every URL
 // an exact version), and the shim's served text, run in a fake window as a browser would run it in a Visual's frame.
 // @effect-diagnostics preferEffectArray:off preferEffectRecord:off schemaSync:off preferTypedSchemaDecoder:off -- assertions over native arrays and records; decoding what a socket carries, as tests do.
-/* oxlint-disable anti-slop/no-unsafe-dictionary-type, anti-slop/no-unknown-parameters, anti-slop/no-known-value-widening, anti-slop/require-safety-comment-for-type-assertion -- a fake window and document: the shim's text is run against what a browser hands it, whose values are the page's own */
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 import { ServerMessageJson } from "./session.ts";

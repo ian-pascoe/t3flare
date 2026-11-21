@@ -3,7 +3,7 @@
 // the in-session tools' output schemas, which `packages/extensions` builds each value for, kept here so one declaration
 // serves both surfaces. Keys are snake_case and "none" is null.
 // @effect-diagnostics missingPipeableSignature:off
-import { InstanceType } from "@cloudpid/config";
+import { InstanceType } from "@t3flare/config";
 import * as Schema from "effect/Schema";
 import { ScopeRef } from "./scope.ts";
 

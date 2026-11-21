@@ -15,7 +15,7 @@ import {
   ROLE_NAMES,
   THINKING_LEVELS,
   ThinkingLevel,
-} from "@cloudpid/config";
+} from "@t3flare/config";
 import * as Arr from "effect/Array";
 import * as Schema from "effect/Schema";
 import { ApprovalRequestFields } from "./approvals.ts";

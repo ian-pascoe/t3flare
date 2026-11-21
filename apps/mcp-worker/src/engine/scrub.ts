@@ -17,7 +17,7 @@ import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
-import type { McpPromptProblem, McpToolProblem } from "@cloudpid/mcp/types";
+import type { McpPromptProblem, McpToolProblem } from "@t3flare/mcp/types";
 
 const REDACTED = "[REDACTED]";
 

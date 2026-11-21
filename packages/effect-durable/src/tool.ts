@@ -63,7 +63,7 @@ const SNAKE_CASE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
 /**
  * The one exception to the snake_case rule: an MCP tool, `mcp__<server>__<tool>` (ADR-0030). Its server part is the
  * server's name lower-cased with `-` as `_`, so it may hold `__` or begin with `_`; its tool part is runs of `[a-z0-9]` joined by `_`, so it may begin with a digit (`2fa`).
- * `@cloudpid/config`'s `mcpToolName` builds these, and its tests check that its names pass.
+ * `@t3flare/config`'s `mcpToolName` builds these, and its tests check that its names pass.
  */
 const MCP_TOOL_NAME = /^mcp__[a-z0-9_]+__[a-z0-9]+(?:_[a-z0-9]+)*$/;
 

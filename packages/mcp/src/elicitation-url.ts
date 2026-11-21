@@ -1,7 +1,7 @@
 // @effect-diagnostics missingPipeableSignature:off preferEffectArray:off preferEffectRecord:off -- plain functions over values, with checks that end early.
 // The page a URL-mode elicitation asks the owner to open, and which pages cloudpid declines without showing
 // (`docs/architecture/mcp-server-requests.md` → Elicitation requests → URL mode; #388 D9.1, D9.2). Pure and SDK-free, so
-// the Session and its tests import it from `@cloudpid/mcp/elicitation-url`, not `./types`: it carries the Public Suffix List
+// the Session and its tests import it from `@t3flare/mcp/elicitation-url`, not `./types`: it carries the Public Suffix List
 // (`tldts`), which the web, importing `./types`, never runs.
 //
 // - **Declined unseen:** a scheme other than `https:`, userinfo, `localhost`, `*.localhost`, `*.local`, `*.internal`, a

@@ -1,5 +1,5 @@
 {
-  "name": "@cloudpid/protocol",
+  "name": "@t3flare/protocol",
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
@@ -18,12 +18,12 @@
     "./visuals": "./src/visuals.ts"
   },
   "scripts": {
-    "typecheck": "effect-tsgo tsrs",
-    "lint": "oxlint",
+    "typecheck": "effect-tsgo tsrs --noEmit",
+    "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives-severity error src vitest.config.ts",
     "test": "vitest run"
   },
   "dependencies": {
-    "@cloudpid/config": "*",
+    "@t3flare/config": "workspace:*",
     "@earendil-works/chord": "^1.5.0",
     "@earendil-works/pi-ai": "^1.5.0",
     "@earendil-works/pi-durable": "^1.5.0",

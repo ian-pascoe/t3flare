@@ -13,7 +13,7 @@
 //   Sampling request (not offered).
 // - Nothing here keeps an answer; logs name fields, never values.
 // @effect-diagnostics cryptoRandomUUID:off
-import { checkElicitationUrl } from "@cloudpid/mcp/elicitation-url";
+import { checkElicitationUrl } from "@t3flare/mcp/elicitation-url";
 import {
   MCP_INVALID_PARAMS,
   type McpInputAnswer,
@@ -23,7 +23,7 @@ import {
   plainLine,
   plainMessage,
   validateElicitation,
-} from "@cloudpid/mcp/types";
+} from "@t3flare/mcp/types";
 import { cardText } from "@t3flare/harness-registry";
 import { MCP_QUESTION_MARKER, type McpCardQuestion, type McpQuestionAnswer, type McpQuestionCard } from "@t3flare/session-protocol";
 import * as Result from "effect/Result";

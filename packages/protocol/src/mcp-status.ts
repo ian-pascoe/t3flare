@@ -5,7 +5,7 @@
 //
 // Every answer union only gains (`docs/architecture/mcp.md` → Deploys): a state is a string and a tag this build does
 // not know reads as `Unavailable` (`readMcpServerState`, the unions' last member), never as a decode error.
-import { MCP_EXPOSURES, type McpExposure } from "@cloudpid/config";
+import { MCP_EXPOSURES, type McpExposure } from "@t3flare/config";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 
@@ -39,7 +39,7 @@ const isExposure = Schema.is(Schema.Literals(MCP_EXPOSURES));
 
 /**
  * `raw`, an Exposure as it crossed the edge (`McpToolView.exposure`, a string so that one a later build adds still
- * decodes), as one this build knows (`MCP_EXPOSURES` of `@cloudpid/config`, which protocol already depends on):
+ * decodes), as one this build knows (`MCP_EXPOSURES` of `@t3flare/config`, which protocol already depends on):
  * `unknown` for any other, never a guess at what it allows.
  */
 export const readMcpExposure = (raw: string): McpExposure | "unknown" =>
@@ -159,7 +159,6 @@ export const OtherAnswerFromWire = Schema.Struct({
           message:
             message ?? `The server answered with something this build does not know (${_tag})`,
         }),
-      // oxlint-disable-next-line anti-slop-effect/no-manual-tagged-construction -- the encoded side is a plain wire object
       encode: ({ message }) => ({ _tag: "Unavailable", message }),
     }),
   ),
@@ -184,7 +183,7 @@ export type McpServersView = typeof McpServersView.Type;
 
 /**
  * One server log entry, oldest first in the ring: `at` is when the engine received it; `data` is JSON text, cut and
- * scrubbed. The twin of `McpLogEntry` in `@cloudpid/mcp`, which protocol does not depend on: change them together.
+ * scrubbed. The twin of `McpLogEntry` in `@t3flare/mcp`, which protocol does not depend on: change them together.
  */
 export const McpLogView = Schema.Struct({
   at: Schema.Finite,

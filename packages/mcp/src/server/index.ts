@@ -1,5 +1,5 @@
 /**
- * `@cloudpid/mcp/server`: cloudpid's own MCP endpoint (`docs/architecture/mcp-endpoint.md` → The handler). It loads the
+ * `@t3flare/mcp/server`: cloudpid's own MCP endpoint (`docs/architecture/mcp-endpoint.md` → The handler). It loads the
  * SDK's server, so only `McpWorker`'s `McpServer` entrypoint (and the conformance run) import it.
  */
 export {

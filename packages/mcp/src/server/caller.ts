@@ -4,7 +4,7 @@
  * main Worker closes it over the `api` target.
  */
 // @effect-diagnostics preferEffectArray:off missingPipeableSignature:off -- plain functions over headers and parsed JSON.
-import { type McpClient, type McpEra, SESSION_ID } from "@cloudpid/protocol/mcp-api";
+import { type McpClient, type McpEra, SESSION_ID } from "@t3flare/protocol/mcp-api";
 import type { Wire } from "./tools.ts";
 import { CLIENT_INFO_META_KEY } from "@modelcontextprotocol/server";
 import * as Option from "effect/Option";

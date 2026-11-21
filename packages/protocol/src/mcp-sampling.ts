@@ -3,7 +3,7 @@
 // answer, and the owner's choices. The Session sends these in `mcp_sampling_requests`, the owner answers with
 // `mcp_sampling_answer`, and `mcp_sampling_get` fetches a settled record when a call's card expands it. Every string is
 // plain text, redacted of the Secrets the Session holds, and cut: a card never shows a server's request whole.
-import { ROLE_NAMES } from "@cloudpid/config";
+import { ROLE_NAMES } from "@t3flare/config";
 import * as Schema from "effect/Schema";
 import { ConversationId } from "./conversation-id.ts";
 import { McpElicitationSource } from "./mcp-elicitation.ts";
