@@ -42,7 +42,7 @@ export interface ValidatorsApi {
   readonly compileAll: (
     tools: ReadonlyArray<McpToolDefinition>,
   ) => Effect.Effect<ReadonlyArray<McpToolProblem>>;
-  /** How `structuredContent` fits `outputSchema` (D17). */
+  /** How `structuredContent` fits `outputSchema`. */
   readonly check: (
     outputSchema: JsonObject,
     structuredContent: StructuredContent,

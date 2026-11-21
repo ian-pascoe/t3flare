@@ -92,8 +92,8 @@ type GitSubcommand = {
 };
 
 /**
- * The subcommands git runs on the Worker Shell: the few read-only ones whose output is checked against real git's in
- * `apps/server/src/workspace/bash.workerd.test.ts`, in the forms checked. computer's git client is isomorphic-git, not
+ * The subcommands git runs on the Worker Shell: the few read-only ones whose output matches real git's, in the forms
+ * that match. computer's git client is isomorphic-git, not
  * git, so everything else goes to the Container's real git: what writes the index or refs (`add`, `rm`, `commit`,
  * `tag`, `branch <name>`, `init`, `remote add`: two git implementations must not write one `.git`), what it gets
  * wrong (`diff` of a revision prints nothing, `show` has no patch, `log` dates and paths, `status -s`, `cat-file`), what
@@ -1259,7 +1259,7 @@ export type WorkerOutput = { readonly stdout: string; readonly stderr: string };
 /**
  * What the Worker Shell writes to stderr when it cannot do what a command asks, where the Container can: a program it
  * lacks, a syntax its parser does not take, an option its version of a program does not take, a feature it does not
- * support, a repository too big for its git (`apps/server/src/workspace/git.ts`).
+ * support, a repository too big for its git.
  */
 const CANNOT: readonly RegExp[] = [
   /^bash: [^\n:]+: command not found$/m,

@@ -34,7 +34,7 @@ import { Validators } from "./validators.ts";
 export interface McpWorkerEnv {
   /** The deployed version; absent where the Worker runs undeployed (tests). */
   readonly CF_VERSION_METADATA?: { readonly id: string };
-  /** The Workspaces Worker's `WorkspaceMcpBridge`, which reaches a Workspace's Container MCP bridge; absent where undeployed. */
+  /** The agents Worker's `WorkspaceMcpBridge`, which reaches a Workspace's Container MCP bridge; absent where undeployed. */
   readonly MCP_BRIDGE?: McpBridgeBinding;
 }
 

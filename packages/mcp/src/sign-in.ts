@@ -134,7 +134,7 @@ export const McpAuthReportAnswer = Schema.Union([
 
 export type McpAuthReportAnswer = typeof McpAuthReportAnswer.Type;
 
-// Starting and completing a sign-in ---------------
+// Starting and completing a sign-in -----------------------------------------------------------------------------------
 
 /** The Environment a start names when the entry is Global's own: `environment=all` of the start link. */
 export const MCP_SIGN_IN_GLOBAL = "all";
@@ -360,7 +360,7 @@ export const readMcpSignInCompleteAnswer = (
 export const scopesOf = (list: string | undefined): ReadonlyArray<string> =>
   Arr.filter((list ?? "").split(/\s+/), (scope) => scope !== "");
 
-// Sign-in requests --------------------------------------------------
+// Sign-in requests ----------------------------------------------------------------------------------------------------
 
 /**
  * `mcpSignInAsk`: a Session's Sign-in request for `server` in `environment`'s set, under its own `request` id. Asking

@@ -1,9 +1,7 @@
 /**
  * A request's value as the engine returns it: serialized once, with every access token the call sent replaced by
- * `[REDACTED]`,
- * then inline up to 1 MiB, else as a native byte
- * stream produced on pull, which RPC neither clones nor counts and the host returns unread. A failed
- * call's error is scrubbed of the same tokens.
+ * `[REDACTED]`, then inline up to 1 MiB, else as a native byte stream produced on pull, which RPC neither clones nor
+ * counts and the host returns unread. A failed call's error is scrubbed of the same tokens.
  */
 // @effect-diagnostics globalJsonInEffect:off -- a server's answer, already decoded by the SDK, serialized to bytes once.
 // @effect-diagnostics globalTimers:off -- a stream's expiry timer, in the invocation that made it.
@@ -17,7 +15,7 @@ import type { CallContext, CallEnvironment } from "./call-context.ts";
 import { scrubValues } from "./scrub.ts";
 import { MiB } from "./units.ts";
 
-/** A value serialized to more than this goes back as a byte stream (D9.2). */
+/** A value serialized to more than this goes back as a byte stream. */
 export const INLINE_LIMIT = MiB;
 
 /** The size of the pieces a large value's stream yields. */

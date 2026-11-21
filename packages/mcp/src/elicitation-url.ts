@@ -1,8 +1,7 @@
 // @effect-diagnostics missingPipeableSignature:off preferEffectArray:off preferEffectRecord:off -- plain functions over values, with checks that end early.
-// The page a URL-mode elicitation asks the owner to open, and which pages t3flare declines without showing.
-// Pure and SDK-free, so
-// the Session and its tests import it from `@t3flare/mcp/elicitation-url`, not `./types`: it carries the Public Suffix List
-// (`tldts`), which the web, importing `./types`, never runs.
+// The page a URL-mode elicitation asks the owner to open, and which pages t3flare declines without showing. Pure and
+// SDK-free, so the Session and its tests import it from `@t3flare/mcp/elicitation-url`, not `./types`: it carries the
+// Public Suffix List (`tldts`), which the importers of `./types` need not load.
 //
 // - **Declined unseen:** a scheme other than `https:`, userinfo, `localhost`, `*.localhost`, `*.local`, `*.internal`, a
 //   loopback, private, link-local, CGNAT or ULA IP literal, and t3flare's own hosts (given as a predicate, since they

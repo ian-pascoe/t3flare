@@ -1,5 +1,5 @@
-# The image's copy of the base mise.toml (BASE_MISE_TOML, apps/sandbox-image/src/toolchains.ts; a test keeps their
-# settings and tools equal). The image build installs these Toolchains into mise's system directory and locks them.
+# The image's base mise.toml, which commands read as mise's system config (`BASE_MISE_CONFIG`,
+# apps/sandbox-image/src/env.ts). The image build installs these Toolchains into mise's system directory and locks them.
 
 [settings]
 lockfile = true

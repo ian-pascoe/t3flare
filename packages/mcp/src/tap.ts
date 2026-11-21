@@ -13,7 +13,7 @@
  * - **Cuts:** an SSE stream that ends without its answer, and cannot be resumed, fails its request at once, since the
  *   SDK neither reconnects nor fails it (it drops `onRequestStreamEnd` for requests).
  * - **Not MCP:** a 2xx answer to a request that is neither JSON-RPC JSON nor an SSE stream.
- * - **The GET stream:** a Legacy session's GET stream ends at an event over 1 MiB (D16), which the core does not
+ * - **The GET stream:** a Legacy session's GET stream ends at an event over 1 MiB, which the core does not
  *   reopen; the span without it is a gap.
  *
  * A verdict on a request reaches the SDK as a JSON-RPC error answering it, carrying a token the core maps back to the
@@ -45,13 +45,13 @@ const isMcpError = Schema.is(McpError);
 
 /** What the tap does with a request, by its method. */
 interface Policy {
-  /** The most its answer may be, in bytes (D16). */
+  /** The most its answer may be, in bytes. */
   readonly limit: number;
-  /** It changes nothing, so it is retried once on a 408, 429 or 5xx (D15). */
+  /** It changes nothing, so it is retried once on a 408, 429 or 5xx. */
   readonly readOnly: boolean;
-  /** The era probe: retried once on a 408 or 429 only, and failed by a throw, never a JSON-RPC error (D2). */
+  /** The era probe: retried once on a 408 or 429 only, and failed by a throw, never a JSON-RPC error. */
   readonly probe: boolean;
-  /** A cut leaves it maybe run (D15). */
+  /** A cut leaves it maybe run. */
   readonly mayHaveRun: boolean;
 }
 
@@ -66,7 +66,7 @@ const LARGE_READ: Policy = {
   mayHaveRun: false,
 };
 
-/** Each method's policy: the reads and `tools/call` get 16 MiB (D16). A `Map`, so no method finds a prototype key. */
+/** Each method's policy: the reads and `tools/call` get 16 MiB. A `Map`, so no method finds a prototype key. */
 const POLICIES = new Map<string, Policy>([
   ["server/discover", { ...OTHER, probe: true }],
   [
@@ -333,13 +333,13 @@ const encoder = new TextEncoder();
 /** Lets go of a body the tap will not pass on. */
 const drain = (body: ReadableStream<Uint8Array> | null) => body?.cancel().catch(() => undefined);
 
-/** The most one event on a GET stream, or on a resumed request stream, may be (D16). */
+/** The most one event on a GET stream, or on a resumed request stream, may be. */
 const EVENT_LIMIT = MiB;
 
-/** How many resumes in a row may fail before the request is cut: the SDK's own `maxRetries` (D15). */
+/** How many resumes in a row may fail before the request is cut: the SDK's own `maxRetries`. */
 const MAX_RESUME_FAILURES = 2;
 
-/** The server's `retry` is waited out within these bounds (D15); with none, the SDK's own first delay. */
+/** The server's `retry` is waited out within these bounds; with none, the SDK's own first delay. */
 const MIN_RESUME_MS = 500;
 const MAX_RESUME_MS = 10_000;
 const DEFAULT_RESUME_MS = 1000;
@@ -442,7 +442,7 @@ type Reopened = Data.TaggedEnum<{
 
 const Reopened = Data.taggedEnum<Reopened>();
 
-/** How the tap reopens a Legacy request's stream with `GET` and `Last-Event-ID` (D15). */
+/** How the tap reopens a Legacy request's stream with `GET` and `Last-Event-ID`. */
 interface Resume {
   readonly open: (lastEventId: string) => Promise<Reopened>;
   readonly sleep: (ms: number) => Promise<void>;
@@ -591,7 +591,7 @@ class Resumer {
 
 /**
  * `body` as it arrives, counted against the request's limit, watched for the answer to `request`. A stream that ends
- * or breaks without it is resumed when `resume` is given and the stream carried an event id (D15): the SDK is handed
+ * or breaks without it is resumed when `resume` is given and the stream carried an event id: the SDK is handed
  * one stream, the first's events and then the resumed ones, and of those only the request's own (an answer to another
  * request never reaches it). The resumed bytes count toward the same limit, and an event over 1 MiB on a resumed
  * stream fails the request. With no way to resume, or once resuming fails, the stream ends with the verdict instead,
@@ -677,7 +677,7 @@ const watchStream = (
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       // The probe reads any JSON-RPC error as Legacy, so it gets no verdict: a stream that ends without its answer
-      // runs to the probe's timeout (D2), and one over the limit breaks.
+      // runs to the probe's timeout, and one over the limit breaks.
       const end = (error: McpError) => {
         if (!request.policy.probe) {
           controller.enqueue(encoder.encode(verdictEvent(request, error, verdicts)));
@@ -941,7 +941,7 @@ export const tapFetch = (
   };
 
   /**
-   * How `request`'s stream is resumed (D15): a Legacy request only, never the probe or a Modern request (its headers
+   * How `request`'s stream is resumed: a Legacy request only, never the probe or a Modern request (its headers
    * say which). The `GET` takes the POST's headers (session, version, authorization, the entry's own), without the
    * body's, and asks for a stream after the last event id; its failures are the caller's to count, never thrown.
    */

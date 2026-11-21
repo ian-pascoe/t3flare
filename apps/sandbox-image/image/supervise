@@ -16,8 +16,8 @@
 # before its OOM killer acts, and every command stalls, `echo` included. Its lines go where computerd's do, so an exit
 # report carries them too.
 #
-# Before anything else runs, it makes the Container's start marker anew: the scan before a snapshot searches only the
-# files whose status changed after it, unless the Workspace DO asks for all.
+# Before anything else runs, it makes the Container's start marker anew, for a scan before a snapshot to search only the
+# files whose status changed after it. Nothing in t3flare reads the marker yet.
 #
 # T3FLARE_COMPUTERD, T3FLARE_MEMORY_GUARD, T3FLARE_MEMORY_NOTES, T3FLARE_START_MARKER and T3FLARE_REPORT_* override
 # their defaults; the image sets none of them.
@@ -39,8 +39,8 @@ base64_marker='[base64 dropped]'
 collapse_base64="s#(data:[-A-Za-z0-9.+/;=_]*;base64,)[-A-Za-z0-9+/=_]{${base64_min},}#\\1${base64_marker}#g"
 
 # A new file, whatever a snapshot kept of an older start's: its status changes now, before computerd, the memory guard
-# or a command can write anything. A marker that cannot be made leaves the scan none (it then searches everything), or
-# an older one (it then searches more).
+# or a command can write anything. A marker that cannot be made leaves a scan none (it would then search everything),
+# or an older one (it would then search more).
 rm -f -- "$start_marker"
 { : >"$start_marker"; } 2>/dev/null
 # A file's times are the kernel's coarse clock, one tick (up to 10 ms) apart: what starts next writes a tick later, so
@@ -61,9 +61,9 @@ tee_pid=$!
 # earlyoom is missing) cannot end tee's input before computerd's output has come.
 exec 3>"$scratch/out"
 
-# A Container started from its Environment's Build (T3FLARE_RESET_STORE=1 in the launch's environment) has the Build's
-# computerd store on its disk, with the sync positions of the Build's own Durable Object: computerd starts with an
-# empty one instead, so this Workspace's Durable Object pushes it every file.
+# A Container started from another Workspace's snapshot (T3FLARE_RESET_STORE=1 in the launch's environment) would have
+# that Workspace's computerd store on its disk, with the sync positions of its Durable Object: computerd starts with an
+# empty one instead, so this Workspace's Durable Object pushes it every file. No launch in t3flare sets it yet.
 if [ "${T3FLARE_RESET_STORE:-}" = 1 ] && [ -n "${COMPUTERD_DB:-}" ]; then
   rm -f -- "$COMPUTERD_DB" "$COMPUTERD_DB-wal" "$COMPUTERD_DB-shm"
 fi

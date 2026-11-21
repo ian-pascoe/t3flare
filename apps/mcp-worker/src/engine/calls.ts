@@ -120,13 +120,12 @@ const withExtensions = (deps: McpDeps, named: McpEngineHttpTarget["extensions"])
 
 /**
  * `deps` that also declare `sampling: { tools: {} }`, only when the host's target says the definition lets it, for an
- * HTTP server or a stdio one.
- * A Legacy server is told once,
- * connection-wide, at `initialize`; a Legacy session that was initialized with another declaration is initialized again,
- * once. A Modern request declares it per request, in its `_meta`, only for a call whose caller offers to answer a Sampling
- * request (`ctx.answers.sampling`) and has an `onInput` to answer with; the round's request is answered by `onInput` (run,
- * or kept for later when the call also defers). The ctx-less declaration (a Modern `server/discover` probe) is Legacy's,
- * which a Modern server never acts on.
+ * HTTP server or a stdio one. A Legacy server is told once, connection-wide, at `initialize`; a Legacy session that was
+ * initialized with another declaration is initialized again, once. A Modern request declares it per request, in its
+ * `_meta`, only for a call whose caller offers to answer a Sampling request (`ctx.answers.sampling`) and has an
+ * `onInput` to answer with; the round's request is answered by `onInput` (run, or kept for later when the call also
+ * defers). The ctx-less declaration (a Modern `server/discover` probe) is Legacy's, which a Modern server never acts
+ * on.
  */
 const withSampling = (deps: McpDeps, server: McpEngineTarget): McpDeps => {
   if (server.sampling !== true) return deps;
@@ -188,7 +187,7 @@ const definitionsOf = (tools: Answer) =>
 const decodeEraRow = Schema.decodeUnknownOption(EraRowV1);
 
 /**
- * Reaches a stdio target through the Workspaces Worker's bridge, offering the server the Roots the target carries (none
+ * Reaches a stdio target through the agents Worker's bridge, offering the server the Roots the target carries (none
  * given, an empty list: a bridge connection always declares `roots`); an HTTP target is reached as it is, with none.
  */
 const reachBridge = Effect.fnUntraced(function* (
@@ -494,7 +493,7 @@ export const discover = Effect.fn("mcp.engine.discover")(function* (
 
 const isServerError = Schema.is(ServerError);
 
-/** The server rejected the call's `Mcp-Param` headers: its tool's definition has changed (D14). */
+/** The server rejected the call's `Mcp-Param` headers: its tool's definition has changed. */
 const headerMismatch = (error: McpError) => isServerError(error) && error.code === -32020;
 
 const toolNamed = (tools: ReadonlyArray<McpToolDefinition>, name: string) =>
@@ -524,7 +523,7 @@ interface Refreshed {
 
 /**
  * Sends `req`; if the server rejects its headers (`-32020`), lists the server's tools again, compiles them as discovery
- * does, and sends it once more with the tool's fresh definition (D14). What the last send gave, the definition it
+ * does, and sends it once more with the tool's fresh definition. What the last send gave, the definition it
  * was sent with, and the fresh tools, if they were listed.
  */
 const callWithRefresh = Effect.fnUntraced(function* (

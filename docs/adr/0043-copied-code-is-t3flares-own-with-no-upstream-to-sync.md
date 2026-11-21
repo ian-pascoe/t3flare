@@ -32,5 +32,5 @@ the commit they came from. That project goes its own way now and will diverge, s
 ## Consequences
 
 - The MCP engine still carries the other project's stdio-bridge path, which always fails here (no bridge, OD-T12), and
-  many comments in the absorbed code point to `docs/architecture/*.md`, which this repository does not have. Both are
+  comments in the absorbed MCP code still name the other project's parts (the Registry, the main Worker). Both are
   cleanup to do.

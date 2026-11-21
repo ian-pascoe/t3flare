@@ -12,8 +12,8 @@
 // - A manual compaction keeps pi-durable's summary. t3's idle compaction is locked off for every provider (K9,
 //   `managedPolicy.ts`) and never reaches a Durable agent.
 // - No owner `/rollover` (t3 has no surface for it), so a Rollover never ends its run; the requests the hook and the
-// tool submit are steers that never start a run of their own (`whenIdle: "reject"`), so no work happens outside a turn
-// t3 started.
+//   tool submit are steers that never start a run of their own (`whenIdle: "reject"`), so no work happens outside a
+//   turn t3 started.
 // @effect-diagnostics globalConsole:off
 import type { Context } from "@earendil-works/chord";
 import {

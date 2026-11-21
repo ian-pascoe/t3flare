@@ -252,7 +252,7 @@ export interface Complete<A> {
   readonly value: A;
   /** False when the result came from answered questions, so no cache may keep it. */
   readonly cacheable: boolean;
-  /** The server's cache hints, for the host's caches; the core serves nothing from a cache (D13). */
+  /** The server's cache hints, for the host's caches; the core serves nothing from a cache. */
   readonly ttlMs?: number;
   readonly cacheScope?: "public" | "private";
   readonly fetchedAt: number;
@@ -328,7 +328,7 @@ export interface McpTasks {
 }
 
 /**
- * A `tools/call`: the tool's definition, from the host's catalog (D13, D14), and the arguments. The call goes by the
+ * A `tools/call`: the tool's definition, from the host's catalog, and the arguments. The call goes by the
  * definition's name, and its `inputSchema` gives the `Mcp-Param` headers.
  */
 export interface CallToolParams {
@@ -501,10 +501,10 @@ const CALL_TIMEOUT_MS = 60_000;
 /** How long a close waits for the notifications in flight. */
 const NOTIFY_GRACE = Duration.seconds(2);
 
-/** A Legacy era row older than this is probed again at the next `initialize` (D3). */
+/** A Legacy era row older than this is probed again at the next `initialize`. */
 const LEGACY_ERA_TTL_MS = 24 * 60 * 60 * 1000;
 
-/** `discover_json` is kept up to 64 KiB (D3). */
+/** `discover_json` is kept up to 64 KiB. */
 const MAX_DISCOVER_BYTES = 64 * 1024;
 
 /** What a request's recovery needs to know beyond whether it may have run. */
@@ -610,7 +610,7 @@ type Lists = {
   };
 };
 
-/** Each list's method and the server capability it needs; `client.request`, so the core walks the cursors (D7). */
+/** Each list's method and the server capability it needs; `client.request`, so the core walks the cursors. */
 const LISTS = {
   tools: {
     capability: "tools",
@@ -694,7 +694,7 @@ const toJsonObject = Schema.decodeUnknownOption(
 );
 
 /**
- * The SDK validates nothing: the engine validates `structuredContent` against what it compiled (D17). `callTool`
+ * The SDK validates nothing: the engine validates `structuredContent` against what it compiled. `callTool`
  * also withholds `outputSchema`, which is what stops the SDK refusing a result without `structuredContent`; this
  * keeps the SDK from building a validator of its own (Ajv on Node, `@cfworker` on workerd) or running one on any
  * other path.
@@ -704,7 +704,7 @@ const noValidation = {
     <T>(): JsonSchemaValidator<T> =>
     (input) => ({
       valid: true,
-      // SAFETY: no validation is the point; the engine checks `structuredContent` itself (D17).
+      // SAFETY: no validation is the point; the engine checks `structuredContent` itself.
       data: input as T,
       errorMessage: undefined,
     }),
@@ -839,7 +839,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
       requestInit,
       onInsufficientScope: "throw",
       // The SDK never resumes a request stream, Legacy included: the tap does, for a Legacy one that carried an event id
-      // (D15; `tap.ts`), and every other stream that ends without its answer is a cut.
+      // (`tap.ts`), and every other stream that ends without its answer is a cut.
       reconnectionOptions: {
         maxRetries: 0,
         initialReconnectionDelay: 1000,
@@ -1154,7 +1154,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
 
   /**
    * Closes `client` once the notifications in flight are sent (at most 2 s), so an aborted Legacy request's
-   * `notifications/cancelled` reaches the server before the close aborts the transport's fetches (D15).
+   * `notifications/cancelled` reaches the server before the close aborts the transport's fetches.
    */
   const closeClient = (client: Client) =>
     Effect.suspend(() =>
@@ -1288,7 +1288,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
     }
 
     if (eraRow?.era === "legacy" && now - eraRow.probedAt < LEGACY_ERA_TTL_MS) {
-      // A failed Legacy `initialize` drops the row (D3); when the server answered, it may speak Modern now.
+      // A failed Legacy `initialize` drops the row; when the server answered, it may speak Modern now.
       return yield* open({ kind: "legacy" }).pipe(
         Effect.catchIf(eraInDoubt, () => Effect.andThen(deps.eras.drop, open({ kind: "probe" }))),
         Effect.tapError((failed) => (unreached(failed) ? deps.eras.drop : Effect.void)),
@@ -1362,7 +1362,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
       }
 
       // A read is sent once more after a cut, and so is a request whose resend is safe (`tasks/update`, `tasks/cancel`);
-      // a `tools/call` never is, in either era (D15).
+      // a `tools/call` never is, in either era.
       return (policy.resend === true || !mayHaveRun) && isCut(failed.error)
         ? Option.some(Effect.void)
         : Option.none();
@@ -1379,7 +1379,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
     );
   };
 
-  /** The client's declaration for `ctx`, sent in a Modern request's `_meta` (D7, D23); none on Legacy. */
+  /** The client's declaration for `ctx`, sent in a Modern request's `_meta`; none on Legacy. */
   const metaFor = (ctx: McpCallContext): RequestMeta | undefined => {
     if (live.era !== "modern") return undefined;
 
@@ -2023,9 +2023,9 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
 
     const options: CallToolRequestOptions = {
       ...timingOf(own, signal, timeoutMs),
-      // Without `outputSchema`, so the SDK checks no `structuredContent`: the engine does (D17). With the
+      // Without `outputSchema`, so the SDK checks no `structuredContent`: the engine does. With the
       // definition given, the SDK rethrows a `-32020` header mismatch rather than refreshing `tools/list`: the
-      // refresh and one retry (D14) belong to the catalog's owner, the engine, so it surfaces as `ServerError`.
+      // refresh and one retry belong to the catalog's owner, the engine, so it surfaces as `ServerError`.
       toolDefinition: Struct.omit(params.tool, ["outputSchema"]),
     };
 
@@ -2845,7 +2845,7 @@ const unreached = (failed: Failure) => isUnreachable(failed.error) || isTimedOut
 const eraInDoubt = (failed: Failure) =>
   !unreached(failed) && !isSignInRequired(failed.error) && !isStepUpRequired(failed.error);
 
-/** A Modern server refused a request before it ran: its era no longer holds (D3). */
+/** A Modern server refused a request before it ran: its era no longer holds. */
 const eraDropped = (live: Live, failed: Failure) =>
   live.era === "modern" &&
   (failed.status === 400 ||
@@ -2853,7 +2853,7 @@ const eraDropped = (live: Live, failed: Failure) =>
     failed.status === 405 ||
     failed.code === -32022);
 
-/** A Legacy server no longer knows the session (D5, D15). */
+/** A Legacy server no longer knows the session. */
 const sessionLost = (live: Live, failed: Failure) =>
   live.era === "legacy" && live.sessionId !== undefined && failed.status === 404;
 
@@ -2913,7 +2913,7 @@ const urlRequiredOf = (error: Error): UrlRequired | undefined => {
 const jsonBytes = (value: Schema.Json) =>
   new TextEncoder().encode(JSON.stringify(value)).byteLength;
 
-/** Keeps a Modern server's era row, unless its `server/discover` result is over 64 KiB (D3). */
+/** Keeps a Modern server's era row, unless its `server/discover` result is over 64 KiB. */
 const keepModernEra = (eras: RowStore, version: string, discover: DiscoverResult, now: number) => {
   const json = jsonObjectOf(discover);
 

@@ -1,4 +1,4 @@
-# What every Container command's bash reads before the command: the Workspace DO points BASH_ENV here (`toolchainEnv`),
+# What every Container command's bash reads before the command: the Workspace DO points BASH_ENV here (`COMMAND_ENV`),
 # and bash reads the file named there when it starts non-interactively, as the `exec bash -c '…'` a command runs in
 # does. The command's own text is not changed, so its line numbers are its own.
 #

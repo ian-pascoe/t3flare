@@ -1,12 +1,11 @@
 /**
  * `@t3flare/mcp/types`: Effect Schemas for `McpHost`'s and `McpEngine`'s RPC (`McpEngineMethods` included). It never
- * loads the SDK, so Sessions, the `mcp` extension, `McpHost`, the web app and the bridge can import it; its test
+ * loads the SDK, so Sessions, the `mcp` extension, `McpHost` and the bridge can import it; its test
  * (`sdk-isolation.test.ts`) fails if it comes to.
  * What is here so far: the core's tagged `McpError`, `McpErrorWire` (with its fallback `OtherMcpError`, and
- * `mayHaveRun`) for the engine edge, the call context, the `prior` rows the host keeps for the engine,
- * `McpEngine`'s RPC, `McpEngineMethods`
- * with the Schemas of its sign-in read (`./public-fetch.ts`), and the
- * host's own RPC (`./host.ts`).
+ * `mayHaveRun`) for the engine edge, the call context, the `prior` rows the host keeps for the engine, `McpEngine`'s
+ * RPC, `McpEngineMethods` with the Schemas of its sign-in read (`./public-fetch.ts`), and the host's own RPC
+ * (`./host.ts`).
  */
 import * as Arr from "effect/Array";
 import * as Match from "effect/Match";

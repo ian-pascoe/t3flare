@@ -1,6 +1,6 @@
 /**
  * A stdio server reached through the Container bridge: the `fetch` the core is given for a stdio target, which hands
- * each request to the Workspaces Worker's `WorkspaceMcpBridge` (`MCP_BRIDGE`), and what the engine does with what comes
+ * each request to the agents Worker's `WorkspaceMcpBridge` (`MCP_BRIDGE`), and what the engine does with what comes
  * back.
  *
  * - **Every response must be the bridge's:** it carries `x-t3flare-bridge: <level>`. One below `MCP_BRIDGE_MIN_LEVEL`

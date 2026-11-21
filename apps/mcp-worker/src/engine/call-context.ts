@@ -1,8 +1,7 @@
 /**
- * One engine call's connection deps, over the host's `prior` rows and the call's hooks:
- * the rows live in memory for the call and the
- * ones it changed go back as `state`; `fetch` is the Worker's own, metered against the call's lease on the byte budget;
- * `auth` asks the host, and every token it gives is remembered so the result can be scrubbed of it.
+ * One engine call's connection deps, over the host's `prior` rows and the call's hooks: the rows live in memory for the
+ * call and the ones it changed go back as `state`; `fetch` is the Worker's own, metered against the call's lease on the
+ * byte budget; `auth` asks the host, and every token it gives is remembered so the result can be scrubbed of it.
  */
 // @effect-diagnostics globalFetch:off -- the engine reaches remote servers with the Worker's own `fetch`, under the core's tap.
 import type { McpDeps, RowStore } from "@t3flare/mcp";

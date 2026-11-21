@@ -1,9 +1,10 @@
 # t3flare's Container image (step 2a; ADR-0015: one image for Durable agents and, later, CLI agents).
 #
-# The Workspace Container's image: Ubuntu 26.04 LTS with fuse3, the everyday command-line tools, a C toolchain, computerd under its supervisor with a memory guard, and mise with its
-# installs of the base mise.toml's Toolchains. Every program a project uses is a mise Toolchain; the image's installs are only found by mise for a
-# Workspace that asks for those versions. The image is glibc-based because computerd is a glibc Node SEA, and
-# linux/amd64 because that is what Cloudflare Containers run.
+# The Workspace Container's image: Ubuntu 26.04 LTS with fuse3, the everyday command-line tools, a C toolchain,
+# computerd under its supervisor with a memory guard, and mise with its installs of the base mise.toml's Toolchains.
+# Every program a project uses is a mise Toolchain; the image's installs are only found by mise for a Workspace that
+# asks for those versions. The image is glibc-based because computerd is a glibc Node SEA, and linux/amd64 because
+# that is what Cloudflare Containers run.
 
 # Keep in step with the version of @cloudflare/computer the Workspace DO runs (apps/environment/test/cliManifest.test.ts
 # fails when they differ): the Workspace and computerd speak a sync protocol that is not stable across releases.
@@ -83,11 +84,10 @@ RUN apt-get update \
 COPY --from=computerd /usr/local/bin/computerd /usr/local/bin/computerd
 COPY --from=mise /mise /usr/local/bin/mise
 
-# The base mise.toml's Toolchains (a copy of BASE_MISE_TOML, apps/sandbox-image/src/toolchains.ts, which a test keeps
-# equal), installed into mise's system directory, /usr/local/share/mise/installs, where mise looks for a version a
-# config asks for before it downloads one. Its lockfile is made here too and copied by the bootstrap next to the base
-# file it writes, since `mise lock` downloads aqua and Python artifacts to checksum them. A Workspace asking for other
-# versions installs them under /root as before. Refresh the versions in toolchains.ts and here together.
+# The base mise.toml's Toolchains (`mise.toml`, which commands read as mise's system config), installed into mise's
+# system directory, /usr/local/share/mise/installs, where mise looks for a version a config asks for before it
+# downloads one. Its lockfile is made here too and copied by the bootstrap next to the base file it writes, since `mise lock` downloads aqua and Python artifacts to checksum them. A Workspace asking for other
+# versions installs them under /root as before.
 COPY mise.toml /usr/local/share/t3flare/mise.toml
 RUN cd /usr/local/share/t3flare \
  && export MISE_GLOBAL_CONFIG_FILE=/usr/local/share/t3flare/mise.toml MISE_TRUSTED_CONFIG_PATHS=/usr/local/share/t3flare \
@@ -156,9 +156,10 @@ RUN cp -a /usr/local/share/t3flare /usr/local/share/cloudpid
 # where it does not. mise keeps the Toolchains it installs on the Container's own disk, in its default place under
 # /root, and its shims put them on PATH, before the shims of the image's own installs. PATH is the one variable
 # computerd passes on to a command, so it is the one set here: mise's other settings reach a command in its exec
-# environment (apps/sandbox-image/src/toolchains.ts).
+# environment (`COMMAND_ENV`, apps/sandbox-image/src/env.ts).
 # computerd keeps its copy of the Workspace in COMPUTERD_DB, on the Container's disk, so a snapshot holds it with its
-# sync positions: a Container restored from one is sent only what changed since, not every file. In memory, the default, it is rebuilt from the Workspace DO at each start.
+# sync positions: a Container restored from one is sent only what changed since, not every file. In memory, the
+# default, it is rebuilt from the Workspace DO at each start.
 ENV PORT=8080 \
     MOUNT_POINT=/workspace \
     FUSE_MOUNT=auto \
