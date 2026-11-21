@@ -19,7 +19,8 @@
 // - The Owner clients' Elicitation modes (ADR-0035's 2026-11-15 refinement): `GET …/api/mcp/clients` lists them and
 //   `POST …/api/mcp/clients` `{ key, clientName, mode }` or `{ key, clientName, remove: true }`, behind the same write
 //   guard, changes one, audited. This is the only place a client's mode is set: the endpoint only reads it.
-import { BUILTIN_TOOLS, describeGlobalMise, ENVIRONMENT_SETTINGS, EXTENSIONS, type HarnessChange, ignoredServersOf, type McpChange, resolveEnvironment, resolveHarness, type ToolsChange } from "@t3flare/harness-registry";
+import { BUILTIN_TOOLS, describeGlobalMise, ENVIRONMENT_SETTINGS, EXTENSIONS, ignoredServersOf, resolveEnvironment, resolveHarness, type ToolsChange } from "@t3flare/harness-registry";
+import { decodeHarnessChange, decodeMcpChange } from "./changeBodies.ts";
 
 import type { AccessCaller } from "../access.ts";
 import type { McpHost } from "../mcp/host.ts";
@@ -304,7 +305,9 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
   }
   if (path === `${SETTINGS_PAGE_PATH}/api/mcp`) {
     if (body === undefined || typeof body.op !== "string" || typeof body.server !== "string") return refused(400, "the body is one change: { op, server, … }");
-    return answer(changeMcp(ops, changeOf(body) as unknown as McpChange, options));
+    const decoded = decodeMcpChange(changeOf(body));
+    if (!decoded.ok) return refused(400, `the body is one change: { op, server, … }: ${decoded.error}`);
+    return answer(changeMcp(ops, decoded.change, options));
   }
   if (path === `${SETTINGS_PAGE_PATH}/api/mcp/servers`) {
     return answer(
@@ -323,7 +326,9 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
   if (path === `${SETTINGS_PAGE_PATH}/api/mcp/oauth`) return answer(await beginMcpSignIn(ops, typeof body?.server === "string" ? body.server : "", options));
   if (path === `${SETTINGS_PAGE_PATH}/api/mcp/secret`) return answer(await setMcpHeader(ops, { server: typeof body?.server === "string" ? body.server : "", value: body?.value }, options));
   if (body === undefined || typeof body.extension !== "string") return refused(400, "the body is one change: { extension, enabled?, settings? }");
-  return answer(changeExtension(ops, changeOf(body) as unknown as HarnessChange, options));
+  const decoded = decodeHarnessChange(changeOf(body));
+  if (!decoded.ok) return refused(400, `the body is one change: { extension, enabled?, settings? }: ${decoded.error}`);
+  return answer(changeExtension(ops, decoded.change, options));
 };
 
 /**

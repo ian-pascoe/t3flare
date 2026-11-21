@@ -32,7 +32,20 @@ export interface DurableObjectHttp {
   readonly handle: (request: Request) => Promise<Response>;
 }
 
-const RESOLVE = Symbol.for("t3flare/http/resolve");
+/**
+ * Each request's settle, keyed by the `HttpServerRequest` handed to the app. Looked up along the request's prototype
+ * chain, as a property stashed on it would be: an upgrade's request is an `Object.create` over the one built from the web
+ * request, and a request derived the same way still finds it.
+ */
+const settlers = new WeakMap<object, (response: Response) => void>();
+
+const settlerOf = (request: object): ((response: Response) => void) | undefined => {
+  for (let at: object | null = request; at !== null; at = Object.getPrototypeOf(at) as object | null) {
+    const settle = settlers.get(at);
+    if (settle !== undefined) return settle;
+  }
+  return undefined;
+};
 
 const PREVIEW_STREAM_PREFIX = "/api/preview-stream/";
 const isPreviewStream = (request: Request) => new URL(request.url).pathname.startsWith(PREVIEW_STREAM_PREFIX);
@@ -77,7 +90,7 @@ export const make = () => {
           httpEffect,
           (request, response) =>
             Effect.sync(() => {
-              const resolve = (request as any)[RESOLVE] as ((response: Response) => void) | undefined;
+              const resolve = settlerOf(request);
               resolve?.(
                 HttpServerResponse.toWeb(response, {
                   withoutBody: request.method === "HEAD",
@@ -136,7 +149,7 @@ export const make = () => {
             : {}),
         });
       }
-      (serverRequest as any)[RESOLVE] = settle;
+      settlers.set(serverRequest, settle);
       const fiber = Effect.runForkWith(Context.add(context, HttpServerRequest.HttpServerRequest, serverRequest))(app);
       fiber.addObserver((exit) => {
         if (!settled) {

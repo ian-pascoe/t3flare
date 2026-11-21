@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsoleInEffect:off globalJsonInEffect:off effectFnOpportunity:off
+// @effect-diagnostics effectFnOpportunity:off
 // What the Cloud Environment's ACP flavors share (step 4b, plan §3.2 and §5 with the review's F1, F7, F9; back to stock,
 // owner 2026-11-12): the agent is pinned to its asking mode and t3 decides each request it asks, as stock t3's adapters
 // decide (plan §5.1); this module is that decision, the effort picker, a failed prompt's failure, and the plan capture
@@ -164,6 +164,7 @@ export const guardedRuntime = (cli: AcpCli, runtime: Runtime): Runtime => {
     setMode: (modeId) =>
       Effect.gen(function* () {
         if (modeId !== CLAUDE_AUTO_MODE || (yield* offersMode(modeId))) return yield* runtime.setMode(modeId);
+        // @effect-diagnostics-next-line globalConsoleInEffect:off globalJsonInEffect:off -- a structured Workers log line (its JSON shape is what the logs are queried by); plain data, so stringify cannot throw
         console.warn(JSON.stringify({ t3flare: "acp-auto-unavailable", cli, fallback: PINNED_MODE[cli] }));
         return yield* runtime.setMode(PINNED_MODE[cli]);
       }),

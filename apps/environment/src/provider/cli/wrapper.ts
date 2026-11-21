@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsoleInEffect:off globalJsonInEffect:off effectFnOpportunity:off cryptoRandomUUID:off
+// @effect-diagnostics effectFnOpportunity:off cryptoRandomUUID:off
 // The CLI adapters' wrapper (step 4a, plan §3 with review F1, F7, F10): t3's own Codex and Pi adapters, with what the
 // Cloud Environment changes around them.
 //
@@ -364,6 +364,7 @@ export const wrapCliAdapter = (adapter: ProviderAdapter.ProviderAdapterV2["Servi
               session.capFiber = yield* Effect.sleep(TURN_CAP_MS).pipe(
                 Effect.andThen(
                   Effect.sync(() => {
+                    // @effect-diagnostics-next-line globalConsoleInEffect:off globalJsonInEffect:off -- a structured Workers log line (its JSON shape is what the logs are queried by); plain data, so stringify cannot throw
                     console.warn(JSON.stringify({ t3flare: "cli-turn-cap", providerSessionId: input.providerSessionId, key: session.process?.key ?? null }));
                     session.process?.kill();
                   }),

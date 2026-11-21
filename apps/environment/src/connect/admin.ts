@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off globalJsonInEffect:off
+// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off
 // The Connect admin routes (step 3+, ADR-0025), under the Worker's admin check (Access plus the admin token):
 //
 //   POST /_t3flare/connect/sign-in            t3's device flow; answers the code and URL for the owner to approve
@@ -16,6 +16,8 @@
 // Mutations are owner-only on prod (review finding 6): the Worker says which caller it admitted, and only the owner's
 // own Access identity passes, never the stage's service token, which CI also holds.
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import type * as CliTokenManager from "t3/src/cloud/CliTokenManager.ts";
 import { cloudCliOAuthConfig, relayUrlConfig } from "t3/src/cloud/publicConfig.ts";
 
@@ -56,6 +58,8 @@ const parseToken = (body: unknown): CliTokenManager.PersistedToken | undefined =
   return { accessToken, refreshToken, expiresAtEpochMs };
 };
 
+const decodeJsonObject = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)));
+
 const probe = Effect.gen(function* () {
   const relayUrl = yield* relayUrlConfig;
   const oauth = yield* cloudCliOAuthConfig;
@@ -80,12 +84,9 @@ const probe = Effect.gen(function* () {
         signal: AbortSignal.timeout(10_000),
       }),
     );
-    let deviceFields: Array<string> = [];
-    try {
-      deviceFields = Object.keys(JSON.parse(device.body) as Record<string, unknown>).toSorted();
-    } catch {
-      // Not JSON: the status says enough.
-    }
+    // Not a JSON object: the status says enough.
+    const parsed = decodeJsonObject(device.body);
+    const deviceFields = Option.isSome(parsed) ? Object.keys(parsed.value).toSorted() : [];
     return {
       relay: { url: `${relayUrl}/health`, status: health.status, ms: health.ms, body: health.body.slice(0, 200) },
       // Field names only: the device and user codes are dropped here.

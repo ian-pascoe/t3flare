@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalDateInEffect:off effectFnOpportunity:off
+// @effect-diagnostics globalDate:off effectFnOpportunity:off
 // The Environment's file system with Workspaces in it (ADR-0008; step 2a plan, section 2): `/w` lists the registry's
 // Workspaces and `/w/<id>/…` is that Workspace DO's files over RPC; every other path is the State directory
 // (fileSystem.ts). An id the registry does not list is NotFound and never reaches a Durable Object.
@@ -7,6 +7,7 @@
 // listed from the registry and hold nothing else; `/w` lists projects only.
 import { REPO_ROOT, W_ROOT, WORKTREES_ROOT, WORKTREES_SEGMENT, isUnderW, normalize, toWorkspace, worktreeDirOf, type DirEntry, type FileStat, type FsAnswer } from "@t3flare/workspace-client";
 import * as ByteSize from "effect/ByteSize";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -110,8 +111,8 @@ const randomName = () => [...crypto.getRandomValues(new Uint8Array(8))].map((byt
  * Container (parity G7, `agents/scratch.ts`; t3's PR review guide). Any other temporary directory in `/w` is refused.
  */
 const scratchDir = (method: string, directory: string, prefix: string | undefined) =>
-  Effect.suspend(() => {
-    const made = makeScratchDir(directory, prefix, Date.now(), randomName);
+  Effect.flatMap(Clock.currentTimeMillis, (now) => {
+    const made = makeScratchDir(directory, prefix, now, randomName);
     return made === undefined
       ? Effect.fail(failure(method, directory, "BadResource", `t3flare: temporary directories in ${WORKTREES_ROOT} are only scratch checkouts (a prefix of letters, digits, '.', '_' or '-')`))
       : Effect.succeed(made);

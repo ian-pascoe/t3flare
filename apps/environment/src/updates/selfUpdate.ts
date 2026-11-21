@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDateInEffect:off effectFnOpportunity:off
+// @effect-diagnostics effectFnOpportunity:off
 // The stock client's server Update in the Cloud Environment (ADR-0037; in-app updates plan D2–D7): t3flare's own
 // `ServerSelfUpdate` and `ServiceLauncherClient`, which replace t3's in `t3/composition.ts` (ADR-0001: Layer).
 //
@@ -13,6 +13,7 @@
 //   and a failed `updateOutcome` (ServerLifecycleEvents replays the newest `ready` to every subscriber).
 import { ServerSelfUpdateError, type ServerLifecycleStreamEvent, type ServerSelfUpdateOutcome } from "@t3tools/contracts";
 import * as Duration from "effect/Duration";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
@@ -81,7 +82,7 @@ export const make = (options: { readonly version?: string; readonly track?: T3Tr
       let record = yield* Effect.tryPromise({ try: () => updates.settle("t3"), catch: (cause) => failWith(cause instanceof Error ? cause.message : String(cause)) }).pipe(
         Effect.catch((error) => Effect.logWarning("t3flare: could not read the server Update's run", { reason: error.reason }).pipe(Effect.as(updates.record("t3")))),
       );
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       if (record?.outcome?.status === "succeeded" && record.target !== version && now - record.outcome.at > LANDED_GRACE_MS) {
         record = updates.fail("t3", `The update's run passed, but this Environment still runs t3@${version}. ${record.outcome.reason}`);
       }

@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsoleInEffect:off globalJsonInEffect:off effectFnOpportunity:off
+// @effect-diagnostics effectFnOpportunity:off
 // Claude Code and OpenCode in the Cloud Environment (step 4b, plan §3 with the review's F1, F2, F4, F7, F9): t3's own
 // kinds (`claudeAgent` "Claude", `opencode` "OpenCode"), so the stock clients' names and icons apply, each built on
 // t3's generic ACP adapter (`makeAcpAdapterV2`) with a flavor of ours, running `claude-agent-acp` or `opencode acp` in
@@ -118,6 +118,7 @@ const spawnRuntime = (cli: AcpCli) => (input: AcpAdapterV2RuntimeInput) =>
         requestLogger: (event) =>
           Effect.andThen(
             LIFECYCLE.has(event.method) && event.status !== "started"
+              // @effect-diagnostics-next-line globalConsoleInEffect:off globalJsonInEffect:off -- a structured Workers log line (its JSON shape is what the logs are queried by); plain data, so stringify cannot throw
               ? Effect.sync(() => console.log(JSON.stringify({ t3flare: "acp-request", cli, method: event.method, status: event.status })))
               : Effect.void,
             options.requestLogger?.(event) ?? Effect.void,

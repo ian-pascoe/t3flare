@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsoleInEffect:off globalJsonInEffect:off effectFnOpportunity:off
+// @effect-diagnostics effectFnOpportunity:off
 // t3's spawns of a CLI agent (step 4a): `codex app-server` and `pi --mode rpc …` in a Workspace run there, through the
 // process channel, as a streaming `ChildProcessHandle`. Fail closed: only the argv our drivers send, only in a
 // Workspace, only through a CLI profile (cliProfiles.ts) that fixes the binary, the environment and the home.
@@ -156,6 +156,7 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
       },
     );
     if ("refused" in launch) {
+      // @effect-diagnostics-next-line globalConsoleInEffect:off globalJsonInEffect:off -- a structured Workers log line (its JSON shape is what the logs are queried by); plain data, so stringify cannot throw
       console.warn(JSON.stringify({ t3flare: "cli-spawn-refused", cli: name, reason: launch.refused, argv: args.slice(0, 6) }));
       return yield* refused(name, launch.refused);
     }
@@ -163,7 +164,9 @@ export const spawnCli = (command: ChildProcess.StandardCommand) =>
     // `--session <file>` on the new process instead of a `switch_session` message (the stdin hook below keeps that one).
     if (name === "pi" && args.includes("--session")) traceProtocol("pi", "--session", args[args.indexOf("--session") + 1] ?? "?");
     // The relay's wiring for this process (never the handle): whether t3's tools reach it, and through which session.
+    // @effect-diagnostics-next-line globalConsoleInEffect:off globalJsonInEffect:off -- a structured Workers log line (its JSON shape is what the logs are queried by); plain data, so stringify cannot throw
     console.log(JSON.stringify({ t3flare: "cli-relay", cli: name, session: session !== undefined, t3Tools: launch.env.T3_MCP_URL !== undefined }));
+    // @effect-diagnostics-next-line globalConsoleInEffect:off globalJsonInEffect:off -- a structured Workers log line (its JSON shape is what the logs are queried by); plain data, so stringify cannot throw
     if (launch.droppedEnv.length > 0) console.log(JSON.stringify({ t3flare: "cli-env-dropped", cli: name, keys: launch.droppedEnv }));
     const start: ChannelStart = {
       key,

@@ -1,7 +1,8 @@
-// @effect-diagnostics globalDateInEffect:off anyUnknownInErrorContext:off
+// @effect-diagnostics anyUnknownInErrorContext:off
 // SQL checks through t3's own SQL client (ADR-0006), run by the admin route `/_t3flare/check/sql`:
 // withTransaction rollback (and a nested savepoint rolled back alone), more than 100 bound parameters through
 // the adapter's inlining, and how reads behave behind an open transaction.
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 
@@ -64,7 +65,7 @@ export const sqlChecks = Effect.gen(function* () {
   const reads: Array<number> = [];
   const seen: Array<string> = [];
   const order: Array<string> = [];
-  const wall0 = Date.now();
+  const wall0 = yield* Clock.currentTimeMillis;
   const t0 = performance.now();
   yield* Effect.all(
     [
@@ -72,15 +73,15 @@ export const sqlChecks = Effect.gen(function* () {
         Effect.gen(function* () {
           yield* sql`UPDATE t3flare_probe SET label = 'locked' WHERE id = 2`;
           yield* Effect.sleep("50 millis");
-          order.push(`tx-body-end@${Date.now() - wall0}`);
+          order.push(`tx-body-end@${(yield* Clock.currentTimeMillis) - wall0}`);
         }),
-      ).pipe(Effect.tap(() => Effect.sync(() => order.push(`tx-committed@${Date.now() - wall0}`)))),
+      ).pipe(Effect.tap(() => Effect.map(Clock.currentTimeMillis, (now) => order.push(`tx-committed@${now - wall0}`)))),
       Effect.gen(function* () {
         yield* Effect.sleep("5 millis");
         const start = performance.now();
-        order.push(`read-issued@${Date.now() - wall0}`);
+        order.push(`read-issued@${(yield* Clock.currentTimeMillis) - wall0}`);
         const row = yield* sql<{ label: string }>`SELECT label FROM t3flare_probe WHERE id = 2`;
-        order.push(`read-done@${Date.now() - wall0}`);
+        order.push(`read-done@${(yield* Clock.currentTimeMillis) - wall0}`);
         reads.push(performance.now() - start);
         seen.push(row[0]?.label ?? "");
       }),

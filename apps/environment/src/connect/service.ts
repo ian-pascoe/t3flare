@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalDateInEffect:off globalFetchInEffect:off effectFnOpportunity:off
+// @effect-diagnostics globalDate:off effectFnOpportunity:off
 // The Connect service (step 3+, ADR-0025): a publish-only T3 Connect link, so the owner's phone hears when a cloud run
 // ends or waits. Everything is t3's own: the device-flow sign-in (`CliTokenManager.deviceAuthorizationLogin`), the
 // link step (`CloudLink.reconcileDesiredLinkIfStillDesired`), the token store, and the publisher, which then publishes
@@ -27,7 +27,9 @@ import * as ManagedLimits from "t3/src/policy/managedLimits.ts";
 import * as AgentAwarenessRelay from "t3/src/relay/AgentAwarenessRelay.ts";
 import type { ThreadId } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
+import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -50,6 +52,9 @@ export const LINK_ORIGIN = "http://127.0.0.1:443";
 
 /** The idle hold the sign-in's poll takes while its code is valid. */
 export const SIGN_IN_HOLD = Idle.CONNECT_SIGN_IN_HOLD;
+
+/** `ms` since the epoch as an ISO timestamp, as `Date#toISOString` writes it. */
+const isoAt = (ms: number): string => DateTime.formatIso(DateTime.makeUnsafe(ms));
 
 /** The phases that leave a card or an alert standing on the phone until something replaces them. */
 const LIVE_PHASES = new Set(["starting", "running", "waiting_for_approval", "waiting_for_input"]);
@@ -184,19 +189,19 @@ export const make = (policy: ConnectPolicy, recorder: PublishRecorder) =>
       lock.withPermits(1)(tokens.store(token).pipe(Effect.mapError((e) => fail("store-account-token", e.message)), Effect.andThen(linkNow)));
 
     const signIn = Effect.gen(function* () {
-      if (pending !== undefined && Date.now() < pending.until) return yield* Deferred.await(pending.prompt);
+      if (pending !== undefined && (yield* Clock.currentTimeMillis) < pending.until) return yield* Deferred.await(pending.prompt);
       const prompt = yield* Deferred.make<SignInPrompt, ConnectError>();
-      const startedAt = Date.now();
+      const startedAt = yield* Clock.currentTimeMillis;
       // Until the code arrives, a short hold; then until it expires (plan section 2.1).
       pending = { prompt, until: startedAt + 30_000 };
       Idle.hold(SIGN_IN_HOLD, startedAt + 30_000);
-      flow = { state: "pending", startedAt: new Date(startedAt).toISOString(), expiresAt: null };
+      flow = { state: "pending", startedAt: isoAt(startedAt), expiresAt: null };
       const run = CliTokenManager.deviceAuthorizationLogin((shown) =>
-        Effect.sync(() => {
-          const until = Date.now() + Duration.toMillis(shown.expiresIn);
+        Effect.map(Clock.currentTimeMillis, (now) => {
+          const until = now + Duration.toMillis(shown.expiresIn);
           pending = { prompt, until };
           Idle.hold(SIGN_IN_HOLD, until + 5_000);
-          flow = { state: "pending", startedAt: new Date(startedAt).toISOString(), expiresAt: new Date(until).toISOString() };
+          flow = { state: "pending", startedAt: isoAt(startedAt), expiresAt: isoAt(until) };
         }).pipe(
           Effect.andThen(
             Deferred.succeed(prompt, {
@@ -213,7 +218,7 @@ export const make = (policy: ConnectPolicy, recorder: PublishRecorder) =>
           Effect.gen(function* () {
             Idle.release(SIGN_IN_HOLD);
             pending = undefined;
-            const at = new Date().toISOString();
+            const at = DateTime.formatIso(yield* DateTime.now);
             flow = Exit.isSuccess(exit)
               ? { state: "linked", at, accountTokenKept: exit.value.accountTokenKept }
               : { state: "failed", at, error: describeFailure(exit.cause) };
@@ -240,6 +245,7 @@ export const make = (policy: ConnectPolicy, recorder: PublishRecorder) =>
       const environmentId = yield* environment.getEnvironmentId;
       const response = yield* Effect.tryPromise({
         try: () =>
+          // @effect-diagnostics-next-line globalFetchInEffect:off -- the Worker's global fetch, as before: connectLink.test.ts stubs it, and the HttpClient service in scope is t3's sign-in client
           fetch(`${url}/v1/client/environment-links/${encodeURIComponent(environmentId)}`, {
             method: "DELETE",
             headers: { authorization: `Bearer ${token.value.accessToken}` },
@@ -269,6 +275,7 @@ export const make = (policy: ConnectPolicy, recorder: PublishRecorder) =>
       const get = (path: string) =>
         Effect.tryPromise({
           try: async () => {
+            // @effect-diagnostics-next-line globalFetchInEffect:off -- the Worker's global fetch, as before: connectLink.test.ts stubs it, and the HttpClient service in scope is t3's sign-in client
             const response = await fetch(`${url}${path}`, { headers: { authorization: `Bearer ${token.value.accessToken}` }, signal: AbortSignal.timeout(10_000) });
             return { status: response.status, body: response.ok ? ((await response.json()) as Record<string, unknown>) : null };
           },

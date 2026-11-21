@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalConsoleInEffect:off globalJsonInEffect:off effectFnOpportunity:off
+// @effect-diagnostics globalConsole:off effectFnOpportunity:off
 // The Codex CLI in the Cloud Environment (step 4a, plan §3, §3.1): t3's own Codex adapter (`makeCodexAdapterV2`) with
 // t3flare's readiness (the image's version and the OpenAI Responses Model endpoints; it needs setup without one,
 // SPI-1176; never a spawning probe), its own app-server client factory (a spawn in the thread's Workspace, the request
@@ -99,6 +99,7 @@ export const guardClient = (client: CodexClient.CodexAppServerClient["Service"],
     const sent = THREAD_OPENERS.has(method) ? opened.pipe(Effect.tap((result) => Effect.sync(() => remember(result)))) : opened;
     if (method === "turn/start") {
       // SPI-1167: a turn Codex refuses to start names why in the Environment's log (t3 shows a generic failure).
+      // @effect-diagnostics-next-line globalConsoleInEffect:off globalJsonInEffect:off -- a structured Workers log line (its JSON shape is what the logs are queried by); plain data, so stringify cannot throw
       return sent.pipe(Effect.tapError((error) => Effect.sync(() => console.warn(JSON.stringify({ t3flare: "codex-turn-start-failed", error: String(error).slice(0, 300) })))));
     }
     // The resume proof (M5): Codex resumed this native thread itself, not a handoff.
