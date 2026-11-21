@@ -1,5 +1,5 @@
-// Adapted from cloudpid@93ba45a3:packages/extensions/src/web.ts (SPI-1054; parity row pi-web-tools): the `web`
-// extension, `web_fetch` (the Worker's own `fetch`, through the SSRF guard) and, when the harness setting turns it on,
+// The `web` extension (SPI-1054; parity row pi-web-tools):
+// `web_fetch` (the Worker's own `fetch`, through the SSRF guard) and, when the harness setting turns it on,
 // `web_search` (a search-capable model on a Model endpoint; `web/search.ts` says why). Both are reads: no mode asks
 // for them, and linked threads may use them. In code mode they are the `web` namespace.
 import { defineExtension, type Extension } from "@earendil-works/pi-durable";

@@ -1,11 +1,11 @@
 // @effect-diagnostics missingPipeableSignature:off preferEffectArray:off preferEffectRecord:off -- plain functions over values, with checks that end early.
-// The page a URL-mode elicitation asks the owner to open, and which pages cloudpid declines without showing
+// The page a URL-mode elicitation asks the owner to open, and which pages t3flare declines without showing
 // (`docs/architecture/mcp-server-requests.md` → Elicitation requests → URL mode; #388 D9.1, D9.2). Pure and SDK-free, so
 // the Session and its tests import it from `@t3flare/mcp/elicitation-url`, not `./types`: it carries the Public Suffix List
 // (`tldts`), which the web, importing `./types`, never runs.
 //
 // - **Declined unseen:** a scheme other than `https:`, userinfo, `localhost`, `*.localhost`, `*.local`, `*.internal`, a
-//   loopback, private, link-local, CGNAT or ULA IP literal, and cloudpid's own hosts (given as a predicate, since they
+//   loopback, private, link-local, CGNAT or ULA IP literal, and t3flare's own hosts (given as a predicate, since they
 //   are a deployment's). The server is told `decline`, and the owner and the agent are told why.
 // - **Malformed:** an address that is not one, or over `ELICITATION_URL_MAX` characters.
 // - **What the card shows:** the address as the browser opens it, its host in ASCII (punycode), the registrable domain to
@@ -31,7 +31,7 @@ export type ElicitationPage = {
   readonly warning?: "idn" | "mixed_script";
 };
 
-/** Why a page is not shown: cloudpid declines it (`decline`, with a reason) or it is malformed (`-32602`). */
+/** Why a page is not shown: t3flare declines it (`decline`, with a reason) or it is malformed (`-32602`). */
 export type ElicitationPageProblem = {
   readonly kind: "declined" | "malformed";
   readonly reason: string;
@@ -164,7 +164,7 @@ export const registrableDomain = (host: string): string =>
   getDomain(host, { allowPrivateDomains: true }) ?? host;
 
 /**
- * The page `text` names, or why it is not shown. `isOwnHost` says whether a host (lowercase, ASCII) is one of cloudpid's
+ * The page `text` names, or why it is not shown. `isOwnHost` says whether a host (lowercase, ASCII) is one of t3flare's
  * own, which a server must not send the owner to (a route like `/oauth/mcp/start`).
  */
 export const checkElicitationUrl = (

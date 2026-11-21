@@ -381,7 +381,7 @@ export class NotFound extends Schema.TaggedError<NotFound, { readonly brand: uni
   },
 ) {}
 
-/** The server and cloudpid share no protocol version, or the server does not offer what was asked. */
+/** The server and t3flare share no protocol version, or the server does not offer what was asked. */
 export class Unsupported extends Schema.TaggedError<
   Unsupported,
   { readonly brand: unique symbol }

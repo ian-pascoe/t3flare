@@ -101,7 +101,7 @@ describe("Variables", () => {
       [`config: password = "${"h".repeat(24)}"`, "an assigned key, token, secret or password"],
     ];
     for (const [value, looksLike] of values) expect(refusal({ SETTING: value })).toBe(`variables: "SETTING"'s value looks like ${looksLike}, and secrets never enter a Container (ADR-0016)`);
-    // cloudpid's local-path patterns are not taken: a path on a machine is a fine value.
+    // Local-path patterns are not taken: a path on a machine is a fine value.
     expect(apply({ CACHE: "/home/runner/.cache", DIR: "/Users/me/x" })).toMatchObject({ ok: true });
   });
 

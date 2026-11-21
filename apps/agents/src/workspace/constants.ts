@@ -34,8 +34,7 @@ export const TERMINAL_IDLE_MS = 30 * 60_000;
 export const TERMINAL_PROMPT_IDLE_MS = 10 * 60_000;
 
 /**
- * Dependency directories, build output and caches stay on the Container's disk, out of the Workspace DO (cloudpid's
- * TOOLCHAIN_IGNORE, trimmed): syncing them would fill the DO's SQLite and slow every command.
+ * Dependency directories, build output and caches stay on the Container's disk, out of the Workspace DO: syncing them would fill the DO's SQLite and slow every command.
  */
 export const CONTAINER_IGNORE: ReadonlyArray<string> = [
   "**/node_modules",

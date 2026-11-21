@@ -1,8 +1,8 @@
 // @effect-diagnostics globalDate:off globalConsole:off globalTimers:off
-// The MCP host (ADR-0028; cloudpid's McpHost, plan §3.0): the Environment DO's part that holds the MCP server set's
-// inventory, each server's protocol state and its credentials, and makes every MCP list and call through the MCP
-// Worker's engine (`MCP_ENGINE`), the one place the SDK runs. No credential leaves the Environment Worker except inside
-// the engine call that uses it; the engine scrubs it (`redact`) from whatever comes back.
+// The MCP host (ADR-0028, plan §3.0): the Environment DO's part that holds the MCP server set's inventory, each
+// server's protocol state and its credentials, and makes every MCP list and call through the MCP Worker's engine
+// (`MCP_ENGINE`), the one place the SDK runs. No credential leaves the Environment Worker except inside the engine call
+// that uses it; the engine scrubs it (`redact`) from whatever comes back.
 //
 // - Inventory: each server's tools, listed at most every 10 minutes, on the panel's test, or after a failure; a failed
 //   list keeps the last one, marked stale. Capped per server (review M12).
@@ -42,7 +42,7 @@ import { settingsDefinitions } from "../settings/tools.ts";
 import { canonicalJson } from "./canonical.ts";
 import { type ElicitAnswer, type ElicitResultOrCancel, isPausingServer, pauseOf, planPause, planQuestion, type QuestionContext, type QuestionPlan } from "./elicitation.ts";
 
-/** How long a server's question waits for the owner: cloudpid's Legacy wait, and the CLI card's (`CLI_ASK_MS`). */
+/** How long a server's question waits for the owner: the Legacy wait, and the CLI card's (`CLI_ASK_MS`). */
 export const QUESTION_WAIT_MS = MCP_ELICITATION_WAIT_MS;
 
 /** The MCP Worker's `McpEngine`, as the Environment binds it. */

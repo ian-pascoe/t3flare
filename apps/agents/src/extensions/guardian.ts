@@ -1,6 +1,5 @@
 // Adapted from ian-pascoe/pi-extensions@a5e15d1:packages/pi-guardian (SPI-1058; parity row pi-guardian),
-// `guardian-gate.ts` in particular: the Guardian, a reviewer model that judges risky tool calls before they run. cloudpid
-// has no port (its v2 list names it "needing an approval primitive in the UI"); t3's own approvals stay what they are,
+// `guardian-gate.ts` in particular: the Guardian, a reviewer model that judges risky tool calls before they run. t3's own approvals stay what they are,
 // and the Guardian sits beside them: a pi-durable `beforeTool` hook, so it runs before any approval card is raised
 // (`permissions.ts` wraps the tools inside the call), and it sees code mode's nested calls too (`call.parent`).
 //

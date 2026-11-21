@@ -6,11 +6,11 @@ Status: accepted (SPI-1148, 2026-11-14; decided in SPI-1001's triage, refined by
 [ADR-0032](0032-environment-settings-and-harness-settings-are-separate-entities-edited-on-one-owner-page.md).
 
 SPI-1147 gave Durable agents a Workspace's Repo skills. The owner also wants Skills of his own in every Project,
-installed from GitHub on the Harness panel: **Environment skills**. They follow cloudpid's ADR-0026 (Skills kept by
-cloudpid and fetched from GitHub), cut to t3flare: one Environment, the owner's changes only.
+installed from GitHub on the Harness panel: **Environment skills**. Skills are kept by
+the Environment and fetched from GitHub: one Environment, the owner's changes only.
 
 1. **GitHub only.** A Skill source is `owner/repo`, `owner/repo@skill`, or `https://github.com/owner/repo/tree/<ref>/<path>`,
-   ported with cloudpid's fetch (the `skills` CLI's path rules, MIT). Other hosts are not installed from.
+   fetched by the `skills` CLI's path rules (MIT). Other hosts are not installed from.
 2. **The credential is the Environment DO's.** It reads GitHub itself, with a token it mints and drops; no Session,
    Container, page or log sees it.
    - A repo the GitHub App is installed on is read with a token for that repo alone (`contents: read`,
@@ -52,7 +52,7 @@ cloudpid and fetched from GitHub), cut to t3flare: one Environment, the owner's 
      they are gone at the next Container start.
    - A set a Workspace cannot mount is refused and reported (the panel's Status shows the last), and not read again
      until the hash moves; the Workspace keeps the set it held, else the empty set.
-   - computer 0.11.2 indexes a mount once per object, so a dependency patch adds `Workspace.remount()` (cloudpid's, about
+   - computer 0.11.2 indexes a mount once per object, so a dependency patch adds `Workspace.remount()` (about
      20 lines, `patches/deps/@cloudflare__computer@0.11.2.patch`); it runs only inside `blockConcurrencyWhile`, since
      computer leaves a mount writable while it copies.
 6. **An Environment skill beats a Repo skill of the same name**, so a fork cannot replace the owner's Skill. The
@@ -65,10 +65,10 @@ cloudpid and fetched from GitHub), cut to t3flare: one Environment, the owner's 
 ## Considered options
 
 - **`npx skills` in a Container.** Every install and update would need a running Container, the panel included, and the
-  CLI's flags change between releases (its `check` applies updates). Rejected, as in cloudpid.
+  CLI's flags change between releases (its `check` applies updates). Rejected.
 - **References only** (a lock file each Container installs from). A new Workspace would have no Skills until its
   Container started, every start would need GitHub, and the first prompt is built before that. Rejected.
-- **Repo wins** (cloudpid's rule). A fork's `.agents/skills/<name>` would silently replace the owner's Skill. Rejected:
+- **Repo wins**. A fork's `.agents/skills/<name>` would silently replace the owner's Skill. Rejected:
   the Environment's is the owner's choice for every Project.
 - **No patch on computer: a throwaway second `ComputerWorkspace`** over the same storage, whose public
   `ensureMountsIndexed()` re-indexes. Rejected: it leans on more of computer's internals (two instances over one

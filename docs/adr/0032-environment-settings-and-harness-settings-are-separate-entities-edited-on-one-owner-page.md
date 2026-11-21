@@ -9,8 +9,8 @@ day). Report: [`docs-archive-1:docs/steps/environment-settings.md`](https://gith
 ADR-0026 gave t3flare one owner page and one settings entity, the **Harness settings**: Pi Durable's extensions and the
 MCP server set, read by a Session at a turn's start. What every Workspace's Container gets (its size, how long it may
 sit idle, how many run at once, and later the Global mise config and the Environment skills) is a different thing with
-different readers, so it is a second entity, the **Environment settings**, modelled on cloudpid's Environment
-configuration. Both are edited on the one page at `/_t3flare/harness`, the Environment ones in its Environment section.
+different readers, so it is a second entity, the **Environment settings**, modelled on t3's own
+settings. Both are edited on the one page at `/_t3flare/harness`, the Environment ones in its Environment section.
 
 1. **Keys, revisions and readers.**
 
@@ -36,7 +36,7 @@ configuration. Both are edited on the one page at `/_t3flare/harness`, the Envir
    before: 1 vCPU, 3 GiB, 12 GB) and Cloudflare's `standard-1` to `standard-4`. The class runs under
    `schedulingPolicy: "durable_object"`, which takes an `instance` per `start()`. Every start passes one: an omitted
    `instance` starts `lite`, and a stored name t3flare does not offer starts the default. `lite` and `basic` (which the
-   runtime refuses) are not offered, nor cloudpid's other custom sizes. A stored name never changes meaning: adding a
+   runtime refuses) are not offered, nor other custom sizes. A stored name never changes meaning: adding a
    size is free, removing one needs a rename map.
 5. **A running Container keeps what it started with.** The Workspace DO records each start's size, idle time and
    budget, and adopts a running Container with the `instance` it started with (computer relaunches one whose launch
@@ -83,7 +83,7 @@ do this: it reaches a tool run through a shim or `mise exec`, not a plain shell 
 agent's own process, which are fixed-path binaries outside mise.
 
 1. **Shape.** One setting, `variables`, of the schema's own `variables` type: at most 50, each name one a shell can
-   export (up to 128 characters), each value up to 4,096 characters without a NUL (cloudpid's limits). The panel shows
+   export (up to 128 characters), each value up to 4,096 characters without a NUL. The panel shows
    them as a list in the Environment section, behind the same guards.
 2. **Refused names**, checked by the API and again when read:
    - the names t3flare already sets or pins: every name `COMMAND_ENV`, a CLI profile's environment, Codex's shell
@@ -94,7 +94,7 @@ agent's own process, which are fixed-path binaries outside mise.
    - the prefixes `T3`, `MISE_`, `GIT_`, `GH_`, `GITHUB_`, `SSH_`, `LD_`;
    - the loader hooks `NODE_OPTIONS`, `BASH_ENV`, `ENV`, `PROMPT_COMMAND`;
    - a name with a `KEY`, `TOKEN`, `SECRET`, `PASSWORD` or `CREDENTIAL` segment, in any case, singular or plural.
-3. **Refused values**: cloudpid's credential patterns, without its two local-path patterns. A Variable is
+3. **Refused values**: credential patterns (`packages/harness-registry/src/variables.ts`). A Variable is
    agent-readable, so it is never a credential (ADR-0016 A′). These refusals are guard rails for the owner, not a
    boundary against him.
 4. **A stored Variable a later rule refuses is dropped alone**, not the whole set: §2's "a value that no longer fits
@@ -130,8 +130,7 @@ Report: [`docs-archive-1:docs/steps/global-mise.md`](https://github.com/spiritle
 [`global-mise-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/global-mise-plan.md). The Environment settings gain the **Global mise config**: the
 owner's `mise.toml` text, which every Container's commands get as mise's global config.
 
-1. **Shape.** One setting, `globalMiseConfig`, of the schema's `file` type: at most 16 KiB of UTF-8, no NUL (cloudpid's
-   `toolchainsProblem`), line ends stored as LF so a browser's round trip is not a change. The panel shows it as a text
+1. **Shape.** One setting, `globalMiseConfig`, of the schema's `file` type: at most 16 KiB of UTF-8, no NUL, line ends stored as LF so a browser's round trip is not a change. The panel shows it as a text
    area of its own, without `maxlength` (which counts UTF-16 units; the API's refusal is the limit).
 2. **Layers.** Every command's environment (`COMMAND_ENV`) makes the image's base file mise's *system* config and the
    Container-local `/var/lib/t3flare/mise/config.toml` its *global* config. mise layers system < global < project and

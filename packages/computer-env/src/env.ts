@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/env.ts; t3flare adds `containerEnv` (step 2a M5).
 // `ComputerExecutionEnv`: pi-durable's `ExecutionEnv` over a Workspace DO stub (docs/architecture/workspace.md → Filesystem and tools).
 // File operations run in the Workspace DO and answer plain data (`host.ts`); commands run on the Workspace's runtime
 // through `@cloudflare/computer`'s RPC client (`exec.ts`).

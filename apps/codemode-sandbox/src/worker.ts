@@ -1,4 +1,4 @@
-// The codemode sandbox Worker (ADR-0027; cloudpid's apps/codemode-sandbox, its ADR-0005): pi-codemode's QuickJS sandbox
+// The codemode sandbox Worker (ADR-0027): pi-codemode's QuickJS sandbox
 // Durable Object, one object per Session (`RemoteCodemodeSandbox` in the Session DO picks it by the Session's name). A
 // Worker of its own so a script that computes holds this isolate's thread, not the Session's. No public URL and no
 // routes: the agents Worker's Durable Object binding (by this Worker's script name) is the only way in.

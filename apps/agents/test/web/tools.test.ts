@@ -1,4 +1,4 @@
-// The web tools (SPI-1054) over a fake network: `web_fetch` through the SSRF guard (cloudpid's fetch.test.ts cases that
+// The web tools (SPI-1054) over a fake network: `web_fetch` through the SSRF guard (the cases that
 // matter here), and `web_search` through an endpoint's search-capable model (an Anthropic Messages answer with
 // `web_search_tool_result` blocks, as Commissary returns it for Claude and for Codex upstreams).
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";

@@ -1,5 +1,5 @@
 /**
- * The OAuth Client Credentials grant, and `private_key_jwt`: cloudpid's own additions to pi-mcp's `oauth`
+ * The OAuth Client Credentials grant, and `private_key_jwt`: t3flare's own additions to pi-mcp's `oauth`
  * (`docs/architecture/mcp-sign-in.md` → Client Credentials; The MCP core #394 D6, Signing in #390 D8). Re-exported by
  * `./oauth`, so the Registry reaches it without the SDK.
  *

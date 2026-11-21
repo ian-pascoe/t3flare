@@ -1,5 +1,4 @@
-// A Container preview (G11's M3, ADR-0031; ported from cloudpid@93ba45a3's `apps/server/src/workspace/container-preview.ts`,
-// its ADR-0023): a request a preview browser's page made to `http://<port>.t3flare.internal/`, which Browser Run sent to
+// A Container preview (G11's M3, ADR-0031): a request a preview browser's page made to `http://<port>.t3flare.internal/`, which Browser Run sent to
 // the Environment Worker's `ContainerPreviews` entrypoint, made for this Workspace, which hands it here through the agents
 // Worker's `WorkspaceContainerPreviews`. It is answered from the Container's port (`getTcpPort`), on the Container's
 // interface, so a dev server must listen on `0.0.0.0`. A Container preview never starts the Container: a stopped one
@@ -26,7 +25,7 @@ export const CONTAINER_PREVIEW_KEEP_ALIVE_MS = 15_000;
 
 /**
  * The most of a carried socket's stream that may wait unread, a bound on the memory a page that stopped reading holds
- * between two ticks: 8 MiB here (cloudpid's 96 MiB), as the Workspace DO also runs the Workspace (R7). A dev server's
+ * between two ticks: 8 MiB, as the Workspace DO also runs the Workspace (R7). A dev server's
  * HMR messages are far smaller; a larger one ends the socket, and the page's client reconnects.
  */
 export const CONTAINER_PREVIEW_MAX_UNREAD_BYTES = 8 * 1024 * 1024;

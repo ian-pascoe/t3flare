@@ -1,5 +1,5 @@
 /**
- * The pages cloudpid declines unseen, and the ones it shows (`docs/architecture/mcp-server-requests.md` → Elicitation
+ * The pages t3flare declines unseen, and the ones it shows (`docs/architecture/mcp-server-requests.md` → Elicitation
  * requests → URL mode; #388 D9.1, D9.2): golden lists, since a miss in either is a server sending the owner somewhere
  * it should not, or a page the owner is never shown.
  */

@@ -1,7 +1,6 @@
 /**
- * Registers t3flare's GitHub App (ADR-0013) through GitHub's manifest flow and hands its secrets to the deploys. Copied from
- * cloudpid@ae5a7b73:infra/github-app-setup.ts and adapted. Run from a workstation with `gh` signed in as the owner, and a
- * browser:
+ * Registers t3flare's GitHub App (ADR-0013) through GitHub's manifest flow and hands its secrets to the deploys. Run from a workstation with
+ * `gh` signed in as the owner, and a browser:
  *
  *   pnpm --filter @t3flare/infra run github-app:setup [--name t3flare] [--repo owner/name]
  *

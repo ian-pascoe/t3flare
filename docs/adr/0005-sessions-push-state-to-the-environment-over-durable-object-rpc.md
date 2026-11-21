@@ -6,7 +6,7 @@ Rule: never call a Session from inside a SQL transaction. `storage.transaction()
 
 ## Considered Options
 
-- **An outbound WebSocket per active Session** (cloudpid's session socket): pins the Environment DO, counts against the 6 outgoing connections, and needs reconnect logic on both ends.
+- **An outbound WebSocket per active Session** (a socket from each Session): pins the Environment DO, counts against the 6 outgoing connections, and needs reconnect logic on both ends.
 - **Hosting the Harness inside the Environment DO**: every agent in one 128 MB single-threaded isolate.
 
 ## Refinement (2026-11-21): a push goes out from the Session's alarm

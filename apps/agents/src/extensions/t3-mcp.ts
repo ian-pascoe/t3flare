@@ -1,5 +1,5 @@
 // The `t3-mcp` extension (step 3, plan section 4.3; ADR-0022): t3's MCP tools in a Durable agent's Session, built from
-// the catalog t3 lists for this thread's own credential (cloudpid's ADR-0030: an extension rebuilt from the MCP
+// the catalog t3 lists for this thread's own credential (an extension rebuilt from the MCP
 // inventory). Calls go Session → Environment DO (`EnvironmentDO.mcp`) → t3's `/mcp`, never the public host and never
 // from a Container: the credential lives in the Session's storage alone.
 //

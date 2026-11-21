@@ -5,7 +5,7 @@
 //   - check:fs: every node:fs member t3's bundled modules read is implemented by a State directory shim, or allowed
 //     with its reason (SPI-1301; `build.ts --check-fs`, a bundle kept in memory)
 //   - check:workspace: pnpm-workspace.yaml, package.json and mise.toml match the pinned t3code
-//   - check:lock: t3's importers install exactly what t3's lock installs, one `effect`, patches, vendored links
+//   - check:lock: t3's importers install exactly what t3's lock installs, one `effect`, patches
 //   - test:scripts: the root scripts' own tests, on `node --test`
 //   - typecheck: `effect-tsgo tsrs` per package, and for the root `scripts/` (typecheck:scripts, its own tsconfig);
 //     lint: oxlint, type-aware through tsrs-lint, which oxlint finds by itself (ADR-0030), with `--deny-warnings` and

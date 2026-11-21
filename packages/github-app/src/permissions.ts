@@ -1,4 +1,4 @@
-// The GitHub permissions t3flare asks for (ADR-0013; adapted from cloudpid@ae5a7b73:packages/config/src/github-permissions.ts).
+// The GitHub permissions t3flare asks for (ADR-0013).
 // One list per kind of token (Container, Environment, skill fetch, update dispatch), so a permission the App gains reaches
 // a token only by being added to that token's list on purpose.
 

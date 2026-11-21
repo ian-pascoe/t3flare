@@ -1284,7 +1284,7 @@ export const TASKS_EXTENSION = "io.modelcontextprotocol/tasks";
  * `Mcp-Param-Region` header; `polls` is how many `tasks/get` it takes to complete (default 1); `bytes` makes the
  * result that much text; `inline` answers at once as a synchronous call does, even to a client that declared the
  * extension; `ask` makes the task wait for an answer to a form (`tasks/update`) before it completes, `sample` for the answer to
- * a Sampling request, `page` for a URL-mode page and `unsupported` for a form cloudpid cannot take; `lag` keeps it
+ * a Sampling request, `page` for a URL-mode page and `unsupported` for a form t3flare cannot take; `lag` keeps it
  * `input_required` for that many polls after the answer; `fail` ends it `failed`.
  */
 export const REPORT_TOOL = {

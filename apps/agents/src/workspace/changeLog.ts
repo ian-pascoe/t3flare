@@ -1,4 +1,4 @@
-// Copied from cloudpid@b8097ff0:apps/server/src/workspace/change-log.ts; t3flare reads `changedBetween` for the write journal of the stale git reads (`./staleReads.ts`).
+// t3flare reads `changedBetween` for the write journal of the stale git reads (`./staleReads.ts`).
 // What computer's sync has sent the Container, read from its change log in the Workspace DO's SQLite (dofs, inside
 // `@cloudflare/computer`), for the file-change signal (docs/architecture/container.md → File-change signals;
 // `notify.ts`). Every write to the Workspace's files takes the next revision (`vfs_meta.rev`) and stamps it on the

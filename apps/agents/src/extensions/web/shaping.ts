@@ -1,6 +1,5 @@
-// Copied from cloudpid@93ba45a3:packages/extensions/src/web/search.ts (SPI-1054; see ./NOTICE.md): `web_search`'s
-// answer shaping (its Exa-style result list shares the `contextMaxCharacters` budget so each result keeps its Title and
-// URL) and the sanitizer for text a provider controls, unchanged but for this header and the exports. `search.ts`
+// `web_search`'s answer shaping (SPI-1054; see ./NOTICE.md; its Exa-style result list shares the `contextMaxCharacters` budget so each result keeps its Title and
+// URL) and the sanitizer for text a provider controls. `search.ts`
 // writes its results in the same `Title:`/`URL:` shape so the same budget applies.
 import * as Arr from "effect/Array";
 import * as Order from "effect/Order";

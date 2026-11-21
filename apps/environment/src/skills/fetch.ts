@@ -1,9 +1,9 @@
 // Fetching Environment skills from a GitHub repo (SPI-1148, ADR-0033): resolve the ref to a commit, list the commit's
 // tree, pick the Skill folders by the `skills` CLI's path rules (`paths.ts`), and read the chosen Skills' files at that
-// commit. GitHub is read through a `RepoReader` (`contents.ts` asks GitHub with the Environment's token), so the rules are
-// tested without a network. Nothing is kept here: the store keeps what comes out. Ported from cloudpid@47941c7c
-// (`apps/server/src/github/skill-fetch.ts`), cut to what the Settings page asks: a preview, a fetch of the folders the
-// owner picked at the previewed commit, and an update check that reads no file.
+// commit. GitHub is read through a `RepoReader` (`contents.ts` asks GitHub with the Environment's token), so the rules
+// are tested without a network. Nothing is kept here: the store keeps what comes out. It is cut to what the Settings
+// page asks: a preview, a fetch of the folders the owner picked at the previewed commit, and an update check that
+// reads no file.
 //
 // Every request is bounded (plan §3.3): a preview reads one commit, one tree and at most `MAX_SKILL_CANDIDATES`
 // `SKILL.md` blobs; a fetch reads each chosen folder's `SKILL.md`, checks the folder from the tree, and refuses before
@@ -108,7 +108,7 @@ export const slug = (name: string): string =>
 
 const basename = (path: string): string => path.slice(path.lastIndexOf("/") + 1);
 
-/** Whether the Skill named `skill.name` in folder `skill.path` is the one `name` asks for (cloudpid's `isNamedSkill`). */
+/** Whether the Skill named `skill.name` in folder `skill.path` is the one `name` asks for. */
 export const isNamedSkill = (skill: { readonly name: string; readonly path: string }, name: string): boolean =>
   skill.name.toLowerCase() === name.toLowerCase() || slug(skill.name) === slug(name) || slug(basename(skill.path)) === slug(name);
 
@@ -294,7 +294,7 @@ export interface FetchedSkill {
   /** Its folder in the repo (`""` for the repo's root). */
   readonly path: string;
   readonly disableModelInvocation: boolean;
-  /** cloudpid's folder hash: SHA-256 over the kept files' paths and blob SHAs. */
+  /** The folder hash: SHA-256 over the kept files' paths and blob SHAs. */
   readonly digest: string;
   readonly bytes: number;
   readonly files: Readonly<Record<string, FetchedFile>>;

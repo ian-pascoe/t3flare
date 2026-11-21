@@ -1,6 +1,6 @@
-// Adapted from cloudpid@93ba45a3:packages/extensions/src/web/fetch.ts (SPI-1054; see ./NOTICE.md): `web_fetch`, one
-// HTTP(S) URL as text, Markdown or HTML, with line paging, every request through the SSRF guard (`net.ts`). The same
-// parameters, limits, conversion and results as cloudpid's, as a plain pi-durable tool; the honest user agent names
+// `web_fetch` (SPI-1054; see ./NOTICE.md), one
+// HTTP(S) URL as text, Markdown or HTML, with line paging, every request through the SSRF guard (`net.ts`). A plain
+// pi-durable tool; the honest user agent names
 // t3flare, and `details` carry what t3's web item shows. A fetch is a read: no mode asks for it, plan mode included,
 // and linked threads may use it.
 import { defineTool, type ToolRegistration } from "@earendil-works/pi-durable";
@@ -25,7 +25,7 @@ const HONEST_USER_AGENT = "t3flare-web-tools";
 const DESCRIPTION =
   "Fetch one HTTP or HTTPS URL as text, Markdown, or HTML. HTML pages are converted to their main content, with the page title, when text or Markdown is requested; HTML format returns the page unchanged. JSON responses are re-indented in text and Markdown formats so long documents can be paged. Model-visible output is truncated to 50 KiB or 2,000 lines, and the result then says which lines remain and the offset to continue from. Use offset and limit (lines, like the read tool) to page through a long result. Private, loopback, link-local, and cloud-metadata addresses are refused, also after redirects.";
 
-/** What programs (code mode) receive instead of the model-facing text (cloudpid's `WebFetchOutput`). */
+/** What programs (code mode) receive instead of the model-facing text. */
 const OUTPUT_SCHEMA = {
   type: "object",
   properties: {

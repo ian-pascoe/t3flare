@@ -27,7 +27,7 @@ export interface EnvironmentSkillRow {
   readonly ref: string | null;
   /** The commit it is pinned to. */
   readonly commit: string;
-  /** cloudpid's folder hash: SHA-256 over the kept files' paths and blob SHAs. */
+  /** The folder hash: SHA-256 over the kept files' paths and blob SHAs. */
   readonly digest: string;
   readonly enabled: boolean;
   readonly disableModelInvocation: boolean;

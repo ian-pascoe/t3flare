@@ -1,7 +1,6 @@
 // Variables (SPI-1152, ADR-0032's Variables refinement): plain `NAME=value` pairs every command in a Workspace starts
 // with, kept in the Environment settings. A Variable is agent-readable by definition, so it is never a credential
-// (ADR-0016 A′): the refusals below are guard rails for the owner, not a boundary against him. Limits as cloudpid's
-// (`@t3flare/config`'s `container-settings.ts`, `variableNameProblem`).
+// (ADR-0016 A′): the refusals below are guard rails for the owner, not a boundary against him.
 
 /** The most Variables the Environment may have. */
 export const MAX_VARIABLES = 50;
@@ -119,8 +118,7 @@ export const SET_BY_T3FLARE: ReadonlyArray<string> = [
 ];
 
 /**
- * What looks like a credential in a value: cloudpid's `CREDENTIAL_PATTERNS` (cloudpid@47941c7c
- * `packages/extensions/src/skill-checks.ts`) without its two local-path patterns, each with what it looks like.
+ * What looks like a credential in a value, each pattern with what it looks like. Local-path patterns are left out.
  */
 export const CREDENTIAL_VALUE_PATTERNS: ReadonlyArray<{ readonly pattern: RegExp; readonly looksLike: string }> = [
   { pattern: /\bsk-[A-Za-z0-9_-]{20,}/, looksLike: "an API key (sk-…)" },

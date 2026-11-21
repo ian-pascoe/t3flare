@@ -1,6 +1,6 @@
 // Adapted from ian-pascoe/pi-extensions@a5e15d1:packages/pi-advisor (SPI-1059; parity row pi-advisor), `advisor-observer.ts`
 // in particular: the Advisor, a reviewer model that reads the agent's completed work in the background and gives
-// attributed advice. cloudpid has no port. Kept:
+// attributed advice. Kept:
 // - a private Advisor Session: here a conversation of its own in the Session's Harness, with the Advisor model, its own
 //   instructions (pi-advisor's default Advisor Prompt), and only `read`, `grep`, `find` and `ls` (8 investigative rounds);
 // - Review Evidence (`advisor/evidence.ts`): a Context Seed first, then only what the Advisor has not seen;

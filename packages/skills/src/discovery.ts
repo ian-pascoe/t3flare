@@ -1,9 +1,9 @@
-// Repo skills' discovery (SPI-1147 §1; ported from cloudpid@47941c7c `packages/extensions/src/skills-discovery.ts`):
+// Repo skills' discovery (SPI-1147 §1):
 // what a Skill is, how its `SKILL.md` is read, and the walk from a thread's cwd up to the repo root through each
 // directory's `.pi/skills`, `.agents/skills` and `.claude/skills`. It reads files only, through `SkillFiles`, so the
 // Workspace DO runs it next to its storage and never starts the Container (ADR-0009).
 //
-// Unlike cloudpid, an Environment skill beats a Repo skill of the same name (SPI-1001's shared decisions), and what is
+// An Environment skill beats a Repo skill of the same name (SPI-1001's shared decisions), and what is
 // not taken is reported in `skipped` with its reason, so a skill that does not show can be explained.
 import { parse } from "yaml";
 

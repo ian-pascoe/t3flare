@@ -108,7 +108,7 @@ _Avoid_: Connect link, tunnel link, Peer link (that is between two Environments)
 
 **Project**:
 One repo, as t3 shows it, in the Cloud Environment.
-_Avoid_: repo (for the t3 concept), Environment (cloudpid's sense)
+_Avoid_: repo (for the t3 concept), Environment (for one repo)
 
 **Workspace**:
 The files of one Project or worktree thread: a file system that is the source of truth, plus a Container when needed.
@@ -234,7 +234,7 @@ _Avoid_: env var, environment variable (it reads as the Environment's own), secr
 
 **Global mise config**:
 The Owner's mise configuration that every Container's commands get, under a repository's own.
-_Avoid_: Toolchains (cloudpid's word), global tools
+_Avoid_: Toolchains (for this config), global tools
 
 **Container size**:
 The vCPU, memory and disk a Workspace's Container starts with, picked by name.
@@ -333,7 +333,7 @@ _Avoid_: risk level, permission level, direct (that is an Exposure), confirmatio
 **Open change**:
 An asked Settings change, or a Purge asked through the Settings server, waiting for its answer, kept for at most 10
 minutes and answered once.
-_Avoid_: Proposal (cloudpid's, a queue), pending request (t3's), draft
+_Avoid_: Proposal (a queue), pending request (t3's), draft
 
 **Change page**:
 A page under the Settings page for one Open change, where the Owner reads it and answers. It is the only place a secret is
@@ -373,7 +373,7 @@ _Avoid_: skills folder, skill path
 
 **Environment skill**:
 A Skill installed into the Cloud Environment by the Owner, or at an agent's asking, offered to every agent in every Project: Durable agents and CLI agents alike.
-_Avoid_: global skill (cloudpid's Global), owner skill, personal skill
+_Avoid_: global skill, owner skill, personal skill
 
 **Skill source**:
 Where an Environment skill was installed from: a GitHub repository, the Skill's folder, the ref named and the commit it is pinned to.

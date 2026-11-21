@@ -1,7 +1,7 @@
 // The Environment skill set as it travels and is served (SPI-1148, ADR-0033): each file's text by its path under the
 // mount (`<skill>/SKILL.md`, …) and a hash of the whole, which says whether two sets differ without comparing their
 // files. The Environment DO makes it from its rows; each Workspace DO keeps a copy and serves it read-only at
-// `SKILLS_MOUNT`. Ported from cloudpid@47941c7c (`apps/server/src/workspace/skill-set-schema.ts`, `skill-set.ts`).
+// `SKILLS_MOUNT`.
 
 import type { EnvironmentPrecedence } from "./cliRoots.ts";
 import { parseSkill, type Skill, type SkillDiscovery } from "./discovery.ts";

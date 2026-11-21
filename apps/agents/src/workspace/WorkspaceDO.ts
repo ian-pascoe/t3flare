@@ -1,8 +1,7 @@
 // @effect-diagnostics globalDate:off globalConsole:off globalTimers:off cryptoRandomUUID:off
 // The Workspace DO (ADR-0008, ADR-0009; step 2a plan): one `@cloudflare/computer` Workspace, its files in this object's
 // SQLite, its commands on the Worker Shell or, for real binaries, in the Container this object starts itself
-// (`schedulingPolicy: "durable_object"`). Adapted from cloudpid@ae5a7b73:apps/server/src/workspace/Workspace.ts, which
-// carries much more (Skills, Builds, spares, previews, snapshots); this keeps what step 2a needs and grows by milestone.
+// (`schedulingPolicy: "durable_object"`). This keeps what step 2a needs and grows by milestone.
 //
 // It is a plain DurableObject: computer reaches it through `__getWorkspaceStub()` with raw Workers RPC, and its Worker
 // Shell calls back into it through `WorkspaceServiceProxy` (exported by the Worker's entry).
@@ -290,7 +289,7 @@ export class WorkspaceDO extends ContainerHost {
   #lastCommandAt = 0;
   /** G11: open carried sockets of Container previews; each holds the Container within the cap (`#previewHolds`). */
   #previewHolds = 0;
-  /** G11 (ADR-0031): the Container previews' server, ported from cloudpid's ADR-0023. */
+  /** G11 (ADR-0031): the Container previews' server. */
   readonly #preview = new ContainerPreview({
     running: () => this.containerRunning(),
     port: (port) => this.ctx.container!.getTcpPort(port),
@@ -329,7 +328,7 @@ export class WorkspaceDO extends ContainerHost {
           name: WORKSPACE_CONTAINER,
           // Each start's own size replaces it (`#budgeted`); a start never omits it (an omitted one starts `lite`).
           instance: launchOf({ settings: resolveEnvironment(EMPTY_ENVIRONMENT), source: "default" }).instance,
-          // Unrestricted direct egress in part 1, as cloudpid's v1 (an allowlist is deferred, docs/history.md).
+          // Unrestricted direct egress in part 1 (an allowlist is deferred, docs/history.md).
           egress: { mode: "direct" },
           ignore: [...patterns],
           connectTimeoutMs: 60_000,
@@ -392,7 +391,7 @@ export class WorkspaceDO extends ContainerHost {
       // The Variables under every command computer runs, on either backend (SPI-1152, `variables.ts`).
       backends: [this.#withVariables(new WorkerShellBackend({ loader: env.LOADER, workspace: ref, ctx })), this.#withVariables(new GlobalMiseBackend(new StoppedExecsBackend(this.#container, this.#stoppedExecs), (runtime) => this.#globalMise.ensure(runtime)))],
     });
-    // The model's file tools reach Container-only paths through the Container (cloudpid's ADR-0018), as a script.
+    // The model's file tools reach Container-only paths through the Container, as a script.
     this.#host = new WorkspaceEnvHost(this.#workspace, {
       patterns: async () => withHarnessKept(await this.#containerPatterns()),
       running: () => this.containerRunning(),

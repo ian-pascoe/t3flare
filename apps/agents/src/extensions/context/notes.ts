@@ -1,7 +1,7 @@
-// Adapted from cloudpid@93ba45a3:packages/extensions/src/context/notes.ts (SPI-1056): a conversation's Notes and its last
+// A conversation's Notes (SPI-1056) and its last
 // saved Handoff, as one pi-durable conversation document in the Session DO's storage. Documents are not part of the
-// transcript, so a Handoff or a compaction leaves them as they are. Bounded tighter than cloudpid's (128 Notes of 64,000
-// characters): the document is one stored value, so here at most 64 Notes of 32,000 characters and 256,000 characters in
+// transcript, so a Handoff or a compaction leaves them as they are. Bounded, as the document is one stored value:
+// at most 64 Notes of 32,000 characters and 256,000 characters in
 // all, and a Handoff of at most 32,000.
 import { type ConversationId, defineDoc } from "@earendil-works/pi-durable";
 

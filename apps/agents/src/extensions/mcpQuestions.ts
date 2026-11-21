@@ -4,7 +4,7 @@
 // (a form), pushed as every request is, and hands back the owner's answer.
 //
 // Held in memory only: the call that waits is a live RPC, so a restart ends it anyway (the card then closes as
-// cancelled), and the answer never touches the Session's storage (cloudpid ADR-0041: never kept). Stop, the turn's end,
+// cancelled), and the answer never touches the Session's storage (never kept). Stop, the turn's end,
 // the server's own withdrawal and the host's timeout close the card.
 // @effect-diagnostics globalDate:off
 import type { AnswerInput, McpAsker, McpQuestionAnswer, McpQuestionCard, PendingApproval, PendingQuestion } from "@t3flare/session-protocol";

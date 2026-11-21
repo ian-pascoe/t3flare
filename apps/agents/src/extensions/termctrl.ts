@@ -1,7 +1,7 @@
 // Adapted from ian-pascoe/pi-extensions@a5e15d1:packages/pi-termctrl (SPI-1057; parity row pi-termctrl): the owner's
 // Terminals and Background jobs for the Durable agent, as PTYs in the Workspace's container under t3flare's terminal host
-// (ADR-0021; the Workspace DO's half is `workspace/agentTerminals.ts`). cloudpid has no port of it (its v2 list names
-// termctrl "needs a PTY computer lacks"); the platform's PTY exec has one.
+// (ADR-0021; the Workspace DO's half is `workspace/agentTerminals.ts`). computer lacks a PTY; the platform's PTY
+// exec has one.
 //
 // - Tools: `terminal_start`, `terminal_send`, `terminal_stop`, `terminal_list`, `terminal_wait` (`termctrl/tools.ts`),
 //   and `bash`'s `background` (`coding-tools.ts`, `backgroundJobs` here).

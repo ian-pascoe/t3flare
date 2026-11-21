@@ -1,4 +1,3 @@
-// Copied from cloudpid@b8097ff0:packages/extensions/src/bash-routing.ts (unchanged but for this line).
 // Which backend a `bash` command runs on when the model names none (docs/architecture/workspace.md → Backends): the Worker Shell, unless
 // the command needs something the Worker Shell does not have, and then the Container. The Container is the costly
 // backend, so the Worker Shell gets every command it can run: a program neither list below holds is asked of the Worker

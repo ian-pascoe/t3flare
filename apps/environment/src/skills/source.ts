@@ -1,6 +1,5 @@
 // What an install is asked to read, as written (not yet a Skill source, which also holds the commit) (SPI-1148,
-// ADR-0033): a GitHub repo, with a Skill named, or a folder of a ref. Only GitHub is installed from. Ported from
-// cloudpid@47941c7c (`apps/server/src/github/skill-source.ts`).
+// ADR-0033): a GitHub repo, with a Skill named, or a folder of a ref. Only GitHub is installed from.
 
 /** A source as the owner or the agent wrote it, parsed. */
 export type SkillSourceInput = {

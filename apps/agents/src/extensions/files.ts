@@ -1,5 +1,5 @@
-// `ls`, `find` and `grep` over the Workspace's files (step 2a plan, section 4), trimmed from
-// cloudpid@b8097ff0:packages/extensions/src/files.ts: the same three tools and the same Workspace DO searches
+// `ls`, `find` and `grep` over the Workspace's files (step 2a plan, section 4):
+// three tools over the Workspace DO's searches
 // (`ComputerFiles`, which reaches the Container only for a Container-only path), as plain Promise tools with text
 // output. Each runs where the call's environment works (`api.env.cwd`), with relative paths resolved against it.
 import type { ComputerFiles } from "@t3flare/computer-env";

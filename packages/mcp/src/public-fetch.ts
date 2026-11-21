@@ -1,5 +1,5 @@
 /**
- * A public read for cloudpid's MCP sign-in, sent from `McpWorker` (`docs/architecture/mcp-sign-in.md` → Code;
+ * A public read for t3flare's MCP sign-in, sent from `McpWorker` (`docs/architecture/mcp-sign-in.md` → Code;
  * `docs/architecture/mcp-endpoint.md` → Self-use). The Registry reads an authorization server's metadata from the
  * Server Worker, whose `fetch` to one of t3flare's own hosts never reaches Access there (Cloudflare refuses it, 1042, or
  * sends it to the origin past Access); `McpWorker` has `global_fetch_strictly_public`, so its `fetch` goes through the

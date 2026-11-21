@@ -210,7 +210,7 @@ type RequiredCapabilities = typeof RequiredCapabilities.Type;
 
 /**
  * What a server that needs the request run as an MCP task says to one that did not declare the extension: `-32021` naming
- * `io.modelcontextprotocol/tasks`. cloudpid declares it only where it can wait for a task (`ctx.allowTask`, under the
+ * `io.modelcontextprotocol/tasks`. t3flare declares it only where it can wait for a task (`ctx.allowTask`, under the
  * caps), so this is the message for the call that could not be offered it (`docs/architecture/mcp-server-requests.md` →
  * MCP tasks, Declaration).
  */

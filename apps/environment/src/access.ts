@@ -1,8 +1,7 @@
 // @effect-diagnostics globalDate:off globalFetch:off
 // The admin guard (ADR-0010): `/_t3flare/*` sits behind a Cloudflare Access application of its own, and
-// the Worker does not trust that Access ran. It verifies `Cf-Access-Jwt-Assertion` itself (after
-// cloudpid's apps/server/src/access.ts) and also requires the admin token, and fails closed: a Worker
-// without its Access audience, team or admin token refuses every admin request.
+// the Worker does not trust that Access ran. It verifies `Cf-Access-Jwt-Assertion` itself and also requires the admin
+// token, and fails closed: a Worker without its Access audience, team or admin token refuses every admin request.
 //
 // Admitted callers: the owner (an assertion with the owner's email and no `common_name`), and the stage's
 // own Access service token (an assertion whose `common_name` is that token's client id), which the

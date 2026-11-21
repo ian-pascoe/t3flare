@@ -68,7 +68,7 @@ nor changes them, and `read_audit` shows their entries without key fingerprints.
 - **No settings tools for agents** (ADR-0026 §8). Reversed by the owner.
 - **A panel-only tier** for what judges agents (the Guardian, tool classes, the server's own entry). Proposed in the
   design interview; the owner chose panel parity.
-- **A panel-side Proposal queue**, as cloudpid has. Rejected by the owner in favour of elicitation; an Open change lives
+- **A panel-side Proposal queue**. Rejected by the owner in favour of elicitation; an Open change lives
   only as long as its question.
 - **Agents calling a public endpoint with a credential.** Rejected: a credential in a Container (ADR-0016), and the
   origin could not tell which thread called.

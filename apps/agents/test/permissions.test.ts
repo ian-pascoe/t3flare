@@ -1,5 +1,4 @@
-// The permissions extension on a real pi-durable Harness (step 2a plan, Tests; cloudpid's restart fixture,
-// cloudpid@b8097ff0:packages/effect-durable/src/harness.fixture.ts `openRestartingHarness`): a model run through pi-ai's
+// The permissions extension on a real pi-durable Harness (step 2a plan, Tests): a model run through pi-ai's
 // faux provider calls `bash`, which waits for the owner's answer. The Harness is restarted as an evicted Durable Object
 // is, more times than `restartLimit`, while the call waits: the request survives, the call is not ended, and the answer
 // given after the restarts runs the tool once. Also: a decline, the modes, and an unsafe tool cut off after it started.

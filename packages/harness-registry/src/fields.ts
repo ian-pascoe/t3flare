@@ -51,7 +51,7 @@ export interface EnvironmentSettingEntry {
 
 const utf8 = new TextEncoder();
 
-/** Why `text` cannot be a `file` field of at most `maxBytes` (cloudpid's `toolchainsProblem`), or undefined. */
+/** Why `text` cannot be a `file` field of at most `maxBytes`, or undefined. */
 const fileProblem = (text: string, maxBytes: number): string | undefined => {
   if (text.includes("\u0000")) return "contains a NUL character";
   // A UTF-16 unit is at most 3 bytes of UTF-8 (a surrogate pair 4 for 2 units): only a long text needs encoding.

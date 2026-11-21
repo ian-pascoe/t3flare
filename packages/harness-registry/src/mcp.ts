@@ -75,7 +75,7 @@ export const toolNamesOf = (
   return { names, refused };
 };
 
-/** How a server's tools reach the Durable agent (cloudpid's Exposure). */
+/** How a server's tools reach the Durable agent. */
 export type Exposure = "direct" | "deferred" | "codemode" | "hidden";
 
 /** A direct server's sign-in (Route B). */

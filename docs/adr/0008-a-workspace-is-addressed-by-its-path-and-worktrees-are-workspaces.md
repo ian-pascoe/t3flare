@@ -9,8 +9,8 @@ A cloud Project is one repo. Its files live in a Workspace: a Workspace DO holdi
 
 ## Considered Options
 
-- **A Workspace per thread always** (cloudpid's default): a clone per thread, where t3 already lets the owner choose.
-- **One Workspace with git worktrees inside**: cloudpid tried and superseded it.
+- **A Workspace per thread always**: a clone per thread, where t3 already lets the owner choose.
+- **One Workspace with git worktrees inside**: tried before this decision, and superseded.
 
 ## Refinement (step 2b, as built)
 

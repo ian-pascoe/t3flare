@@ -37,7 +37,7 @@ export type McpSetSource = typeof McpSetSource.Type;
 /**
  * One MCP server of the set as the Registry hands it over: its entry in force with every default applied and `${NAME}`
  * unresolved (so no resolved value is here, in a hash, or in the host's storage), and three hashes of it, which the
- * Registry computes with `@t3flare/config` so the host never needs to.
+ * Registry computes so the host never needs to.
  */
 export const McpSetEntry = Schema.Struct({
   /** The name as the entry spells it. */
@@ -335,7 +335,7 @@ export const readMcpApplyResult: (answer: Schema.Json) => McpApplyResult = hostA
  * - `completions`: the host answers `request({ op: "completion/complete" })`, which never starts a Container, and says in
  *   each server's inventory whether it declares the capability (`mcp-in-a-session.md` → Arguments and completions).
  *
- * The Session side names those of these its MCP tools use: `MCP_TOOL_FEATURES` (`@cloudpid/extensions/mcp`) the ones
+ * The Session side names those of these its MCP tools use: `MCP_TOOL_FEATURES` the ones
  * they cannot be built without, `MCP_OPTIONAL_TOOL_FEATURES` the ones it does without when the host lacks them (`resources`).
  * A feature added here reaches the Session only once one of those lists names it.
  */

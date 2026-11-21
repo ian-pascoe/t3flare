@@ -1,7 +1,6 @@
-// An MCP server's questions as t3 cards (SPI-1079, ADR-0028's elicitation refinement; cloudpid ADR-0041's rules as
-// ported). Pure: the MCP host makes a card of each question a server asks during an agent's call, and of each pause an
-// Executor-style server returns, and turns the owner's answer back into what the server gets. The caller (the Session or
-// the CLI relay) only shows the card.
+// An MCP server's questions as t3 cards (SPI-1079, ADR-0028's elicitation refinement). Pure: the MCP host makes a card
+// of each question a server asks during an agent's call, and of each pause an Executor-style server returns, and turns
+// the owner's answer back into what the server gets. The caller (the Session or the CLI relay) only shows the card.
 //
 // - A form with no fields, an Executor `approval-required` and a page (URL mode) are t3's own `mcp-elicitation` approval
 //   cards, as t3's Codex adapter shows an approval-shaped elicitation; a form with fields is a `user_input` card, one

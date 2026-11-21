@@ -1,11 +1,11 @@
 /**
- * An MCP server's question to cloudpid, and the form of an elicitation (`docs/architecture/mcp-server-requests.md` →
+ * An MCP server's question to t3flare, and the form of an elicitation (`docs/architecture/mcp-server-requests.md` →
  * Questions, Elicitation requests → The form; ADR-0037, ADR-0041). Pure and SDK-free, so the Session, the `mcp`
  * extension, the engine's edge and the web app all import it (`./types`).
  *
  * - **The question's shape:** `McpInputRequest` is what the core hands the call's `onInput`, `McpInputAnswer` what it
  *   gets back; an elicitation's answer is the spec's own `ElicitResult`.
- * - **The normalizer** makes cloudpid's own `ElicitationForm` (`@t3flare/protocol`) of the server's `requestedSchema`,
+ * - **The normalizer** makes t3flare's own `ElicitationForm` (`elicitation-form.ts`) of the server's `requestedSchema`,
  *   checking it against the spec's flat subset, its bounds and the credential rule, so the web never reads raw JSON
  *   Schema and a form that is malformed or asks for a credential is refused without being shown.
  * - **The validator** checks the owner's values against the form, in the web before Submit and again in the Session.
@@ -42,7 +42,7 @@ export const MCP_SAMPLING_WAIT_MS = 12 * 60 * 1000;
 /** The JSON-RPC code a Sampling request turned down gets: `-1`, the spec's refusal. */
 export const MCP_SAMPLING_REFUSED = -1;
 
-/** The JSON-RPC code of a request that is invalid, or that cloudpid cannot serve. */
+/** The JSON-RPC code of a request that is invalid, or that t3flare cannot serve. */
 export const MCP_INVALID_PARAMS = -32602;
 
 /** The JSON-RPC code of an internal error: a Sampling request whose model failed, or that the Session failed to answer. */
@@ -50,7 +50,7 @@ export const MCP_INTERNAL_ERROR = -32603;
 
 /**
  * The Protocol era of the server that asked a question: Legacy (`2025-11-25` or earlier) or Modern (`2026-07-28` or
- * later). The client protocol's own `McpEra` (`@t3flare/protocol/mcp-api`) is an open set that adds `unknown`.
+ * later).
  */
 export const McpEra = Schema.Literals(["legacy", "modern"]);
 
@@ -109,7 +109,7 @@ export type McpSamplingResult = typeof McpSamplingResult.Type;
 /**
  * What a call's `onInput` answers. `answered` carries the result the server gets (an elicitation's `ElicitResult`),
  * `sampled` a Sampling request's `CreateMessageResult`;
- * `refused` is a question cloudpid cannot take (Legacy: a malformed form, the server getting a JSON-RPC error with
+ * `refused` is a question t3flare cannot take (Legacy: a malformed form, the server getting a JSON-RPC error with
  * `code`, `-32602` unless it says otherwise; Modern: the call ends locally, the server told nothing). `defer` keeps a
  * `deferrable` question for later: the core answers the round's other questions, keeps them in the call's
  * `ResumeState`, and returns `input_required` (only to a call whose `ctx.answers.defer` is set; for any other, and for
@@ -297,7 +297,7 @@ const objectOf = (object: JsonObject, key: string): JsonObject | undefined => {
   return isJsonObject(value) ? value : undefined;
 };
 
-/** The keywords a property may carry that cloudpid reads; any other is ignored, with a note. */
+/** The keywords a property may carry that t3flare reads; any other is ignored, with a note. */
 const KNOWN_KEYWORDS: ReadonlySet<string> = new Set([
   "type",
   "title",
@@ -630,7 +630,7 @@ const mayHoldCredential = (property: JsonObject, read: Read) =>
   read.freeText || property["format"] === "password" || property["writeOnly"] === true;
 
 /**
- * A server's form made into cloudpid's own, what was left out of it, and the credential it asks for, if any.
+ * A server's form made into t3flare's own, what was left out of it, and the credential it asks for, if any.
  */
 export type NormalizedForm = {
   readonly form: ElicitationForm;
@@ -641,7 +641,7 @@ export type NormalizedForm = {
 };
 
 /**
- * The server's `requestedSchema` as cloudpid's `ElicitationForm`, or why it is malformed: a root that is not an
+ * The server's `requestedSchema` as t3flare's `ElicitationForm`, or why it is malformed: a root that is not an
  * `object`, a property outside the spec's subset, a `required` naming no property, or a form over the bounds. What is
  * ignored (unknown keywords, an unknown `format`, an invalid default) goes in `notes`. A form asking for a credential
  * is returned with `credential` set, and is to be declined unseen.

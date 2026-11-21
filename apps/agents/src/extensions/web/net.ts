@@ -1,10 +1,9 @@
-// Adapted from cloudpid@93ba45a3:packages/extensions/src/web/{transport,errors,response,dns,guarded-fetch}.ts (SPI-1054;
-// see ./NOTICE.md): the web tools' network, the SSRF guard and bounded reads, as plain Promise code instead of Effect
-// services. The rules are cloudpid's: every hop (the URL the model gave and each redirect target) is checked by
+// The web tools' network (SPI-1054; see ./NOTICE.md), the SSRF guard and bounded reads, as plain Promise code instead
+// of Effect services. The rules: every hop (the URL the model gave and each redirect target) is checked by
 // `ssrf.ts` and its host resolved through Cloudflare's DNS-over-HTTPS before a request is sent; redirects are followed
 // by hand; a body is read incrementally and never past its bound.
 //
-// The residual risk is cloudpid's too: the platform's own lookup at `fetch` time is separate from the guard's, so a
+// The residual risk: the platform's own lookup at `fetch` time is separate from the guard's, so a
 // name that answers differently to two queries milliseconds apart can still pass. Both go through Cloudflare's caching
 // resolver, and Cloudflare's edge refuses Worker subrequests to private addresses anyway.
 // @effect-diagnostics globalFetch:off extendsNativeError:off globalTimers:off

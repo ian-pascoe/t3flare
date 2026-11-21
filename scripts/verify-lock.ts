@@ -10,7 +10,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { parse } from "yaml";
-import { bareKey, closure, DEPENDENCY_FIELDS, depPatchKey, readLock, versionsByName, type Json } from "./lock.ts";
+import { bareKey, closure, depPatchKey, readLock, versionsByName, type Json } from "./lock.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const PREFIX = "t3code/";

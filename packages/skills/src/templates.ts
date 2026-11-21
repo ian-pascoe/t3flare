@@ -1,8 +1,8 @@
-// Prompt templates (SPI-1147 §1 and §4; ported from cloudpid@47941c7c `packages/extensions/src/prompt-templates.ts`):
+// Prompt templates (SPI-1147 §1 and §4):
 // Markdown files in the thread's cwd's `.pi/prompts` whose Slash command expands into a message, its arguments filled
 // in. Parsing and substitution follow pi (`core/prompt-templates.ts` and `utils/frontmatter.ts` of pi's coding agent,
-// MIT, © 2025 Mario Zechner). Unlike cloudpid, only the cwd's `.pi/prompts` counts, as pi's project templates do: not
-// `.agents/prompts` (cloudpid's convention) nor `.claude/commands`.
+// MIT, © 2025 Mario Zechner). Only the cwd's `.pi/prompts` counts, as pi's project templates do: not
+// `.agents/prompts` nor `.claude/commands`.
 import { parse } from "yaml";
 
 import type { CommandSource } from "./cliRoots.ts";

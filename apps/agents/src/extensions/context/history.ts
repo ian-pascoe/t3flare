@@ -1,4 +1,3 @@
-// Copied from cloudpid@93ba45a3:packages/extensions/src/context/history.ts, unchanged but for its header (SPI-1056).
 // History: a conversation's stored entries, which a Handoff or a compaction takes out of the model's context but never
 // out of storage. Ported from pi-context-management's `context-tools.ts` and `entry-preview.ts`: Context Windows, one-line
 // entry previews, references, and literal search over the decoded strings of an entry's JSON.

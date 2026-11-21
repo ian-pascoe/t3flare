@@ -6,7 +6,7 @@ credential (`McpProviderSessions`); the adapter reads it at every open and turn 
 keeps it in its own storage. The Session calls t3's `/mcp` through a Durable Object RPC on the Environment DO
 (`EnvironmentDO.mcp`), which builds the request and hands it to t3's HTTP app, so t3's own auth, tool access, link fence
 and mode ceiling run unchanged. The tools reach the agent as one pi-durable extension, `t3-mcp`, built from the catalog
-t3 lists for that credential and installed again when its hash changes (cloudpid's ADR-0030), under t3's own names
+t3 lists for that credential and installed again when its hash changes, under t3's own names
 (`mcp__t3-code__<tool>`), so t3's clients present them as they present its Pi provider's.
 
 ## Considered options

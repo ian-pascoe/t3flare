@@ -1,12 +1,12 @@
 /**
- * `@t3flare/mcp/oauth`: pi-mcp's `oauth` functions and cloudpid's local additions, for the sign-in code in the
+ * `@t3flare/mcp/oauth`: pi-mcp's `oauth` functions and t3flare's local additions, for the sign-in code in the
  * Registry and the main Worker. It never imports the SDK; its test (`sdk-isolation.test.ts`) fails if it comes to.
  *
  * `docs/architecture/mcp-sign-in.md` → Tokens reach the host object (Code), Client registration, Sign-out;
  * `docs/architecture/mcp.md` → Packages and objects.
  *
  * What comes from pi-mcp is named one by one: its `oauth` entry also holds `McpOAuthProvider`, `OAuthCallbackServer`
- * (`node:http`) and `authorizeMcp`, which cloudpid never uses (`authorizeMcp` drops the client and the tokens on
+ * (`node:http`) and `authorizeMcp`, which t3flare never uses (`authorizeMcp` drops the client and the tokens on
  * `invalid_client`). The additions pi-mcp lacks live here, and go to pi as an issue first (The MCP core #394 D6): RFC 7009
  * revocation, `client_secret_expires_at` and the issuer pin, and the size bounds the Registry holds sign-ins to.
  * The `client_credentials` grant is in `./oauth-client-credentials.ts` and the `private_key_jwt` assertion in `./client-assertion.ts`, re-exported here.

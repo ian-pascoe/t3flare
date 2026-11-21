@@ -1,6 +1,6 @@
-// An MCP server's question is the owner's to answer (SPI-1079, cloudpid ADR-0041's first rule as ported). Its approval
-// cards cannot be answered by an agent (t3's `t3_pending_request` answers `user_input` requests only), but its form cards
-// are `user_input` requests, which t3 lets an agent answer, and even tells a parent agent to (a delegated child's
+// An MCP server's question is the owner's to answer (SPI-1079). Its approval cards
+// cannot be answered by an agent (t3's `t3_pending_request` answers `user_input` requests only), but its form cards are
+// `user_input` requests, which t3 lets an agent answer, and even tells a parent agent to (a delegated child's
 // question). So every request to t3's own `/mcp` (a CLI's, a linked laptop's, and a Durable Session's through
 // `EnvironmentDO.mcp`) is read here first: a `t3_pending_request` naming a card of ours (its id carries
 // `MCP_QUESTION_MARKER`) is answered with a tool error, and t3 never sees it. `list` still lists the id (t3's answer);

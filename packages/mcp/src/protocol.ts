@@ -11,7 +11,7 @@ export const MODERN_PROTOCOL_VERSION = "2026-07-28";
 /** Legacy offers the first and accepts the rest, as pi-mcp does (D1). */
 export const LEGACY_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
-/** Exactly these five: the SDK's own list adds `2024-10-07`, which cloudpid drops (D1). */
+/** Exactly these five: the SDK's own list adds `2024-10-07`, which t3flare drops (D1). */
 export const SUPPORTED_PROTOCOL_VERSIONS = [MODERN_PROTOCOL_VERSION, ...LEGACY_PROTOCOL_VERSIONS];
 
 /** MCP Apps, declared always, in both eras, on every request (D23; `docs/architecture/mcp-apps.md`). */
