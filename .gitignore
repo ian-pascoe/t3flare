@@ -9,5 +9,3 @@ dist/
 apps/environment/test/docker/.work-*
 # The stage scripts' evidence (CONTRIBUTING.md) stays on the machine that made it.
 /.evidence/
-# Their output from before 2026-11-21, when it went under docs/steps/.
-/docs/steps/
