@@ -12,6 +12,7 @@ const environment = () => {
     modelEndpoints: async () => (calls.push("modelEndpoints"), { revision: 1, endpoints: [] }),
     endpointCredential: async () => (calls.push("endpointCredential"), { apiKey: null }),
   };
+  // SAFETY: `EndpointTextGeneration` calls only `idFromName` and `get`, and on the stub only the two methods it answers (`modelEndpoints`, `endpointCredential`).
   const namespace = { idFromName: (name: string) => name, get: () => stub } as unknown as TextGenerationEnv["ENVIRONMENT"];
   return { calls, namespace };
 };

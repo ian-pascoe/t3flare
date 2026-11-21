@@ -55,14 +55,14 @@ describe("the typecheck's verdict", () => {
   });
 
   it("passes errors in our files that a program does not own, and fails on one in a file it owns", () => {
-    const isOurs = (file: string) => file.endsWith(".workerd.test.ts");
+    const ownership = (file: string) => file.endsWith(".workerd.test.ts");
     const workerdError = "test/stateStore.workerd.test.ts(3,1): error TS2322: no.";
-    const verdict = typecheckVerdict(2, `${OUR_ERROR}\n${T3_ERROR}\n`, cwd, t3Root, isOurs);
+    const verdict = typecheckVerdict(2, `${OUR_ERROR}\n${T3_ERROR}\n`, cwd, t3Root, ownership);
     expect(verdict).toMatchObject({ ok: true, ours: [] });
     expect(verdict.elsewhereErrors.map((d) => d.text)).toEqual([OUR_ERROR]);
     expect(verdict.t3Errors.map((d) => d.text)).toEqual([T3_ERROR]);
-    expect(typecheckVerdict(2, `${OUR_ERROR}\n`, cwd, t3Root, isOurs)).toMatchObject({ ok: true });
-    expect(typecheckVerdict(2, `${OUR_ERROR}\n${workerdError}\n`, cwd, t3Root, isOurs)).toMatchObject({ ok: false });
+    expect(typecheckVerdict(2, `${OUR_ERROR}\n`, cwd, t3Root, ownership)).toMatchObject({ ok: true });
+    expect(typecheckVerdict(2, `${OUR_ERROR}\n${workerdError}\n`, cwd, t3Root, ownership)).toMatchObject({ ok: false });
   });
 
   it("judges the workerd program's files on the resolved path, however the compiler prints it", () => {

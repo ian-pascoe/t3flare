@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off
-// The pushes arrive as plain Promise RPC from the DO host, so their timing uses the platform clock.
+// A push arrives as plain Promise RPC from the DO host, outside Effect, so its arrival time reads the platform clock.
 // The Durable agent provider's ProviderAdapterV2 (step 2a plan, sections 2–3). A provider session is t3's handle on one
 // thread's Session DO (agents Worker): commands go to the Session over DO RPC; its pushes come back through the session
 // sink and the differ turns them into t3's events. The Session is the durable party: a provider session holds nothing

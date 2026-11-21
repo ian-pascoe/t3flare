@@ -577,10 +577,10 @@ export class WorkspaceDO extends ContainerHost {
     if (process === undefined) return;
     const output = await process.output();
     try {
-      // SAFETY: `last-scan.json` is the `leakscan` command's answer, which writes a `LeakScanAnswer`; anything else
-      // throws in `answer.hits` below and is the same "no answer" as unparsable output.
-      const answer = JSON.parse(new TextDecoder().decode(output.stdout)) as LeakScanAnswer;
-      if (answer.hits.length > 0) await this.#onLeak(answer.hits);
+      // SAFETY: `last-scan.json` is the `leakscan` command's answer, which writes a `LeakScanAnswer`; one without a
+      // `hits` array is the same "no answer" as unparsable output.
+      const answer = JSON.parse(new TextDecoder().decode(output.stdout)) as Partial<LeakScanAnswer> | null;
+      if (Array.isArray(answer?.hits) && answer.hits.length > 0) await this.#onLeak(answer.hits);
     } catch {
       // No answer: the command's scan did not run.
     }

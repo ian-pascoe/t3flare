@@ -74,11 +74,11 @@ export interface TypecheckVerdict {
   /** Errors in t3's files: reported, not failing. */
   readonly t3Errors: ReadonlyArray<Diagnostic>;
   /**
-   * Errors in t3flare's files that this program reaches but does not own (`isOurs`): the workerd tests' program reaches
+   * Errors in t3flare's files that this program reaches but does not own (`ownership`): the workerd tests' program reaches
    * `src`, which the package's own program checks under the configuration it is built for. Reported, not failing.
    */
   readonly elsewhereErrors: ReadonlyArray<Diagnostic>;
-  /** Errors in files `isOurs` could not place in any program: failing, as they may be ours. */
+  /** Errors in files `ownership` could not place in any program: failing, as they may be ours. */
   readonly unownedErrors: ReadonlyArray<Diagnostic>;
   /** Why the typecheck failed without an error of ours, if it did. */
   readonly reason?: string;
@@ -87,14 +87,14 @@ export interface TypecheckVerdict {
 /**
  * The typecheck's verdict from the compiler's exit status and output. It passes a non-zero exit only when every error
  * is a diagnostic in t3's files and the compiler printed nothing else: any line it could not read (a global error, a
- * crash), a signal, or a non-zero exit with no error diagnostic fails it. Only a clean exit passes regardless. `isOurs`
+ * crash), a signal, or a non-zero exit with no error diagnostic fails it. Only a clean exit passes regardless. `ownership`
  * narrows our own files (by default every file outside t3's) to the ones this program owns, judged on each file's
  * `packagePath`; errors in files another program owns pass too, and errors in files it cannot place fail.
  */
-export const typecheckVerdict = (status: number | null, output: string, cwd: string, t3Root: string, isOurs: Ownership = () => true): TypecheckVerdict => {
+export const typecheckVerdict = (status: number | null, output: string, cwd: string, t3Root: string, ownership: Ownership = () => true): TypecheckVerdict => {
   const { diagnostics, unparsed } = parseDiagnostics(output);
   const t3 = (d: Diagnostic) => isT3File(d.file, cwd, t3Root);
-  const owner = (d: Diagnostic) => isOurs(packagePath(d.file, cwd));
+  const owner = (d: Diagnostic) => ownership(packagePath(d.file, cwd));
   const ours = diagnostics.filter((d) => !t3(d) && owner(d) === true);
   const t3Errors = diagnostics.filter((d) => d.category === "error" && t3(d));
   const elsewhereErrors = diagnostics.filter((d) => d.category === "error" && !t3(d) && owner(d) === false);

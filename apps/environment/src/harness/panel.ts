@@ -20,12 +20,13 @@
 //   `POST …/api/mcp/clients` `{ key, clientName, mode }` or `{ key, clientName, remove: true }`, behind the same write
 //   guard, changes one, audited. This is the only place a client's mode is set: the endpoint only reads it.
 import { BUILTIN_TOOLS, describeGlobalMise, ENVIRONMENT_SETTINGS, EXTENSIONS, ignoredServersOf, resolveEnvironment, resolveHarness, type ToolsChange } from "@t3flare/harness-registry";
-import { decodeHarnessChange, decodeMcpChange } from "./changeBodies.ts";
 
 import type { AccessCaller } from "../access.ts";
 import type { McpHost } from "../mcp/host.ts";
 import type { HarnessOAuth } from "./oauth.ts";
 import type { HarnessSecrets } from "./secrets.ts";
+
+import { decodeHarnessChange, decodeMcpChange } from "./changeBodies.ts";
 
 import { SKILLS_WRITE_ROUTES, type SkillsAnswer, type SkillsApiDeps, skillsOverview, viewSkill } from "../skills/api.ts";
 import { ENDPOINTS_PATHS, endpointsChange, endpointsDiscover, type EndpointsAnswer, type EndpointsApiDeps, endpointsOverview, endpointsSignIn } from "../endpoints/api.ts";

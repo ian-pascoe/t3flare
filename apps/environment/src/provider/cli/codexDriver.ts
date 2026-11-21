@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off effectFnOpportunity:off
+// @effect-diagnostics effectFnOpportunity:off
 // The Codex CLI in the Cloud Environment (step 4a, plan §3, §3.1): t3's own Codex adapter (`makeCodexAdapterV2`) with
 // t3flare's readiness (the image's version and the OpenAI Responses Model endpoints; it needs setup without one,
 // SPI-1176; never a spawning probe), its own app-server client factory (a spawn in the thread's Workspace, the request

@@ -12,14 +12,15 @@ import { type Diagnostic, type Ownership, t3ErrorsHeading, typecheckVerdict, wor
 const cwd = path.resolve(import.meta.dirname, "..");
 const t3Root = path.resolve(cwd, "../../t3code");
 
-const programs: ReadonlyArray<{ readonly project: string; readonly isOurs?: Ownership }> = [
+/** Each program, and for one that reaches files it does not own, the program that checks those (`elsewhere`). */
+const programs: ReadonlyArray<{ readonly project: string; readonly ownership?: Ownership; readonly elsewhere?: string }> = [
   { project: "tsconfig.json" },
-  { project: "test/tsconfig.workerd.json", isOurs: workerdOwnership },
+  { project: "test/tsconfig.workerd.json", ownership: workerdOwnership, elsewhere: "tsconfig.json" },
 ];
 
 let ok = true;
 const t3Errors = new Map<string, Diagnostic>();
-for (const { project, isOurs } of programs) {
+for (const { project, ownership, elsewhere } of programs) {
   const result = spawnSync("effect-tsgo", ["tsrs", "--noEmit", "--pretty", "false", "-p", project, ...process.argv.slice(2)], {
     cwd,
     encoding: "utf8",
@@ -30,11 +31,11 @@ for (const { project, isOurs } of programs) {
     process.exit(1);
   }
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
-  const verdict = typecheckVerdict(result.status, output, cwd, t3Root, isOurs);
+  const verdict = typecheckVerdict(result.status, output, cwd, t3Root, ownership);
   for (const diagnostic of verdict.ours) console.log(diagnostic.text);
   for (const diagnostic of verdict.t3Errors) t3Errors.set(diagnostic.text, diagnostic);
   if (verdict.elsewhereErrors.length > 0) {
-    console.log(`${project}: ${verdict.elsewhereErrors.length} error(s) in files it does not own, which tsconfig.json checks; not failing.`);
+    console.log(`${project}: ${verdict.elsewhereErrors.length} error(s) in files it does not own, which ${elsewhere ?? "another program"} checks; not failing.`);
   }
   if (!verdict.ok) {
     ok = false;
