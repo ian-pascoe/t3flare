@@ -1,8 +1,8 @@
 # Model endpoints are the owner's, set in the Harness panel
 
 Status: **accepted** at the hard cut (SPI-1176, 2026-11-17); drafted with SPI-1162 (2026-11-14). Part of **Model
-endpoints** (SPI-1160 to SPI-1176; the owner's decisions of 2026-11-13). Reports: [`docs/steps/spi-1162.md`](../steps/spi-1162.md),
-[`docs/steps/spi-1176.md`](../steps/spi-1176.md); the owner's guide: [`docs/model-endpoints.md`](../model-endpoints.md).
+endpoints** (SPI-1160 to SPI-1176; the owner's decisions of 2026-11-13). Reports: [`docs-archive-1:docs/steps/spi-1162.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1162.md),
+[`docs-archive-1:docs/steps/spi-1176.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1176.md); the owner's guide: [`docs/model-endpoints.md`](../model-endpoints.md).
 **Supersedes** [ADR-0012](0012-all-model-access-goes-through-the-model-proxy.md) (until the hard cut, the Model proxy
 and the endpoints stood side by side; items 2, 5, 6 and 8 below say what they did then, and the SPI-1176 refinement at
 the end what holds now) and refines [ADR-0032](0032-environment-settings-and-harness-settings-are-separate-entities-edited-on-one-owner-page.md)
@@ -98,7 +98,7 @@ a stage's alchemy state loses its credentials key, and the owner enters the endp
 
 ## Refinement (SPI-1176, 2026-11-17): the hard cut
 
-Report: [`docs/steps/spi-1176.md`](../steps/spi-1176.md). t3flare no longer knows a Model proxy. Where items 2, 5, 6 and 8
+Report: [`docs-archive-1:docs/steps/spi-1176.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1176.md). t3flare no longer knows a Model proxy. Where items 2, 5, 6 and 8
 speak of "until the hard cut", this holds instead:
 
 1. **No proxy, no compatibility path.** `MODEL_PROXY_URL`, `MODEL_PROXY_API_KEY`, `COMMISSARY_CONTAINER_API_KEY` and every

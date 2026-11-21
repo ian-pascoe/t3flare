@@ -32,7 +32,7 @@
  *                      earlier run set): CI's stages then have no model, and the bump's real turn fails.
  *
  * MODEL_PROXY_URL, MODEL_PROXY_API_KEY and COMMISSARY_CONTAINER_API_KEY are not read: a run removes them where an
- * earlier run set them (`docs/steps/spi-1176-owner-setup.md`).
+ * earlier run set them (`docs-archive-1:docs/steps/spi-1176-owner-setup.md`).
  *   T3FLARE_PROD_ENV_FILE  prod's bootstrap and admin tokens, the laptop's (default:
  *                      ../apps/environment/.alchemy/stages/prod.env.json; set it when running from a worktree)
  *

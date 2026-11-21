@@ -1,5 +1,5 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalRandom:off
-// The pi-harness ports' stage harness (SPI-1054 web, SPI-1055 todo, SPI-1056 context; docs/steps/pi-ports-1.md): a
+// The pi-harness ports' stage harness (SPI-1054 web, SPI-1055 todo, SPI-1056 context; docs-archive-1:docs/steps/pi-ports-1.md): a
 // Durable thread uses each ported tool in real turns, and t3's own projection is read back for the items it shows.
 // Evidence goes to docs/steps/pi-ports-1/<file>.json, tokens and cookies redacted.
 //

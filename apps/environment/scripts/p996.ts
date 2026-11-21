@@ -1,5 +1,5 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off globalDateInEffect:off
-// SPI-996's stage harness (parity G5; docs/steps/spi-996.md): on a Durable thread, a plan-mode turn ends with t3's
+// SPI-996's stage harness (parity G5; docs-archive-1:docs/steps/spi-996.md): on a Durable thread, a plan-mode turn ends with t3's
 // proposed plan and Implement starts a default-mode turn from it; a long command's output streams to t3's command item
 // while it runs (t3's own command-output subscription, as an expanded row reads it); with t3's labs flag on, a completed
 // turn gets a prompt suggestion. Evidence goes to docs/steps/spi-996/<file>.json, tokens and cookies redacted.

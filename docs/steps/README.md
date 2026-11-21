@@ -1,15 +1,26 @@
 # Step reports
 
-Each `*.md` here reports one step or one Linear issue: what was tried on a real Stage, what passed and what did not.
-Plans and reviews sit beside their reports (`*-plan.md`, `*-review.md`). The SPI-#### names are the Maintainer's Linear
-issue ids.
+A step report says what was tried on a real Stage, what passed and what did not, for one step or one Linear issue
+(the SPI-#### names are the Maintainer's Linear issue ids). [`docs/history.md`](../history.md) summarises what the
+milestones delivered.
+
+## The archive
+
+The reports, plans and plan reviews written up to 2026-11-21 are not on `main`. They are at the tag
+[`docs-archive-1`](https://github.com/spiritledsoftware/t3flare/tree/docs-archive-1/docs), together with the step 0
+spike (`docs/spike/`), the early research notes, the scope audit and the milestone plan. A citation such as
+`docs-archive-1:docs/steps/spi-1151.md` is that path at that tag:
+
+```sh
+git show docs-archive-1:docs/steps/spi-1151.md
+```
 
 ## Where the evidence is
 
 The raw evidence of the reports up to the open-source release (JSON from the stage harnesses, screenshots, logs, the
-one-off scripts that made some of it) is kept in the tag
-[`steps-evidence-1`](https://github.com/spiritledsoftware/t3flare/tree/steps-evidence-1/docs/steps), not on `main`. A
-path such as `docs/steps/step-2a/m3-memory.json`, cited by a report, an ADR or a code comment, is that path at the tag:
+one-off scripts that made some of it) is at the tag
+[`steps-evidence-1`](https://github.com/spiritledsoftware/t3flare/tree/steps-evidence-1/docs/steps). A path such as
+`docs/steps/step-2a/m3-memory.json`, cited by an ADR, a doc or a code comment, is that path at the tag:
 
 ```sh
 git show steps-evidence-1:docs/steps/step-2a/m3-memory.json

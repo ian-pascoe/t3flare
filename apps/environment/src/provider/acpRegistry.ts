@@ -7,7 +7,7 @@
 // registry's agents only four have both, and each is already a built-in provider of t3's own kind, running the same
 // agent in the Workspace's Container (steps 4a, 4b): Claude Agent, Codex, OpenCode and pi. The rest either sign in with
 // their vendor (refused, parity D3) or read their key only from the environment or a settings file (not offered; the
-// owner's call: docs/steps/parity-batch-2.md). So no registry agent is installed, at runtime or
+// owner's call: docs-archive-1:docs/steps/parity-batch-2.md). So no registry agent is installed, at runtime or
 // in the image (ADR-0024's pin is unchanged).
 import type { AcpRegistrySearchAgent } from "@t3tools/contracts";
 import * as AcpRegistryRuntimeCoordinator from "@t3tools/provider-acp-registry/server/AcpRegistryRuntimeCoordinator";

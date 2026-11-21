@@ -1,5 +1,5 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off anyUnknownInErrorContext:off
-// G11's stage harness (docs/steps/previews.md): Browser Run, the Container previews and the hostile cases, on the
+// G11's stage harness (docs-archive-1:docs/steps/previews.md): Browser Run, the Container previews and the hostile cases, on the
 // throwaway stage `previews`. Evidence goes to docs/steps/previews/<name>.json; no token, cookie or page URL beyond the
 // harness's own is written.
 //

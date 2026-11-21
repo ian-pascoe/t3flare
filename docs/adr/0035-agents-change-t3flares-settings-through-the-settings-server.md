@@ -1,11 +1,11 @@
 # Agents change t3flare's settings through the Settings server
 
 Status: accepted (owner decisions, 2026-11-14; built and unit-tested through SPI-1202, stage-run on `psmcp`: report
-[`docs/steps/settings-mcp.md`](../steps/settings-mcp.md)). Where the
+[`docs-archive-1:docs/steps/settings-mcp.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/settings-mcp.md)). Where the
 Owner-client endpoint lives:
 [ADR-0036](0036-owner-clients-reach-the-settings-server-at-t3flare-mcp-behind-an-access-application-of-its-own.md),
 whose sign-in probe (owner step 1) passed on 2026-11-15. Plan:
-[`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md). Supersedes
+[`docs-archive-1:docs/steps/settings-mcp-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/settings-mcp-plan.md). Supersedes
 [ADR-0026](0026-pi-durable-harness-settings-live-in-the-environment-and-an-owner-only-panel-edits-them.md) §8 ("the agent
 gets no settings tools", OD-T9). Refines ADR-0026, [ADR-0028](0028-mcp-tools-reach-agents-through-the-environments-mcp-host.md),
 [ADR-0032](0032-environment-settings-and-harness-settings-are-separate-entities-edited-on-one-owner-page.md) and

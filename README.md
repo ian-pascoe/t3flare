@@ -18,7 +18,7 @@ https://github.com/user-attachments/assets/5dbc7d46-0e75-45ba-b2b1-4526ab2d507d
 
 Experimental. t3flare is one Maintainer's working Deployment, published so others can run their own. It is maintained
 on a best-effort basis, with no stability guarantee: `main` is the only supported version, and there are no releases,
-tags or changelog. The commit log and the t3 bump pull requests are the record. [`docs/plan.md`](docs/plan.md) has
+tags or changelog. The commit log and the t3 bump pull requests are the record. [`docs/history.md`](docs/history.md) has
 the milestones done so far.
 
 ## What you get
@@ -122,7 +122,8 @@ publishes a prebuilt image ([ADR-0040](docs/adr/0040-the-workspace-image-is-buil
 - Contributors: [`CONTRIBUTING.md`](CONTRIBUTING.md), [`GLOSSARY.md`](GLOSSARY.md), the decisions in
   [`docs/adr/`](docs/adr/), the platform facts in [`docs/research/`](docs/research/), and
   [`docs/upstream-fragility.md`](docs/upstream-fragility.md) for where following t3code's nightlies breaks t3flare.
-- History: [`docs/plan.md`](docs/plan.md), the milestones and what each delivered.
+- History: [`docs/history.md`](docs/history.md), the milestones and what each delivered; the step reports, plans and
+  reviews are archived at the tag `docs-archive-1` ([`docs/steps/README.md`](docs/steps/README.md)).
 
 ## License
 

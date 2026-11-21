@@ -3,7 +3,7 @@
 // (`wrapCliAdapter`'s `takeEnvironmentSkills`), so the set is current in the Container when the turn runs. The take is
 // the one a Pi Durable turn's Session runs (`takeSkillsForTurn`): bounded, never failing the spawn or the turn, and when
 // the hash is the Workspace's already, one call that changes nothing. Whether a running CLI then sees a changed set is
-// its own (docs/steps/env-skills-cli.md, "When a CLI catches up").
+// its own (docs-archive-1:docs/steps/env-skills-cli.md, "When a CLI catches up").
 import { type SkillsTaker, takeSkillsForTurn } from "@t3flare/skills";
 import * as Effect from "effect/Effect";
 

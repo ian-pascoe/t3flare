@@ -1,6 +1,6 @@
 # Previews run in Browser Run, with `localhost` routed to the thread's Container
 
-Status: accepted (owner decisions O1–O5, 2026-11-13; built in G11, SPI-1002). Plan: [`docs/steps/previews-plan.md`](../steps/previews-plan.md) with its review changelog; report: [`docs/steps/previews.md`](../steps/previews.md).
+Status: accepted (owner decisions O1–O5, 2026-11-13; built in G11, SPI-1002). Plan: [`docs-archive-1:docs/steps/previews-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/previews-plan.md) with its review changelog; report: [`docs-archive-1:docs/steps/previews.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/previews.md).
 
 Stock t3's previews stay stock above three seams: where Chrome comes from, where `localhost` goes, and how ports are listed.
 

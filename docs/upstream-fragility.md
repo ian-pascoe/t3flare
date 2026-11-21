@@ -281,7 +281,7 @@ The bump runs: the whole `pnpm run check` (`git apply --check` of the Patches, t
 - **Blast radius**: every Durable agent turn.
 - **Fix**: re-cut the patch against the new `dist/`; re-run `--real-turn`.
 
-### U25. Retired: Commissary's `/v1/models` and the alias scheme (SPI-1176)
+### U25. Commissary's model aliases in an endpoint's list (the rest retired at SPI-1176)
 
 The Model proxy's catalog (`packages/models/src/catalog.ts`), its static list and its failure classifier
 (`proxyFailure.ts`) went at the hard cut (SPI-1176). What is left is the list parsing an endpoint's discovery reads
@@ -296,10 +296,6 @@ to its real id when an endpoint is at Commissary): `apps/environment/test/modelL
 - **Detection**: acceptance fails loudly ("fixtures written"). This is a false alarm about production, but a true one about U3: the same shapes are what the differ emits.
 - **Blast radius**: none in production.
 - **Fix**: update the fixtures alongside the differ.
-
-### U27. The bump job checks less than `bun run check` (fixed)
-
-Fixed by ADR-0030: `scripts/bump.ts` runs the whole `pnpm run check`, as prod's deploy does.
 
 ### U28. T3 Connect: the publish-only link and the publisher (step 3+)
 
@@ -397,17 +393,6 @@ Fixed by ADR-0030: `scripts/bump.ts` runs the whole `pnpm run check`, as prod's 
 - **Detection**: typecheck; `test/cliCard.test.ts` (t3's ACP adapter wrapped, a scripted agent: the card's shape, the answers, withdrawal, the turn's end); `scripts/tools.ts` relay cases on a stage. **Silent**: t3 dropping the card without an error (the call is then refused after 10 minutes).
 - **Blast radius**: relayed MCP writes from CLI threads that need a card are refused (fail closed).
 - **Fix**: `git -C t3code diff <old>..<new> -- packages/provider-core/src/server/ProviderAdapter.ts apps/server/src/orchestration-v2/RunExecutionService.ts`; follow how t3 accepts and routes runtime requests.
-
-### U38. Retired: t3's push argv, turned into expectations (SPI-992)
-
-Retired with the push gateway (owner, 2026-11-12, back to stock): no Expectation is registered, and t3's own push goes
-to GitHub as the agent's does.
-
-### U39. Retired: no t3 path pushes for a linked agent (SPI-992)
-
-Retired with the push gateway (owner, 2026-11-12, back to stock): a linked thread pushes under its own mode. Still
-true and kept for another reason: `acpAdapterOptions` gives t3's ACP adapter no `clientTerminals`, since the
-Environment DO runs no processes and an agent's commands belong in its Workspace (`test/cliCard.test.ts`).
 
 ### U40. Code mode and pi-codemode (tools step)
 
@@ -583,15 +568,6 @@ Environment DO runs no processes and an agent's commands belong in its Workspace
 - **Detection**: typecheck (`ScheduledTaskWebhookOrigin`, `WEBHOOK_ROUTE_PREFIX`); `test/scratchCheckout.test.ts` (t3's argv as written today, the profile, the event parser); `test/host.test.ts` (the watch query on a synthetic payload); `test/webhookOrigin.test.ts`. **Silent**: a changed guide flow (a refusal with the reason, in the router trace), a moved watch field (no wake while asleep: watches resume at the next boot). Cheapest check: `scripts/pbatch.ts guide` and `prwatch-start`/`prwatch-check` on a stage, outside the bump.
 - **Blast radius**: review guides fail ("Codex gave no answer" or a git refusal); hook URLs missing; PR watches checked only while a client is connected.
 - **Fix**: diff `PullRequestReviewGuideService.ts`, `CodexTextGeneration.ts`, `ScheduledTaskService.ts` and `PullRequestWatchReactor.ts` between tags.
-
-### U58. Retired: Commissary's usage and limit readers (SPI-1176)
-
-The Usage page's reader of Commissary's request log and the limit source of Commissary's accounts went with the Model
-proxy at the hard cut (SPI-1176). The Usage page's readers are
-[U79](#u79-the-usage-page-from-t3flares-own-usage-records-spi-1173); the limit-source Layer
-(`usage/limitSources.ts`) is [U84](#u84-limit-meters-for-subscription-endpoints-vendors-limit-headers-and-t3s-limit-source-contract-spi-1174);
-the rest of parity batch 2's leans (the ACP registry, the Storage page, OTLP) moved to
-[U86](#u86-the-acp-registrys-refusals-the-storage-pages-database-row-otlp-from-settings-parity-batch-2-g13).
 
 ### U59. The preview browser: a Shadow of `ServerBrowserContexts`, the HTML-render bridge, and `@cloudflare/playwright` (G11)
 
@@ -962,7 +938,7 @@ cut, SPI-1176: a model from before it, a bare id, runs on the default model, the
   answered 202). It rests on M0 (`docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json`, copied from the
   spike branch `settings-mcp-m0-spike`): the more specific Access application wins a path; a token of one application is
   refused at another's (tested with a service-token stand-in only; the OAuth bearer case is owner step 1,
-  `docs/steps/settings-mcp/m5a-stage-run.md` items 1-4, so layout (B) is unproven until then); Access answers no root or
+  `docs-archive-1:docs/steps/settings-mcp/m5a-stage-run.md` items 1-4, so layout (B) is unproven until then); Access answers no root or
   path-inserted well-known document, so clients find the authorization server only from the 401's `WWW-Authenticate`
   `resource_metadata`; `resource` is accepted with or without the query at authorize; the query reaches the origin
   (no longer relied on by the named clients: Claude Code's discovery fails with one, U74); and Claude Code 2.1.322's
@@ -1013,7 +989,7 @@ cut, SPI-1176: a model from before it, a bare id, runs on the default model, the
   server's Pause as one.
 - **Detection**: `test/settingsModes.test.ts` pins our side of each shape, and imports `pauseOf` and
   `isPausingServer`, so a change to our own reading of Executor's shape fails there. **Silent** for real clients: the
-  stage run of `m5b-settings-owner-modes.json` (`docs/steps/settings-mcp/m5b-stage-run.md`).
+  stage run of `m5b-settings-owner-modes.json` (`docs-archive-1:docs/steps/settings-mcp/m5b-stage-run.md`).
 - **Blast radius**: `native` or `model` with that client: the question is not shown or not answered, and the change
   waits on its Change page until it expires (the page still answers it, so nothing applies unseen). `browser`, own
   agents and the panel are unaffected.
@@ -1697,6 +1673,15 @@ Moved from U58 when its Commissary readers went (SPI-1176).
 - **Detection**: typecheck (the palette is typed `Record<ThemeColorRole, string>`, so a new role fails it; the service's shape); `test/flareTheme.test.ts` (the file decodes, every role, contrast floors, the seed over t3's own service); `test/nodeFsShim.workerd.test.ts` (t3's guarded read, restated, on DO SQLite); the upstream fingerprint watches `readThemeFileGuarded` (region for `shims/node-fs.ts`), so a bump that changes its calls names the shim for review. **Silent**: a theme read moved out of `readThemeFileGuarded`, or a change to `findThemeBackground`'s `lstatSync(…, { bigint: true })` (`ino`, `size`, `mtimeNs`), which is outside the watched region; the theme then drops from the picker in the Cloud Environment only. Cheapest check: on a stage, `t3_theme_read` lists `t3flare`.
 - **Blast radius**: the picker lacks the t3flare theme, or a client keeps the stock theme; never a turn.
 - **Fix**: diff `environmentTheme.ts` and `themePalettes.ts` between tags; give a new role a colour in both palettes.
+
+## Retired entries
+
+Entries whose dependency is gone. Their ids are not reused.
+
+- **U27. The bump job checked less than the whole check.** Fixed by ADR-0030: `scripts/bump.ts` runs the whole `pnpm run check`, as prod's deploy does.
+- **U38. t3's push argv, turned into Expectations (SPI-992).** Went with the push gateway (owner, 2026-11-12, back to stock): t3's own push goes to GitHub as the agent's does.
+- **U39. No t3 path pushes for a linked agent (SPI-992).** Went with the push gateway: a linked thread pushes under its own mode. Still true for another reason: `acpAdapterOptions` gives t3's ACP adapter no `clientTerminals`, since the Environment DO runs no processes and an agent's commands belong in its Workspace (`test/cliCard.test.ts`).
+- **U58. Commissary's usage and limit readers (SPI-1176).** Went with the Model proxy at the hard cut. The Usage page's readers are [U79](#u79-the-usage-page-from-t3flares-own-usage-records-spi-1173); the limit-source Layer (`usage/limitSources.ts`) is [U84](#u84-limit-meters-for-subscription-endpoints-vendors-limit-headers-and-t3s-limit-source-contract-spi-1174); the rest of parity batch 2's leans (the ACP registry, the Storage page, OTLP) are [U86](#u86-the-acp-registrys-refusals-the-storage-pages-database-row-otlp-from-settings-parity-batch-2-g13).
 
 ## Gaps in detection
 

@@ -17,7 +17,7 @@ Each Environment signs in itself: a rotating credential is never copied from the
 
 ## Refinement (SPI-1164, 2026-11-16)
 
-Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
+Report: [`docs-archive-1:docs/steps/spi-1164.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1164.md).
 
 1. **A sign-in is a Model endpoint's auth.** An endpoint's auth is an API key, none, or a sign-in (`chatgpt` first,
    `claude` second (item 10), `copilot` third (item 11), each one entry in `SIGN_IN_KINDS` and one vendor in the
@@ -70,7 +70,7 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
    below. No Workspace code asks for a sign-in's token through `endpointCredential`.
 
 10. **Claude is a Claude Pro or Max plan through Claude Code's OAuth sign-in** (SPI-1165; report
-    [`docs/steps/spi-1165.md`](../steps/spi-1165.md)). It is pi-ai's copy-code flow: the owner approves at claude.ai,
+    [`docs-archive-1:docs/steps/spi-1165.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1165.md)). It is pi-ai's copy-code flow: the owner approves at claude.ai,
     Anthropic's page shows a code (`code#state`), and the owner pastes it into the panel. Its client, URLs and scopes
     are pi-ai's (Claude Code's public client), pinned against pi-ai's own flow; its state is a random value of its own,
     not the PKCE verifier pi-ai sends as the state. Its endpoint is `anthropic-messages` at `https://api.anthropic.com`,
@@ -103,7 +103,7 @@ Report: [`docs/steps/spi-1164.md`](../steps/spi-1164.md).
     panel names the risk as the owner's beside the sign-in.
 
 11. **GitHub Copilot is a Copilot plan through GitHub's device flow** (SPI-1166; report
-    [`docs/steps/spi-1166.md`](../steps/spi-1166.md)), with the Copilot editor's public GitHub client, as pi-ai signs in
+    [`docs-archive-1:docs/steps/spi-1166.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1166.md)), with the Copilot editor's public GitHub client, as pi-ai signs in
     to Copilot: the panel shows GitHub's device page and a code, the owner enters it there and approves, and the
     Environment asks GitHub whether it was approved once per panel ask, no sooner than GitHub's interval (slowed as
     `slow_down` says). The device code is sealed with the attempt, as item 7's state and verifier are; no paste.
@@ -162,7 +162,7 @@ Considered and not taken:
 
 ## Refinement (SPI-1171, 2026-11-16): the model relay is a caller too
 
-Report: [`docs/steps/spi-1171.md`](../steps/spi-1171.md); the relay's side is ADR-0016's SPI-1171 refinement.
+Report: [`docs-archive-1:docs/steps/spi-1171.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1171.md); the relay's side is ADR-0016's SPI-1171 refinement.
 
 1. **The model relay asks at use time, per request.** `modelRelayTarget` gives a sign-in's access token for one relayed
    request (the broker's `access`, renewed first under item 3's lock when near its expiry). The Workspace DO hands it

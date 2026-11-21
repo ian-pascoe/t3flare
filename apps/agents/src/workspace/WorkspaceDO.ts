@@ -329,7 +329,7 @@ export class WorkspaceDO extends ContainerHost {
           name: WORKSPACE_CONTAINER,
           // Each start's own size replaces it (`#budgeted`); a start never omits it (an omitted one starts `lite`).
           instance: launchOf({ settings: resolveEnvironment(EMPTY_ENVIRONMENT), source: "default" }).instance,
-          // Unrestricted direct egress in part 1, as cloudpid's v1 (an allowlist is deferred, docs/plan.md).
+          // Unrestricted direct egress in part 1, as cloudpid's v1 (an allowlist is deferred, docs/history.md).
           egress: { mode: "direct" },
           ignore: [...patterns],
           connectTimeoutMs: 60_000,

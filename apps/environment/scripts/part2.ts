@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off globalTimers:off
-// Step 2a part 2's checks on a deployed stage (docs/steps/step-2a-part2-plan.md):
+// Step 2a part 2's checks on a deployed stage (docs-archive-1:docs/steps/step-2a-part2-plan.md):
 //
 //   node scripts/stage.ts run step2a2 part2 setup            clone the fixture into a Workspace and open a project on it
 //   node scripts/stage.ts run step2a2 part2 ps               the Container's processes (pid, ppid, pgid, sid, args)

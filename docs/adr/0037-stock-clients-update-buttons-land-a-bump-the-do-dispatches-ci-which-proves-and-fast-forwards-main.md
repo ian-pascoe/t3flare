@@ -1,7 +1,7 @@
 # Stock clients' Update buttons land a bump: the DO dispatches CI, which proves and fast-forwards main
 
 Status: accepted (owner, 2026-11-17, after a four-round design interview). Plan:
-[`docs/steps/in-app-updates-plan.md`](../steps/in-app-updates-plan.md) (D1–D23). Facts:
+[`docs-archive-1:docs/steps/in-app-updates-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/in-app-updates-plan.md) (D1–D23). Facts:
 [`docs/research/github-actions-dispatch-and-do-deploy.md`](../research/github-actions-dispatch-and-do-deploy.md). Refines
 [ADR-0017](0017-upstream-is-tracked-by-nightly-tag-with-an-automated-bump.md) (the bump can land),
 [ADR-0023](0023-the-cloud-environment-tells-clients-only-what-it-does.md) (a third classification),

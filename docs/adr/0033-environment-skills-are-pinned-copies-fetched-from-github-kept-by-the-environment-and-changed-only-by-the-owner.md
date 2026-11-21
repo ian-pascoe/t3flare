@@ -1,8 +1,8 @@
 # Environment skills are pinned copies fetched from GitHub, kept by the Environment and changed only by the owner
 
 Status: accepted (SPI-1148, 2026-11-14; decided in SPI-1001's triage, refined by the plan's two reviews). Plan:
-[`docs/steps/spi-1001-env-plan.md`](../steps/spi-1001-env-plan.md). Report:
-[`docs/steps/spi-1001-env.md`](../steps/spi-1001-env.md). Refines
+[`docs-archive-1:docs/steps/spi-1001-env-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1001-env-plan.md). Report:
+[`docs-archive-1:docs/steps/spi-1001-env.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1001-env.md). Refines
 [ADR-0032](0032-environment-settings-and-harness-settings-are-separate-entities-edited-on-one-owner-page.md).
 
 SPI-1147 gave Durable agents a Workspace's Repo skills. The owner also wants Skills of his own in every Project,
@@ -81,7 +81,7 @@ cloudpid and fetched from GitHub), cut to t3flare: one Environment, the owner's 
   window), its files at the next turn, and the composer at once.
 - A Pi Durable turn carries the set's hash to its Session, which has the Workspace take it. A CLI agent's Workspace
   takes it on the Environment's side, before the CLI's process starts and before each of its turns (SPI-1153,
-  `docs/steps/env-skills-cli.md`); the CLI reads it through a link in its user-level Skill root (pi: a `--skill` flag)
+  `docs-archive-1:docs/steps/env-skills-cli.md`); the CLI reads it through a link in its user-level Skill root (pi: a `--skill` flag)
   and keeps its own rule for a same-named Repo skill, by the root the Repo skill is in: Claude Code and pi keep the
   Environment's; OpenCode keeps a Repo skill in `.opencode/skills` or `.opencode/skill` and the Environment's over one
   in `.agents/skills`; Codex lists both and a bare mention picks neither.
@@ -93,7 +93,7 @@ cloudpid and fetched from GitHub), cut to t3flare: one Environment, the owner's 
 
 §7 ("No agent tool changes them") is refined by
 [ADR-0035](0035-agents-change-t3flares-settings-through-the-settings-server.md); this ADR's title predates it. Plan:
-[`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md).
+[`docs-archive-1:docs/steps/settings-mcp-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/settings-mcp-plan.md).
 
 - An agent may preview a Skill source and check for updates (reads), and ask to install, update, enable or remove an
   Environment skill; each of those waits for an answer. Disabling one is free.

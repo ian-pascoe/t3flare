@@ -4,7 +4,7 @@ Orchestration between the laptop and the cloud uses t3's Peer links: the linking
 
 ## Refinement (step 3, as built)
 
-- **The link is t3's, unchanged on the laptop**, and needs no route, Shadow or Patch in the cloud: t3's `/mcp`, MCP OAuth, Peer forwarding and remote delegation were mounted since step 0. The cloud seeds **Linked environments** on once (a DO-storage mark, so an owner who turns it off keeps it off), pins agent browser access off, and refuses the bootstrap token at `/oauth/mcp/decision` (ADR-0010's refinement). Proved with a stock `t3` from npm at the pin and at the desktop's nightly as the laptop, and from the owner's desktop app ([report](../steps/step-3.md)).
+- **The link is t3's, unchanged on the laptop**, and needs no route, Shadow or Patch in the cloud: t3's `/mcp`, MCP OAuth, Peer forwarding and remote delegation were mounted since step 0. The cloud seeds **Linked environments** on once (a DO-storage mark, so an owner who turns it off keeps it off), pins agent browser access off, and refuses the bootstrap token at `/oauth/mcp/decision` (ADR-0010's refinement). Proved with a stock `t3` from npm at the pin and at the desktop's nightly as the laptop, and from the owner's desktop app ([report](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/step-3.md)).
 - **The fence is t3's plus ours.** t3 fences what a link below full access may change through its tools; the Durable agent enforces the modes the link hands down: runtime modes fail closed (`auto` and unknown modes run as approval-required) and `plan` is read-only in the Session (edit and write refused, every `bash` asks, only read-only T3 tools). A full-access link is not fenced (t3's rule).
 - **Pushes from linked work ask every time** (owner decision D1): see ADR-0013's refinement.
 - **A remote task runs in the cloud project's checkout**, shared with the owner's threads on it (t3 refuses worktree isolation for a remote task); `t3_thread_launch` with a worktree strategy is the way to isolate one.
@@ -12,7 +12,7 @@ Orchestration between the laptop and the cloud uses t3's Peer links: the linking
 
 ## Refinement (SPI-1061): the reverse direction
 
-Status: accepted (owner decision, 2026-11-12; built in SPI-1061). Plan: [`docs/steps/spi-1061-plan.md`](../steps/spi-1061-plan.md).
+Status: accepted (owner decision, 2026-11-12; built in SPI-1061). Plan: [`docs-archive-1:docs/steps/spi-1061-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1061-plan.md).
 
 - **The cloud links to the Laptop Environment with the same Peer link, t3's own and unchanged:** an **Outbound link**, made and governed as on stock t3 ([ADR-0029](0029-the-outbound-link-is-t3s-own-unchanged-and-t3flare-adds-only-reachability.md)). t3's peer services were mounted since step 0, so no route, Shadow or Patch is added, and the link tools withheld from agents since ADR-0022 are offered again.
 - **The laptop is reached at a Route:** a plain https address that ends at the laptop's t3, with t3's own auth in front and nothing else. Three kinds are supported (owner decision, 2026-11-12):

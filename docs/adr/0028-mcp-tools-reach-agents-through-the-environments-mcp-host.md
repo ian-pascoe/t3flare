@@ -1,6 +1,6 @@
 # MCP tools reach agents through the Environment's MCP host
 
-Status: accepted (tools step, 2026-11-12). Plan: [`docs/steps/tools-plan.md`](../steps/tools-plan.md) §3–§5, with its review changelog (H1–H3, M1, M3, M5, M7, M9–M13). Tickets: SPI-1001 (MCP part), SPI-1039.
+Status: accepted (tools step, 2026-11-12). Plan: [`docs-archive-1:docs/steps/tools-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/tools-plan.md) §3–§5, with its review changelog (H1–H3, M1, M3, M5, M7, M9–M13). Tickets: SPI-1001 (MCP part), SPI-1039.
 
 Agents in t3flare had t3's own tools and nothing else. The owner wants Commissary's tools, and servers he adds himself such as Executor, for every agent kind, without a third-party server's credential ever reaching an agent, a Session or a Container.
 
@@ -54,7 +54,7 @@ Agents in t3flare had t3's own tools and nothing else. The owner wants Commissar
 
 ## Back to stock (owner, 2026-11-12)
 
-The owner chose to stay close to stock t3 (`docs/scope-audit.md`). Removed, each "owner, 2026-11-12, back to stock":
+The owner chose to stay close to stock t3 (`docs-archive-1:docs/scope-audit.md`). Removed, each "owner, 2026-11-12, back to stock":
 
 1. Linked threads and MCP: the per-call rule for linked writes, the "offered to linked threads" switch, judging a tainted Workspace as linked, and the strictest-mode rule (M7). Linked threads follow their own mode and see every enabled server.
 2. t3's tools for CLI agents: `mcp/t3Relay.ts`, the handle swap and the tainted-owner-handle refusal (H1). The CLI gets t3's per-thread bearer, as stock t3 hands it, at t3's public `/mcp`. The relay with per-process handles stays for Commissary and direct servers.
@@ -65,8 +65,8 @@ Rerun on stage after the cut: the panel at its new path (`m3-panel-safety.json`)
 ## Server questions reach the owner as t3 cards (refinement, SPI-1079, 2026-11-13)
 
 The owner wants Executor's "Through your agent" (`model`) and "In your client" (`native`) approval modes (owner,
-2026-11-12, SPI-1079). Neither may let an agent answer its own approval. Plan: [`docs/steps/spi-1079-plan.md`](../steps/spi-1079-plan.md);
-report: [`docs/steps/spi-1079.md`](../steps/spi-1079.md).
+2026-11-12, SPI-1079). Neither may let an agent answer its own approval. Plan: [`docs-archive-1:docs/steps/spi-1079-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1079-plan.md);
+report: [`docs-archive-1:docs/steps/spi-1079.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1079.md).
 
 1. **Every agent call declares elicitation** (form and URL), Durable and relayed alike, with no per-server switch: a
    server that finds no elicitation may take that as consent. The panel's test and the inventory lists declare nothing.
@@ -129,7 +129,7 @@ The CLI wrapper no longer strips t3's `mcpApps`, so Codex renders an MCP server'
 
 ## Refinement (SPI-1160, 2026-11-14): Commissary is a direct server the owner adds
 
-Part of **Model endpoints** (owner, 2026-11-13): t3flare stops depending on the Model proxy, so the MCP host no longer reads its settings. Report: [`docs/steps/spi-1160.md`](../steps/spi-1160.md).
+Part of **Model endpoints** (owner, 2026-11-13): t3flare stops depending on the Model proxy, so the MCP host no longer reads its settings. Report: [`docs-archive-1:docs/steps/spi-1160.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1160.md).
 
 1. **No built-in server.** The `commissary` server kind, `toolsKeyOf`, `COMMISSARY_TOOLS_URL` and `COMMISSARY_TOOLKITS` are gone. The MCP server set is the direct servers the owner added, and nothing else: a new Environment offers no MCP server until he adds one. This replaces item 3's first sentence and "Commissary's endpoint" in item 1.
 2. **Commissary is added by hand**, in the Harness panel, as any direct server: its MCP endpoint on the API host (`https://<api host>/mcp`, with `?toolkits=a,b` to narrow it), signed in with an `x-api-key` header whose value the owner types once. The key is his choice, a Commissary API key with a tool scope; it is stored write-only like every direct server's secret, and never enters a Container (item 3's rule for direct servers). `docs/model-endpoints.md` says how.
@@ -144,7 +144,7 @@ Part of **Model endpoints** (owner, 2026-11-13): t3flare stops depending on the 
 
 ## Refinement (ADR-0035, 2026-11-14): the Settings server beside Direct servers, and the pi CLI gets the relay
 
-Plan: [`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md) (written before SPI-1160, when Commissary's
+Plan: [`docs-archive-1:docs/steps/settings-mcp-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/settings-mcp-plan.md) (written before SPI-1160, when Commissary's
 was a built-in kind; this refinement follows the SPI-1160 refinement above).
 
 1. **The MCP server set has a second kind** beside Direct servers: the **Settings server**

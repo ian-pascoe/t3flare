@@ -94,7 +94,7 @@ CLI agents reach MCP tools with a **tool handle**: an opaque per-process bearer 
 
 ## Refinement (parity batch 2, G13): ACP registry agents
 
-t3's ACP registry offers 45 agents. The rule above admits one that takes the proxy's base URL through its own setting **and** its key from a helper on demand (A′). Four do, and each is already a built-in provider of t3's own kind: Claude Agent, Codex, OpenCode and pi. The others either sign in with their vendor (refused, parity D3) or read their key only from their environment or a settings file (Gemini CLI, Qwen Code, goose, Mistral Vibe and most of the rest), which would put the Container key in the agent's environment, readable by every command it runs, with no grant count. They are listed with that reason and refused (`apps/environment/src/provider/acpRegistry.ts`); nothing is installed, at runtime or in the image. Admitting them is the owner's call (`docs/steps/parity-batch-2.md`, "For the owner").
+t3's ACP registry offers 45 agents. The rule above admits one that takes the proxy's base URL through its own setting **and** its key from a helper on demand (A′). Four do, and each is already a built-in provider of t3's own kind: Claude Agent, Codex, OpenCode and pi. The others either sign in with their vendor (refused, parity D3) or read their key only from their environment or a settings file (Gemini CLI, Qwen Code, goose, Mistral Vibe and most of the rest), which would put the Container key in the agent's environment, readable by every command it runs, with no grant count. They are listed with that reason and refused (`apps/environment/src/provider/acpRegistry.ts`); nothing is installed, at runtime or in the image. Admitting them is the owner's call (`docs-archive-1:docs/steps/parity-batch-2.md`, "For the owner").
 
 ## Refinement (SPI-1152): Variables are never credentials
 
@@ -108,7 +108,7 @@ Variable. These are guard rails for the owner, not a boundary against him.
 ## Refinement (SPI-1167, 2026-11-14): the model relay replaces the key helper for Model endpoints
 
 Part of **Model endpoints** (owner, 2026-11-13; [ADR-0034](0034-model-endpoints-are-the-owners-set-in-the-harness-panel.md)).
-Report: [`docs/steps/spi-1167.md`](../steps/spi-1167.md). The key helper (A′ above) stays for the Model proxy until the
+Report: [`docs-archive-1:docs/steps/spi-1167.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1167.md). The key helper (A′ above) stays for the Model proxy until the
 hard cut (SPI-1176); for Model endpoints it is replaced by a **model relay**, which is the original design's Handle
 (option B) without an intercept or a CA:
 
@@ -159,7 +159,7 @@ not refused.
 
 ## Refinement (SPI-1168, 2026-11-15): Claude Code through the model relay, and the model-routed URL
 
-Report: [`docs/steps/spi-1168.md`](../steps/spi-1168.md); evidence: `docs/steps/spi-1168/p1168.json`.
+Report: [`docs-archive-1:docs/steps/spi-1168.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1168.md); evidence: `docs/steps/spi-1168/p1168.json`.
 
 1. **One base URL, every endpoint.** Claude Code takes one `ANTHROPIC_BASE_URL` per process (no per-model base URL;
    `modelOverrides` only maps ids), and t3 resumes a thread in the running process on a model change (SPI-1167's
@@ -209,7 +209,7 @@ Report: [`docs/steps/spi-1168.md`](../steps/spi-1168.md); evidence: `docs/steps/
 
 ## Refinement (SPI-1169, 2026-11-16): OpenCode through the model relay
 
-Report: [`docs/steps/spi-1169.md`](../steps/spi-1169.md); evidence: `docs/steps/spi-1169/p1169.json`.
+Report: [`docs-archive-1:docs/steps/spi-1169.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1169.md); evidence: `docs/steps/spi-1169/p1169.json`.
 
 1. **A provider per endpoint, at its own path.** OpenCode takes a base URL per provider, so each endpoint whose API it
    speaks is its own provider, `t3flare-endpoint-<endpointId>` (prefixed as Codex's, so no endpoint id takes one of
@@ -254,7 +254,7 @@ Report: [`docs/steps/spi-1169.md`](../steps/spi-1169.md); evidence: `docs/steps/
 
 ## Refinement (SPI-1170, 2026-11-16): the pi CLI through the model relay
 
-Report: [`docs/steps/spi-1170.md`](../steps/spi-1170.md); evidence: `docs/steps/spi-1170/p1170.json`.
+Report: [`docs-archive-1:docs/steps/spi-1170.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1170.md); evidence: `docs/steps/spi-1170/p1170.json`.
 
 1. **A provider per endpoint, every API.** pi takes a base URL per provider (`models.json`), so each endpoint the
    relay carries (no sign-in endpoint until SPI-1171, `relayedEndpoints`) that lists a model is its own provider, `t3flare-endpoint-<endpointId>` (prefixed, so no endpoint id changes one of pi's
@@ -311,7 +311,7 @@ Report: [`docs/steps/spi-1170.md`](../steps/spi-1170.md); evidence: `docs/steps/
 
 ## Refinement (SPI-1171, 2026-11-16): subscription sign-ins through the model relay
 
-Report: [`docs/steps/spi-1171.md`](../steps/spi-1171.md). A sign-in endpoint (ADR-0018) is carried by the relay like an
+Report: [`docs-archive-1:docs/steps/spi-1171.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1171.md). A sign-in endpoint (ADR-0018) is carried by the relay like an
 API-key one: the handle is swapped for the credential in the agents Worker, never in the Container.
 
 1. **Which CLI takes which sign-in** (the ticket's matrix, `RELAYED_SIGN_INS` in `@t3flare/models/relay`): Codex the
@@ -358,7 +358,7 @@ API-key one: the handle is swapped for the credential in the agents Worker, neve
 
 ## Refinement (SPI-1176, 2026-11-17): the hard cut
 
-Report: [`docs/steps/spi-1176.md`](../steps/spi-1176.md).
+Report: [`docs-archive-1:docs/steps/spi-1176.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1176.md).
 
 1. **The relay is the only way.** Every CLI's profile names only Model endpoints (`agents/cliProfiles.ts`,
    `acpProfiles.ts`); the Model proxy's provider (Codex's `t3flare-proxy`, pi's `anthropic` `models.json`, Claude Code's

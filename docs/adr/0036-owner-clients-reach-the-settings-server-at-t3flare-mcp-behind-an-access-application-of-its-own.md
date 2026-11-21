@@ -1,14 +1,14 @@
 # Owner clients reach the Settings server at `/_t3flare/mcp`, behind an Access application of its own
 
 Status: accepted (SPI-1196's M0 spike and SPI-1200, 2026-11-14), confirmed on 2026-11-15: **owner step 1**
-([`docs/steps/settings-mcp-m0-owner-steps.md`](../steps/settings-mcp-m0-owner-steps.md)), a real OAuth token's exchange
+([`docs-archive-1:docs/steps/settings-mcp-m0-owner-steps.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/settings-mcp-m0-owner-steps.md)), a real OAuth token's exchange
 for the endpoint's path and its refusal at the panel's paths, **passed** on the `psmcp` stage (P6, P11 at 900 s, P12,
 P13 the same `sub`; recorded in `docs/steps/settings-mcp/m5a-settings-owner-browser.json`). Owner step 2 (Cursor's
 redirect URI) is still open. **Prod is still deployed without the endpoint**: no `SettingsAccess`, the admin
 application exactly as before, no `T3FLARE_ACCESS_SETTINGS_AUD`, so `/_t3flare/mcp` on prod answers 404 `not_configured`
 (`OWNER_ENDPOINT_EXCLUDED_STAGES` in `apps/environment/src/settings/endpointLayout.ts`). Enabling prod is removing it
 from that list, when the owner turns the endpoint on. The nightly job's `bump` stage is on that list for good. Plan:
-[`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md) D13. Evidence:
+[`docs-archive-1:docs/steps/settings-mcp-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/settings-mcp-plan.md) D13. Evidence:
 `docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json` (copied from the spike branch). Refines
 [ADR-0010](0010-the-endpoint-is-public-behind-t3s-own-auth.md) ("Access only on the admin path"),
 [ADR-0026](0026-pi-durable-harness-settings-live-in-the-environment-and-an-owner-only-panel-edits-them.md) §1-2 (one
@@ -22,7 +22,7 @@ application, so the endpoint cannot share the `/_t3flare` application: there the
 owner's assertion alone, and an Owner client's token would drive them. The endpoint gets an application of its own on a
 narrower path of the same host. M0 showed Access routing the two paths apart; that it keeps their **tokens** apart was
 tested with a service-token stand-in in M0, and with a real OAuth bearer in owner step 1, which passed on 2026-11-15
-(`docs/steps/settings-mcp/m5a-stage-run.md` items 1-4).
+(`docs-archive-1:docs/steps/settings-mcp/m5a-stage-run.md` items 1-4).
 
 1. **The endpoint is `https://<host>/_t3flare/mcp`**, served by the Environment Worker, which verifies Access's
    assertion against the endpoint's own audience (`T3FLARE_ACCESS_SETTINGS_AUD`, `verifySettingsRequest`) and hands the

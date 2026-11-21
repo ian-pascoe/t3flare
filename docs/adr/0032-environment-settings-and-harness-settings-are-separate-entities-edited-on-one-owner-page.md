@@ -1,7 +1,7 @@
 # Environment settings and Harness settings are separate entities, edited on one owner page
 
 Status: accepted (SPI-1149, 2026-11-13; decided in SPI-1001's triage, the budget added at the owner's request the same
-day). Report: [`docs/steps/environment-settings.md`](../steps/environment-settings.md). Refines
+day). Report: [`docs-archive-1:docs/steps/environment-settings.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/environment-settings.md). Refines
 [ADR-0026](0026-pi-durable-harness-settings-live-in-the-environment-and-an-owner-only-panel-edits-them.md). Refined by
 [ADR-0033](0033-environment-skills-are-pinned-copies-fetched-from-github-kept-by-the-environment-and-changed-only-by-the-owner.md)
 (Environment skills: the same entity, revision and audit `entity`, applied at a turn, not a Container start).
@@ -77,7 +77,7 @@ configuration. Both are edited on the one page at `/_t3flare/harness`, the Envir
 
 ## Refinement (SPI-1152): Variables
 
-Report: [`docs/steps/spi-1152.md`](../steps/spi-1152.md). The Environment settings gain **Variables**: plain
+Report: [`docs-archive-1:docs/steps/spi-1152.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/spi-1152.md). The Environment settings gain **Variables**: plain
 `NAME=value` pairs every command in a Workspace starts with. mise's `[env]` (the Global mise config, SPI-1150) does not
 do this: it reaches a tool run through a shim or `mise exec`, not a plain shell line, an apt-installed tool, or a CLI
 agent's own process, which are fixed-path binaries outside mise.
@@ -126,8 +126,8 @@ Considered and rejected:
 
 ## Refinement (SPI-1150): the Global mise config
 
-Report: [`docs/steps/global-mise.md`](../steps/global-mise.md); plan and M0:
-[`global-mise-plan.md`](../steps/global-mise-plan.md). The Environment settings gain the **Global mise config**: the
+Report: [`docs-archive-1:docs/steps/global-mise.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/global-mise.md); plan and M0:
+[`global-mise-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/global-mise-plan.md). The Environment settings gain the **Global mise config**: the
 owner's `mise.toml` text, which every Container's commands get as mise's global config.
 
 1. **Shape.** One setting, `globalMiseConfig`, of the schema's `file` type: at most 16 KiB of UTF-8, no NUL (cloudpid's
@@ -188,7 +188,7 @@ Considered and rejected:
 ## Refinement (ADR-0035, 2026-11-14): the Settings server changes both entities
 
 [ADR-0035](0035-agents-change-t3flares-settings-through-the-settings-server.md); plan:
-[`docs/steps/settings-mcp-plan.md`](../steps/settings-mcp-plan.md). Agents may ask for changes to the Harness settings
+[`docs-archive-1:docs/steps/settings-mcp-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/settings-mcp-plan.md). Agents may ask for changes to the Harness settings
 and the Environment settings through the Settings server, which calls the same functions as the page.
 
 1. **Keys, revisions, readers and application points are unchanged** (§1). A change through the Settings server names

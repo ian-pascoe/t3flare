@@ -1,5 +1,5 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off globalDateInEffect:off
-// SPI-1151's stage harness (the CLI agents' Skills and Slash commands in t3's composer; docs/steps/spi-1151.md),
+// SPI-1151's stage harness (the CLI agents' Skills and Slash commands in t3's composer; docs-archive-1:docs/steps/spi-1151.md),
 // through t3's own calls as the web client makes them. The fixture (apps/environment/test/fixtures/cli-skills/) is
 // written, uncommitted, into a clone of the fixture project with t3's file write.
 //

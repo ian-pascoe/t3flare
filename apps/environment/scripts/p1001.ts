@@ -1,5 +1,5 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off globalDateInEffect:off
-// SPI-1147's stage harness (Repo skills and Prompt templates for Pi Durable; docs/steps/spi-1001.md), through t3's own
+// SPI-1147's stage harness (Repo skills and Prompt templates for Pi Durable; docs-archive-1:docs/steps/spi-1001.md), through t3's own
 // calls as the web client makes them. The fixture's files (apps/environment/test/fixtures/skills/) are written,
 // uncommitted, into a clone of the fixture project with t3's file write; they are never committed to the fixture repo,
 // whose other acceptances would get them in their system prompts.

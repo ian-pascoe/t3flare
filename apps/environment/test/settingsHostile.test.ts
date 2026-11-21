@@ -1,8 +1,8 @@
 // @effect-diagnostics globalDate:off globalConsole:off
 // Plan §5's hostile list (ADR-0035), M6 (SPI-1202): the cases that can be driven without a stage, end to end through the
 // doors as the Environment wires them (the MCP host, the CLI relay, the Owner-client endpoint, the Settings page). Each
-// `describe` names its line of the list; `docs/steps/settings-mcp.md` maps every line to its tests here and elsewhere,
-// and `docs/steps/settings-mcp/m6-stage-run.md` to what the stage run records.
+// `describe` names its line of the list; `docs-archive-1:docs/steps/settings-mcp.md` maps every line to its tests here and elsewhere,
+// and `docs-archive-1:docs/steps/settings-mcp/m6-stage-run.md` to what the stage run records.
 import { MCP_QUESTION_MARKER, type McpAsker, type McpQuestionAnswer, type McpQuestionCard } from "@t3flare/session-protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

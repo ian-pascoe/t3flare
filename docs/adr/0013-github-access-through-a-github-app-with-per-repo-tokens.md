@@ -41,7 +41,7 @@ Other hosts (GitLab, Bitbucket, Azure DevOps, Forgejo) are out of scope for now:
 
 **Superseded** by the back-to-stock refinement below (owner, 2026-11-12, back to stock). Kept as the record of what was built.
 
-Supersedes step 3's residual risk and the write half of step 2a's Container token. Evidence in `docs/steps/spi-992/`; the report is `docs/steps/spi-992.md`.
+Supersedes step 3's residual risk and the write half of step 2a's Container token. Evidence in `docs/steps/spi-992/`; the report is `docs-archive-1:docs/steps/spi-992.md`.
 
 - **The Container token is read-only code** (`contents: read`, `pull_requests: write`, `metadata: read`): it clones and fetches, and lets an agent's `gh pr create`/`view` work, since a pull request carries no code. The credential helper (protocol `v=2`) answers only `https://github.com`, so it never hands a token to a `pushurl` on another host (a finding of the plan: the old helper did).
 - **Every push to github.com goes through the push gateway**: the image's system gitconfig rewrites it (`pushInsteadOf` to `http://computer.internal/t3flare/git/`), and the agents Worker's outbound handler forwards it to GitHub with a **gateway token** (`contents: write`, plus `workflows: write` for an opted-in Workspace) that never enters a Container or a Session. Before forwarding, the gateway parses the receive-pack command list strictly, re-serialises it from what it parsed (no parser differential), and asks the Workspace DO's policy (`pushDecision`) about the exact ref updates:
