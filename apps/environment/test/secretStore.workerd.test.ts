@@ -33,6 +33,6 @@ it("stores, creates once, generates once and removes secrets in DO storage", asy
     expect(result.random2).toEqual(result.random1);
     expect(Option.isNone(result.removed)).toBe(true);
     // Kept in key-value storage, apart from SQL.
-    expect(await state.storage.get("t3flare/secret/signing")).toBeDefined();
+    expect(new Uint8Array((await state.storage.get("t3flare/secret/signing")) as ArrayBuffer)).toEqual(result.random1);
   });
 });

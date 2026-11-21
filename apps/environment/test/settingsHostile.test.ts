@@ -270,8 +270,13 @@ describe("hostile: a parent agent cannot answer a child's card", () => {
     expect(parent.cards).toEqual([]);
     const [card] = child.cards;
     // An approval card, with no field: t3 lets an agent answer user_input requests only.
-    expect(card).toMatchObject({ kind: "approval" });
+    expect(card).toMatchObject({ kind: "approval", server: "settings", title: "settings: change_environment?" });
     expect(card!.questions).toBeUndefined();
+    expect(card!.options).toEqual([
+      { decision: "accept", label: "Approve" },
+      { decision: "decline", label: "Decline" },
+      { decision: "cancel", label: "Cancel" },
+    ]);
     expect(card!.id).toContain(MCP_QUESTION_MARKER);
     // The parent names the child's request as t3 lists it; read and respond are refused before t3 sees them.
     const requestId = `runtime-request:piDurable:thread:thread-child:approval:${card!.id}`;

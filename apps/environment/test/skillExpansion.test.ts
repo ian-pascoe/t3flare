@@ -1,14 +1,27 @@
 // Skill mentions and Slash commands in a Pi Durable message (SPI-1147 §4): `turnPrompt` expands them when its caller
-// passes the thread's skills (the Pi Durable adapter, for a new turn and a steer), never for the ACP builder.
+// passes the thread's skills (the Pi Durable adapter, for a new turn and a steer; of the ACP flavors, OpenCode's only).
 import * as NodeFs from "node:fs";
 
-import type { ChatAttachment } from "@t3tools/contracts";
+import { type ChatAttachment, MessageId, ProviderDriverKind, ProviderInstanceId, ProviderSessionId, ThreadId } from "@t3tools/contracts";
+import type * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
+import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import type * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import { matchInlineSkills } from "@t3tools/shared/inlineSkills";
+import type { SubmitTurnInput, SteerInput } from "@t3flare/session-protocol";
 import { isMentionable, type PromptTemplate, SKILL_TOKEN_REGEX, type Skill, type SkillDiscovery } from "@t3flare/skills";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import type * as FileSystem from "effect/FileSystem";
+import { makeTurnInput } from "t3/src/orchestration-v2/Adapters/AcpAdapterV2.testkit.ts";
 import { describe, expect, it } from "vitest";
 
+import { bindEnvironmentServices, type EnvironmentServices } from "../src/agents/bindings.ts";
+import type { SessionRpc } from "../src/agents/rpc.ts";
+import { makePiDurableAdapter } from "../src/provider/adapter.ts";
+import { normalise } from "../scripts/lib/upstreamFingerprint.ts";
 import { type AttachmentReader, turnPrompt } from "../src/provider/attachments.ts";
+import { acpInstanceFlavor } from "../src/provider/cli/acpDriver.ts";
+import { CliTurn } from "../src/provider/cli/wrapper.ts";
 import { messageSkillsFor, type MessageSkills, type SkillsAccess } from "../src/provider/skills.ts";
 
 const SKILLS = "/workspace/repo/.agents/skills";
@@ -94,26 +107,81 @@ describe("Slash commands", () => {
 });
 
 describe("the caller's switch", () => {
+  /** The Repo skills of the Workspace at `/w/proj`, as `SkillsAccess` finds them (no Environment skills). */
+  const workspaceAccess = (): SkillsAccess => ({
+    enabled: () => true,
+    locate: (cwd) =>
+      cwd.startsWith("/w/proj")
+        ? {
+            id: "proj",
+            inner: "/workspace/repo",
+            workspace: {
+              skills: () => Promise.resolve({ skills: [skill("fruit-code"), skill("veg")], skipped: [], omitted: 0 }),
+              prompts: () => Promise.resolve([]),
+              readText: (path) => Promise.resolve(files[path] ?? null),
+            },
+          }
+        : undefined,
+  });
+
   it("does not expand without the thread's skills (the ACP builder's turnPrompt)", async () => {
     expect(await expand("/skill:fruit-code x $veg", null)).toBe("/skill:fruit-code x $veg");
   });
 
-  it("of the ACP flavors, only OpenCode's builds its prompts with skills (SPI-1151; cliSkillDispatch.test.ts runs both)", () => {
-    const source = NodeFs.readFileSync(new URL("../src/provider/cli/acpDriver.ts", import.meta.url), "utf8");
-    expect(source).toContain('acpPromptBuilder(host, fileSystem, spec.cli === "opencode" ? skillsAccess : undefined)');
+  it("of the ACP flavors an instance runs, only OpenCode's expands a message's skills (SPI-1151)", async () => {
+    // The prompt hooks read attachments only; this message has none.
+    const host = {} as ProviderHost.ProviderHost["Service"];
+    const fileSystem = {} as FileSystem.FileSystem;
+    const rewrite = (cli: "claude" | "opencode") => {
+      const flavor = acpInstanceFlavor({ cli, driver: ProviderDriverKind.make(cli) }, host, fileSystem, workspaceAccess());
+      return flavor.rewriteUserText === undefined
+        ? Promise.resolve("(no rewrite)")
+        : // Never spawns: the hooks' requirement is t3's, for flavors that run a process to rewrite.
+          Effect.runPromise(flavor.rewriteUserText("$fruit-code", {} as ProviderAdapter.ProviderAdapterV2TurnInput).pipe(Effect.provideService(CliTurn, { cwd: "/w/proj" })) as Effect.Effect<string>);
+    };
+    // As OpenCode's skill tool returns it (cliSkillDispatch.test.ts pins the block).
+    expect(await rewrite("opencode")).toContain(`$fruit-code\n\n<skill_content name="fruit-code">\n# Skill: fruit-code\n\nRead reference/code.md for the code.`);
+    expect(await rewrite("claude")).toBe("(no rewrite)");
   });
 
-  it("the Pi Durable adapter passes the thread's skills for a new turn and for a steer", () => {
-    const source = NodeFs.readFileSync(new URL("../src/provider/adapter.ts", import.meta.url), "utf8");
-    const calls = [...source.matchAll(/turnPrompt\((turnInput|steerInput)\.message, \{([^}]*)\}\)/g)];
-    expect(calls.map((match) => match[1])).toEqual(["turnInput", "steerInput"]);
-    for (const match of calls) expect(match[2]).toMatch(/\bskills: threadSkills\b/);
-  });
-
-  it("the Pi Durable adapter carries the Environment skill set's hash on a new turn (SPI-1148)", () => {
-    const source = NodeFs.readFileSync(new URL("../src/provider/adapter.ts", import.meta.url), "utf8");
-    const call = /client\(\)\.submitTurn\(\{([\s\S]*?)\)\.pipe\(/.exec(source)?.[1];
-    expect(call).toMatch(/\.\.\.environmentSkillsInput\(\)/);
+  it("the Pi Durable adapter expands the thread's skills for a new turn and a steer, and carries the Environment skill set's hash on the turn (SPI-1148)", async () => {
+    const submitted: Array<SubmitTurnInput> = [];
+    const steered: Array<SteerInput> = [];
+    const session: Partial<SessionRpc> = {
+      open: () => Promise.resolve({ busy: false } as Awaited<ReturnType<SessionRpc["open"]>>),
+      submitTurn: (input) => (submitted.push(input), Promise.resolve({ submissionId: "s1" })),
+      steer: (input) => (steered.push(input), Promise.resolve({ submissionId: "s2" })),
+    };
+    bindEnvironmentServices({
+      agents: { SESSIONS: { idFromName: (name: string) => name, get: () => session } },
+      sql: { exec: () => ({ toArray: () => [] }) },
+    } as unknown as EnvironmentServices);
+    const mcpSessions = { read: () => Effect.succeed(undefined) } as unknown as McpProviderSessions.McpProviderSessions["Service"];
+    const instanceId = ProviderInstanceId.make("piDurable");
+    const access: SkillsAccess = { ...workspaceAccess(), environment: { entries: () => [], skillMd: () => undefined, hash: () => "env-hash" } };
+    const adapter = makePiDurableAdapter(instanceId, mcpSessions, noFiles, access);
+    const threadId = ThreadId.make("thread-skills");
+    const modelSelection = { instanceId, model: "comm/claude-sonnet-5-5" } as const;
+    const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({ runtimeMode: "full-access", interactionMode: "default", cwd: "/w/proj" });
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const runtime = yield* adapter.openSession({ threadId, providerSessionId: ProviderSessionId.make("session-skills"), modelSelection, runtimePolicy });
+        const providerThread = yield* runtime.ensureThread({ threadId, modelSelection, runtimePolicy });
+        const turn = makeTurnInput({ threadId, providerThread, instanceId, runtimePolicy, now: yield* DateTime.now, modelSelection, messageText: "what is it? $fruit-code" });
+        yield* runtime.startTurn(turn);
+        yield* runtime.steerTurn({
+          threadId,
+          runId: turn.runId,
+          providerThread,
+          providerTurnId: submitted[0]!.providerTurnId as never,
+          message: { ...turn.message, messageId: MessageId.make("message:steer"), text: "and $veg" },
+        });
+      }).pipe(Effect.scoped),
+    );
+    expect(submitted.map(({ text, environmentSkillsHash }) => ({ text, environmentSkillsHash }))).toEqual([
+      { text: `what is it? $fruit-code\n\n${fruitBlock}`, environmentSkillsHash: "env-hash" },
+    ]);
+    expect(steered.map(({ text }) => text)).toEqual([`and $veg\n\n${vegBlock}`]);
   });
 
   it("expands nothing with the Harness switch off, or outside a Workspace", async () => {
@@ -196,8 +264,11 @@ describe("upstream pins (U64)", () => {
     expect({ source: SKILL_TOKEN_REGEX.source, flags: SKILL_TOKEN_REGEX.flags }).toEqual({ source: t3![1], flags: t3![2] });
   });
 
+  // Not a fingerprint literal: that would watch ChatComposer.tsx byte for byte, and t3 changes it most nights.
   it("t3's composer inserts `$<name> ` for a picked skill (ChatComposer.tsx)", () => {
     const source = NodeFs.readFileSync(new URL("../../../t3code/apps/web/src/components/chat/ChatComposer.tsx", import.meta.url), "utf8");
-    expect(source, "t3's composer changed what it inserts for a skill; re-read U64").toContain('if (item.type === "skill") {\n      const replacement = `$${item.skill.name} `;');
+    expect(normalise(source), "t3's composer changed what it inserts for a skill; re-read U64").toContain(normalise('if (item.type === "skill") { const replacement = `$${item.skill.name} `;'));
+    // `normalise` drops the space before the backtick; the template itself is text a reformat leaves alone.
+    expect(source).toContain("`$${item.skill.name} `");
   });
 });

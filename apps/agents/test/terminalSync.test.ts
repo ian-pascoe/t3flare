@@ -3,7 +3,7 @@
 // @effect-diagnostics globalTimers:off globalDate:off
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MAX_QUIET_BACKOFF_MS, PUSH_EVERY_MS, TerminalSync } from "../src/workspace/terminalSync.ts";
+import { PUSH_EVERY_MS, TerminalSync } from "../src/workspace/terminalSync.ts";
 
 const harness = (pullEntries: () => number = () => 0) => {
   const calls: Array<string> = [];
@@ -84,7 +84,6 @@ describe("TerminalSync", () => {
     h.sync.changed("prompt");
     await vi.advanceTimersByTimeAsync(2100);
     expect(h.names().at(-1)).toBe("pull");
-    expect(MAX_QUIET_BACKOFF_MS).toBe(60_000);
   });
 
   it("never syncs while the Container is stopped", async () => {

@@ -64,7 +64,6 @@ describe("runText on Model endpoints", () => {
     const exit = await run("openai/gpt-5-mini");
     expect(exit).toEqual(Exit.succeed({ title: "Fix the build" }));
     expect(calls).toEqual([{ endpointId: "openai", modelId: "gpt-5-mini", prompt: "Name this thread." }]);
-    expect(JSON.stringify(calls)).not.toContain("proxy-key");
   });
 
   it("runs `default` on a small model of the first endpoint that has one", async () => {

@@ -259,6 +259,21 @@ export const acpPromptBuilder = (
 };
 
 /**
+ * The flavor an instance runs (`createAcpCliInstance`'s): SPI-1151, only OpenCode's prompts embed a message's Skill
+ * mentions; Claude Code's are rewritten by the wrapper (`claudeMentionRewrite`) instead.
+ */
+export const acpInstanceFlavor = (
+  spec: Pick<AcpCliDriverSpec, "cli" | "driver">,
+  host: ProviderHost.ProviderHost["Service"],
+  fileSystem: FileSystem.FileSystem,
+  skills: SkillsAccess,
+): AcpAdapterV2Flavor =>
+  acpFlavor(spec.cli, spec.driver, {
+    prompt: acpPromptBuilder(host, fileSystem, spec.cli === "opencode" ? skills : undefined),
+    modelEndpoints: () => environmentServices().modelEndpoints?.(),
+  });
+
+/**
  * The options t3's ACP adapter runs with here. Never `clientTerminals`: with it the adapter would run the agent's
  * terminal commands itself, in t3's process (the Environment DO, which runs no processes), outside the Workspace.
  */
@@ -311,8 +326,7 @@ export const createAcpCliInstance = Effect.fn("AcpCliDriver.create")(function* <
   const fileSystem = yield* FileSystem.FileSystem;
   // SPI-1151: a picked Skill reaches the CLI as its own: Claude Code's mention rewritten (the wrapper), OpenCode's embedded.
   const skillsAccess = environmentSkillsAccess();
-  const prompt = acpPromptBuilder(host, fileSystem, spec.cli === "opencode" ? skillsAccess : undefined);
-  const adapter = yield* makeAcpAdapterV2(acpAdapterOptions(instanceId, acpFlavor(spec.cli, spec.driver, { prompt, modelEndpoints: () => environmentServices().modelEndpoints?.() }), continuationRequests)).pipe(
+  const adapter = yield* makeAcpAdapterV2(acpAdapterOptions(instanceId, acpInstanceFlavor(spec, host, fileSystem, skillsAccess), continuationRequests)).pipe(
     Effect.provideService(McpProviderSessions.McpProviderSessions, relayed),
   );
   return {

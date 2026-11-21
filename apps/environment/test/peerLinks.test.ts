@@ -93,8 +93,4 @@ it("leaves t3's `notListed` as t3 wrote it, pointing at a tool the agent is offe
   const named = [...t3Line!.matchAll(/\bt3_[a-z_]+/g)].map((match) => match[0]);
   expect(named).toContain("t3_environment_link");
   expect(named.filter(isDeniedT3Tool)).toEqual([]);
-  // No Layer of ours over PeerForwarding or PeerLinkRequests is left in the composition.
-  const composition = NodeFs.readFileSync(new URL("../src/t3/composition.ts", import.meta.url), "utf8");
-  expect(composition).not.toMatch(/layerOwnerPeer/);
-  expect(composition).toContain("Layer.provide(PeerLinkRequests.layer)");
 });

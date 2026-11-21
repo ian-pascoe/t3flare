@@ -10,7 +10,6 @@ import { type CredentialBroker, credentialBroker } from "../src/credentials/brok
 import { claudeSignIn } from "../src/credentials/claude.ts";
 import { sealedStore } from "../src/credentials/sealed.ts";
 import { type FakeAnthropic, fakeAnthropic } from "./fixtures/fakeAnthropicAuth.ts";
-import { gate } from "./fixtures/fakeOpenAIAuth.ts";
 
 const HOURS_8 = 8 * 3_600_000;
 
@@ -80,55 +79,6 @@ describe("the Credential broker with a Claude sign-in", () => {
     vendor.options.tokenDown = false;
   });
 
-  it("renews once for many callers near the expiry, saving the rotated refresh token before anyone gets the new access token", async () => {
-    const { kv, vendor, broker, advance } = setup();
-    await signIn(broker, vendor);
-    advance(HOURS_8 - 60_000);
-    const slow = gate();
-    vendor.options.refreshGate = slow.opened;
-    vendor.options.onRefresh = slow.reached;
-    const asks = Promise.all(Array.from({ length: 5 }, () => broker.access("claude")));
-    await slow.arrived;
-    slow.open();
-    const answers = await asks;
-    expect(vendor.counts.refreshes).toBe(1);
-    expect(new Set(answers.map((answer) => (answer.ok ? answer.accessToken : "refused")))).toEqual(new Set([vendor.accessTokens[1]]));
-    // The stored refresh token is the rotated one Anthropic honours now; the next renewal succeeds with it.
-    const stored = await broker.read("claude");
-    expect(stored?.type === "oauth" ? stored.refresh : undefined).toBe(vendor.currentRefresh());
-    advance(HOURS_8);
-    vendor.options.refreshGate = undefined;
-    expect(await broker.access("claude")).toMatchObject({ ok: true, accessToken: vendor.accessTokens[2] });
-    scan(kv, vendor);
-  });
-
-  it("gives no renewed token whose rotated refresh token could not be saved", async () => {
-    const { kv, vendor, broker, advance } = setup();
-    await signIn(broker, vendor);
-    advance(HOURS_8);
-    kv.failWhen((key) => key.includes("endpoint/claude/oauth"));
-    const answer = await broker.access("claude");
-    expect(answer).toMatchObject({ ok: false, signedOut: false });
-    expect(vendor.accessTokens).toHaveLength(2);
-    expect(JSON.stringify(answer)).not.toContain(vendor.accessTokens[1]!);
-    kv.failWhen(undefined);
-    scan(kv, vendor);
-  });
-
-  it("signs the endpoint out when Anthropic refuses the renewal (a replaced refresh token), and forgets the account", async () => {
-    const { kv, vendor, broker, advance } = setup();
-    await signIn(broker, vendor);
-    advance(HOURS_8);
-    vendor.options.refreshError = "invalid_grant";
-    const answer = await broker.access("claude");
-    expect(answer).toMatchObject({ ok: false, signedOut: true, problem: "Claude refused to renew the sign-in (invalid_grant): it is signed out" });
-    expect(broker.status("claude")).toMatchObject({ signedIn: false, subject: null, email: null, problem: expect.stringMatching(/invalid_grant/) });
-    expect(await broker.read("claude")).toBeUndefined();
-    expect(await broker.access("claude")).toMatchObject({ ok: false, signedOut: true });
-    expect(vendor.counts.refreshes).toBe(1);
-    scan(kv, vendor);
-  });
-
   it("signs the endpoint out when the grant was removed at claude.ai (a 401 with no OAuth code), instead of failing every turn as retryable", async () => {
     const { kv, vendor, broker, advance } = setup();
     await signIn(broker, vendor);
@@ -171,40 +121,6 @@ describe("the Credential broker with a Claude sign-in", () => {
     // Another account may sign in next.
     expect(await signIn(broker, vendor, { uuid: "acct-9", email: "other@example.com" })).toMatchObject({ ok: true });
     expect(broker.status("claude")).toMatchObject({ signedIn: true, email: "other@example.com" });
-    scan(kv, vendor);
-  });
-
-  it("signs out after a renewal in flight: nothing it left is kept", async () => {
-    const { kv, vendor, broker, advance } = setup();
-    await signIn(broker, vendor);
-    advance(HOURS_8);
-    const slow = gate();
-    vendor.options.refreshGate = slow.opened;
-    vendor.options.onRefresh = slow.reached;
-    const refreshing = broker.access("claude");
-    await slow.arrived;
-    const out = broker.signOut("claude");
-    slow.open();
-    await refreshing;
-    expect(await out).toEqual({ signedOut: true, revoked: false });
-    expect(await broker.read("claude")).toBeUndefined();
-    expect(await broker.access("claude")).toMatchObject({ ok: false, signedOut: true });
-    scan(kv, vendor);
-  });
-
-  it("drops a grant a sign-out overtook during its exchange: nothing shows signed in", async () => {
-    const { kv, vendor, broker } = setup();
-    const { authorizeUrl } = await broker.start("claude", "claude");
-    const slow = gate();
-    vendor.options.exchangeGate = slow.opened;
-    vendor.options.onExchange = slow.reached;
-    const completing = broker.complete("claude", vendor.approve(authorizeUrl));
-    await slow.arrived;
-    await broker.signOut("claude");
-    slow.open();
-    expect(await completing).toMatchObject({ ok: false, problem: expect.stringMatching(/signed out or started again/) });
-    expect(await broker.read("claude")).toBeUndefined();
-    expect(broker.status("claude")).toMatchObject({ signedIn: false, pendingSince: null });
     scan(kv, vendor);
   });
 

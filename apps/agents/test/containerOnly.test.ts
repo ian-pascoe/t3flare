@@ -4,10 +4,11 @@
 import * as fs from "node:fs";
 import { join } from "node:path";
 
+import { SKILLS_LOCK_SCRIPT } from "@t3flare/workspace-client";
 import { describe, expect, it } from "vitest";
 
 import { CONTAINER_IGNORE } from "../src/workspace/constants.ts";
-import { containerPatterns, ContainerOnlyBackend, type PatternedBackend, submoduleDirsScript, submodulePaths } from "../src/workspace/containerOnly.ts";
+import { containerPatterns, ContainerOnlyBackend, containerScript, type PatternedBackend, submoduleDirsScript, submodulePaths } from "../src/workspace/containerOnly.ts";
 
 describe("the patterns a Container starts with", () => {
   it("names t3flare's own submodule from its .gitmodules", () => {
@@ -121,3 +122,12 @@ describe("the Container backend made again when the patterns change", () => {
   });
 });
 
+describe("the Workspace DO's own Container commands", () => {
+  it("start with the Environment skills' lock, before the submodule directories and the command", () => {
+    const patterns = containerPatterns([], ["vendor/lib"]);
+    const dirs = submoduleDirsScript(patterns);
+    expect(dirs).not.toBe("");
+    expect(containerScript(patterns, "git status")).toBe(`${SKILLS_LOCK_SCRIPT}${dirs}git status`);
+    expect(containerScript([], "git status")).toBe(`${SKILLS_LOCK_SCRIPT}git status`);
+  });
+});

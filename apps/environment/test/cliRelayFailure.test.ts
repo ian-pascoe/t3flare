@@ -163,11 +163,10 @@ const acpTurn = (cli: "claude" | "opencode", relayed: EndpointFailureRecord | nu
     yield* runtime.events.pipe(Stream.runForEach((event) => Queue.offer(queue, event)), Effect.forkScoped);
     const providerThread = yield* runtime.ensureThread({ threadId, modelSelection, runtimePolicy });
     yield* runtime.startTurn(makeTurnInput({ threadId, providerThread, instanceId, runtimePolicy, now: yield* DateTime.now, modelSelection }));
-    const seen: Array<Event> = [];
     while (true) {
       const event = yield* Queue.take(queue).pipe(Effect.timeout("20 seconds"));
-      seen.push(event);
-      if (event.type === "turn.terminal") return { terminal: event, errors: seen.flatMap((e) => (e.type === "turn_item.updated" && e.turnItem.type === "error" ? [e.turnItem.failure] : [])) };
+      // t3's ACP adapter reports a failed prompt on the terminal alone (no error item), so the terminal is the whole failure.
+      if (event.type === "turn.terminal") return { terminal: event };
     }
   });
 
@@ -176,11 +175,10 @@ const run = <A>(body: Effect.Effect<A, unknown, Layer.Success<typeof layerTest> 
 for (const cli of ["claude", "opencode"] as const) {
   describe(`${cli} on a Model endpoint, through the relay`, () => {
     it("a relayed refused key: the relay's failure naming the endpoint", async () => {
-      const { terminal, errors } = await run(acpTurn(cli, KEY_REFUSED, "commissary/claude-haiku-5-5"));
+      const { terminal } = await run(acpTurn(cli, KEY_REFUSED, "commissary/claude-haiku-5-5"));
       expect(terminal.type === "turn.terminal" && terminal.status).toBe("failed");
       const failure = terminal.type === "turn.terminal" && terminal.status === "failed" ? terminal.failure : undefined;
       expect(failure).toMatchObject({ class: "permission_error", code: "key_refused", message: KEY_REFUSED.message });
-      for (const error of errors) expect(error).toMatchObject({ code: "key_refused" });
     });
 
     it("a relayed usage limit: t3's usage limit with the endpoint's reset", async () => {
@@ -191,6 +189,9 @@ for (const cli of ["claude", "opencode"] as const) {
     it("no relay failure: the adapter's own failure, never a text naming the retired Model proxy's key (SPI-1176)", async () => {
       const onEndpoint = await run(acpTurn(cli, null, "commissary/claude-haiku-5-5"));
       const endpointFailure = onEndpoint.terminal.type === "turn.terminal" && onEndpoint.terminal.status === "failed" ? onEndpoint.terminal.failure : undefined;
+      expect(onEndpoint.terminal.type === "turn.terminal" && onEndpoint.terminal.status).toBe("failed");
+      // The adapter's own classification of the ACP error (its code is the ACP error's), not the relay's `key_refused`.
+      expect(endpointFailure).toMatchObject({ class: "permission_error", code: String(PROMPT_ERROR.code) });
       expect(endpointFailure?.message).not.toMatch(/model proxy|COMMISSARY/i);
     });
   });

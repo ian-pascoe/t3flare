@@ -643,8 +643,11 @@ and field shapes it leans on fail typecheck rather than silently.
   makes the chip's "View instructions" fail harder than a read error.
 - **Detection**: the bump's check step (`pnpm run check`): typecheck for the hook, the error and the fields; the tests
   `apps/environment/test/skillsSnapshot.test.ts`, `apps/environment/test/skillExpansion.test.ts` (pins on
-  `matchInlineSkills`, on the copied `SKILL_TOKEN_REGEX`'s source and on its answers matching t3's for a table of names,
-  and on the composer's inserted text) and `packages/skills/src/discovery.test.ts` (the mentionable names). Stage: `scripts/p1001.ts`, outside the bump. **Silent**: a client that sends skills another way leaves
+  `matchInlineSkills`, on the copied `SKILL_TOKEN_REGEX`'s source and on its answers matching t3's for a table of names;
+  the Pi Durable adapter expanding a turn's and a steer's mentions and carrying the Environment skill set's hash; of the
+  ACP flavors, only OpenCode's expanding; and the composer's inserted text, compared without layout, not through the
+  upstream fingerprint, which would hold every bump that touches `ChatComposer.tsx`) and
+  `packages/skills/src/discovery.test.ts` (the mentionable names). Stage: `scripts/p1001.ts`, outside the bump. **Silent**: a client that sends skills another way leaves
   `$name` unexpanded, and a changed Pi provider block goes unnoticed (ours stays as it was); a chip that stops opening an
   Environment skill's path is only seen on a stage (`scripts/penvsk.ts public`). Cheapest check: the source-text test,
   and a diff of `mcpExtensionSource.ts` and `SkillInlineText.tsx` in the bump PR.

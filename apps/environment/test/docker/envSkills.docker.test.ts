@@ -6,7 +6,8 @@
 // each root's winner is seen apart (review round 1: OpenCode's differs by root). Each CLI reports what it loaded (as in
 // `skills.docker.test.ts`); the test holds that every CLI reads the set through its link, that each root's winner is
 // that root's `environment` in `CLI_ROOTS`, and that a write through the link fails. Codex is also run with its whole
-// user-level root linked, the layout SPI-1153 did not take (`CODEX_ENVIRONMENT_SKILLS`). No model is called.
+// user-level root linked, the layout SPI-1153 did not take (`CODEX_ENVIRONMENT_SKILLS`), only when the report is asked
+// for. No model is called.
 // T3FLARE_ENV_SKILLS_PROBE_OUT=<file> writes the report (steps-evidence-1:docs/steps/env-skills-cli/m0-probe.json).
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -151,11 +152,14 @@ it("each CLI reads the Environment skill set through its link, keeps its own win
       }
     }
     // The layout not taken: Codex's whole user-level root linked to the read-only set.
-    const linkedRoot = loadedBy("codex", workspaceWith(".agents/skills"), (launch, key) => ({
-      ...launch,
-      links: (launch.links ?? []).map((link) => (link.target === SKILLS_MOUNT ? { path: `/var/lib/t3flare/cli/${key}/codex/skills`, target: SKILLS_MOUNT } : link)),
-    }));
-    report["codex (whole root linked)"] = { skills: linkedRoot.loaded.skills.map((skill) => `${skill.name} (${skill.scope}) ${skill.path}`), raw: linkedRoot.raw };
+    // Asserted by nothing, so it runs only when the report is asked for.
+    if (out !== undefined) {
+      const linkedRoot = loadedBy("codex", workspaceWith(".agents/skills"), (launch, key) => ({
+        ...launch,
+        links: (launch.links ?? []).map((link) => (link.target === SKILLS_MOUNT ? { path: `/var/lib/t3flare/cli/${key}/codex/skills`, target: SKILLS_MOUNT } : link)),
+      }));
+      report["codex (whole root linked)"] = { skills: linkedRoot.loaded.skills.map((skill) => `${skill.name} (${skill.scope}) ${skill.path}`), raw: linkedRoot.raw };
+    }
   } finally {
     harness.stop();
     for (const workspace of workspaces) {

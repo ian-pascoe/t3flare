@@ -1,14 +1,13 @@
 // @effect-diagnostics globalDate:off
 // T-card (plan §5; ADR-0035, plan D6, D9), M4 (SPI-1199): an own agent's asked change on its owner-only card. An
-// `approval` card with no field, whose id `refuseOwnerOnly` refuses to an agent; the prompt's server-written parts and
-// fixed lines; no Approve on a change that needs the page; the page answering first withdraws the card; a Stop
+// `approval` card with no field (its shape and the owner-only refusal are in settingsHostile.test.ts); the prompt's
+// server-written parts and fixed lines; no Approve on a change that needs the page; the page answering first withdraws the card; a Stop
 // withdraws the Open change.
 import { applyChange, CARD_TEXT_MAX, EMPTY_HARNESS, MAX_GLOBAL_MISE_BYTES } from "@t3flare/harness-registry";
-import { MCP_QUESTION_MARKER, type McpQuestionCard } from "@t3flare/session-protocol";
+import { type McpQuestionCard } from "@t3flare/session-protocol";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { handleHarness } from "../src/harness/panel.ts";
-import { OWNER_ONLY_REFUSAL, refuseOwnerOnly } from "../src/mcp/ownerOnly.ts";
 import { CHANGES_API_PATH, changePagePath } from "../src/harness/paths.ts";
 import { HINT_TRUST_LINE } from "../src/settings/render.ts";
 import { addMcpServer } from "../src/harness/ops.ts";
@@ -36,23 +35,6 @@ const pagePost = async (run: SettingsFixture, id: string, body: Record<string, u
 };
 
 describe("the asked change's card", () => {
-  it("is an approval card with no field, and an agent's t3_pending_request on its id is refused", async () => {
-    fixture = settingsFixture();
-    const run = fixture;
-    await run.call(run.durable(), "change_environment", ASKED);
-    const [card] = run.cards;
-    expect(card).toMatchObject({ kind: "approval", server: "settings", title: "settings: change_environment?" });
-    expect(card!.questions).toBeUndefined();
-    expect(card!.options).toEqual([
-      { decision: "accept", label: "Approve" },
-      { decision: "decline", label: "Decline" },
-      { decision: "cancel", label: "Cancel" },
-    ]);
-    expect(card!.id).toContain(MCP_QUESTION_MARKER);
-    const body = JSON.stringify({ jsonrpc: "2.0", id: 7, method: "tools/call", params: { name: "t3_pending_request", arguments: { action: "respond", requestId: card!.id, answer: "accept" } } });
-    expect(refuseOwnerOnly(body)).toContain(OWNER_ONLY_REFUSAL.slice(0, 40));
-  });
-
   it("is written by the server: the change, why, when, who, the page's link, and the agent's call last", async () => {
     fixture = settingsFixture();
     const run = fixture;

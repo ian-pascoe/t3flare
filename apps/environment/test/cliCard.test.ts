@@ -284,7 +284,10 @@ describe("the ACP driver's adapter options", () => {
         const hold = yield* startTurn(harness);
         yield* harness.runtime.respondToRuntimeRequest({ requestId: hold.id, decision: "accept" });
         const initialize = harness.agentLog().find((entry) => entry.received === "initialize");
-        expect((initialize?.params?.clientCapabilities as { terminal?: boolean } | undefined)?.terminal ?? false).toBe(false);
+        // The agent saw t3's initialize, and its client capabilities do not offer terminals.
+        expect(initialize).toBeDefined();
+        const capabilities = initialize!.params!.clientCapabilities as { terminal?: boolean };
+        expect(capabilities.terminal).toBe(false);
       }),
     ));
 });

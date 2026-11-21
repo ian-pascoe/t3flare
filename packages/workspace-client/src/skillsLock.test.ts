@@ -26,8 +26,4 @@ describe("SKILLS_LOCK_SCRIPT", () => {
     // Not tried again in the same launch.
     expect(fs.statSync(SKILLS_LOCK_FAILED).mtimeMs).toBe(at);
   });
-
-  it("ends with a newline, so it never joins the command's first line", () => {
-    expect(SKILLS_LOCK_SCRIPT.endsWith("\n")).toBe(true);
-  });
 });

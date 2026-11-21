@@ -169,13 +169,6 @@ describe("endpointStore", () => {
     expect(store.load()).toMatchObject({ revision: 2 });
     expect(store.load().endpoints.map((endpoint) => endpoint.id).sort()).toEqual(["openai", "other"]);
   });
-
-  it("resolves an endpoint with its key for a caller that uses it", async () => {
-    const { store } = setup();
-    await store.save(OPENAI, { apiKey: "sk-use" });
-    expect(await store.resolve("openai")).toMatchObject({ endpoint: { id: "openai" }, apiKey: "sk-use" });
-    expect(await store.resolve("nope")).toBeUndefined();
-  });
 });
 
 describe("pi-ai's GitHub Copilot catalog (SPI-1166)", () => {

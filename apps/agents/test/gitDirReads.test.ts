@@ -38,27 +38,24 @@ describe("the allow-list", () => {
   });
 });
 
-describe("a passive client watching a primed Workspace whose Container is stopped", () => {
-  it("never starts it: every read it repeats has a last answer, before and after an Environment restart", () => {
-    // The read cache is the Workspace DO's storage: an Environment restart (or a new Environment instance) does not
-    // touch it, so the same reads find the same last answers.
-    const lastAnswers = new Set(["status", "diff-index", "for-each-ref", "git-common-dir", "remotes", "base-upstream"]);
-    const poll = (name: string, allowed: boolean) =>
-      passiveDecision({ cachedNow: false, running: false, hasLastAnswer: lastAnswers.has(name), allowed, emulated: name === "remotes" });
-    for (const _restart of [false, true]) {
-      for (let round = 0; round < 50; round++) {
-        expect(poll("status", false)).toBe("stale");
-        expect(poll("diff-index", false)).toBe("stale");
-        expect(poll("git-common-dir", true)).toBe("stale");
-        expect(poll("base-upstream", true)).toBe("stale");
-      }
-    }
-    // Unprimed: an allow-listed read starts it once; any other read never does; `remote` is answered from the files.
-    expect(poll("checkout-workers", true)).toBe("run-starting-container");
-    expect(poll("ls-files of a new file", false)).toBe("stale");
-    expect(passiveDecision({ cachedNow: false, running: false, hasLastAnswer: false, allowed: true, emulated: true })).toBe("stale");
-    expect(passiveDecision({ cachedNow: true, running: false, hasLastAnswer: true, allowed: false, emulated: false })).toBe("cache");
-    expect(passiveDecision({ cachedNow: false, running: true, hasLastAnswer: false, allowed: false, emulated: false })).toBe("run");
+describe("a passive read while the Container is stopped", () => {
+  const stopped = { cachedNow: false, running: false, hasLastAnswer: false, allowed: false, emulated: false };
+
+  it("never starts it for a read with a last answer, allow-listed or not", () => {
+    expect(passiveDecision({ ...stopped, hasLastAnswer: true, allowed: false })).toBe("stale");
+    expect(passiveDecision({ ...stopped, hasLastAnswer: true, allowed: true })).toBe("stale");
+  });
+
+  it("starts it only for an unprimed allow-listed read that is not answered from the files", () => {
+    expect(passiveDecision({ ...stopped, allowed: true })).toBe("run-starting-container");
+    expect(passiveDecision({ ...stopped, allowed: false })).toBe("stale");
+    // `remote` is answered from the files.
+    expect(passiveDecision({ ...stopped, allowed: true, emulated: true })).toBe("stale");
+  });
+
+  it("answers from the cache when it is fresh, and runs the read when the Container runs", () => {
+    expect(passiveDecision({ ...stopped, cachedNow: true, hasLastAnswer: true })).toBe("cache");
+    expect(passiveDecision({ ...stopped, running: true })).toBe("run");
   });
 });
 

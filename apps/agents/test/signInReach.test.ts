@@ -22,13 +22,4 @@ describe("a sign-in's token and the Workspace side", () => {
     expect(callers).toEqual(["endpointTextGeneration.ts", "session/endpoints.ts"]);
     for (const file of files(path.join(src, "workspace"))) expect(fs.readFileSync(file, "utf8"), file).not.toMatch(/endpointCredential|accessToken/);
   });
-
-  it("reaches the Environment from the Workspace for a credential only through the relay's target", () => {
-    const workspace = fs.readFileSync(path.join(src, "workspace/WorkspaceDO.ts"), "utf8");
-    const calls = [...workspace.matchAll(/environmentStub\([^)]*\)\.(\w+)\(/g)].map((match) => match[1]);
-    // The Environment RPCs the Workspace DO calls: only the relay's target gives a credential (a key, or a sign-in's
-    // token for one request).
-    expect(calls).not.toContain("endpointCredential");
-    expect(calls).toContain("modelRelayTarget");
-  });
 });

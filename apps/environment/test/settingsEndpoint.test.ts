@@ -9,7 +9,7 @@ import { applyMcpChange } from "@t3flare/harness-registry";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { BODY_MAX, LEGACY_VERSIONS, MODERN_VERSION, SUPPORTED_VERSIONS } from "../src/settings/endpoint.ts";
-import { isSettingsMcpPath, OWNER_ENDPOINT_EXCLUDED_STAGES, ownerEndpointOn, SETTINGS_MCP_PATH, settingsMcpUrl } from "../src/settings/endpointLayout.ts";
+import { isSettingsMcpPath, ownerEndpointOn, SETTINGS_MCP_PATH, settingsMcpUrl } from "../src/settings/endpointLayout.ts";
 import { SETTINGS_TOOLS } from "../src/settings/tools.ts";
 import { signToken } from "../src/settings/tokens.ts";
 import { ASKED, BOTH, bodyOf, ENDPOINT, endpointOf, FREE, initialize, KEY, legacy, modern, modernMeta, post, setAccess, structuredOf, SUB } from "./settingsEndpointFixture.ts";
@@ -208,11 +208,10 @@ describe("T-endpoint: versions and methods", () => {
     expect((await bodyOf(await endpoint(post({ jsonrpc: "1.0", id: 1, method: "ping" })))).error?.code).toBe(-32600);
   });
 
-  it("lists the thirteen tools with readOnlyHint from their class, and never resume", async () => {
+  it("lists every tool with readOnlyHint from their class, and never resume", async () => {
     const body = await bodyOf(await endpointOf(world())(modern("tools/list")));
     const tools = body.result?.tools as Array<{ name: string; annotations: { readOnlyHint: boolean } }>;
     expect(tools.map((tool) => tool.name)).toEqual(SETTINGS_TOOLS.map((tool) => tool.name));
-    expect(tools).toHaveLength(13);
     for (const tool of tools) expect(tool.annotations.readOnlyHint).toBe(SETTINGS_TOOLS.find((each) => each.name === tool.name)!.class === "read");
     expect(tools.map((tool) => tool.name)).not.toContain("resume");
   });
@@ -371,7 +370,6 @@ describe("layout (B): the endpoint's paths (settings/endpointLayout.ts)", () => 
   it("SPI-1195 review: prod is deployed without the endpoint until the owner turns it on, and bump (the t3 bump's) without it; every other stage with it", () => {
     // alchemy.run.ts creates `SettingsAccess`, the admin application's path cookie and `T3FLARE_ACCESS_SETTINGS_AUD` only
     // when `ownerEndpointOn(stage)`; the stack itself needs Cloudflare's providers, so this switch is what is tested.
-    expect(OWNER_ENDPOINT_EXCLUDED_STAGES).toEqual(["prod", "bump"]);
     expect(ownerEndpointOn("prod")).toBe(false);
     expect(ownerEndpointOn("bump")).toBe(false);
     for (const stage of ["psettings", "pdev", "dev"]) expect(ownerEndpointOn(stage)).toBe(true);

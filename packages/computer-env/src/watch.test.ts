@@ -8,15 +8,14 @@ import { PollingWatcher } from "./watch.ts";
 import type { Snapshot } from "./wire.ts";
 
 const target = { path: "/workspace", recursive: true, hidden: true, names: [] };
-/** A scan as slow as a loaded machine makes it: three of them, with the polls between, overran the old 100 ms wait. */
-const SLOW_SCAN_MS = 40;
 
 /**
  * A Workspace DO stand-in that answers each scan with the next step: a snapshot, or a thrown RPC failure; the last
  * step repeats. `settled` resolves when a scan past the last step starts: the watcher polls again only once the
- * previous poll is done, so by then every step has been handled, however slowly the machine ran.
+ * previous poll is done, so by then every step has been handled, however slowly the machine ran (SPI-1109: the flake
+ * was a fixed wait here, not the watcher).
  */
-const scripted = (steps: ReadonlyArray<Snapshot | "unreachable">, scanMs: number) => {
+const scripted = (steps: ReadonlyArray<Snapshot | "unreachable">) => {
   let index = 0;
   let settle = () => {};
   const settled = new Promise<void>((resolve) => (settle = resolve));
@@ -26,7 +25,6 @@ const scripted = (steps: ReadonlyArray<Snapshot | "unreachable">, scanMs: number
       const current = index++;
 
       if (current === steps.length) settle();
-      if (scanMs > 0) await new Promise((resolve) => setTimeout(resolve, scanMs));
       const step = steps[Math.min(current, steps.length - 1)];
 
       if (step === "unreachable")
@@ -39,9 +37,9 @@ const scripted = (steps: ReadonlyArray<Snapshot | "unreachable">, scanMs: number
   return { call, settled };
 };
 
-const changes = async (steps: ReadonlyArray<Snapshot | "unreachable">, scanMs = 0) => {
+const changes = async (steps: ReadonlyArray<Snapshot | "unreachable">) => {
   const seen: FileChange[] = [];
-  const { call, settled } = scripted(steps, scanMs);
+  const { call, settled } = scripted(steps);
 
   const watcher = getOrThrow(
     await PollingWatcher.open(
@@ -71,15 +69,6 @@ describe("PollingWatcher", () => {
     const snapshot: Snapshot = [["/workspace/a", "1"]];
 
     expect(await changes([snapshot, "unreachable", "unreachable", snapshot])).toEqual([
-      { kind: "overflow" },
-    ]);
-  });
-
-  // SPI-1109: a loaded machine (the parallel check) makes each scan slow; the outcome must not depend on it.
-  it("reports the same overflow when every scan is slow", async () => {
-    const snapshot: Snapshot = [["/workspace/a", "1"]];
-
-    expect(await changes([snapshot, "unreachable", "unreachable", snapshot], SLOW_SCAN_MS)).toEqual([
       { kind: "overflow" },
     ]);
   });

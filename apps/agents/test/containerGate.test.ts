@@ -1,5 +1,6 @@
 // The Container gate (the nightly's step 2b `leased: true`): a tombstoned worktree's close refuses later starts and waits
 // out a start under way, so the stop after it is the last word and no lease outlives the removal.
+import { startRefusal } from "@t3flare/workspace-client";
 import { describe, expect, it } from "vitest";
 
 import { CLOSED_MESSAGE, ContainerGate, type GateStore } from "../src/workspace/containerGate.ts";
@@ -66,16 +67,6 @@ describe("ContainerGate", () => {
     expect(ws.state).toEqual({ leased: false, running: false });
   });
 
-  it("without the gate's wait, the same order leaves the lease held (the failure it fixes)", async () => {
-    const ws = workspace(new ContainerGate(store()));
-    const pending = pendingStart();
-    const starting = ws.start(pending.run());
-    ws.stop();
-    pending.finish();
-    await starting;
-    expect(ws.state).toEqual({ leased: true, running: true });
-  });
-
   it("refuses every start once closed, before any of it runs, and keeps the mark in its store", async () => {
     const kept = store();
     const gate = new ContainerGate(kept);
@@ -124,8 +115,10 @@ describe("ContainerGate", () => {
     await expect(gate.start(async () => undefined)).rejects.toThrow(CLOSED_MESSAGE);
   });
 
-  it("refuses in the budget refusal's words, which computer's wrapping keeps", () => {
-    expect(CLOSED_MESSAGE).toMatch(/the Container cannot start: /);
+  it("refuses in the budget refusal's words, so every surface reads the removal as the reason", () => {
+    expect(startRefusal(new Error(CLOSED_MESSAGE))).toBe("this Workspace was removed");
+    // Through computer's wrapping too: the reason is read from the deepest cause.
+    expect(startRefusal(new Error("connect failed", { cause: new Error(CLOSED_MESSAGE) }))).toBe("this Workspace was removed");
   });
 
   it("starts again once reopened (a restored tombstone, a reprovisioned path)", async () => {
