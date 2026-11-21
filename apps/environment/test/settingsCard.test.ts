@@ -62,7 +62,7 @@ describe("the asked change's card", () => {
     await until(() => run.cards.length === 2);
     const prompt = run.cards[1]!.prompt;
     expect(prompt).toContain('- web_search: Exposure: "hidden" to "direct"');
-    expect(prompt).toContain('- t3-code/t3_thread_read: Exposure: "direct" to "codemode"');
+    expect(prompt).toContain('- t3-code/t3_thread_read (t3\'s hint unknown): Exposure: "direct" to "codemode"');
     expect(prompt).toContain("It waits for the owner because:\n- web_search: Exposure hidden to direct");
   });
 

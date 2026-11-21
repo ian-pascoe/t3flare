@@ -9,8 +9,8 @@
 import { applyEnvironmentChange, type EnvironmentChange, ENVIRONMENT_SETTINGS, resolveEnvironment, settingOf, type StoredEnvironment } from "./environment.ts";
 import type { SettingTier } from "./fields.ts";
 import { EXTENSIONS, type HarnessChange, type McpChange, mcpServersOf, resolveHarness, type StoredHarness } from "./index.ts";
-import { type Exposure, ownEntry, SETTINGS_SERVER, type ToolClass } from "./mcp.ts";
-import { applyToolsChange, movedServerTools, movedTools, resolveTools, type ToolsChange } from "./tools.ts";
+import { type Exposure, type McpServerSetting, ownEntry, SETTINGS_SERVER, type ToolClass } from "./mcp.ts";
+import { applyToolsChange, builtinTool, movedServerTools, movedTools, resolveTools, type ToolsChange } from "./tools.ts";
 
 export type ChangeTier = "free" | "asked";
 
@@ -173,24 +173,30 @@ const toolsTier = (stored: StoredHarness, change: ToolsChange, asksForDirect: (t
   const applied = applyToolsChange(stored, change);
   // Malformed: the change function refuses it; until then it is asked.
   if (!applied.ok) return { tier: "asked", reasons: [applied.error] };
-  const moves = movedTools(resolveTools(stored.global), resolveTools(applied.harness.global), asksForDirect);
-  // A preset moves MCP servers' tools too; the Settings server's own entry is asked whichever way (plan D5).
-  const serverParts = movedServerTools(mcpServersOf(stored), mcpServersOf(applied.harness)).map((move) => {
-    const reason = `${move.tool}: Exposure ${move.before} to ${move.after}`;
-    if (move.server === SETTINGS_SERVER) return { asked: true, reason: `${reason} (the Settings server's own entry)` };
-    return { asked: rankOf(move.after) > rankOf(move.before), reason };
+  const moved = (move: { readonly tool: string; readonly before: Exposure; readonly after: Exposure }): Part => ({
+    asked: rankOf(move.after) > rankOf(move.before),
+    reason: `${move.tool}: Exposure ${move.before} to ${move.after}`,
   });
-  return verdictOf([
-    ...moves.flatMap((move) => {
-      const part = { asked: rankOf(move.after) > rankOf(move.before), reason: `${move.tool}: Exposure ${move.before} to ${move.after}` };
-      // Hiding code mode or tool search narrows it but widens the tools that fall back (codemode.ts), MCP servers' too.
-      if (move.after !== "hidden") return [part];
-      if (move.tool === "codemode") return [part, { asked: true, reason: "codemode hidden: a tool set to codemode is offered deferred or direct instead" }];
-      if (move.tool === "tool_search") return [part, { asked: true, reason: "tool_search hidden: a deferred tool is offered direct instead" }];
-      return [part];
-    }),
-    ...serverParts,
-  ]);
+  const parts: Array<Part> = [];
+  for (const move of movedTools(resolveTools(stored.global), resolveTools(applied.harness.global), asksForDirect)) {
+    parts.push(moved(move));
+    // Hiding code mode or tool search narrows it but widens the tools that fall back (codemode.ts), MCP servers' too.
+    const widens = builtinTool(move.tool)?.hidingWidens;
+    if (move.after === "hidden" && widens !== undefined) parts.push({ asked: true, reason: `${move.tool} hidden: ${widens}` });
+  }
+  // A preset moves MCP servers' tools too; every change to the Settings server's own entry is asked (plan D5), one
+  // that moves no tool's Exposure (a redundant own Exposure cleared) included.
+  const [before, after] = [mcpServersOf(stored), mcpServersOf(applied.harness)];
+  for (const move of movedServerTools(before, after)) {
+    const part = moved(move);
+    parts.push(move.server === SETTINGS_SERVER ? { asked: true, reason: `${part.reason} (the Settings server's own entry)` } : part);
+  }
+  // A preset changes only an entry's Exposures.
+  const exposuresOf = (server: McpServerSetting | undefined) => JSON.stringify([server?.exposure, Object.entries(server?.toolExposure ?? {}).sort(([a], [b]) => a.localeCompare(b))]);
+  if (exposuresOf(before[SETTINGS_SERVER]) !== exposuresOf(after[SETTINGS_SERVER]) && !parts.some((part) => part.reason.endsWith("(the Settings server's own entry)"))) {
+    parts.push({ asked: true, reason: `${SETTINGS_SERVER}: its own entry rewritten (the Settings server's own entry)` });
+  }
+  return verdictOf(parts);
 };
 
 const environmentTier = (stored: StoredEnvironment, change: EnvironmentChange): TierVerdict => {

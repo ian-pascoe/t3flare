@@ -186,6 +186,9 @@ describe("applyToolsChange", () => {
     const everything = apply({ preset: "everything" }, before);
     expect(mcpServersOf(everything)).toMatchObject({ fixture: { exposure: "direct" }, shut: { exposure: "hidden", toolExposure: { c: "direct" } }, settings: { kind: "settings", exposure: "direct" } });
     expect(apply({ preset: "core" }, EMPTY_HARNESS).mcp).toBeUndefined();
+    // An entry the set ignores (a Direct server stored as `settings`) is dropped, as by any change to the set.
+    const stale: StoredHarness = { ...EMPTY_HARNESS, mcp: { servers: { settings: { ...fixture, toolExposure: {} } } } };
+    expect(apply({ preset: "core" }, stale).mcp).toEqual({ servers: {} });
   });
 
   it("refuses more t3 tools set one by one than t3 lists", () => {

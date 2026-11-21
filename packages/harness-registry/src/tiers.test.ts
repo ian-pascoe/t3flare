@@ -172,7 +172,7 @@ describe("tierOf: tools", () => {
   });
 
   it("judges t3's tools by their Exposure before and after, a tool's own or the card's", () => {
-    expect(tools(EMPTY_HARNESS, { t3: { tools: { t3_thread_read: "codemode" } } })).toEqual({ tier: "free", reasons: ["t3-code/t3_thread_read: Exposure direct to codemode"] });
+    expect(tools(EMPTY_HARNESS, { t3: { tools: { t3_thread_read: "codemode" } } })).toEqual({ tier: "free", reasons: ["t3-code/t3_thread_read (t3's hint unknown): Exposure direct to codemode"] });
     expect(tools(withTools({ t3: { exposure: "hidden" } }), { t3: { tools: { t3_thread_read: "deferred" } } }).tier).toBe("asked");
     expect(tools(EMPTY_HARNESS, { t3: { exposure: "deferred" } }).tier).toBe("free");
   });
@@ -189,6 +189,7 @@ describe("tierOf: tools", () => {
     const hidden = withTools({ t3: { exposure: "hidden", tools: { t3_x: "hidden" } } });
     const hinted = (asks: boolean | undefined) => tierOf({ entity: "tools", stored: hidden, change: { t3: { tools: { t3_x: null } } }, asksForDirect: () => asks });
     expect(hinted(true)).toEqual({ tier: "asked", reasons: ["t3-code/t3_x: Exposure hidden to direct"] });
+    expect(hinted(undefined).reasons).toEqual(["t3-code/t3_x (t3's hint unknown): Exposure hidden to direct"]);
     expect(hinted(undefined).tier).toBe("asked");
     expect(hinted(false).tier).toBe("unchanged");
     // Unknown, a narrowing judged at its worst case is still a move (so it applies), never `unchanged`.
@@ -210,6 +211,14 @@ describe("tierOf: tools", () => {
     const withServer: StoredHarness = { ...EMPTY_HARNESS, mcp: { servers: { fixture } } };
     expect(tools(withServer, { preset: "core" })).toEqual({ tier: "free", reasons: ["fixture (tools without their own): Exposure direct to deferred"] });
     expect(tools(withServer, { preset: "everything" })).toEqual({ tier: "asked", reasons: ["settings (tools without their own): Exposure deferred to direct (the Settings server's own entry)"] });
+  });
+
+  it("a preset that rewrites the Settings server's own entry without moving a tool's Exposure is asked", () => {
+    const settings = { kind: "settings" as const, enabled: true, exposure: "deferred" as const, writes: true, toolExposure: { get_settings: "deferred" as const } };
+    expect(tools({ ...EMPTY_HARNESS, mcp: { servers: { settings } } }, { preset: "core" })).toEqual({
+      tier: "asked",
+      reasons: ["settings: its own entry rewritten (the Settings server's own entry)"],
+    });
   });
 
   it("a malformed change is asked (fails closed)", () => {

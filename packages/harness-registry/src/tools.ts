@@ -32,6 +32,8 @@ export interface BuiltinTool {
   readonly extension: string;
   /** The Exposures it may have. */
   readonly exposures: ReadonlyArray<Exposure>;
+  /** A switch's: what hiding it widens, by the Session's fallbacks (codemode.ts); hiding it is asked (tiers.ts). */
+  readonly hidingWidens?: string;
 }
 
 const tools = (extension: string, names: ReadonlyArray<string>, exposures: ReadonlyArray<Exposure> = EXPOSURES): Array<BuiltinTool> =>
@@ -39,8 +41,8 @@ const tools = (extension: string, names: ReadonlyArray<string>, exposures: Reado
 
 /** Every built-in tool, in the panel's order. `propose_plan` is not here: plan mode alone offers it. */
 export const BUILTIN_TOOLS: ReadonlyArray<BuiltinTool> = [
-  ...tools("codemode", ["codemode"], SWITCH),
-  ...tools("tool-search", ["tool_search"], SWITCH),
+  { name: "codemode", extension: "codemode", exposures: SWITCH, hidingWidens: "a tool set to codemode is offered deferred or direct instead" },
+  { name: "tool_search", extension: "tool-search", exposures: SWITCH, hidingWidens: "a deferred tool is offered direct instead" },
   ...tools("coding-tools", ["read", "edit", "write", "bash"]),
   ...tools("files", ["ls", "find", "grep"]),
   ...tools("ask-user", ["ask_user"]),
@@ -184,6 +186,9 @@ const withEntries = (before: Readonly<Record<string, Exposure>> | undefined, ent
   return Object.fromEntries(map);
 };
 
+/** The Exposure `offered` gives an MCP server's tools: a preset names them by server, so any tool name stands for all. */
+const serverExposure = (offered: ReadonlyArray<string>, server: string): Exposure => offeredExposure(offered, `mcp__${server}__tool`);
+
 /**
  * `preset` over `layer`: every built-in tool that is not hidden and is not a switch takes the Exposure the preset gives
  * it, and so do t3's tools (their default, and each tool the owner set but did not hide, kept as its own so a tool t3
@@ -193,16 +198,13 @@ const withPreset = (layer: HarnessLayer, preset: OfferedPreset): HarnessLayer =>
   const current = resolveTools(layer);
   const offered = OFFERED_PRESETS[preset];
   const builtins = BUILTIN_TOOLS.filter((tool) => tool.exposures !== SWITCH && current.tools[tool.name] !== "hidden").map((tool) => [tool.name, offeredExposure(offered, tool.name)] as const);
-  const t3Preset = offeredExposure(offered, `mcp__${T3_SERVER}__tool`);
+  const t3Preset = serverExposure(offered, T3_SERVER);
   const t3Exposure = current.t3.exposure === "hidden" ? "hidden" : t3Preset;
   const t3Tools = Object.entries(current.t3.tools)
     .filter(([, exposure]) => exposure !== "hidden")
     .map(([tool]) => [tool, t3Preset] as const);
   return { ...layer, tools: withEntries(layer.tools, builtins), t3: { exposure: t3Exposure, tools: withEntries(layer.t3?.tools, t3Tools) } };
 };
-
-/** The Exposure `offered` gives an MCP server's tools: a preset names them by server, so any tool name stands for all. */
-const serverExposure = (offered: ReadonlyArray<string>, server: string): Exposure => offeredExposure(offered, `mcp__${server}__tool`);
 
 /** What a preset leaves on an MCP server: hidden, and code mode only, as the old preset's wrap did (it only deferred). */
 const KEPT_BY_PRESET: ReadonlyArray<Exposure> = ["hidden", "codemode"];
@@ -223,14 +225,15 @@ const presetServer = (offered: ReadonlyArray<string>, name: string, server: McpS
 
 /**
  * `preset` over the stored MCP servers (ADR-0042 §5): every Direct server and the Settings server's entry, the implied
- * one stored only when the preset moves it. An entry the set ignores (`mcpServersOf`) is kept as it is.
+ * one stored only when the preset moves it. An entry the set ignores (`mcpServersOf`) is dropped, as by any change to
+ * the set (`applyMcpChange`).
  */
 const withPresetServers = (stored: StoredHarness, preset: OfferedPreset): StoredHarness["mcp"] => {
   const offered = OFFERED_PRESETS[preset];
-  const servers = new Map<string, McpServerSetting>(Object.entries(stored.mcp?.servers ?? {}));
-  for (const [name, server] of servers) {
-    if ((name === SETTINGS_SERVER) !== (server.kind === "settings") || (server.kind !== "direct" && server.kind !== "settings")) continue;
-    servers.set(name, presetServer(offered, name, server));
+  const servers = new Map<string, McpServerSetting>();
+  for (const [name, server] of Object.entries(stored.mcp?.servers ?? {})) {
+    const kept = name === SETTINGS_SERVER ? server.kind === "settings" : server.kind === "direct";
+    if (kept) servers.set(name, presetServer(offered, name, server));
   }
   if (servers.get(SETTINGS_SERVER)?.kind !== "settings") {
     const implied = presetServer(offered, SETTINGS_SERVER, defaultSettingsServer());
@@ -298,9 +301,10 @@ export const movedTools = (
     const own = [ownEntry(before.t3.tools, tool), ownEntry(after.t3.tools, tool)] as const;
     const from = own[0] ?? (asks === true ? "direct" : before.t3.exposure);
     const to = own[1] ?? (asks !== false ? "direct" : after.t3.exposure);
-    if (from !== to) moves.push({ tool: `${T3_SERVER}/${tool}`, before: from, after: to });
-    // Its hint unknown, a stored change judged as no move still moves something: shown, at its worst case.
-    else if (asks === undefined && own[0] !== own[1]) moves.push({ tool: `${T3_SERVER}/${tool} (t3's hint unknown)`, before: from, after: to });
+    // Its hint unknown where a side has no Exposure of its own, the move is judged at its worst case, and says so; a
+    // stored change judged as no move still moves something, so it is shown.
+    const label = `${T3_SERVER}/${tool}${asks === undefined && (own[0] === undefined || own[1] === undefined) ? " (t3's hint unknown)" : ""}`;
+    if (from !== to || (asks === undefined && own[0] !== own[1])) moves.push({ tool: label, before: from, after: to });
   }
   return moves;
 };
