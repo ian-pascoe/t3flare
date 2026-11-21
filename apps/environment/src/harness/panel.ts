@@ -19,7 +19,7 @@
 // - The Owner clients' Elicitation modes (ADR-0035's 2026-11-15 refinement): `GET …/api/mcp/clients` lists them and
 //   `POST …/api/mcp/clients` `{ key, clientName, mode }` or `{ key, clientName, remove: true }`, behind the same write
 //   guard, changes one, audited. This is the only place a client's mode is set: the endpoint only reads it.
-import { describeGlobalMise, ENVIRONMENT_SETTINGS, EXTENSIONS, type HarnessChange, ignoredServersOf, type McpChange, resolveEnvironment, resolveHarness } from "@t3flare/harness-registry";
+import { BUILTIN_TOOLS, describeGlobalMise, ENVIRONMENT_SETTINGS, EXTENSIONS, type HarnessChange, ignoredServersOf, type McpChange, resolveEnvironment, resolveHarness, type ToolsChange } from "@t3flare/harness-registry";
 
 import type { AccessCaller } from "../access.ts";
 import type { McpHost } from "../mcp/host.ts";
@@ -36,6 +36,7 @@ import {
   beginMcpSignIn,
   changeEnvironment,
   changeExtension,
+  changeTools,
   changeMcp,
   changeSkills,
   type OpOptions,
@@ -203,6 +204,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
         audit: deps.store.auditLog(50),
         status: harnessStatus(deps),
         mcp: await mcpOverview(deps),
+        ...(deps.store.lastT3Tools() === undefined ? {} : { t3Tools: deps.store.lastT3Tools()! }),
         ...(deps.skills === undefined ? {} : { skills: skillsOverview(deps.skills) }),
         ...(deps.endpoints === undefined ? {} : { endpoints: await endpointsOverview(deps.endpoints) }),
         ...(deps.changes === undefined ? {} : { openChanges: deps.changes.list().map((record) => openChangeSummary(record, undefined)) }),
@@ -228,7 +230,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     }
     if (path === `${SETTINGS_PAGE_PATH}/api/settings`) {
       const stored = deps.store.load();
-      return json({ revision: stored.revision, resolved: resolveHarness(stored), registry: EXTENSIONS, stored });
+      return json({ revision: stored.revision, resolved: resolveHarness(stored), registry: EXTENSIONS, tools: BUILTIN_TOOLS, t3Tools: deps.store.lastT3Tools() ?? null, stored });
     }
     if (path === `${SETTINGS_PAGE_PATH}/api/environment`) {
       const stored = deps.store.loadEnvironment();
@@ -245,7 +247,7 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     return refused(404, "Not found");
   }
   if (request.method !== "POST") return refused(405, "Method not allowed");
-  const routes = [`${SETTINGS_PAGE_PATH}/api/extensions`, `${SETTINGS_PAGE_PATH}/api/environment`, `${SETTINGS_PAGE_PATH}/api/mcp`, `${SETTINGS_PAGE_PATH}/api/mcp/test`, `${SETTINGS_PAGE_PATH}/api/mcp/servers`, `${SETTINGS_PAGE_PATH}/api/mcp/oauth`, `${SETTINGS_PAGE_PATH}/api/mcp/secret`];
+  const routes = [`${SETTINGS_PAGE_PATH}/api/extensions`, `${SETTINGS_PAGE_PATH}/api/tools`, `${SETTINGS_PAGE_PATH}/api/environment`, `${SETTINGS_PAGE_PATH}/api/mcp`, `${SETTINGS_PAGE_PATH}/api/mcp/test`, `${SETTINGS_PAGE_PATH}/api/mcp/servers`, `${SETTINGS_PAGE_PATH}/api/mcp/oauth`, `${SETTINGS_PAGE_PATH}/api/mcp/secret`];
   const skillsRoute = SKILLS_WRITE_ROUTES.find((route) => path === `${SETTINGS_PAGE_PATH}/api/skills${route}`);
   const endpointsRoute = deps.endpoints === undefined ? undefined : Object.values(ENDPOINTS_PATHS).find((route) => path === `${SETTINGS_PAGE_PATH}${route}`);
   const changeRoute = path.startsWith(`${CHANGES_API_PATH}/`) && deps.changes !== undefined ? path.slice(`${CHANGES_API_PATH}/`.length) : undefined;
@@ -286,6 +288,12 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     const settings = body?.settings;
     if (settings === null || typeof settings !== "object" || Array.isArray(settings)) return refused(400, "the body is one change: { settings: { … } }");
     return answer(await changeEnvironment(ops, settings as Record<string, unknown>, options));
+  }
+  if (path === `${SETTINGS_PAGE_PATH}/api/tools`) {
+    if (body === undefined) return refused(400, "the body is one change: { preset?, tools?, t3? }");
+    const { preset, tools, t3 } = changeOf(body);
+    if ((tools !== undefined && (tools === null || typeof tools !== "object")) || (t3 !== undefined && (t3 === null || typeof t3 !== "object"))) return refused(400, "tools and t3 are objects");
+    return answer(changeTools(ops, { ...(preset === undefined ? {} : { preset }), ...(tools === undefined ? {} : { tools }), ...(t3 === undefined ? {} : { t3 }) } as ToolsChange, options));
   }
   if (path === `${SETTINGS_PAGE_PATH}/api/mcp/test`) {
     // The test's answer has no `ok`, as before the ops moved out.

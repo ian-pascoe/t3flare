@@ -78,7 +78,7 @@ const harness = async (method: string, pathname: string, body?: unknown, headers
   return { status: response.status, json, headers: response.headers };
 };
 
-const setPreset = async (preset: string) => harness("POST", "/_t3flare/settings/api/extensions", { extension: "offered-tools", settings: { preset } });
+const setPreset = async (preset: string) => harness("POST", "/_t3flare/settings/api/tools", { preset });
 
 let cookie = "";
 let providerOn = false;
@@ -508,7 +508,7 @@ const panel = async () => {
   for (const pathname of ["/_t3flare/settings", "/_t3flare/settings/api/settings", "/_t3flare/settings/api/mcp", "/_t3flare/settings/api/audit"]) {
     linkedStatuses.push((await fetch(new URL(pathname, t3), { headers: { authorization: `Bearer ${link.token}` }, redirect: "manual" })).status);
   }
-  const linkedPost = (await fetch(new URL("/_t3flare/settings/api/extensions", t3), { method: "POST", headers: { authorization: `Bearer ${link.token}`, "content-type": "application/json" }, body: JSON.stringify({ extension: "tool-search", enabled: false }), redirect: "manual" })).status;
+  const linkedPost = (await fetch(new URL("/_t3flare/settings/api/extensions", t3), { method: "POST", headers: { authorization: `Bearer ${link.token}`, "content-type": "application/json" }, body: JSON.stringify({ extension: "advisor", enabled: true }), redirect: "manual" })).status;
   results.push({ name: "a linked laptop's MCP bearer on every panel route (GET and a change): refused", statuses: [...linkedStatuses, linkedPost], ok: [...linkedStatuses, linkedPost].every((status) => [302, 401, 403, 404].includes(status)) });
   // From a Container: computer.internal and the public t3 host, with no credential and with a forged assertion.
   const workspace = `tools-panel-${Date.now().toString(36)}`;
@@ -535,7 +535,7 @@ const panel = async () => {
   results.push({ name: "the OAuth callback and client document are public outside /_t3flare (an unknown state refused)", statuses: [callback.status, client.status], ok: callback.status >= 400 && callback.status < 500 && client.status === 200 });
   // Cross-origin and form posts: refused before anything is stored.
   const before = (await harness("GET", "/_t3flare/settings/api/settings")).json?.revision;
-  const crossOrigin = await harness("POST", "/_t3flare/settings/api/extensions", { extension: "tool-search", enabled: false }, { origin: "https://evil.example" });
+  const crossOrigin = await harness("POST", "/_t3flare/settings/api/extensions", { extension: "advisor", enabled: true }, { origin: "https://evil.example" });
   const form = await harness("POST", "/_t3flare/settings/api/extensions", "extension=tool-search&enabled=false", { "content-type": "application/x-www-form-urlencoded" });
   const after = (await harness("GET", "/_t3flare/settings/api/settings")).json?.revision;
   results.push({ name: "cross-origin and form-encoded changes refused", statuses: [crossOrigin.status, form.status], ok: crossOrigin.status === 403 && form.status === 403 && before === after });

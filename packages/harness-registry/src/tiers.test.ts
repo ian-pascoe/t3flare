@@ -4,34 +4,33 @@ import { describe, expect, it } from "vitest";
 
 import { EMPTY_ENVIRONMENT, ENVIRONMENT_SETTINGS, type EnvironmentKey, type StoredEnvironment } from "./environment.ts";
 import type { FieldSchema } from "./fields.ts";
-import { applyChange, applyMcpChange, EMPTY_HARNESS, EXTENSIONS, SETTINGS_SERVER, type StoredHarness } from "./index.ts";
+import { applyChange, applyMcpChange, applyToolsChange, EMPTY_HARNESS, EXTENSIONS, SETTINGS_SERVER, type StoredHarness, type ToolsChange } from "./index.ts";
 import { type McpTierChange, type SkillsTierChange, tierOf } from "./tiers.ts";
 
-/** Each extension's switch: `switch` (off to on asked, on to off free), `guard` (both asked), or `unchangeable`. */
-const SWITCHES: Readonly<Record<string, "switch" | "guard" | "unchangeable">> = {
-  codemode: "switch",
-  "tool-search": "switch",
-  "offered-tools": "unchangeable",
-  web: "switch",
-  todo: "switch",
-  context: "switch",
-  termctrl: "switch",
+/**
+ * Each extension's switch: `switch` (off to on asked, on to off free), `guard` (both asked), `unchangeable`, or `tools`
+ * (no switch: on while any of its tools is not hidden, so its tools' Exposures are its switch).
+ */
+const SWITCHES: Readonly<Record<string, "switch" | "guard" | "unchangeable" | "tools">> = {
+  codemode: "tools",
+  "tool-search": "tools",
+  "coding-tools": "tools",
+  files: "tools",
+  "ask-user": "tools",
+  web: "tools",
+  todo: "tools",
+  context: "tools",
+  termctrl: "tools",
   guardian: "guard",
   advisor: "switch",
   skills: "switch",
-  "coding-tools": "unchangeable",
-  files: "unchangeable",
   permissions: "unchangeable",
-  "ask-user": "unchangeable",
-  "t3-mcp": "unchangeable",
   "project-context": "unchangeable",
 };
 
 /** Each extension setting's rule: `free`, `down-free`, or `asked` (a Guard's settings and any without a declared tier). */
 const SETTINGS: Readonly<Record<string, "free" | "down-free" | "asked">> = {
   "codemode.inlineBudget": "free",
-  "offered-tools.preset": "free",
-  "web.search": "down-free",
   "web.searchModel": "asked",
   "context.rolloverOnCompaction": "free",
   "termctrl.backgroundBash": "down-free",
@@ -89,12 +88,19 @@ describe("tierOf: extensions", () => {
   it("each switch: off to on asked; on to off free, asked for a Guard; an unchangeable switch stays refused", () => {
     for (const entry of EXTENSIONS) {
       const rule = SWITCHES[entry.id]!;
-      if (rule === "unchangeable") {
+      if (rule === "unchangeable" || rule === "tools") {
         expect(applyChange(EMPTY_HARNESS, { extension: entry.id, enabled: false }).ok, entry.id).toBe(false);
         continue;
       }
       expect(tier({ entity: "extension", stored: withExtension(entry.id, false), change: { extension: entry.id, enabled: true } }), entry.id).toBe("asked");
       expect(tier({ entity: "extension", stored: withExtension(entry.id, true), change: { extension: entry.id, enabled: false } }), entry.id).toBe(rule === "guard" ? "asked" : "free");
+    }
+  });
+
+  it("an extension with tools has no switch: its tools' Exposures turn it on and off", () => {
+    for (const entry of EXTENSIONS.filter((each) => SWITCHES[each.id] === "tools")) {
+      expect(entry.tools?.length, entry.id).toBeGreaterThan(0);
+      expect(applyChange(EMPTY_HARNESS, { extension: entry.id, enabled: false })).toEqual({ ok: false, error: `${entry.id}: on while any of its tools is not hidden; set its tools' Exposure instead` });
     }
   });
 
@@ -123,9 +129,13 @@ describe("tierOf: extensions", () => {
   it("a change that moves nothing is unchanged; several parts are asked when any is", () => {
     expect(tier({ entity: "extension", stored: EMPTY_HARNESS, change: { extension: "codemode", enabled: true, settings: { inlineBudget: 2_000 } } })).toBe("unchanged");
     expect(tier({ entity: "extension", stored: EMPTY_HARNESS, change: { extension: "termctrl", settings: { cols: 200, backgroundBash: false } } })).toBe("free");
-    expect(tierOf({ entity: "extension", stored: EMPTY_HARNESS, change: { extension: "web", settings: { search: true, searchModel: "default" } } })).toEqual({
+    expect(tierOf({ entity: "extension", stored: EMPTY_HARNESS, change: { extension: "termctrl", settings: { backgroundBash: true, cols: 200 } } })).toEqual({
+      tier: "free",
+      reasons: ["termctrl.cols: 120 to 200 (free in either direction)"],
+    });
+    expect(tierOf({ entity: "extension", stored: withExtension("termctrl", undefined, { backgroundBash: false }), change: { extension: "termctrl", settings: { backgroundBash: true, cols: 200 } } })).toEqual({
       tier: "asked",
-      reasons: ["web.search: false to true (turned up)"],
+      reasons: ["termctrl.backgroundBash: false to true (turned up)"],
     });
   });
 
@@ -135,11 +145,49 @@ describe("tierOf: extensions", () => {
   });
 
   it("a switch that is not true or false is asked, whatever is stored (it would resolve to the default)", () => {
-    const off = applyChange(EMPTY_HARNESS, { extension: "codemode", enabled: false });
+    const off = applyChange(EMPTY_HARNESS, { extension: "advisor", enabled: false });
     if (!off.ok) throw new Error(off.error);
     for (const enabled of [null, "false", 0]) {
-      expect(tier({ entity: "extension", stored: off.harness, change: { extension: "codemode", enabled: enabled as unknown as boolean } })).toBe("asked");
+      expect(tier({ entity: "extension", stored: off.harness, change: { extension: "advisor", enabled: enabled as unknown as boolean } })).toBe("asked");
     }
+  });
+});
+
+describe("tierOf: tools", () => {
+  const tools = (stored: StoredHarness, change: ToolsChange) => tierOf({ entity: "tools", stored, change });
+  const withTools = (change: ToolsChange): StoredHarness => {
+    const applied = applyToolsChange(EMPTY_HARNESS, change);
+    if (!applied.ok) throw new Error(applied.error);
+    return applied.harness;
+  };
+
+  it("narrowing a tool is free; widening it is asked, deferred and direct ranking alike", () => {
+    expect(tools(EMPTY_HARNESS, { tools: { ask_user: "hidden" } })).toEqual({ tier: "free", reasons: ["ask_user: Exposure direct to hidden"] });
+    expect(tools(EMPTY_HARNESS, { tools: { read: "codemode" } }).tier).toBe("free");
+    expect(tools(EMPTY_HARNESS, { tools: { read: "deferred" } }).tier).toBe("free");
+    expect(tools(withTools({ tools: { read: "deferred" } }), { tools: { read: "direct" } }).tier).toBe("free");
+    expect(tools(EMPTY_HARNESS, { tools: { web_search: "direct" } })).toEqual({ tier: "asked", reasons: ["web_search: Exposure hidden to direct"] });
+    expect(tools(withTools({ tools: { codemode: "hidden" } }), { tools: { codemode: "direct" } }).tier).toBe("asked");
+    expect(tools(withTools({ tools: { bash: "codemode" } }), { tools: { bash: null } })).toEqual({ tier: "asked", reasons: ["bash: Exposure codemode to direct"] });
+  });
+
+  it("judges t3's tools by their Exposure before and after, a tool's own or the card's", () => {
+    expect(tools(EMPTY_HARNESS, { t3: { tools: { t3_thread_read: "codemode" } } })).toEqual({ tier: "free", reasons: ["t3-code/t3_thread_read: Exposure direct to codemode"] });
+    expect(tools(withTools({ t3: { exposure: "hidden" } }), { t3: { tools: { t3_thread_read: "deferred" } } }).tier).toBe("asked");
+    expect(tools(EMPTY_HARNESS, { t3: { exposure: "deferred" } }).tier).toBe("free");
+  });
+
+  it("a preset is judged by every tool it moves; a change that moves nothing is unchanged", () => {
+    expect(tools(EMPTY_HARNESS, { preset: "core" }).tier).toBe("unchanged");
+    expect(tools(EMPTY_HARNESS, { tools: { read: "direct" } }).tier).toBe("unchanged");
+    expect(tools(EMPTY_HARNESS, { preset: "codemode-only" }).tier).toBe("free");
+    expect(tools(withTools({ preset: "codemode-only" }), { preset: "everything" }).tier).toBe("free");
+    expect(tools(withTools({ tools: { read: "codemode" } }), { preset: "core" }).tier).toBe("asked");
+  });
+
+  it("a malformed change is asked (fails closed)", () => {
+    expect(tools(EMPTY_HARNESS, { tools: { nope: "direct" } }).tier).toBe("asked");
+    expect(tools(EMPTY_HARNESS, { tools: { codemode: "deferred" } }).tier).toBe("asked");
   });
 });
 

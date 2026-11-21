@@ -10,6 +10,7 @@ import { applyEnvironmentChange, type EnvironmentChange, ENVIRONMENT_SETTINGS, r
 import type { SettingTier } from "./fields.ts";
 import { EXTENSIONS, type HarnessChange, type McpChange, mcpServersOf, resolveHarness, type StoredHarness } from "./index.ts";
 import { type Exposure, ownEntry, type ToolClass } from "./mcp.ts";
+import { applyToolsChange, movedTools, resolveTools, type ToolsChange } from "./tools.ts";
 
 export type ChangeTier = "free" | "asked";
 
@@ -40,6 +41,7 @@ export type TierInput =
       /** A tool's own class from its `readOnlyHint`, undefined when unknown (not listed, or no inventory). */
       readonly hintedClass?: (server: string, tool: string) => ToolClass | undefined;
     }
+  | { readonly entity: "tools"; readonly stored: StoredHarness; readonly change: ToolsChange }
   | { readonly entity: "environment"; readonly stored: StoredEnvironment; readonly change: EnvironmentChange }
   | { readonly entity: "skills"; readonly change: SkillsTierChange };
 
@@ -160,6 +162,15 @@ const mcpTier = (stored: StoredHarness, change: McpTierChange, hintedClass: (ser
   return verdictOf(parts);
 };
 
+/** Each tool's Exposure before and after, as MCP tools' are judged: widening is asked, narrowing free. */
+const toolsTier = (stored: StoredHarness, change: ToolsChange): TierVerdict => {
+  const applied = applyToolsChange(stored, change);
+  // Malformed: the change function refuses it; until then it is asked.
+  if (!applied.ok) return { tier: "asked", reasons: [applied.error] };
+  const moves = movedTools(resolveTools(stored.global), resolveTools(applied.harness.global));
+  return verdictOf(moves.map((move) => ({ asked: rankOf(move.after) > rankOf(move.before), reason: `${move.tool}: Exposure ${move.before} to ${move.after}` })));
+};
+
 const environmentTier = (stored: StoredEnvironment, change: EnvironmentChange): TierVerdict => {
   for (const key of Object.keys(change.settings)) if (ownEntry(ENVIRONMENT_SETTINGS as Readonly<Record<string, unknown>>, key) === undefined) return { tier: "asked", reasons: [`${key}: not a setting this registry knows`] };
   const applied = applyEnvironmentChange(stored, change);
@@ -191,6 +202,8 @@ export const tierOf = (input: TierInput): TierVerdict => {
   switch (input.entity) {
     case "extension":
       return extensionTier(input.stored, input.change);
+    case "tools":
+      return toolsTier(input.stored, input.change);
     case "mcp":
       return mcpTier(input.stored, input.change, input.hintedClass ?? (() => undefined));
     case "environment":

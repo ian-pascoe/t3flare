@@ -54,6 +54,23 @@ for (const select of document.querySelectorAll("select[data-mcp-exposure]")) {
     else select.value = select.querySelector("option[selected]").value;
   });
 }
+// A tool's Exposure (built-in, or t3's: a tool's, or "" for the card's default), saved at once; "" clears a tool's own.
+for (const select of document.querySelectorAll("select[data-tool-exposure]")) {
+  select.addEventListener("change", async () => {
+    const tool = select.dataset.toolExposure;
+    const value = select.value === "" ? null : select.value;
+    const change = select.dataset.t3 === undefined ? { tools: { [tool]: value } } : tool === "" ? { t3: { exposure: value } } : { t3: { tools: { [tool]: value } } };
+    if (await post("/_t3flare/settings/api/tools", change, select)) done();
+    else select.value = select.querySelector("option[selected]").value;
+  });
+}
+for (const button of document.querySelectorAll("button[data-tools-preset]")) {
+  button.addEventListener("click", async () => {
+    const preset = button.dataset.toolsPreset;
+    if (!confirm("Apply the " + preset + " preset? Every tool that is not hidden takes its Exposure, t3's too; hidden tools stay hidden.")) return;
+    if (await post("/_t3flare/settings/api/tools", { preset }, button)) done();
+  });
+}
 // The Owner clients' modes (ADR-0035's 2026-11-15 refinement): set here alone, at the client's next request.
 for (const select of document.querySelectorAll("select[data-client-mode]")) {
   select.addEventListener("change", async () => {

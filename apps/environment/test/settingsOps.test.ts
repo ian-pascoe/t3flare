@@ -134,15 +134,15 @@ describe("expectedRevision", () => {
 
   it("the panel takes one in the body: a stale one is 409, a malformed one 400, and none keeps the form working", async () => {
     const env = setup({ kind: "service-token" });
-    expect((await post(env, "extensions", { extension: "tool-search", enabled: false, expectedRevision: 0 })).status).toBe(200);
-    const stale = await post(env, "extensions", { extension: "tool-search", enabled: true, expectedRevision: 0 });
+    expect((await post(env, "extensions", { extension: "advisor", enabled: false, expectedRevision: 0 })).status).toBe(200);
+    const stale = await post(env, "extensions", { extension: "advisor", enabled: true, expectedRevision: 0 });
     expect(stale.status).toBe(409);
     expect(await stale.text()).toBe("the Harness settings are at revision 1, not 0; read them again\n");
-    expect((await post(env, "extensions", { extension: "tool-search", enabled: true, expectedRevision: "1" })).status).toBe(400);
+    expect((await post(env, "extensions", { extension: "advisor", enabled: true, expectedRevision: "1" })).status).toBe(400);
     expect((await post(env, "environment", { settings: { containerIdleMinutes: 9 }, expectedRevision: 1 })).status).toBe(409);
     expect((await post(env, "mcp", { op: "server", server: "settings", writes: false, expectedRevision: 0 })).status).toBe(409);
     expect((await post(env, "skills/remove", { name: "a", expectedRevision: 5 })).status).toBe(409);
-    expect((await post(env, "extensions", { extension: "tool-search", enabled: true })).status).toBe(200);
+    expect((await post(env, "extensions", { extension: "advisor", enabled: true })).status).toBe(200);
     // The change stored is the change alone, never the revision it named.
     expect(JSON.stringify(env.store.load())).not.toContain("expectedRevision");
   });

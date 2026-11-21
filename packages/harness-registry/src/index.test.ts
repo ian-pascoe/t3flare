@@ -3,24 +3,28 @@
 // cloudpid ADR-0027's merge (keyed settings merged key by key, lists replaced whole) for the later per-Project overrides.
 import { describe, expect, it } from "vitest";
 
-import { applyChange, EMPTY_HARNESS, extensionOf, EXTENSIONS, resolveHarness, withoutQuery } from "./index.ts";
+import { applyChange, applyToolsChange, BUILTIN_TOOLS, EMPTY_HARNESS, extensionOf, EXTENSIONS, resolvedToolsOf, resolveHarness, type StoredHarness, type ToolsChange, withoutQuery } from "./index.ts";
 
 describe("resolveHarness", () => {
-  it("gives the defaults for empty settings: code mode on, tool search on, the core preset offered", () => {
+  it("gives the defaults for empty settings: every tool direct (the core preset), web_search hidden, t3's tools direct", () => {
     const resolved = resolveHarness(EMPTY_HARNESS);
     expect(resolved.revision).toBe(0);
     expect(resolved.codemode).toEqual({ enabled: true, inlineBudget: 2000 });
     expect(resolved.toolSearch).toEqual({ enabled: true });
-    expect(resolved.offered).toEqual([
-      "read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*", "web_fetch", "web_search", "todo", "context_notes", "context_history", "context_rollover", "terminal_start", "terminal_send", "terminal_stop", "terminal_list", "terminal_wait",
-    ]);
+    expect(resolved.tools).toEqual({
+      ...Object.fromEntries(BUILTIN_TOOLS.map((tool) => [tool.name, "direct"])),
+      web_search: "hidden",
+    });
+    expect(resolved.t3).toEqual({ exposure: "direct", tools: {} });
+    expect(resolved.offered).toBeUndefined();
   });
 
-  it("has the web tools on with web_search off (a search costs a model request), and the search model switchable (SPI-1054)", () => {
-    expect(resolveHarness(EMPTY_HARNESS).extensions.web).toEqual({ enabled: true, settings: { search: false, searchModel: "default" } });
-    const on = applyChange(EMPTY_HARNESS, { extension: "web", settings: { search: true, searchModel: "claude-sonnet-5-5" } });
+  it("has the web tools on with web_search hidden (a search costs a model request), and the search model switchable (SPI-1054)", () => {
+    expect(resolveHarness(EMPTY_HARNESS).extensions.web).toEqual({ enabled: true, settings: { searchModel: "default" } });
+    const on = applyChange(EMPTY_HARNESS, { extension: "web", settings: { searchModel: "claude-sonnet-5-5" } });
     if (!on.ok) throw new Error(on.error);
-    expect(resolveHarness(on.harness).extensions.web).toEqual({ enabled: true, settings: { search: true, searchModel: "claude-sonnet-5-5" } });
+    expect(resolveHarness(on.harness).extensions.web).toEqual({ enabled: true, settings: { searchModel: "claude-sonnet-5-5" } });
+    expect(applyChange(EMPTY_HARNESS, { extension: "web", settings: { search: true } })).toEqual({ ok: false, error: "web.search: no such setting" });
     // Since SPI-1176 the setting is text, resolved against the Model endpoints at use: any slug is taken, an overlong one is not.
     expect(applyChange(EMPTY_HARNESS, { extension: "web", settings: { searchModel: "openai/gpt-9" } })).toMatchObject({ ok: true });
     expect(applyChange(EMPTY_HARNESS, { extension: "web", settings: { searchModel: "x".repeat(301) } })).toMatchObject({ ok: false });
@@ -49,14 +53,36 @@ describe("resolveHarness", () => {
   it("gives an extension's defaults to a Session whose resolved view predates the entry", () => {
     const { web: _web, ...older } = resolveHarness(EMPTY_HARNESS).extensions;
     const taken = { ...resolveHarness(EMPTY_HARNESS), extensions: older };
-    expect(extensionOf(taken, "web")).toEqual({ enabled: true, settings: { search: false, searchModel: "default" } });
+    expect(extensionOf(taken, "web")).toEqual({ enabled: true, settings: { searchModel: "default" } });
     expect(extensionOf(taken, "nope")).toEqual({ enabled: false, settings: {} });
   });
 
-  it("offers everything when tool search is off, since nothing could load a deferred tool", () => {
-    const stored = applyChange(EMPTY_HARNESS, { extension: "tool-search", enabled: false });
-    if (!stored.ok) throw new Error(stored.error);
-    expect(resolveHarness(stored.harness).offered).toEqual(["*"]);
+  it("resolves settings stored before Exposures: switches off hide their tools, the preset defers, web search follows its old switch", () => {
+    const legacy: StoredHarness = {
+      revision: 7,
+      overrides: {},
+      global: { extensions: { "offered-tools": { settings: { preset: "codemode-only" } }, todo: { enabled: false }, web: { settings: { search: true } } } },
+    };
+    const resolved = resolveHarness(legacy);
+    expect(resolved.tools).toMatchObject({ codemode: "direct", tool_search: "direct", read: "deferred", todo: "hidden", web_search: "deferred", ask_user: "deferred" });
+    expect(resolved.t3.exposure).toBe("deferred");
+    expect(resolved.extensions.todo?.enabled).toBe(false);
+    // Tool search off offered everything: nothing was deferred.
+    const noSearch = resolveHarness({ ...legacy, global: { extensions: { "tool-search": { enabled: false }, codemode: { enabled: false } } } });
+    expect(noSearch.tools).toMatchObject({ tool_search: "hidden", codemode: "hidden", read: "direct", terminal_wait: "direct" });
+    expect(noSearch.toolSearch.enabled).toBe(false);
+    expect(noSearch.codemode.enabled).toBe(false);
+    // A tool's own Exposure wins over what the old settings gave it.
+    const own = applyToolsChange(legacy, { tools: { todo: "codemode", read: "direct" } });
+    if (!own.ok) throw new Error(own.error);
+    expect(resolveHarness(own.harness).tools).toMatchObject({ todo: "codemode", read: "direct", grep: "deferred" });
+  });
+
+  it("reads the tools of a view a Session kept from before Exposures", () => {
+    const { tools: _tools, t3: _t3, ...rest } = resolveHarness(EMPTY_HARNESS);
+    const kept = { ...rest, offered: ["codemode", "tool_search"], extensions: { ...rest.extensions, termctrl: { enabled: false, settings: {} } } };
+    expect(resolvedToolsOf(kept).tools).toMatchObject({ read: "deferred", codemode: "direct", terminal_start: "hidden", web_search: "hidden" });
+    expect(extensionOf(kept, "termctrl").enabled).toBe(false);
   });
 
   it("applies a Project's override over Global, key by key", () => {
@@ -70,29 +96,26 @@ describe("resolveHarness", () => {
 
 describe("applyChange", () => {
   it("stores a valid change and bumps the revision", () => {
-    const changed = applyChange(EMPTY_HARNESS, { extension: "offered-tools", settings: { preset: "codemode-only" } });
+    const changed = applyChange(EMPTY_HARNESS, { extension: "codemode", settings: { inlineBudget: 4000 } });
     if (!changed.ok) throw new Error(changed.error);
     expect(changed.harness.revision).toBe(1);
-    expect(resolveHarness(changed.harness).offered).toEqual(["codemode", "tool_search"]);
+    expect(resolveHarness(changed.harness).codemode).toEqual({ enabled: true, inlineBudget: 4000 });
   });
 
   it("refuses a value outside the schema, an unknown setting, and an unknown extension", () => {
     expect(applyChange(EMPTY_HARNESS, { extension: "codemode", settings: { inlineBudget: 10 } })).toEqual({ ok: false, error: "codemode.inlineBudget: at least 500" });
     expect(applyChange(EMPTY_HARNESS, { extension: "codemode", settings: { inlineBudget: "big" } })).toEqual({ ok: false, error: "codemode.inlineBudget: an integer" });
     expect(applyChange(EMPTY_HARNESS, { extension: "codemode", settings: { other: 1 } })).toEqual({ ok: false, error: "codemode.other: no such setting" });
-    expect(applyChange(EMPTY_HARNESS, { extension: "offered-tools", settings: { preset: "all" } })).toEqual({
-      ok: false,
-      error: "offered-tools.preset: one of core, codemode-only, everything",
-    });
+    expect(applyChange(EMPTY_HARNESS, { extension: "advisor", settings: { reviewEvery: "7" } })).toEqual({ ok: false, error: "advisor.reviewEvery: one of turn, 2, 3, 5, request" });
     expect(applyChange(EMPTY_HARNESS, { extension: "nope", enabled: true })).toEqual({ ok: false, error: "nope: no such extension" });
     expect(applyChange(EMPTY_HARNESS, { extension: "codemode", settings: { constructor: 1 } })).toEqual({ ok: false, error: "codemode.constructor: no such setting" });
   });
 
   it("refuses a switch that is not true or false: a stored null would resolve to the default, on", () => {
-    const off = applyChange(EMPTY_HARNESS, { extension: "codemode", enabled: false });
+    const off = applyChange(EMPTY_HARNESS, { extension: "advisor", enabled: false });
     if (!off.ok) throw new Error(off.error);
-    expect(applyChange(off.harness, { extension: "codemode", enabled: null as unknown as boolean })).toEqual({ ok: false, error: "enabled: true or false" });
-    expect(applyChange(off.harness, { extension: "codemode", enabled: "no" as unknown as boolean })).toEqual({ ok: false, error: "enabled: true or false" });
+    expect(applyChange(off.harness, { extension: "advisor", enabled: null as unknown as boolean })).toEqual({ ok: false, error: "enabled: true or false" });
+    expect(applyChange(off.harness, { extension: "advisor", enabled: "no" as unknown as boolean })).toEqual({ ok: false, error: "enabled: true or false" });
   });
 
   it("refuses to change a locked extension: permissions can never be turned off", () => {
@@ -101,8 +124,56 @@ describe("applyChange", () => {
     expect(applyChange(EMPTY_HARNESS, { extension: "permissions", enabled: false })).toEqual({ ok: false, error: `permissions: locked (${permissions?.locked})` });
   });
 
-  it("refuses to turn an extension without a switch on or off", () => {
-    expect(applyChange(EMPTY_HARNESS, { extension: "offered-tools", enabled: false })).toEqual({ ok: false, error: "offered-tools: cannot be turned off" });
+  it("refuses to turn an extension with tools on or off: its tools' Exposures are its switch", () => {
+    expect(applyChange(EMPTY_HARNESS, { extension: "todo", enabled: false })).toEqual({ ok: false, error: "todo: on while any of its tools is not hidden; set its tools' Exposure instead" });
+  });
+});
+
+describe("applyToolsChange", () => {
+  const apply = (change: ToolsChange, stored: StoredHarness = EMPTY_HARNESS) => {
+    const applied = applyToolsChange(stored, change);
+    if (!applied.ok) throw new Error(applied.error);
+    return applied.harness;
+  };
+
+  it("sets each tool's Exposure; hiding all of an extension's tools turns it off; null returns a tool to its default", () => {
+    const changed = apply({ tools: { ask_user: "hidden", read: "codemode", web_search: "deferred" } });
+    expect(changed.revision).toBe(1);
+    const resolved = resolveHarness(changed);
+    expect(resolved.tools).toMatchObject({ ask_user: "hidden", read: "codemode", web_search: "deferred" });
+    expect(resolved.extensions["ask-user"]?.enabled).toBe(false);
+    expect(resolved.extensions["coding-tools"]?.enabled).toBe(true);
+    expect(resolveHarness(apply({ tools: { read: null } }, changed)).tools.read).toBe("direct");
+    expect(resolveHarness(apply({ tools: { codemode: "hidden", tool_search: "hidden" } })).codemode.enabled).toBe(false);
+  });
+
+  it("sets t3's tools one by one, and a default for those without their own", () => {
+    const changed = resolveHarness(apply({ t3: { exposure: "deferred", tools: { t3_thread_read: "codemode", t3_thread_wait: "hidden" } } }));
+    expect(changed.t3).toEqual({ exposure: "deferred", tools: { t3_thread_read: "codemode", t3_thread_wait: "hidden" } });
+  });
+
+  it("applies a preset to every tool that is not hidden and is not a switch, t3's included; hidden ones stay hidden", () => {
+    const before = apply({ tools: { ask_user: "hidden", codemode: "hidden", grep: "codemode" }, t3: { tools: { t3_thread_read: "codemode", t3_thread_wait: "hidden" } } });
+    const resolved = resolveHarness(apply({ preset: "codemode-only" }, before));
+    expect(resolved.tools).toMatchObject({ ask_user: "hidden", codemode: "hidden", tool_search: "direct", grep: "deferred", read: "deferred", web_search: "hidden" });
+    expect(resolved.t3).toEqual({ exposure: "deferred", tools: { t3_thread_wait: "hidden" } });
+    expect(resolveHarness(apply({ preset: "everything" }, before)).tools).toMatchObject({ read: "direct", grep: "direct", ask_user: "hidden" });
+  });
+
+  it("refuses an unknown tool or preset, an Exposure a tool cannot have, and a malformed t3 tool name", () => {
+    expect(applyToolsChange(EMPTY_HARNESS, { tools: { nope: "direct" } })).toEqual({ ok: false, error: "nope: not a built-in tool" });
+    expect(applyToolsChange(EMPTY_HARNESS, { tools: { codemode: "deferred" } })).toEqual({ ok: false, error: "codemode: one of direct, hidden, or null" });
+    expect(applyToolsChange(EMPTY_HARNESS, { tools: { read: "all" as never } })).toEqual({ ok: false, error: "read: one of direct, deferred, codemode, hidden, or null" });
+    expect(applyToolsChange(EMPTY_HARNESS, { preset: "all" as never })).toEqual({ ok: false, error: "preset: one of core, codemode-only, everything" });
+    expect(applyToolsChange(EMPTY_HARNESS, { t3: { tools: { t3_thread_wait: "codemode" } } })).toEqual({ ok: false, error: "t3-code/t3_thread_wait: one of direct, deferred, hidden, or null" });
+    expect(applyToolsChange(EMPTY_HARNESS, { t3: { tools: { "a b": "direct" } } })).toEqual({ ok: false, error: "a b: not a t3 tool name" });
+    expect(applyToolsChange(EMPTY_HARNESS, { t3: { exposure: "all" as never } })).toEqual({ ok: false, error: "t3 exposure: one of direct, deferred, codemode, hidden" });
+  });
+
+  it("keeps a tool named like an Object.prototype key a key like any other", () => {
+    expect(resolveHarness(apply({ t3: { tools: { __proto__: "hidden" } as never } })).t3.tools).toEqual({});
+    const named = resolveHarness(apply({ t3: { tools: JSON.parse('{"__proto__":"hidden"}') } }));
+    expect(Object.hasOwn(named.t3.tools, "__proto__")).toBe(true);
   });
 });
 

@@ -5,7 +5,7 @@
 //
 // `resume` (plan D12) is not among them: it is `RESUME_TOOL`, the Owner-client endpoint's alone in `model` (M5b,
 // SPI-1201), never the in-process server's.
-import { ENVIRONMENT_SETTINGS, type EnvironmentFieldSchema, EXTENSIONS, type ToolClass } from "@t3flare/harness-registry";
+import { BUILTIN_TOOLS, ENVIRONMENT_SETTINGS, type EnvironmentFieldSchema, EXTENSIONS, OFFERED_PRESETS, type ToolClass } from "@t3flare/harness-registry";
 
 import { CHANGE_TTL_MS, durationText } from "./changes.ts";
 
@@ -67,7 +67,7 @@ const fieldJson = (schema: EnvironmentFieldSchema): Record<string, unknown> => {
 };
 
 /** The changeable extensions (a locked one, or one with no switch and no settings, cannot be changed by anyone). */
-const CHANGEABLE = EXTENSIONS.filter((entry) => entry.locked === undefined && (entry.default !== "always" || Object.keys(entry.settings).length > 0));
+const CHANGEABLE = EXTENSIONS.filter((entry) => entry.locked === undefined && ((entry.default !== "always" && entry.tools === undefined) || Object.keys(entry.settings).length > 0));
 
 const extensionSettings = (): string =>
   CHANGEABLE.filter((entry) => Object.keys(entry.settings).length > 0)
@@ -129,7 +129,7 @@ export const SETTINGS_TOOLS: ReadonlyArray<SettingsTool> = [
   {
     name: "change_extension",
     class: "write",
-    description: `Changes one Pi Durable extension's switch or some of its settings (the Harness settings). Settings by extension: ${extensionSettings()}. Applies at each thread's next turn. ${ASKED_NOTE}`,
+    description: `Changes one Pi Durable extension's switch or some of its settings (the Harness settings); an extension with tools has no switch: change_tools hides or offers its tools. Settings by extension: ${extensionSettings()}. Applies at each thread's next turn. ${ASKED_NOTE}`,
     inputSchema: {
       type: "object",
       required: ["expectedRevision", "extension"],
@@ -138,6 +138,29 @@ export const SETTINGS_TOOLS: ReadonlyArray<SettingsTool> = [
         extension: { type: "string", enum: CHANGEABLE.map((entry) => entry.id) },
         enabled: { type: "boolean" },
         settings: { type: "object", propertyNames: { enum: settingNames }, description: "Some of the extension's settings, by name; get_settings lists each one's limits." },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "change_tools",
+    class: "write",
+    description: `Sets tools' Exposures (the Harness settings): direct (in every request), deferred (loaded by tool_search), codemode (code mode's scripts only) or hidden; null returns a tool to its default. tools: built-in tools by name (${BUILTIN_TOOLS.map((tool) => tool.name).join(", ")}; codemode and tool_search are direct or hidden). t3: t3's own tools, exposure for those without their own and tools by t3's name (t3_thread_wait and t3_background_wait are never codemode). preset (core, codemode-only, everything) sets every tool that is not hidden first. An extension runs while any of its tools is not hidden. Applies at each thread's next turn. ${ASKED_NOTE}`,
+    inputSchema: {
+      type: "object",
+      required: ["expectedRevision"],
+      properties: {
+        expectedRevision: expectedRevision("Harness"),
+        preset: { type: "string", enum: Object.keys(OFFERED_PRESETS) },
+        tools: { type: "object", additionalProperties: { anyOf: [{ type: "string", enum: [...EXPOSURES] }, { type: "null" }] } },
+        t3: {
+          type: "object",
+          properties: {
+            exposure: { type: "string", enum: [...EXPOSURES] },
+            tools: { type: "object", additionalProperties: { anyOf: [{ type: "string", enum: [...EXPOSURES] }, { type: "null" }] } },
+          },
+          additionalProperties: false,
+        },
       },
       additionalProperties: false,
     },

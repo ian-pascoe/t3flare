@@ -1,8 +1,7 @@
 // Code mode and tool search for the Durable agent (ADR-0027; plan §2.1-§2.2): pi-durable's `codemode` tool, whose
 // scripts call the Session's tools as nested calls, over pi-codemode's QuickJS VM in the codemode sandbox Worker (one
-// object per Session), and pi-durable's `tool_search` with the offered-tools rule ported from cloudpid
-// (`packages/extensions/src/tool-search.ts`): a tool the harness settings do not offer is deferred by a wrap, so a
-// later extension's tools need no naming.
+// object per Session), pi-durable's `tool_search`, and each tool's Exposure (harness-registry's tools.ts), set by a wrap:
+// direct, deferred (loaded by `tool_search`), code mode only, or hidden (callable by no one).
 //
 // No rule lives here: every guard is in the tools (the `permissions` wraps, t3-mcp's own check), and pi-durable runs a
 // script's nested call through the registered, wrapped tool, so a call from a script is judged exactly as a direct one.
@@ -11,6 +10,7 @@ import { type CodemodeRemote, type CodemodeSandboxBase, RemoteCodemodeSandbox } 
 import { defineExtension, type Extension, section, type ToolRegistration } from "@earendil-works/pi-durable";
 import { type CodemodeNamespace, CODEMODE_TOOL_NAME, createCodemodeExtension } from "@earendil-works/pi-durable/codemode";
 import { createToolSearchTool, TOOL_SEARCH_TOOL_NAME } from "@earendil-works/pi-durable/tool-search";
+import type { Exposure } from "@t3flare/harness-registry";
 import { PROPOSE_PLAN_TOOL } from "@t3flare/session-protocol";
 
 /** The sandbox Durable Object namespace, as the agents Worker binds it from the codemode Worker (`scriptName`). */
@@ -56,25 +56,47 @@ export const codemodeExtension = (sandbox: CodemodeSandboxBase, options: { reado
  */
 export const ALWAYS_OFFERED: ReadonlyArray<string> = [TOOL_SEARCH_TOOL_NAME, CODEMODE_TOOL_NAME, PROPOSE_PLAN_TOOL];
 
-/** Whether `name` matches `pattern`, where `*` matches any run of characters. */
-export const matchesToolPattern = (pattern: string, name: string): boolean => {
-  if (!pattern.includes("*")) return pattern === name;
-  const expression = pattern
-    .split("*")
-    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
-    .join(".*");
-  return new RegExp(`^${expression}$`).test(name);
+/** What the Session has installed, which decides what an Exposure can mean. */
+export interface ExposureRules {
+  /** Whether `tool_search` is installed: without it a deferred tool could never load, so it is direct. */
+  readonly toolSearch: boolean;
+  /** Whether code mode is installed: without it a `codemode` tool could never run, so it is deferred. */
+  readonly codemode: boolean;
+}
+
+/** The Exposure a tool's registration gives it (an MCP tool's, set by its server's settings). */
+export const registeredExposure = (tool: Pick<ToolRegistration, "callers" | "deferred">): Exposure => {
+  if (tool.callers !== undefined && tool.callers.length === 0) return "hidden";
+  if (tool.callers !== undefined && !tool.callers.includes("model")) return "codemode";
+  return tool.deferred === true ? "deferred" : "direct";
 };
 
-/** Whether the settings offer tool `name` without a search. */
-export const isOffered = (offered: ReadonlyArray<string>, name: string): boolean =>
-  ALWAYS_OFFERED.includes(name) || offered.some((pattern) => matchesToolPattern(pattern, name));
+/**
+ * The Exposure a tool gets under `rules`: `codemode` needs code mode (else deferred) and a tool scripts may call (a
+ * direct-only one, such as t3's waits, is direct); `deferred` needs tool search (else direct).
+ */
+export const effectiveExposure = (exposure: Exposure, rules: ExposureRules, scriptable = true): Exposure => {
+  const runnable = exposure === "codemode" && !scriptable ? "direct" : exposure === "codemode" && !rules.codemode ? "deferred" : exposure;
+  return runnable === "deferred" && !rules.toolSearch ? "direct" : runnable;
+};
 
-const withDeferral = (tool: ToolRegistration, defer: boolean): ToolRegistration => {
-  if (defer) return tool.deferred === true ? tool : { ...tool, deferred: true };
-  if (tool.deferred === undefined) return tool;
-  const { deferred: _deferred, ...offered } = tool;
-  return offered;
+/** Whether scripts may call the tool: its registration does not keep it for the model alone. */
+const scriptable = (tool: ToolRegistration): boolean => tool.callers === undefined || tool.callers.length !== 1 || tool.callers[0] !== "model";
+
+const withExposure = (tool: ToolRegistration, exposure: Exposure): ToolRegistration => {
+  const { deferred: _deferred, callers, ...rest } = tool;
+  // A tool its registration kept from the model (code mode only, or hidden) is offered to it again with no callers.
+  const offered = callers === undefined || !callers.includes("model") ? rest : { ...rest, callers };
+  switch (exposure) {
+    case "hidden":
+      return { ...rest, callers: [] };
+    case "codemode":
+      return { ...rest, callers: ["tools"] };
+    case "deferred":
+      return { ...offered, deferred: true };
+    case "direct":
+      return offered;
+  }
 };
 
 /** What the model is told about deferred tools: their names, whether loaded or not, so the text changes only with them. */
@@ -85,16 +107,26 @@ const deferredTools = section("deferred_tools", (input) => {
   return `Tools the settings defer: each is offered once you load it with \`${TOOL_SEARCH_TOOL_NAME}\` (code mode scripts call them without loading): ${names.join(", ")}.`;
 });
 
-/**
- * `tool_search`, and the deferral of the tools named `toolNames` (those of every other extension) that `offered` does
- * not offer. Wraps are pure: install a new one over this (same name) when the settings or the tools change.
- */
-export const toolSearchExtension = (toolNames: ReadonlyArray<string>, offered: ReadonlyArray<string>): Extension =>
+/** `tool_search` and what the model is told about the deferred tools. */
+export const toolSearchExtension = (): Extension =>
   defineExtension({
     name: "tool-search",
     tools: [createToolSearchTool()],
     sections: [deferredTools],
-    wraps: [...new Set(toolNames)]
-      .filter((name) => !ALWAYS_OFFERED.includes(name))
-      .map((name) => ({ tool: name, wrap: (tool: ToolRegistration) => withDeferral(tool, !isOffered(offered, name)) })),
+  });
+
+/**
+ * Each tool's Exposure: `chosen` names the tools and the Exposure the settings give them, or none for a tool whose
+ * registration has its own (an MCP server's); either way under `rules`. `tool_search`, `codemode` and `propose_plan` are
+ * never wrapped. Wraps are pure: install a new one over this (same name) when the settings or the tools change.
+ */
+export const offeredToolsExtension = (chosen: ReadonlyArray<{ readonly name: string; readonly exposure?: Exposure }>, rules: ExposureRules): Extension =>
+  defineExtension({
+    name: "offered-tools",
+    wraps: [...new Map(chosen.map((tool) => [tool.name, tool.exposure])).entries()]
+      .filter(([name]) => !ALWAYS_OFFERED.includes(name))
+      .map(([name, exposure]) => ({
+        tool: name,
+        wrap: (tool: ToolRegistration) => withExposure(tool, effectiveExposure(exposure ?? registeredExposure(tool), rules, scriptable(tool))),
+      })),
   });

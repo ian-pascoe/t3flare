@@ -57,7 +57,7 @@ describe("Environment settings in the panel", () => {
     expect((await post(deps, "environment", { settings: { containerSize: "standard-2" } }, headers)).status).toBe(200);
     expect(store.loadEnvironment().revision).toBe(1);
     expect(store.load().revision).toBe(0);
-    expect((await post(deps, "extensions", { extension: "tool-search", enabled: false }, headers)).status).toBe(200);
+    expect((await post(deps, "extensions", { extension: "advisor", enabled: false }, headers)).status).toBe(200);
     expect(store.load().revision).toBe(1);
     expect(store.loadEnvironment().revision).toBe(1);
     expect(await getJson(deps, "environment")).toMatchObject({ revision: 1, resolved: { containerSize: "standard-2", containerIdleMinutes: 2, containerBudget: 3 } });
@@ -68,9 +68,9 @@ describe("Environment settings in the panel", () => {
     kv.put(AUDIT_KEY, [{ at: NOW - 1000, caller: "service-token", action: "extension.change", target: "codemode", after: { enabled: false } }]);
     await post(deps, "environment", { settings: { containerSize: "standard-3", containerIdleMinutes: 10 } }, {});
     await post(deps, "environment", { settings: { containerIdleMinutes: 5 } }, {});
-    await post(deps, "extensions", { extension: "codemode", enabled: true }, {});
+    await post(deps, "extensions", { extension: "advisor", enabled: true }, {});
     expect(store.auditLog(10)).toMatchObject([
-      { entity: "harness", action: "extension.change", target: "codemode" },
+      { entity: "harness", action: "extension.change", target: "advisor" },
       { entity: "environment", action: "environment.change", target: "containerIdleMinutes", before: { containerIdleMinutes: 10 }, after: { containerIdleMinutes: 5 } },
       {
         entity: "environment",

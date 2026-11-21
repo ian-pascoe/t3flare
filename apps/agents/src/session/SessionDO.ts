@@ -60,14 +60,14 @@ import { type SkillsTaker, takeSkillsForTurn } from "@t3flare/skills";
 import { REPO_ROOT } from "@t3flare/workspace-client";
 import { DurableObject } from "cloudflare:workers";
 
-import { EMPTY_HARNESS, extensionOf, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
+import { EMPTY_HARNESS, extensionOf, ownEntry, resolvedToolsOf, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
 
 import { environmentStub, limitsSender, usageSender } from "../environment.ts";
-import { type CodemodeSandboxNamespace, codemodeExtension, remoteSandbox, toolSearchExtension } from "../extensions/codemode.ts";
+import { type CodemodeSandboxNamespace, codemodeExtension, offeredToolsExtension, remoteSandbox, toolSearchExtension } from "../extensions/codemode.ts";
 import { mcpExtension, mcpNamespaces, type McpView } from "../extensions/mcp.ts";
 import { codingTools } from "../extensions/coding-tools.ts";
 import { fileTools } from "../extensions/files.ts";
-import { answerText, askUser, QuestionStore } from "../extensions/ask-user.ts";
+import { answerText, ASK_USER_EXTENSION, askUser, QuestionStore } from "../extensions/ask-user.ts";
 import { McpQuestions } from "../extensions/mcpQuestions.ts";
 import { ApprovalStore, interactionModeSection, permissions, toToolPath } from "../extensions/permissions.ts";
 import { projectContext } from "../extensions/project-context.ts";
@@ -81,7 +81,7 @@ import { SKILLS_EXTENSION, skillsExtension } from "../extensions/skills.ts";
 import { TODO_EXTENSION, TodoDoc, todoExtension } from "../extensions/todo.ts";
 import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts";
 import { type SearchTarget, searchChoice } from "../extensions/web/search.ts";
-import { catalogOf, type T3Catalog, t3McpExtension, t3ToolName } from "../extensions/t3-mcp.ts";
+import { catalogOf, T3_EXTENSION, t3ListingOf, type T3Catalog, t3ExposureOf, t3McpExtension, t3ToolName } from "../extensions/t3-mcp.ts";
 import { T3McpClient } from "./t3McpClient.ts";
 import { NO_KEY, sessionModels } from "./models.ts";
 import { credentialFailure } from "./credentialFailure.ts";
@@ -237,7 +237,6 @@ export class SessionDO extends DurableObject<SessionEnv> {
     registry.install(interactionModeSection(() => interactionModeOf(this.#meta()?.interactionMode)));
     // SPI-996: plan mode's proposed plan, as t3's proposed-plan item.
     registry.install(proposePlan(() => interactionModeOf(this.#meta()?.interactionMode)));
-    registry.install(askUser({ store: this.#questions, turn: () => this.#liveTurn() }));
     this.#t3 = new T3McpClient(
       (request) => environmentStub(env.ENVIRONMENT).mcp(request),
       () => ctx.storage.kv.get<T3McpCredential>(T3_MCP_KEY),
@@ -348,6 +347,8 @@ export class SessionDO extends DurableObject<SessionEnv> {
       const listed = await this.#t3.listTools();
       if (listed === undefined) return;
       const catalog = catalogOf(listed);
+      // The panel's t3-code card lists t3's tools as this thread was offered them; a failure only leaves the card older.
+      this.ctx.waitUntil(environmentStub(this.env.ENVIRONMENT).noteT3Tools(t3ListingOf(catalog, Date.now())).then(() => undefined, () => undefined));
       if (kv.get<T3Catalog>(T3_CATALOG_KEY)?.hash === catalog.hash) return;
       kv.put(T3_CATALOG_KEY, catalog);
       this.#registryWriter.install(this.#t3Extension(catalog));
@@ -383,19 +384,23 @@ export class SessionDO extends DurableObject<SessionEnv> {
    */
   #installHarness(harness: ResolvedHarness): void {
     const registry = this.#registryWriter;
+    const tools = resolvedToolsOf(harness);
     const namespaces: Array<CodemodeNamespace> = [];
     const web = extensionOf(harness, WEB_EXTENSION);
     if (web.enabled) {
       const searchModel = String(web.settings.searchModel);
       registry.install(
         webExtension(
-          web.settings.search === true ? { search: { resolve: () => this.#searchTarget(searchModel) } } : {},
+          tools.tools.web_search !== "hidden" ? { search: { resolve: () => this.#searchTarget(searchModel) } } : {},
         ),
       );
       namespaces.push(WEB_NAMESPACE);
     } else {
       registry.uninstall({ name: WEB_EXTENSION });
     }
+    // The owner's own question tools may come from an MCP server instead.
+    if (extensionOf(harness, ASK_USER_EXTENSION).enabled) registry.install(askUser({ store: this.#questions, turn: () => this.#liveTurn() }));
+    else registry.uninstall({ name: ASK_USER_EXTENSION });
     if (extensionOf(harness, TODO_EXTENSION).enabled) registry.install(todoExtension(() => this.#opening));
     else registry.uninstall({ name: TODO_EXTENSION });
     // SPI-1147: the Repo skills' listing, frozen per context window.
@@ -470,15 +475,24 @@ export class SessionDO extends DurableObject<SessionEnv> {
     } else {
       registry.uninstall({ name: "codemode" });
     }
-    if (harness.toolSearch.enabled) {
-      const names = registry
-        .snapshot()
-        .tools()
-        .flatMap(({ extension, tool }) => (extension.name === "tool-search" ? [] : [tool.name]));
-      registry.install(toolSearchExtension(names, harness.offered));
-    } else {
-      registry.uninstall({ name: "tool-search" });
-    }
+    if (harness.toolSearch.enabled) registry.install(toolSearchExtension());
+    else registry.uninstall({ name: "tool-search" });
+    // Every tool's Exposure: a built-in tool's and t3's from the settings, an MCP server's from its own registration.
+    // A hidden tool of an extension still installed (a coding tool, one of several) is callable by no one.
+    const catalog = this.ctx.storage.kv.get<T3Catalog>(T3_CATALOG_KEY);
+    const chosen = registry
+      .snapshot()
+      .tools()
+      .flatMap(({ extension, tool }) => {
+        if (extension.name === "tool-search") return [];
+        if (extension.name === T3_EXTENSION) {
+          const listed = catalog?.tools.find((each) => t3ToolName(each.name) === tool.name);
+          return [{ name: tool.name, exposure: listed === undefined ? tools.t3.exposure : t3ExposureOf(tools.t3, listed) }];
+        }
+        const own = ownEntry(tools.tools, tool.name);
+        return [own === undefined ? { name: tool.name } : { name: tool.name, exposure: own }];
+      });
+    registry.install(offeredToolsExtension(chosen, { toolSearch: harness.toolSearch.enabled, codemode: harness.codemode.enabled && sandbox !== undefined }));
   }
 
   /**

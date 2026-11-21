@@ -51,6 +51,21 @@ describe("the asked change's card", () => {
     expect(prompt.indexOf("The agent's call: settings: change_environment")).toBeGreaterThan(prompt.indexOf("The Change page"));
   });
 
+  it("asks to widen a tool's Exposure, showing each tool it moves; narrowing one applies at once", async () => {
+    fixture = settingsFixture();
+    const run = fixture;
+    const free = structured(await run.call(run.durable(), "change_tools", { expectedRevision: 0, tools: { ask_user: "hidden" } }));
+    // Free (the thread's mode still asks for the write itself, so the card says so).
+    expect(free).toMatchObject({ status: "applied" });
+    expect(run.cards[0]!.prompt).toContain("This change is free (it narrows what agents have)");
+    void run.call(run.durable("thread-2"), "change_tools", { expectedRevision: 1, tools: { web_search: "direct" }, t3: { tools: { t3_thread_read: "codemode" } } });
+    await until(() => run.cards.length === 2);
+    const prompt = run.cards[1]!.prompt;
+    expect(prompt).toContain('- web_search: Exposure: "hidden" to "direct"');
+    expect(prompt).toContain('- t3-code/t3_thread_read: Exposure: "direct" to "codemode"');
+    expect(prompt).toContain("It waits for the owner because:\n- web_search: Exposure hidden to direct");
+  });
+
   it("carries the Guard line when a Guard is turned off, and the hint-trust line for a new server", async () => {
     const guarded = applyChange(EMPTY_HARNESS, { extension: "guardian", enabled: true });
     if (!guarded.ok) throw new Error(guarded.error);
