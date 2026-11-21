@@ -29,7 +29,7 @@ const out = arg("--out");
 
 const cookie = await pair();
 await enablePiDurable(cookie);
-// As the owner's prod has it: after each completed turn the Environment asks the Session for a suggestion while it
+// As the Owner's prod has it: after each completed turn the Environment asks the Session for a suggestion while it
 // handles the Session's push, a call back into the Session on every turn.
 await wsCall(cookie, "server.updateSettings", { patch: { promptSuggestionsEnabled: true } });
 const stamp = Date.now().toString(36);
@@ -80,14 +80,26 @@ await Effect.runPromise(
 
 const projection = projectionOf(await threadWindow(cookie, threadId));
 const runs = runsOf(projection).map((run) => run.status);
-// The command ran in every turn the snapshot still shows (it keeps the latest items too): its output is in that turn's
-// answer, which a made-up answer could not know.
+// Every turn the snapshot still shows (it keeps the latest items too) ran its command and answered with the output.
 const items = itemsOf(projection);
 const textsOf = (type: string) => items.filter((item: any) => item.type === type).map((item: any) => String(item.text ?? ""));
+const exact = (marker: string) => new RegExp(`\\b${marker}\\b`);
 const markers = textsOf("user_message").flatMap((text) => text.match(/turn-\d+/) ?? []);
-const missing = markers.filter((marker) => !textsOf("assistant_message").some((text) => text.includes(marker)));
+const ran = items
+  .filter((item: any) => item.type === "command_execution")
+  .map((item: any) => String(item.input ?? item.title ?? ""));
+const missing = markers.filter(
+  (marker) =>
+    !ran.some((input) => exact(marker).test(input)) ||
+    !textsOf("assistant_message").some((text) => exact(marker).test(text)),
+);
 const failures = items.filter((item: any) => item.type === "error").map((item: any) => item.failure?.message ?? item.title);
-const ok = runs.length === turns && runs.every((status) => status === "completed") && markers.length > 0 && missing.length === 0;
+const ok =
+  runs.length === turns &&
+  runs.every((status) => status === "completed") &&
+  markers.length > 0 &&
+  missing.length === 0 &&
+  failures.length === 0;
 const report = { at: new Date().toISOString(), threadId, turns, runs, checkedTurns: markers.length, missing, failures, ok };
 if (out !== undefined) fs.writeFileSync(out, `${JSON.stringify(report, null, 1)}\n`);
 console.log(ok ? `ok: ${turns} turns completed, each with its command's output` : `FAILED: ${JSON.stringify(report)}`);

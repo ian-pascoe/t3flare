@@ -756,17 +756,26 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const now = Date.now();
     const work = alarmWork(now, { pushDue: this.#pushDue, housekeepingAt: this.#housekeepingAt });
     let push = work.push;
-    if (work.housekeeping && (await this.#housekeeping(harness, now))) {
-      this.#dirty = true;
-      push = true;
+    // A failed housekeeping still lets a due push leave; its error is rethrown after, so the platform retries the alarm.
+    let failed: { readonly error: unknown } | undefined;
+    if (work.housekeeping) {
+      try {
+        if (await this.#housekeeping(harness, now)) {
+          this.#dirty = true;
+          push = true;
+        }
+      } catch (error) {
+        failed = { error };
+      }
     }
-    // From inside the alarm, this request: see `alarmPlan.ts`.
-    if (push) {
+    // From inside the alarm, this request: see `alarmPlan.ts`. A Session destroyed meanwhile sends nothing.
+    if (push && !this.#destroyed) {
       // Cleared only now, so a housekeeping failure (the platform retries the alarm) cannot lose a due push.
       this.#pushDue = false;
       this.#pushing = this.#pushing.then(() => this.#push()).catch(() => undefined);
       await this.#pushing;
     }
+    if (failed !== undefined) throw failed.error;
     await this.#arm();
   }
 

@@ -35,7 +35,7 @@ describe("alarmWork", () => {
     expect(alarmWork(NOW, { pushDue: true, housekeepingAt: NOW })).toEqual({ push: true, housekeeping: true });
   });
 
-  it("keeps house on a push alarm once housekeeping is overdue, however often pushes rearm the alarm", () => {
+  it("keeps house on a push alarm once a fixed-time candidate is overdue, however often pushes rearm the alarm", () => {
     // A streaming Session pushes every 300 ms and rearms each time: an overdue deadline must not move 500 ms ahead again.
     let now = NOW;
     const overdue = NOW - 10;
