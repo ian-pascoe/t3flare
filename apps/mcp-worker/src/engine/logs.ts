@@ -64,9 +64,9 @@ const pairValues = (value: string): Array<string> =>
 
 /**
  * The headers that carry credentials by name, besides `authorization`, `proxy-authorization` and `cookie`. A looser
- * match than the names an entry may not hold as a literal (`TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `API_KEY`,
- * `APIKEY`, `ACCESS_KEY`, `PRIVATE_KEY`), which every `key` here covers: a header that is wrongly taken for one only
- * has its value scrubbed from the text it is echoed in.
+ * match than credential-like names (`TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `API_KEY`, `APIKEY`, `ACCESS_KEY`,
+ * `PRIVATE_KEY`), which every `key` here covers: a header that is wrongly taken for one only has its value scrubbed
+ * from the text it is echoed in.
  */
 const CREDENTIAL_HEADER = /key|token|secret|auth|session|passw(?:or)?d|credential|signature/i;
 

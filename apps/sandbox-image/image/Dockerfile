@@ -86,8 +86,8 @@ COPY --from=mise /mise /usr/local/bin/mise
 
 # The base mise.toml's Toolchains (`mise.toml`, which commands read as mise's system config), installed into mise's
 # system directory, /usr/local/share/mise/installs, where mise looks for a version a config asks for before it
-# downloads one. Its lockfile is made here too and copied by the bootstrap next to the base file it writes, since `mise lock` downloads aqua and Python artifacts to checksum them. A Workspace asking for other
-# versions installs them under /root as before.
+# downloads one. Its lockfile is made here too, next to it, since `mise lock` downloads aqua and Python artifacts to
+# checksum them. A Workspace asking for other versions installs them under /root.
 COPY mise.toml /usr/local/share/t3flare/mise.toml
 RUN cd /usr/local/share/t3flare \
  && export MISE_GLOBAL_CONFIG_FILE=/usr/local/share/t3flare/mise.toml MISE_TRUSTED_CONFIG_PATHS=/usr/local/share/t3flare \

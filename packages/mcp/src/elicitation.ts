@@ -1,6 +1,6 @@
 /**
- * An MCP server's question to t3flare, and the form of an elicitation. Pure and SDK-free, so the Session, the `mcp`
- * extension, and the engine's edge import it (`./types`).
+ * An MCP server's question to t3flare, and the form of an elicitation. Pure and SDK-free, so the Environment Worker's
+ * MCP host and the engine's edge import it (`./types`).
  *
  * - **The question's shape:** `McpInputRequest` is what the core hands the call's `onInput`, `McpInputAnswer` what it
  *   gets back; an elicitation's answer is the spec's own `ElicitResult`.

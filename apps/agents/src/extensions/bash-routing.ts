@@ -92,15 +92,14 @@ type GitSubcommand = {
 };
 
 /**
- * The subcommands git runs on the Worker Shell: the few read-only ones whose output matches real git's, in the forms
- * that match. computer's git client is isomorphic-git, not
- * git, so everything else goes to the Container's real git: what writes the index or refs (`add`, `rm`, `commit`,
- * `tag`, `branch <name>`, `init`, `remote add`: two git implementations must not write one `.git`), what it gets
- * wrong (`diff` of a revision prints nothing, `show` has no patch, `log` dates and paths, `status -s`, `cat-file`), what
- * needs the network or credentials (`clone`, `fetch`, `pull`, `push`), and what rewrites the working tree (`checkout`,
- * `switch`, `reset`, `merge`, `stash`, `clean`). Bare `git status` prints one `XY path` line per changed file (`?` for
- * untracked), not git's long format, and `git status` of a repo that tracks files under the `ignore` paths shows them
- * deleted, since those never reach the Workspace.
+ * The subcommands git runs on the Worker Shell: the few read-only ones whose output matches real git's, in the forms it
+ * handles. computer's git client is isomorphic-git, not git, so everything else goes to the Container's real git: what
+ * writes the index or refs (`add`, `rm`, `commit`, `tag`, `branch <name>`, `init`, `remote add`: two git
+ * implementations must not write one `.git`), what it gets wrong (`diff` of a revision prints nothing, `show` has no
+ * patch, `log` dates and paths, `status -s`, `cat-file`), what needs the network or credentials (`clone`, `fetch`,
+ * `pull`, `push`), and what rewrites the working tree (`checkout`, `switch`, `reset`, `merge`, `stash`, `clean`). Bare
+ * `git status` prints one `XY path` line per changed file (`?` for untracked), not git's long format, and `git status`
+ * of a repo that tracks files under the `ignore` paths shows them deleted, since those never reach the Workspace.
  */
 const GIT_ON_WORKER: ReadonlyMap<string, GitSubcommand> = new Map(
   Object.entries({

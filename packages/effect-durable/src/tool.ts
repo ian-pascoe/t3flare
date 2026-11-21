@@ -43,11 +43,12 @@ export type EffectToolDefinition<
  * The call `api` runs has reached a durable wait: what it waits for, such as the owner's answer, is in storage, and a
  * rerun after a restart waits for it again. pi-durable then starts the restart count over for the call and its owners
  * (a `codemode` call waiting for it as a nested call), up to the first that is being aborted
- * (`ToolExecutionApi.progressed`, `patches/deps/@earendil-works__pi-durable@1.5.0.patch`), so the restarts that cut them
- * off while it waits (a Session that hibernates is started again by each heartbeat) never reach the restart limit.
- * Run it once the wait is stored and the attempt is about to await: an attempt cut off before then still counts, so a call that keeps crashing before its wait still ends; an owner that
- * crashes the instance each time does not, and reruns about once a heartbeat until the wait ends. Never fails: a mark
- * that is not stored (the call is being stopped, or the instance was replaced) leaves the count as it was.
+ * (`ToolExecutionApi.progressed`, `patches/deps/@earendil-works__pi-durable@1.5.0.patch`), so the restarts that cut
+ * them off while it waits (a Session that hibernates is started again by each heartbeat) never reach the restart limit.
+ * Run it once the wait is stored and the attempt is about to await: an attempt cut off before then still counts, so a
+ * call that keeps crashing before its wait still ends; an owner that crashes the instance each time does not, and
+ * reruns about once a heartbeat until the wait ends. Never fails: a mark that is not stored (the call is being stopped,
+ * or the instance was replaced) leaves the count as it was.
  *
  * A tool whose `execute` is not an Effect provides its call's Context as `ChordContext`; an Effect tool's is there.
  */
@@ -60,8 +61,8 @@ const SNAKE_CASE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
 
 /**
  * The one exception to the snake_case rule: an MCP tool, `mcp__<server>__<tool>`. Its server part is the server's name
- * lower-cased with `-` as `_`, so it may hold `__` or begin with `_`; its tool part is runs of `[a-z0-9]` joined by `_`,
- * so it may begin with a digit (`2fa`).
+ * lower-cased with `-` as `_`, so it may hold `__` or begin with `_`; its tool part is runs of `[a-z0-9]` joined by
+ * `_`, so it may begin with a digit (`2fa`).
  */
 const MCP_TOOL_NAME = /^mcp__[a-z0-9_]+__[a-z0-9]+(?:_[a-z0-9]+)*$/;
 

@@ -6,10 +6,12 @@ export const MCP_ENGINE_BINDING = "MCP_ENGINE";
 /** The `McpWorker` entrypoint the Environment Worker binds as `MCP_ENGINE`. */
 export const MCP_ENGINE_ENTRYPOINT = "McpEngine";
 
-/** The name `McpWorker` binds the agents Worker's `WorkspaceMcpBridge` entrypoint under. */
+/** The name `McpWorker` would bind the agents Worker's `WorkspaceMcpBridge` entrypoint under. */
 export const MCP_BRIDGE_BINDING = "MCP_BRIDGE";
 
-/** The agents Worker's entrypoint `McpWorker` would bind as `MCP_BRIDGE`; the agents Worker has none, so it is unbound. */
+/**
+ * The agents Worker's entrypoint `McpWorker` would bind as `MCP_BRIDGE`. The agents Worker has none, so it is unbound.
+ */
 export const WORKSPACE_MCP_BRIDGE_ENTRYPOINT = "WorkspaceMcpBridge";
 
 /**

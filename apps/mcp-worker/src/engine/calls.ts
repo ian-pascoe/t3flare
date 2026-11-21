@@ -124,8 +124,7 @@ const withExtensions = (deps: McpDeps, named: McpEngineHttpTarget["extensions"])
  * initialized with another declaration is initialized again, once. A Modern request declares it per request, in its
  * `_meta`, only for a call whose caller offers to answer a Sampling request (`ctx.answers.sampling`) and has an
  * `onInput` to answer with; the round's request is answered by `onInput` (run, or kept for later when the call also
- * defers). The ctx-less declaration (a Modern `server/discover` probe) is Legacy's, which a Modern server never acts
- * on.
+ * defers). The ctx-less declaration (a Modern `server/discover` probe) is Legacy's, which a Modern server ignores.
  */
 const withSampling = (deps: McpDeps, server: McpEngineTarget): McpDeps => {
   if (server.sampling !== true) return deps;

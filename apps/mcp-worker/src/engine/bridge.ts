@@ -1,7 +1,7 @@
 /**
- * A stdio server reached through the Container bridge: the `fetch` the core is given for a stdio target, which hands
- * each request to the agents Worker's `WorkspaceMcpBridge` (`MCP_BRIDGE`), and what the engine does with what comes
- * back.
+ * A stdio server reached through the Container bridge: the `fetch` the core is given for a stdio target, which would
+ * hand each request to the agents Worker's `WorkspaceMcpBridge` (`MCP_BRIDGE`, unbound: `./binding.ts`), and what the
+ * engine does with what comes back.
  *
  * - **Every response must be the bridge's:** it carries `x-t3flare-bridge: <level>`. One below `MCP_BRIDGE_MIN_LEVEL`
  *   (or with none) fails the call as `Unsupported`, "this Container runs an older bridge; restart it", which the host reads as the

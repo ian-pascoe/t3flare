@@ -1,10 +1,10 @@
 #!/bin/bash
-# The Container's entrypoint. It runs computerd, passing its output through to the Container's own log as before, and
-# keeps the last lines of it. When computerd exits without having been asked to (no SIGTERM or SIGINT reached this
-# script), its status, how long it ran and those lines are posted to the report host (t3flare.internal/container-exit):
-# the platform keeps a Container's output where no API reads it. Nothing in t3flare answers that host yet, so the report
-# is dropped until something does. The lines are kept in memory (a tmpfs where there is one), never on the Container's
-# disk, which a snapshot captures. A report that cannot be sent is dropped; the exit status is computerd's either way.
+# The Container's entrypoint. It runs computerd, passing its output through to the Container's own log, and keeps the
+# last lines of it. When computerd exits without having been asked to (no SIGTERM or SIGINT reached this script), its
+# status, how long it ran and those lines are posted to the report host (t3flare.internal/container-exit): the platform
+# keeps a Container's output where no API reads it. Nothing in t3flare answers that host yet, so the report is dropped
+# until something does. The lines are kept in memory (a tmpfs where there is one), never on the Container's disk, which
+# a snapshot captures. A report that cannot be sent is dropped; the exit status is computerd's either way.
 #
 # computerd's log lines can carry file contents as `data:<mime>;base64,<payload>` runs, hundreds of KB each, which would
 # fill the report and push out the lines that matter (a crash and its stack). The kept copy, not the passthrough, has
@@ -44,7 +44,7 @@ collapse_base64="s#(data:[-A-Za-z0-9.+/;=_]*;base64,)[-A-Za-z0-9+/=_]{${base64_m
 rm -f -- "$start_marker"
 { : >"$start_marker"; } 2>/dev/null
 # A file's times are the kernel's coarse clock, one tick (up to 10 ms) apart: what starts next writes a tick later, so
-# the scan, which takes only the files changed after the marker, never misses a write of the same tick.
+# a scan, which would take only the files changed after the marker, never misses a write of the same tick.
 sleep 0.02
 
 scratch=$(mktemp -d /dev/shm/t3flare-supervise.XXXXXX 2>/dev/null || mktemp -d)
