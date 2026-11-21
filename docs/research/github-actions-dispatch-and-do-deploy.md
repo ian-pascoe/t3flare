@@ -122,7 +122,7 @@ Shutdown-level confirmation: https://developers.cloudflare.com/durable-objects/c
 
 Delay options: `deferred` `max_delay` up to 86400 s (lengthens the window, not a guarantee). Deferral is best effort: "Deferral is best effort and does not guarantee that every operation finishes."
 
-Runtime updates are a separate shutdown cause (lifecycle page): "When the Worker runtime system is being updated, in-flight requests have up to 30 seconds to complete." The Workers limits page (https://developers.cloudflare.com/workers/platform/limits/#runtime-updates) says up to 20 min for WebSockets. Those statements conflict. Earlier notes (`cloudflare-platform-limits.md`) flagged the same conflict. **UNCONFIRMED:** which applies to DO WebSockets during a runtime update. Treat sockets as interruptible.
+Runtime updates are a separate shutdown cause (lifecycle page): "When the Worker runtime system is being updated, in-flight requests have up to 30 seconds to complete." The Workers limits page (https://developers.cloudflare.com/workers/platform/limits/#runtime-updates) says up to 20 min for WebSockets. Those statements conflict. Earlier notes (`docs-archive-1:docs/research/cloudflare-platform-limits.md`) flagged the same conflict. **UNCONFIRMED:** which applies to DO WebSockets during a runtime update. Treat sockets as interruptible.
 
 ### 4c. Point-in-time recovery (PITR) for SQLite-backed DOs
 Source: https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/ (Last updated Sep 21, 2026). Same content at https://developers.cloudflare.com/durable-objects/api/storage-api/.
