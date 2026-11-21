@@ -9,7 +9,7 @@ import * as Effect from "effect/Effect";
 import * as PlatformError from "effect/PlatformError";
 import { describe, expect, it } from "vitest";
 import { noEndpointFor } from "../src/agents/cliProfiles.ts";
-import { spawnRefusalOf, withSpawnRefusal, wrapCliAdapter } from "../src/provider/cli/wrapper.ts";
+import { spawnRefusalOf, wrapCliAdapter } from "../src/provider/cli/wrapper.ts";
 
 const driver = ProviderDriverKind.make("codex");
 const providerSessionId = ProviderSessionId.make("session-1");
@@ -17,24 +17,6 @@ const instanceId = ProviderInstanceId.make("codex");
 const refusal = noEndpointFor("Codex", "OpenAI Responses");
 const spawnError = (tag: "PermissionDenied" | "Unknown", description: string) =>
   PlatformError.systemError({ _tag: tag, module: "ChildProcess", method: "spawn", description, pathOrDescriptor: "codex" });
-
-describe("a refused CLI spawn (SPI-1176)", () => {
-  it("shows the refusal through t3's open error", () => {
-    const opened = new ProviderAdapter.ProviderAdapterOpenSessionError({ driver, providerSessionId, cause: spawnError("PermissionDenied", `t3flare: ${refusal}`) });
-    expect(knownProviderFailureMessage({ cause: opened })).toBeUndefined();
-    const mapped = withSpawnRefusal(instanceId, driver, providerSessionId)(opened);
-    expect(mapped._tag).toBe("ProviderAdapterOpenSessionError");
-    // t3's session manager wraps the open error once more before the turn start reads it.
-    expect(knownProviderFailureMessage({ cause: mapped })).toBe(`${refusal}.`);
-    expect(refusal).toContain("Settings page");
-  });
-
-  it("leaves any other failure as it was", () => {
-    const failed = new ProviderAdapter.ProviderAdapterOpenSessionError({ driver, providerSessionId, cause: spawnError("Unknown", "t3flare: the Container did not start") });
-    expect(withSpawnRefusal(instanceId, driver, providerSessionId)(failed)).toBe(failed);
-    expect(spawnRefusalOf(spawnError("PermissionDenied", "EACCES"))).toBeUndefined();
-  });
-});
 
 describe("the CLI wrapper's open (SPI-1176)", () => {
   /** A stand-in for t3's adapter whose open fails as t3's Codex adapter's does on a refused spawn. */
@@ -59,12 +41,19 @@ describe("the CLI wrapper's open (SPI-1176)", () => {
     );
 
   it("fails a refused spawn's open with the refusal as t3's failure text", async () => {
-    const failed = await open(refusing(spawnError("PermissionDenied", `t3flare: ${refusal}`)));
+    const cause = spawnError("PermissionDenied", `t3flare: ${refusal}`);
+    // Unmapped, t3's own open error shows nothing: the refusal reaches t3 through the wrapper alone.
+    expect(knownProviderFailureMessage({ cause: new ProviderAdapter.ProviderAdapterOpenSessionError({ driver, providerSessionId, cause }) })).toBeUndefined();
+    const failed = await open(refusing(cause));
+    expect(failed._tag).toBe("ProviderAdapterOpenSessionError");
     expect(knownProviderFailureMessage({ cause: failed })).toBe(`${refusal}.`);
+    expect(refusal).toContain("Settings page");
   });
 
   it("passes any other open failure through as it was", async () => {
     const failed = await open(refusing(spawnError("Unknown", "t3flare: the Container did not start")));
     expect(knownProviderFailureMessage({ cause: failed })).toBeUndefined();
+    // Only the Environment's own refusal reads through: a bare permission error from the OS is not one.
+    expect(spawnRefusalOf(spawnError("PermissionDenied", "EACCES"))).toBeUndefined();
   });
 });

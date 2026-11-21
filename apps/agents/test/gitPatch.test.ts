@@ -208,7 +208,10 @@ describe("checkpoint diffs match git's", { timeout: GIT_TEST_TIMEOUT_MS }, () =>
     check(r.dir, a, b);
   });
 
-  it("latin1 round trip keeps bytes", () => {
-    expect(latin1(new Uint8Array([0xc3, 0xbc]))).toBe("\u00c3\u00bc");
+  it("latin1 keeps every byte of a file longer than one 8192-byte chunk, across the chunks' edges", () => {
+    const bytes = Uint8Array.from({ length: 8192 * 2 + 5 }, (_, at) => (at * 7) % 256);
+    const text = latin1(bytes);
+    expect(text).toHaveLength(bytes.length);
+    expect(text).toBe(Buffer.from(bytes).toString("latin1"));
   });
 });

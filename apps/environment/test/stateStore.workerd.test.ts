@@ -76,6 +76,31 @@ describe("State directory", () => {
     });
   });
 
+  // rename's transaction runs remove's own for the path it replaces: DO SQLite's transactionSync nests.
+  it("renames onto an existing file or folder, replacing it and its chunks", async () => {
+    await inObject("rename-over", (state) => {
+      store.mkdir("/t3/d", { recursive: true });
+      const kept = bytes(store.CHUNK_BYTES + 3, 4);
+      store.writeFile("/t3/d/new.bin", kept);
+      store.writeFile("/t3/d/old.bin", bytes(store.CHUNK_BYTES * 2 + 1, 5));
+      expect(rowCount(state, "t3flare_file_chunks")).toBe(5);
+      store.rename("/t3/d/new.bin", "/t3/d/old.bin");
+      expect(same(store.readFile("/t3/d/old.bin"), kept)).toBe(true);
+      expect(store.get("/t3/d/new.bin")).toBeUndefined();
+      expect(rowCount(state, "t3flare_file_chunks")).toBe(2);
+
+      store.mkdir("/t3/from/sub", { recursive: true });
+      store.writeFile("/t3/from/sub/x", bytes(10, 6));
+      store.mkdir("/t3/to/stale", { recursive: true });
+      store.writeFile("/t3/to/stale/big.bin", bytes(store.CHUNK_BYTES + 1, 7));
+      store.rename("/t3/from", "/t3/to");
+      expect(store.readFile("/t3/to/sub/x")).toEqual(bytes(10, 6));
+      expect(store.get("/t3/to/stale")).toBeUndefined();
+      expect(store.get("/t3/from")).toBeUndefined();
+      expect(rowCount(state, "t3flare_file_chunks")).toBe(2);
+    });
+  });
+
   it("reports Node-style errors", async () => {
     await inObject("errors", () => {
       expect(() => store.readFile("/missing")).toThrow(expect.objectContaining({ code: "ENOENT" }));

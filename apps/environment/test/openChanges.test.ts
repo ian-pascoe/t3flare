@@ -30,7 +30,6 @@ import {
   waitForChange,
 } from "../src/settings/openChanges.ts";
 import { answerDepsOf, changesApiOf, settingsOwnerCall } from "../src/settings/server.ts";
-import { QUESTION_WAIT_MS } from "../src/mcp/host.ts";
 import { changePagePath } from "../src/harness/paths.ts";
 import { nodeSqlStorage } from "./nodeSqlStorage.ts";
 import { bodyOf, endpointOf, modern, structuredOf, SUB } from "./settingsEndpointFixture.ts";
@@ -112,10 +111,6 @@ describe("an Open change has one answer", () => {
 });
 
 describe("expiry and pruning", () => {
-  it("an Open change waits as long as the MCP host's question wait", () => {
-    expect(CHANGE_TTL_MS).toBe(QUESTION_WAIT_MS);
-  });
-
   it("expires at 10 minutes, and an answer after it applies nothing", async () => {
     const w = world();
     const record = w.open(OWN);

@@ -67,15 +67,20 @@ describe("Container-only paths", () => {
     // 32_000 (V8's "Regular expression too large"): too small for the old quadratic trim to take 10s alone (~1.3s), and
     // compiling such a regex costs ~50ms itself, so a fixed bound would flake on a loaded runner. The guard is relative:
     // nine such patterns, against compiling and running the same nine regexes with no trim. A loaded runner slows both
-    // alike; the old trim made it ~25 times slower.
-    const patterns = Array.from({ length: 9 }, (_, index) => `a${"/".repeat(30_000)}${index}`);
+    // alike; the old trim made it ~25 times slower. One round can still land a spike on one side only (seen under a
+    // full `pnpm run check`), so each side keeps its fastest of three rounds, each with patterns of its own: V8 caches
+    // a compiled regex by its source, and a repeat would time the cache.
+    const round = (index: number) => {
+      const patterns = Array.from({ length: 9 }, (_, each) => `a${"/".repeat(30_000)}${index}-${each}`);
+      const baselineStarted = performance.now();
+      for (const pattern of patterns) new RegExp(`^${pattern}$`).test("a/b");
+      const baseline = Math.max(performance.now() - baselineStarted, 1);
+      const started = performance.now();
+      expect(isContainerOnly("/workspace/a/b", patterns)).toBe(false);
+      return { baseline, took: performance.now() - started };
+    };
+    const rounds = [0, 1, 2].map(round);
 
-    const baselineStarted = performance.now();
-    for (const pattern of patterns) new RegExp(`^${pattern}$`).test("a/b");
-    const baseline = Math.max(performance.now() - baselineStarted, 1);
-
-    const started = performance.now();
-    expect(isContainerOnly("/workspace/a/b", patterns)).toBe(false);
-    expect(performance.now() - started).toBeLessThan(baseline * 8);
+    expect(Math.min(...rounds.map((each) => each.took))).toBeLessThan(Math.min(...rounds.map((each) => each.baseline)) * 8);
   });
 });

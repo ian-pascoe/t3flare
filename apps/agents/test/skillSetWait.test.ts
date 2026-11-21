@@ -134,10 +134,3 @@ describe("keepPriorSkills", () => {
     }
   });
 });
-
-describe("the Workspace DO's own Container commands", () => {
-  it("start with the Environment skills' lock, before the submodule directories and the command", () => {
-    const source = fs.readFileSync(path.join(import.meta.dirname, "../src/workspace/WorkspaceDO.ts"), "utf8");
-    expect(source).toContain("`${SKILLS_LOCK_SCRIPT}${submoduleDirsScript(await this.#containerPatterns())}${body}`");
-  });
-});

@@ -39,7 +39,7 @@ import type {
   TerminalOpenInput,
 } from "@t3flare/workspace-client";
 import { type CliAgent, isCliAgent, type PromptTemplate, type SkillDiscovery, SKILLS_MOUNT } from "@t3flare/skills";
-import { describeFailure, HARNESS_ROOT, REPO_ROOT, SKILLS_LOCK_SCRIPT, startRefusal } from "@t3flare/workspace-client";
+import { describeFailure, HARNESS_ROOT, REPO_ROOT, startRefusal } from "@t3flare/workspace-client";
 
 import * as git from "isomorphic-git";
 
@@ -72,7 +72,7 @@ import {
   repoFacts,
   withinGuard,
 } from "./gitRepo.ts";
-import { containerPatterns, ContainerOnlyBackend, submoduleDirsScript, submodulePaths } from "./containerOnly.ts";
+import { containerPatterns, ContainerOnlyBackend, containerScript, submodulePaths } from "./containerOnly.ts";
 import { isomorphicFs } from "./isoFs.ts";
 import { CREDENTIAL_HELPER_VERSION } from "./credentialHelper.ts";
 import { allowedRead, parsePrimed, passiveDecision, primeArgvs, primeScript, withoutOwnGitDir } from "./gitDirReads.ts";
@@ -955,7 +955,7 @@ export class WorkspaceDO extends ContainerHost {
       const guard = backend === CONTAINER_BACKEND && input.passive !== true && this.#processes.size > 0 ? await this.#scanSuffix() : undefined;
       const body = guard === undefined ? input.script : `(\n${input.script}\n)\n__t3flare_rc=$?\n${guard}\nexit $__t3flare_rc`;
       // SPI-1148: every Container command starts with the Environment skills' lock (ADR-0033).
-      const script = backend === CONTAINER_BACKEND ? `${SKILLS_LOCK_SCRIPT}${submoduleDirsScript(await this.#containerPatterns())}${body}` : body;
+      const script = backend === CONTAINER_BACKEND ? containerScript(await this.#containerPatterns(), body) : body;
       if (input.onlyIfRunning === true && !this.containerRunning()) return { exitCode: -1, status: "not-running", stdout: "", stderr: "", ms: Date.now() - started };
       const handle = await this.#workspace.runtime.exec(script, {
         backend,

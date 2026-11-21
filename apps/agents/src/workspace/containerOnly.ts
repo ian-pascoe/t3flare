@@ -8,6 +8,7 @@
 // git directories (`.git/modules`), and each path `.gitmodules` names (read from the DO's files at each start).
 // @effect-diagnostics asyncFunction:off
 import type { WorkspaceBackend } from "@cloudflare/computer";
+import { SKILLS_LOCK_SCRIPT } from "@t3flare/workspace-client";
 
 import { REPO_ROOT, WORKSPACE_ROOT } from "./constants.ts";
 
@@ -61,6 +62,12 @@ export const submoduleDirsScript = (patterns: ReadonlyArray<string>): string => 
   // own disk on it) would make fail.
   return dirs.length === 0 ? "" : `[ -e ${REPO_ROOT}/.git ] && mkdir -p -- ${dirs.map((dir) => `'${dir}'`).join(" ")} 2>/dev/null\n`;
 };
+
+/**
+ * A command as the Workspace DO runs it in the Container: the Environment skills' lock first (SPI-1148, ADR-0033), so
+ * nothing reads the mount before it is read-only, then the submodules' directories, then the command.
+ */
+export const containerScript = (patterns: ReadonlyArray<string>, body: string): string => `${SKILLS_LOCK_SCRIPT}${submoduleDirsScript(patterns)}${body}`;
 
 /** The ignore patterns a Container starts with: the static ones, the submodules' git directories, then each submodule. */
 export const containerPatterns = (base: ReadonlyArray<string>, submodules: ReadonlyArray<string>): ReadonlyArray<string> => {

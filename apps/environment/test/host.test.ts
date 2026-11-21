@@ -1,6 +1,6 @@
 // The host's pure parts: the boot record and safe mode, the redacting Console, the idle queries over t3's
 // tables (on Node's SQLite), and the Pairing window's alarm and bootstrap refusal.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import * as BootState from "../src/host/bootState.ts";
 import * as Idle from "../src/host/idle.ts";
@@ -217,8 +217,14 @@ describe("idle queries", () => {
     const sql = t3Tables();
     Object.assign(Idle.activity, { sockets: 1, inFlight: 0, idleSince: now.getTime() - 120_000, unreadableUntil: 0 });
     expect(Idle.idleVerdict(sql, now).reset).toBe(false);
-    Idle.socketClosed();
-    expect(Idle.activity.idleSince).not.toBe(now.getTime() - 120_000);
+    // The last socket closing starts the idle clock at that moment.
+    vi.useFakeTimers({ now });
+    try {
+      Idle.socketClosed();
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(Idle.activity.idleSince).toBe(now.getTime());
     Object.assign(Idle.activity, { idleSince: now.getTime() - 30_000 });
     expect(Idle.idleVerdict(sql, now)).toEqual({ reset: false, why: "not idle long enough" });
     Object.assign(Idle.activity, { idleSince: now.getTime() - 61_000 });

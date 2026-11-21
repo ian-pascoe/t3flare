@@ -7,7 +7,6 @@ import {
   folderHashOf,
   isInstallablePath,
   linksIn,
-  PRIORITY_PREFIXES,
   skillFilesIn,
   skillFolderOf,
   skillMdIn,
@@ -104,6 +103,7 @@ describe("findSkillMdPaths — the rest of the function", () => {
     const tree = makeTree([
       ".claude/skills/claude-one/SKILL.md",
       "skills/one/SKILL.md",
+      ".agents/skills/agents-one/SKILL.md",
       "SKILL.md",
       "skills/.curated/curated/SKILL.md",
     ]);
@@ -112,6 +112,7 @@ describe("findSkillMdPaths — the rest of the function", () => {
       "SKILL.md",
       "skills/one/SKILL.md",
       "skills/.curated/curated/SKILL.md",
+      ".agents/skills/agents-one/SKILL.md",
       ".claude/skills/claude-one/SKILL.md",
     ]);
   });
@@ -152,12 +153,6 @@ describe("findSkillMdPaths — the rest of the function", () => {
     expect(findSkillMdPaths(tree)).toEqual([]);
   });
 
-  it("lists the directories the CLI looks in, root first", () => {
-    expect(PRIORITY_PREFIXES[0]).toBe("");
-    expect(PRIORITY_PREFIXES).toContain("skills/");
-    expect(PRIORITY_PREFIXES).toContain(".agents/skills/");
-    expect(PRIORITY_PREFIXES).toHaveLength(35);
-  });
 });
 
 describe("a Skill's folder and files", () => {

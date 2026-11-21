@@ -8,7 +8,7 @@ import type { InteractionMode, RuntimeMode } from "@t3flare/session-protocol";
 import { describe, expect, it } from "vitest";
 
 import { ApprovalStore, PLAN_MODE_REFUSAL } from "../src/extensions/permissions.ts";
-import { type CatalogTool, catalogOf, type McpCallAnswer, t3McpExtension, t3ToolName, T3_TOOL_DENYLIST } from "../src/extensions/t3-mcp.ts";
+import { type CatalogTool, catalogOf, type McpCallAnswer, t3McpExtension, t3ToolName } from "../src/extensions/t3-mcp.ts";
 import { context, memoryKv, restartingHarness, textOf, until } from "./harness.fixture.ts";
 
 const schema = (properties: Record<string, unknown>) => ({ type: "object", properties });
@@ -63,18 +63,25 @@ const setup = (options: Setup = {}) => {
 
 describe("t3-mcp catalog", () => {
   it("offers every listed tool but the denied ones under t3's names, and reports what it left out", () => {
-    const catalog = catalogOf([...LISTED, { name: "t3_brand_new_tool" }, { name: "t3_attachment_prepare_upload" }, { name: "t3_worktree_handoff" }]);
-    expect(catalog.tools.map((tool) => tool.name)).toEqual(["delegate_task", "preview_open", "request_secret", "t3_brand_new_tool", "t3_environment_link", "t3_thread_read", "t3_thread_update", "t3_thread_wait"]);
-    // G11 (ADR-0031): t3's server browser runs in Browser Run, so `preview_*` is offered.
+    const catalog = catalogOf([...LISTED, { name: "t3_brand_new_tool" }, { name: "t3_environment_unlink" }, { name: "t3_attachment_prepare_upload" }, { name: "t3_worktree_handoff" }]);
+    expect(catalog.tools.map((tool) => tool.name)).toEqual([
+      "delegate_task",
+      "preview_open",
+      "request_secret",
+      "t3_brand_new_tool",
+      "t3_environment_link",
+      "t3_environment_unlink",
+      "t3_thread_read",
+      "t3_thread_update",
+      "t3_thread_wait",
+    ]);
+    // G11 (ADR-0031): t3's server browser runs in Browser Run, so `preview_*` is offered. D5 lifted (owner, 2026-11-12,
+    // back to stock): an agent may ask the owner for a secret. SPI-1061: the Outbound link is t3's own; an agent may ask
+    // for a link with t3's card, and unlink.
     expect(catalog.left).toEqual(["t3_attachment_prepare_upload", "t3_worktree_handoff"]);
     expect(t3ToolName("delegate_task")).toBe("mcp__t3-code__delegate_task");
     const extension = setup().extension();
     expect(extension.tools?.map((tool) => tool.name)).toContain("mcp__t3-code__t3_thread_read");
-    // D5 lifted (owner, 2026-11-12, back to stock): an agent may ask the owner for a secret.
-    expect(T3_TOOL_DENYLIST.has("request_secret")).toBe(false);
-    // SPI-1061: the Outbound link is t3's own; an agent may ask for a link with t3's card, and unlink.
-    expect(T3_TOOL_DENYLIST.has("t3_environment_link")).toBe(false);
-    expect(T3_TOOL_DENYLIST.has("t3_environment_unlink")).toBe(false);
   });
 
   it("changes its hash when t3's catalog changes, and only then", () => {

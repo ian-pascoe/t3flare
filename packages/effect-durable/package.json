@@ -4,9 +4,7 @@
   "license": "MIT",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./sqlite": "./src/sqlite.ts",
-    "./sqlite/testing": "./src/sqlite-testing.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "typecheck": "effect-tsgo tsrs --noEmit",

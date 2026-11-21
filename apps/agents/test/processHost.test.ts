@@ -53,7 +53,7 @@ const fakeProcess = (options: { failWrites?: boolean } = {}) => {
   };
 };
 
-const harness = (options: { running?: boolean; refuse?: string; maxProcesses?: number; failWrites?: boolean } = {}) => {
+const harness = (options: { running?: boolean; refuse?: string; maxProcesses?: number; failWrites?: boolean; allowProbe?: boolean } = {}) => {
   let now = 1_000_000;
   let running = options.running ?? true;
   let ack = 0;
@@ -82,7 +82,7 @@ const harness = (options: { running?: boolean; refuse?: string; maxProcesses?: n
     remembered: () => remembered,
     filesMayHaveChanged: () => undefined,
     maxProcesses: options.maxProcesses ?? 4,
-    allowProbe: true,
+    allowProbe: options.allowProbe ?? true,
   };
   const host = new ProcessHost(deps);
   /** The Environment's reads until nothing is left, each acknowledged. */
@@ -288,10 +288,20 @@ describe("ProcessHost", () => {
     expect(h.host.size).toBe(0);
   });
 
-  it("refuses the probe program unless the stage allows it, and a binary that is not absolute", async () => {
+  it("refuses the probe program unless the stage allows it", async () => {
+    const probe = start("proc-a", { cli: "probe", argv: ["/opt/t3flare/bin/probe"] });
+    const refused = harness({ allowProbe: false });
+    expect(await refused.host.start(probe)).toEqual({ ok: false, epoch: 7, reason: "the probe program runs on test stages only" });
+    expect(refused.spawned).toHaveLength(0);
+    const allowed = harness({ allowProbe: true });
+    expect((await allowed.host.start(probe)).ok).toBe(true);
+  });
+
+  it("refuses a binary that is not absolute", async () => {
     const h = harness();
     const answer = await h.host.start(start("proc-a", { argv: ["codex", "app-server"] }));
-    expect(answer).toMatchObject({ ok: false });
+    expect(answer).toMatchObject({ ok: false, reason: "t3flare: a process's binary must be an absolute path" });
+    expect(h.spawned).toHaveLength(0);
   });
 });
 

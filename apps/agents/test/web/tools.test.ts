@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { webExtension } from "../../src/extensions/web.ts";
 import { webFetchTool } from "../../src/extensions/web/fetch.ts";
 import type { WebRequest, WebTransport } from "../../src/extensions/web/net.ts";
-import { readAnswer, resultText, webSearchTool } from "../../src/extensions/web/search.ts";
+import { readAnswer, webSearchTool } from "../../src/extensions/web/search.ts";
 
 const PUBLIC = "93.184.215.14";
 
@@ -129,9 +129,13 @@ describe("web_search", () => {
     expect(outcome.ok && outcome.result.usage).toMatchObject({ input: 1200, output: 80 });
   });
 
-  it("trims to numResults and reports no results", () => {
-    const read = readAnswer(answer, (text) => text);
-    expect(resultText(read.results.slice(0, 1), "")).not.toContain("Two");
+  it("trims to numResults and reports no results", async () => {
+    const { transport } = network(() => Response.json(answer));
+    const outcome = await run(webSearchTool(transport, endpoint), { query: "pi durable", numResults: 1 });
+    expect(textOf(outcome)).toContain("Title: One");
+    expect(textOf(outcome)).not.toContain("Title: Two");
+    expect(outcome.ok && outcome.result.details).toMatchObject({ results: [{ url: "https://a.example/one" }] });
+    expect(outcome.ok && (outcome.result.details as { results: Array<unknown> }).results).toHaveLength(1);
     expect(readAnswer({ content: [] }, (text) => text)).toEqual({ results: [], summary: "" });
   });
 

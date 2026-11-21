@@ -25,6 +25,7 @@ import { describe, expect, it } from "vitest";
 
 import * as TestProviderHost from "../../../t3code/packages/provider-testing/src/TestProviderHost.ts";
 import { makeTurnInput } from "t3/src/orchestration-v2/Adapters/AcpAdapterV2.testkit.ts";
+import { planClaudeSkillDispatch } from "../../../t3code/apps/server/src/provider/Drivers/ClaudeSkillDispatch.ts";
 import { acpFlavor, acpPromptBuilder } from "../src/provider/cli/acpDriver.ts";
 import { CLAUDE_SKILL_NOTE, claudeMentionRewrite, claudeSkillText } from "../src/provider/cli/claudeSkills.ts";
 import { wrapCliAdapter } from "../src/provider/cli/wrapper.ts";
@@ -71,9 +72,9 @@ describe("Claude Code's rewrite of a Skill mention (stock's planClaudeSkillDispa
     expect({ source: SKILL_TOKEN_REGEX.source, flags: SKILL_TOKEN_REGEX.flags }).toEqual({ source: planner![1], flags: planner![2] });
   });
 
-  it("words the note as stock does (ClaudeSkillDispatch.ts)", () => {
-    const source = fs.readFileSync(new URL("../../../t3code/apps/server/src/provider/Drivers/ClaudeSkillDispatch.ts", import.meta.url), "utf8");
-    expect(source, "t3 changed its Claude skill note; re-read U65").toContain(`\` ${CLAUDE_SKILL_NOTE}\${mention.skill.path}]\``);
+  it("words the note as stock does: an earlier user-only Skill is noted in stock's wording (planClaudeSkillDispatch)", () => {
+    const planned = planClaudeSkillDispatch("$a then $b", new Map([["a", { path: "/p/a", userInvocationOnly: true }], ["b", { path: "/p/b" }]]));
+    expect(planned?.leadingText, "t3 changed its Claude skill note; re-read U65").toContain(` ${CLAUDE_SKILL_NOTE}/p/a]`);
   });
 
   it("asks the Workspace at Claude Code's roots only for a message with a sigil, and keeps the text when it cannot answer", async () => {

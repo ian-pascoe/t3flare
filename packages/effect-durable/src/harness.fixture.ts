@@ -130,8 +130,8 @@ export const openRestartingHarness = async (
       live = false;
     };
 
-    // As `refusingStorage` (`./sqlite-testing.ts`) does for a Durable Object's storage: a proxy trap is dynamic by
-    // nature, and the storage's members are told apart at run time, with no schema to parse.
+    // A proxy trap is dynamic by nature, and the storage's members are told apart at run time, with no schema to
+    // parse.
     return new Proxy(memory, {
       get: (target, key) => {
         // oxlint-disable-next-line anti-slop/no-reflect-get -- see above

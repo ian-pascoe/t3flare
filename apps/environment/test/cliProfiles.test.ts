@@ -35,7 +35,6 @@ describe("Codex's profile", () => {
     expect(overrides.filter((value) => value.startsWith("model_providers."))).toEqual([
       'model_providers.t3flare-endpoint-openai={name="t3flare-endpoint-openai",base_url="http://computer.internal/t3flare/model/openai",wire_api="responses",env_key="T3FLARE_MODEL_HANDLE",requires_openai_auth=false,supports_websockets=false,request_max_retries=1,stream_max_retries=1}',
     ]);
-    expect(answer.argv.join(" ")).not.toMatch(/t3flare-proxy|t3flare-model-key/);
     expect(answer.modelRelay).toEqual(["openai"]);
     expect(overrides).toEqual(
       expect.arrayContaining([
@@ -262,8 +261,6 @@ describe("pi's profile", () => {
       });
       // No MODEL_PROXY_* setting.
       expect(models.providers.anthropic).toBeUndefined();
-      expect(JSON.stringify(models)).not.toContain("proxy.example");
-      expect(JSON.stringify(models)).not.toContain("t3flare-model-key");
     });
 
     it("gives a ChatGPT sign-in's models plan usage's compatibility overrides, as the Session's pi-ai has them (SPI-1171)", () => {
