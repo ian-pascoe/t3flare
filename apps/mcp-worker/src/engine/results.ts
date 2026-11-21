@@ -1,15 +1,13 @@
 /**
- * A request's value as the engine returns it (`docs/architecture/mcp-connections.md` → The engine, Large results;
- * #382 D9.2): serialized once, with every access token the call sent replaced by `[REDACTED]`
- * (`docs/architecture/mcp-sign-in.md` → Tokens reach the host object), then inline up to 1 MiB, else as a native byte
- * stream produced on pull, which RPC neither clones nor counts and the host returns unread (#409 answer 3). A failed
- * call's error is scrubbed of the same tokens.
+ * A request's value as the engine returns it: serialized once, with every access token the call sent replaced by
+ * `[REDACTED]`, then inline up to 1 MiB, else as a native byte stream produced on pull, which RPC neither clones nor
+ * counts and the host returns unread. A failed call's error is scrubbed of the same tokens.
  */
 // @effect-diagnostics globalJsonInEffect:off -- a server's answer, already decoded by the SDK, serialized to bytes once.
 // @effect-diagnostics globalTimers:off -- a stream's expiry timer, in the invocation that made it.
 // @effect-diagnostics missingPipeableSignature:off -- `byteStream` is a plain function over bytes, not a combinator.
-import type { ListItems, ListKind, McpConnection } from "@cloudpid/mcp";
-import { McpErrorWire, type McpEngineValue, ProtocolViolation } from "@cloudpid/mcp/types";
+import type { ListItems, ListKind, McpConnection } from "@t3flare/mcp";
+import { McpErrorWire, type McpEngineValue, ProtocolViolation } from "@t3flare/mcp/types";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { STREAM_HOLD_MS } from "./budget.ts";
@@ -17,7 +15,7 @@ import type { CallContext, CallEnvironment } from "./call-context.ts";
 import { scrubValues } from "./scrub.ts";
 import { MiB } from "./units.ts";
 
-/** A value serialized to more than this goes back as a byte stream (D9.2). */
+/** A value serialized to more than this goes back as a byte stream. */
 export const INLINE_LIMIT = MiB;
 
 /** The size of the pieces a large value's stream yields. */

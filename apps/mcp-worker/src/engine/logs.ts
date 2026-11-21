@@ -1,17 +1,17 @@
 /**
- * The server logs of one engine call (`docs/architecture/mcp-connections.md` → Telemetry; #382 D12.2): each
+ * The server logs of one engine call: each
  * `notifications/message` the core hears is kept as an entry, the last 50, and goes back to the host in the call's
  * result, since a discovery passes no hooks and a function stub would not outlive its invocation anyway. Entries are
  * scrubbed of the call's access tokens and of the secrets of its target (`secretsOf`; a server may echo what it
  * was sent, and all are in the call's `tokens`), and their data is cut to 2 KiB, after the scrub so no token is left cut in half. Nothing here reaches a model.
  */
-import { type McpLog } from "@cloudpid/mcp";
+import { type McpLog } from "@t3flare/mcp";
 import {
   MCP_LOG_DATA_MAX,
   MCP_LOG_RING,
   type McpEngineTargetEncoded,
   type McpLogEntry,
-} from "@cloudpid/mcp/types";
+} from "@t3flare/mcp/types";
 import * as Arr from "effect/Array";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
@@ -64,9 +64,9 @@ const pairValues = (value: string): Array<string> =>
 
 /**
  * The headers that carry credentials by name, besides `authorization`, `proxy-authorization` and `cookie`. A looser
- * match than the names an entry may not hold as a literal (`docs/architecture/mcp-configuration.md` → Approval: `TOKEN`,
- * `SECRET`, `PASSWORD`, `PASSWD`, `API_KEY`, `APIKEY`, `ACCESS_KEY`, `PRIVATE_KEY`), which every `key` here covers: a
- * header that is wrongly taken for one only has its value scrubbed from the text it is echoed in.
+ * match than credential-like names (`TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `API_KEY`, `APIKEY`, `ACCESS_KEY`,
+ * `PRIVATE_KEY`), which every `key` here covers: a header that is wrongly taken for one only has its value scrubbed
+ * from the text it is echoed in.
  */
 const CREDENTIAL_HEADER = /key|token|secret|auth|session|passw(?:or)?d|credential|signature/i;
 

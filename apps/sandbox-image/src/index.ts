@@ -1,5 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off
-// The Container image (copied from cloudpid@ae5a7b73:apps/sandbox-image, trimmed; step 2a plan, section 5).
+// The Container image (step 2a plan, section 5).
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 

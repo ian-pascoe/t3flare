@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/effect-durable/src/hook.test.ts.
 // pi-durable's Harness is Promise-based, so these tests are too.
 import { defineExtension, ToolTask } from "@earendil-works/pi-durable";
 import * as Context from "effect/Context";

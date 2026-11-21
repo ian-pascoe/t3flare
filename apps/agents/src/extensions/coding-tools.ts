@@ -1,9 +1,9 @@
-// Adapted from cloudpid@b8097ff0:packages/extensions/src/coding-tools.ts (step 2a plan, section 4): pi-durable's `read`,
-// `write` and `edit`, and a `bash` that chooses where its command runs (`./bash-routing.ts`): the Worker Shell unless
-// the command needs a real binary, so the Container (the costly backend) starts only when a command needs it. Dropped
-// from cloudpid's: the Images binding (`read` keeps pi-durable's own image checks), the Call diff of `write` and of
-// codemode's nested calls (`edit` records its patch itself; a script's edits show as its children, ADR-0027). Added: `bash`'s exit code in its result's
-// `details`, which the Environment's differ shows on the command item, and (SPI-1057) pi-termctrl's `background`.
+// The coding tools (step 2a plan, section 4): pi-durable's `read`, `write` and `edit`, and a `bash` that chooses where
+// its command runs (`./bash-routing.ts`): the Worker Shell unless the command needs a real binary, so the Container
+// (the costly backend) starts only when a command needs it. It leaves out the Images binding (`read` keeps pi-durable's
+// own image checks) and the Call diff of `write` and of codemode's nested calls (`edit` records its patch itself; a
+// script's edits show as its children, ADR-0027). It adds `bash`'s exit code in its result's `details`, which the
+// Environment's differ shows on the command item, and (SPI-1057) pi-termctrl's `background`.
 import type { Context } from "@earendil-works/chord";
 import { defineExtension, defineTool, type Extension, section, type ToolExecutionApi, type ToolExecutionResult, type ToolRegistration } from "@earendil-works/pi-durable";
 import type { ExecutionEnv, FileError, Result, ShellOutputInfo } from "@earendil-works/pi-durable/env";

@@ -1,6 +1,6 @@
 // A stream's reads are Promise-based, so this file is too.
 // @effect-diagnostics asyncFunction:off
-import { ServerError } from "@cloudpid/mcp/types";
+import { ServerError } from "@t3flare/mcp/types";
 import * as Effect from "effect/Effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { byteStream, scrubError } from "./results.ts";

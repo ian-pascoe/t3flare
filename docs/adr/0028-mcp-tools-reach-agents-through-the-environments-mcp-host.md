@@ -1,6 +1,6 @@
 # MCP tools reach agents through the Environment's MCP host
 
-Status: accepted (tools step, 2026-11-12). Plan: [`docs-archive-1:docs/steps/tools-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/tools-plan.md) §3–§5, with its review changelog (H1–H3, M1, M3, M5, M7, M9–M13). Tickets: SPI-1001 (MCP part), SPI-1039.
+Status: accepted (tools step, 2026-11-12). Plan: [`docs-archive-1:docs/steps/tools-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/tools-plan.md) §3–§5, with its review changelog (H1–H3, M1, M3, M5, M7, M9–M13). Tickets: SPI-1001 (MCP part), SPI-1039. The MCP core is t3flare's own package since [ADR-0045](0045-copied-code-is-t3flares-own-with-no-upstream-to-sync.md).
 
 Agents in t3flare had t3's own tools and nothing else. The owner wants Commissary's tools, and servers he adds himself such as Executor, for every agent kind, without a third-party server's credential ever reaching an agent, a Session or a Container.
 
@@ -10,7 +10,7 @@ Agents in t3flare had t3's own tools and nothing else. The owner wants Commissar
    - their credentials.
 
    Every MCP request goes through it.
-2. **The engine is a Worker of its own**, `t3flare-mcp-<stage>`. It runs cloudpid's MCP core (`vendor/cloudpid/mcp`, official SDK 2.4.0) behind two entrypoints, `McpEngine` and `McpOAuth`. It has **no bindings** and `global_fetch_strictly_public`, and it makes every outbound MCP and OAuth request: discovery, registration, token exchange, refresh, list and call. Each request goes through a guard on every URL and hop, with `redirect: "manual"`. Its logs pass through cloudpid's `scrub.ts`. The Environment DO calls it over service bindings and sends the credential with each request; the engine keeps none.
+2. **The engine is a Worker of its own**, `t3flare-mcp-<stage>`. It runs the MCP core (`packages/mcp`, official SDK 2.4.0) behind two entrypoints, `McpEngine` and `McpOAuth`. It has **no bindings** and `global_fetch_strictly_public`, and it makes every outbound MCP and OAuth request: discovery, registration, token exchange, refresh, list and call. Each request goes through a guard on every URL and hop, with `redirect: "manual"`. Its logs pass through `engine/scrub.ts`. The Environment DO calls it over service bindings and sends the credential with each request; the engine keeps none.
 3. **Commissary's key** is the Workers-only `MODEL_PROXY_API_KEY`, read through `toolsKeyOf(env)` so a dedicated key can replace it. It never enters a Container (owner decision; no new secret). A **direct server** signs in with a header the owner types once, or with OAuth that he completes in the panel (DCR or CIMD, PKCE, single-use `state`, an `iss` check, one refresh in flight). Its credentials are kept write-only in the Environment DO's secret store (ADR-0012's tools refinement).
 4. **A tool's class is read or write**: the tool's own `readOnlyHint` (true is read; anything else, write), as t3 does, unless the owner overrides it in the panel. Colliding sanitised names are refused. "Accept for the session" covers one tool definition (its hash): a changed definition asks again.
 5. **One decision for every caller** (`decideCall`):
@@ -28,13 +28,13 @@ Agents in t3flare had t3's own tools and nothing else. The owner wants Commissar
 8. **t3's own tools for CLI agents** come as stock t3 hands them: t3's per-thread MCP bearer, given to the CLI, at t3's public `/mcp` (t3 names its in-isolate address, which a Container cannot reach, so only the endpoint is rewritten; SPI-1039, ADR-0022's tools refinement). The relay's handles stay for third-party servers, whose credentials are real secrets.
 9. **Not offered:**
    - **Local stdio servers** are refused (ADR-0024's table): Container-only, with no secrets, and served over HTTP instead.
-   - **Elicitation is not declared** by any t3flare client (OD-T7: later, under cloudpid ADR-0041's rules). Superseded by the SPI-1079 refinement below: an agent's calls declare it, and the owner answers.
+   - **Elicitation is not declared** by any t3flare client (OD-T7: later). Superseded by the SPI-1079 refinement below: an agent's calls declare it, and the owner answers.
    - **MCP resources, prompts and apps** are not offered.
    - **Executor** is added directly, in `browser` elicitation mode, so the agent never holds the approval. Since SPI-1079 its `native` ("In your client") and `model` ("Through your agent") modes work too (refinement below). The owner chose direct over Commissary. `skills`, `search` and `describe` carry read hints; the owner marks `resume` read; `call` and `execute` are write.
 
 ## Considered options
 
-- **The engine inside the Environment Worker.** Rejected: the SDK's heap and outbound fetches would share the isolate that holds t3, and outbound requests would need bindings-free isolation anyway (review M5, cloudpid's ADR-0038).
+- **The engine inside the Environment Worker.** Rejected: the SDK's heap and outbound fetches would share the isolate that holds t3, and outbound requests would need bindings-free isolation anyway (review M5).
 - **Commissary only** (Route A). Rejected: there is no upstream elicitation, no resources, a 240 s cap per call, and a dependency on Commissary being up. Commissary stays the recommended route for servers it fronts well.
 - **The CLIs reach Commissary or the server directly with a key.** Rejected: a key in a Container (ADR-0016).
 - **Pinned classes** (review H3, built first): a class pinned by definition hash, a direct server's tools write until marked read, a flipped hint write until confirmed. Removed (owner, 2026-11-12, back to stock). On stage the pin also misfired: Executor's `resume`, marked read, fell back to write after a relist (`m6-executor.json`).
@@ -79,10 +79,10 @@ report: [`docs-archive-1:docs/steps/spi-1079.md`](https://github.com/spiritledso
    - a form with fields, or an Executor `input-required`, becomes a `user_input` card with one question per field (as
      t3's ACP adapter builds one), plus a last Send / Decline question, since t3 offers no way to dismiss a live question.
    - Every card names the server and shows the agent's call (tool and arguments), through `cardText`.
-3. **The question waits live**, up to 10 minutes (cloudpid's Legacy wait; the CLI card's `CLI_ASK_MS`). The engine pauses
+3. **The question waits live**, up to 10 minutes (the CLI card's `CLI_ASK_MS`). The engine pauses
    the call's 270 s bound meanwhile. No Modern `ResumeState` is kept: a Session or Environment restart ends the call, and
    the card closes as cancelled. A read is replayed and asks again; a write answers "cut off", as before.
-4. **Only the owner answers** (cloudpid ADR-0041, ported):
+4. **Only the owner answers**:
    - an approval card cannot be answered by an agent (t3's `t3_pending_request` answers `user_input` requests only);
    - a form card's request id carries `t3flare-elicit`, and the Environment refuses an agent's `t3_pending_request` `read`
      or `respond` naming it before t3 sees the request. The refusal is on `/mcp` (CLI agents, linked laptops) and on the
@@ -111,7 +111,7 @@ report: [`docs-archive-1:docs/steps/spi-1079.md`](https://github.com/spiritledso
 
 - **Refusing the agent's `resume` until the owner answers** (an unlock per `requestId`). Rejected: the model would hold
   and relay the request, and each round would need another unlock.
-- **Durable Modern questions** (cloudpid's `defer`/`resume` with a sealed `ResumeState`): the call would outlive a
+- **Durable Modern questions** (`defer`/`resume` with a sealed `ResumeState`): the call would outlive a
   restart. Deferred; no server the owner uses is Modern-only.
 - **Declining forms with fields**, as t3's Codex adapter does: safe, but Executor's `input-required` and real forms
   would fail.
@@ -121,7 +121,7 @@ report: [`docs-archive-1:docs/steps/spi-1079.md`](https://github.com/spiritledso
 - In `native` mode on a full-access thread, Executor's `call` runs without a card, as any write does there. Its
   `execute` approvals still ask, since an elicitation always asks.
 - A `-32042` (URL required, Legacy) is still the server's error.
-- One more import in the Environment Worker: `@cloudpid/mcp/elicitation-url` (SDK-free; `sdk-isolation.test.ts`).
+- One more import in the Environment Worker: `@t3flare/mcp/elicitation-url` (SDK-free; `sdk-isolation.test.ts`).
 
 ## Refinement (G11, 2026-11-13): MCP apps through the relay
 

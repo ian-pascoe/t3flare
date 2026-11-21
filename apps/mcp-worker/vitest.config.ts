@@ -1,3 +1,4 @@
-import config from "@cloudpid/config/vitest";
+import { defineConfig } from "vitest/config";
 
-export default config;
+// The MCP tests drive real SDK clients against fake servers, many at once under `pnpm run check`: past Vitest's 5 s default.
+export default defineConfig({ test: { testTimeout: 30_000 } });

@@ -1,7 +1,6 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/client.ts.
 // The client end of the Workspace DO's file operations: one RPC call per operation, its answer as a pi-durable
 // `Result`, and the call's abort honored before and after it.
-// pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
+// pi-durable's `ExecutionEnv` is Promise-native and stays so; this adapter follows it.
 import type { Context } from "@earendil-works/chord";
 import { err, FileError, type Result } from "@earendil-works/pi-durable/env";
 import { failureMessage } from "@t3flare/workspace-client";

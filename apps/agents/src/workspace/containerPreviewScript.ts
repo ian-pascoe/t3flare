@@ -1,5 +1,4 @@
-// The script a Container preview's HTML pages get (G11's M3, ADR-0031; ported from cloudpid@93ba45a3's
-// `apps/server/src/workspace/container-preview-script.ts`, its ADR-0023): Browser Run's outbound Workers route only HTTP,
+// The script a Container preview's HTML pages get (G11's M3, ADR-0031): Browser Run's outbound Workers route only HTTP,
 // so a WebSocket to the page's own host (Vite's HMR, its restart ping) is a carried socket over plain HTTP instead.
 // `GET /__t3flare/ws/open` is a stream of server-sent events (`open` with the socket's id, each message, `close`), read
 // with `fetch` so it can carry a header; `send` and `close` are POSTs, sent in order. The Workspace DO holds the real

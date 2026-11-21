@@ -1,10 +1,9 @@
-// Adapted from cloudpid@93ba45a3:packages/extensions/src/context/rollover.ts (SPI-1056), as plain pi-durable code: the
-// agent writes its own Handoff instead of the generated summary of a compaction. `context_rollover` returns
-// `control: { handoff }`, which pi-durable applies once the whole tool round is done: it appends a `pi.reset` entry
-// carrying the Handoff and the same run goes on in the new context, where a steer the tool queued, placed right after the
-// Handoff, tells the agent to continue. The `beforeCompact` hook turns a background threshold compaction into a Rollover
-// request; a compaction that cannot wait for the agent (a blocking threshold one, or an overflow one) is the Emergency
-// Rollover, whose summary is the last saved Handoff.
+// Rollover (SPI-1056), as plain pi-durable code: the agent writes its own Handoff instead of the generated summary of a
+// compaction. `context_rollover` returns `control: { handoff }`, which pi-durable applies once the whole tool round is
+// done: it appends a `pi.reset` entry carrying the Handoff and the same run goes on in the new context, where a steer
+// the tool queued, placed right after the Handoff, tells the agent to continue. The `beforeCompact` hook turns a
+// background threshold compaction into a Rollover request; a compaction that cannot wait for the agent (a blocking
+// threshold one, or an overflow one) is the Emergency Rollover, whose summary is the last saved Handoff.
 //
 // How it sits with the other compactions (the reconciliation, SPI-1056):
 // - pi-durable's own compaction stays the mechanism: thresholds, the cut that never splits a call from its result, the
@@ -12,9 +11,9 @@
 //   the context extension off, or its `rolloverOnCompaction` setting off, pi-durable summarizes as before.
 // - A manual compaction keeps pi-durable's summary. t3's idle compaction is locked off for every provider (K9,
 //   `managedPolicy.ts`) and never reaches a Durable agent.
-// - Changed from cloudpid's: no owner `/rollover` (t3 has no surface for it), so a Rollover never ends its run; the
-//   requests the hook and the tool submit are steers that never start a run of their own (`whenIdle: "reject"`), so no
-//   work happens outside a turn t3 started.
+// - No owner `/rollover` (t3 has no surface for it), so a Rollover never ends its run; the requests the hook and the
+//   tool submit are steers that never start a run of their own (`whenIdle: "reject"`), so no work happens outside a
+//   turn t3 started.
 // @effect-diagnostics globalConsole:off
 import type { Context } from "@earendil-works/chord";
 import {

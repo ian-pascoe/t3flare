@@ -23,7 +23,7 @@ export interface Repo {
   readonly fileSizes?: () => { readonly largest: number; readonly worktreeBytes: number };
 }
 
-/** The most tracked files the DO handles itself (cloudpid's guard); past it, a capture needs the Container's git. */
+/** The most tracked files the DO handles itself; past it, a capture needs the Container's git. */
 export const MAX_TRACKED_FILES = 2_000;
 /** The most bytes of packs the DO reads itself. */
 export const MAX_PACK_BYTES = 16 * 1024 * 1024;

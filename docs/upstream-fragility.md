@@ -274,7 +274,7 @@ The bump runs: the whole `pnpm run check` (`git apply --check` of the Patches, t
 - **Blast radius**: wrong cached git answers (status and diffs that do not change), or a Workspace DO that throws on every read.
 - **Fix**: the computer release's schema; pin computer until the reads are ported.
 
-### U24. pi-durable 1.5.0 with cloudpid's patch
+### U24. pi-durable 1.5.0 with its patch
 
 - **Where**: `@earendil-works/pi-durable` 1.5.0 (`apps/agents/package.json`, `packages/computer-env`, `packages/effect-durable`), patched by `patches/deps/@earendil-works__pi-durable@1.5.0.patch` (codemode's details capped to 64 KiB, `dist/codemode/codemode.js`, `dist/harness/scheduler.js`, `dist/harness/tool.js`). Its runtime events reach t3 through the Session's pushes and the differ (U3).
 - **Breaks when**: we bump pi-durable (the patch is keyed to 1.5.0), or a t3 bump moves one of its dependencies (U20).
@@ -424,12 +424,12 @@ to its real id when an endpoint is at Commissary): `apps/environment/test/modelL
 - **Detection**: `test/cliProfiles.test.ts` (snapshot of the managed files and argv); the stage's `cli-mcp <cli>` per CLI (read without a card, write asks, decline, full access, plan); `relay-hostile`.
 - **Fix**: re-read the CLI's config reference at the new version; adjust the profile and its snapshot.
 
-### U44. The MCP SDK pin, the vendored cloudpid MCP core, and Commissary's MCP contract (tools step)
+### U44. The MCP SDK pin, the MCP core, and Commissary's MCP contract (tools step)
 
-- **Where**: `vendor/cloudpid/mcp` (`@cloudpid/mcp`, copied at cloudpid `93ba45a3`, OD-T10) on `@modelcontextprotocol/{client,core,server}` 2.4.0, run in `apps/mcp-worker` (no bindings, `global_fetch_strictly_public`); its OAuth helpers (`discoverOAuthServerInfo`, `selectResource`, `registerClient`, `startAuthorization`) for direct servers' sign-ins. Commissary's endpoint: its eras, `readOnlyHint` on read tools, its `<toolkit>_<tool>` names, its text fallbacks for pending approvals and connect links (like U25 for models).
-- **Breaks when**: an SDK bump changes the client, the OAuth discovery or resource selection; a cloudpid sync changes `scrub.ts` or the call budget; Commissary changes its hints, fallbacks or name rule.
-- **Detection**: the vendored core's tests and `apps/mcp-worker/test/sdk-isolation.test.ts` in `pnpm run check`; `test/mcpHost.test.ts`; Commissary's MCP contract on a stage through `scripts/commissaryMcp.ts` (`add`, `durable`, `cli`), and `scripts/tools.ts`'s `oauth`. **Silent**: a hint flip from write to read on a tool the owner never overrode (classes trust `readOnlyHint` since the back-to-stock cut, owner 2026-11-12, so the tool then runs without a card).
-- **Fix**: sync from cloudpid as a copy (its README names the commit); re-run the stage cases.
+- **Where**: `packages/mcp` (`@t3flare/mcp`, ADR-0045) on `@modelcontextprotocol/{client,core,server}` 2.4.0, run in `apps/mcp-worker` (no bindings, `global_fetch_strictly_public`); its OAuth helpers (`discoverOAuthServerInfo`, `selectResource`, `registerClient`, `startAuthorization`) for direct servers' sign-ins. Commissary's endpoint: its eras, `readOnlyHint` on read tools, its `<toolkit>_<tool>` names, its text fallbacks for pending approvals and connect links (like U25 for models).
+- **Breaks when**: an SDK bump changes the client, the OAuth discovery or resource selection; Commissary changes its hints, fallbacks or name rule.
+- **Detection**: `@t3flare/mcp`'s tests and `apps/mcp-worker/test/sdk-isolation.test.ts` in `pnpm run check`; `test/mcpHost.test.ts`; Commissary's MCP contract on a stage through `scripts/commissaryMcp.ts` (`add`, `durable`, `cli`), and `scripts/tools.ts`'s `oauth`. **Silent**: a hint flip from write to read on a tool the owner never overrode (classes trust `readOnlyHint` since the back-to-stock cut, owner 2026-11-12, so the tool then runs without a card).
+- **Fix**: mend `packages/mcp` against the new SDK until its tests pass; re-run the stage cases.
 
 ### U45. The `cause`-stripping Layer over t3's `PeerLinks` (SPI-1061)
 
@@ -600,15 +600,15 @@ to its real id when an endpoint is at Commissary): `apps/environment/test/modelL
 
 ### U62. Container previews and the carried-socket script (G11)
 
-- **Where**: `apps/agents/src/workspace/containerPreview.ts` and `containerPreviewScript.ts` (ported from cloudpid@93ba45a3), `WorkspaceDO.containerPreview` with its use and hold accounting (`#someoneWorks`, `#previewHold`), `WorkspaceContainerPreviews` (agents Worker) and `ContainerPreviews` (Environment Worker), the eight ports in `@t3flare/workspace-client`.
+- **Where**: `apps/agents/src/workspace/containerPreview.ts` and `containerPreviewScript.ts`, `WorkspaceDO.containerPreview` with its use and hold accounting (`#someoneWorks`, `#previewHold`), `WorkspaceContainerPreviews` (agents Worker) and `ContainerPreviews` (Environment Worker), the eight ports in `@t3flare/workspace-client`.
 - **Breaks when**: Browser Run starts routing WebSockets (the script becomes dead weight), a dev-server client changes how it opens sockets (Vite's `SharedWorker` ping), or Containers change `getTcpPort`.
 - **Detection**: `apps/agents/test/containerPreview.test.ts` (Host and Location, refusals, the script). **Silent**: HMR stops while pages still load. Cheapest check: `scripts/previews.ts browser` (its HMR line).
 - **Blast radius**: no live reload; pages still load.
-- **Fix**: compare with cloudpid's current `container-preview*.ts`, which meets the same breakage first.
+- **Fix**: adjust the carried-socket script to the change; drop it once Browser Run routes WebSockets.
 
 ### U63. MCP apps through the CLI wrapper and the MCP host (G11)
 
-- **Where**: `provider/cli/wrapper.ts` (no longer strips `mcpApps`); `ProviderAdapterV2McpApps` (`provider-core/src/server/ProviderAdapter.ts`); `mcp/relay.ts` (`_meta.ui` in `tools/list`, `structuredContent`, `resources/read` of a `ui://` URI) and `mcp/host.ts` (`readAppResource`, through the vendored engine's `resources/read` with `app: true`); `appUriOfMeta` from `@cloudpid/mcp/types`.
+- **Where**: `provider/cli/wrapper.ts` (no longer strips `mcpApps`); `ProviderAdapterV2McpApps` (`provider-core/src/server/ProviderAdapter.ts`); `mcp/relay.ts` (`_meta.ui` in `tools/list`, `structuredContent`, `resources/read` of a `ui://` URI) and `mcp/host.ts` (`readAppResource`, through the MCP engine's `resources/read` with `app: true`); `appUriOfMeta` from `@t3flare/mcp/types`.
 - **Breaks when**: t3 changes `ProviderAdapterV2McpApps`; Codex's app-server renames `mcpServerStatus/list`, `mcpServer/tool/call` or `mcpServer/resource/read`; the ext-apps spec moves its `_meta` key.
 - **Detection**: typecheck covers the adapter shape; `test/mcpHost.test.ts` and `test/mcpRelay.test.ts` cover the pass-through and the refusals. **Silent**: a moved `_meta` key shows plain tool rows.
 - **Blast radius**: apps show as ordinary tool rows.

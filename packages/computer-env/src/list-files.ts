@@ -1,10 +1,9 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/list-files.ts.
 // `ExecutionEnv.listFiles` in the Workspace DO: a walk of one directory at a time (depth first, siblings in byte order of
 // their names, symbolic links listed and not followed), filtered by hidden names, excluded names and git's ignore rules
 // as it goes, so a directory skipped (`node_modules`, an ignored `dist/` or `.venv/`) is never walked. A directory
 // holding `.git` below the listed one is a work tree of its own: its ignore rules apply from there, in place of those
 // above it, as git applies a nested repository's.
-// pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
+// pi-durable's `ExecutionEnv` is Promise-native and stays so; this adapter follows it.
 // @effect-diagnostics globalDate:off
 import type { Workspace } from "@cloudflare/computer";
 import type { FileListEntry, FileListing, ListFilesOptions } from "@earendil-works/pi-durable/env";

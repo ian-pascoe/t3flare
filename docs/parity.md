@@ -190,11 +190,11 @@ Written down (SPI-1004, SPI-1006):
 
 ## 6. Pi harness parity (the owner's pi setup vs the Durable agent)
 
-The second checklist, beside the matrix above: what the owner's local pi harness offers, and whether t3flare's Durable agent (pi-durable in `apps/agents/src/session/SessionDO.ts`) has it. First audit 2026-11-12, against the owner's `~/.pi/agent` (core pi, npm packages, `ian-pascoe/pi-extensions`, cloudpid, local extensions, `mcp.json`). Update rows as ports land; each gap has a Linear ticket (project t3flare).
+The second checklist, beside the matrix above: what the owner's local pi harness offers, and whether t3flare's Durable agent (pi-durable in `apps/agents/src/session/SessionDO.ts`) has it. First audit 2026-11-12, against the owner's `~/.pi/agent` (core pi, npm packages, `ian-pascoe/pi-extensions`, local extensions, `mcp.json`). Update rows as ports land; each gap has a Linear ticket (project t3flare).
 
 The CLI agents (Codex, Pi CLI, Claude Code, OpenCode) run with clean, managed profiles (steps 4a, 4b), so none of the owner's extensions load there either; this checklist is about the Durable agent.
 
-**Source for ports:** cloudpid's durable extensions (`~/src/cloudpid/packages/extensions/src`: `web`, `todo`, `context`, `tool-search`, `mcp`, `subagents`, `skills`, `secrets`, `browser`, `notify`), already written for pi-durable.
+**Source for ports:** the owner's durable pi extensions (`web`, `todo`, `context`, `tool-search`, `mcp`, `subagents`, `skills`, `secrets`, `browser`, `notify`), already written for pi-durable.
 
 **Status:** **W** works · **C** covered another way · **M** missing (ticketed) · **D** deferred by the owner · **R** refused by design or N/A.
 
@@ -212,9 +212,9 @@ The CLI agents (Codex, Pi CLI, Claude Code, OpenCode) run with clean, managed pr
 | `codemode`, `tool_search` | W | `extensions/codemode.ts`, sandbox Worker `t3flare-codemode-<stage>` (ADR-0027); switchable on the Settings page | — |
 | MCP servers (pi-mcp-selector, `mcp.json`: Executor, REA, Superlogical) | W | `extensions/mcp.ts` over the Environment's MCP host (ADR-0028): Direct servers added on the Settings page (Commissary's toolkits, Executor in browser mode); REA and Superlogical once served over HTTP (stdio refused); `t3` is covered by t3's tools | — |
 | Harness settings | W | the Settings page (ADR-0026): extensions, offered tools, MCP servers; later ports register in its extension registry. The agent may ask for any change the Settings page makes through the Settings server (ADR-0035), answered on the owner's card or the Change page; built, unit-tested and stage-run on `psmcp` (`docs-archive-1:docs/steps/settings-mcp.md`); Model endpoints stay panel-only | — |
-| pi-web-tools (`web_search`, `web_fetch`) | W | `extensions/web.ts` (cloudpid `web`): `web_fetch` through the SSRF guard, on by default; `web_search` asks a search-capable model on an Anthropic Messages Model endpoint (Anthropic's web search tool, no new key; the Model proxy until SPI-1176), off until switched on, on the Settings page (a model request per search). Both show as t3's web search items | SPI-1054 |
-| pi-todo | W | `extensions/todo.ts` (cloudpid `todo`): the list in the Session's storage, shown as t3's `todo_list` rows and plan (parity G5) | SPI-1055 |
-| pi-context-management (notes, history, rollover) | W | `extensions/context.ts` (cloudpid `context`): bounded Notes and stored History in the Session's storage, `context_rollover`, and automatic compaction as a Rollover (switchable); t3's idle compaction stays off (K9) | SPI-1056 |
+| pi-web-tools (`web_search`, `web_fetch`) | W | `extensions/web.ts`: `web_fetch` through the SSRF guard, on by default; `web_search` asks a search-capable model on an Anthropic Messages Model endpoint (Anthropic's web search tool, no new key; the Model proxy until SPI-1176), off until switched on, on the Settings page (a model request per search). Both show as t3's web search items | SPI-1054 |
+| pi-todo | W | `extensions/todo.ts`: the list in the Session's storage, shown as t3's `todo_list` rows and plan (parity G5) | SPI-1055 |
+| pi-context-management (notes, history, rollover) | W | `extensions/context.ts`: bounded Notes and stored History in the Session's storage, `context_rollover`, and automatic compaction as a Rollover (switchable); t3's idle compaction stays off (K9) | SPI-1056 |
 | pi-termctrl (terminals, background jobs) | W | `extensions/termctrl.ts` and `workspace/agentTerminals.ts` (pi-termctrl): `terminal_*` and `bash`'s `background` as PTYs in the Workspace's container under a second terminal host (ADR-0021: 8 at once, they end with the container), screens rendered by a headless xterm in the Workspace DO; approvals as `bash`'s; exits told as steers or notes, never a run of their own; shown as t3's command items. On by default: nothing starts a container until used. No `/ps` panel (t3's UI) | SPI-1057 |
 | pi-guardian | W | `extensions/guardian.ts` (pi-guardian): a `beforeTool` hook (code mode's nested calls too) reviews risky calls on a Model endpoint's model (the endpoints' small model by default) with pi-guardian's Tool Policy, policy prompt, Decision Table and Escalation Pass; a Rejection or Review Failure blocks the call and t3 shows a "Guardian blocked …" notice with the reason. Off by default; model, thinking, Tool Policies, Command Rules and Security Policy on the Settings page. Beside t3's approvals. No `cd` proved harmless, no Allow once, no classifier | SPI-1058 |
 | pi-advisor | W | `extensions/advisor.ts` (pi-advisor): a private Advisor Session in the Session's Harness reviews the run on pi-advisor's cadence and gives cited findings, delivered as pi-advisor does (Concerns and Blockers steer the running agent, Nits and after-answer findings are notes, a final Blocker continues the same run once), shown as "Advisor …" notices in t3; never a run t3 did not start. Off by default; model, cadence, thinking and corrective continuations in the panel. No `advisor_ask` | SPI-1059 |
@@ -228,7 +228,6 @@ The CLI agents (Codex, Pi CLI, Claude Code, OpenCode) run with clean, managed pr
 | pi-git-checkpoints | C | t3 checkpoints every turn (rollback: parity G6) | — |
 | pi-command-deck, pi-tps-tracker, pi-issues-selector, pi-bible-verses | R | terminal UI; t3's app is the UI | — |
 | Local extensions (active-theme, continue-on-dot, paste-image-on-empty-paste, herdr-agent-state, tool-schemas, flow-title, subq) | R | terminal UI and local glue; t3 makes its own titles | — |
-| cloudpid's extension | R | controls cloudpid; could return as an MCP server | — |
 
 ### Order
 

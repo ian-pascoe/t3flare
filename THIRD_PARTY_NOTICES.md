@@ -18,13 +18,6 @@ build time. This repository does not include them; each is under its own licence
   - `apps/environment/src/shadows/`: modified copies of t3code files (Shadows, ADR-0001). Each header names its source.
   - `packages/skills/src/discovery.ts`: the mention-token regex, copied from `packages/shared/src/inlineSkills.ts`.
 
-## Cloudflare Agents
-
-- Source: <https://github.com/cloudflare/agents>
-- Licence: MIT, Copyright (c) 2025 Cloudflare, Inc.
-- Files: `vendor/cloudpid/protocol/src/mirror.ts`, `transcript.ts` and `view.ts`, adapted from
-  `examples/next/harnesses/pi/src/`. Each file's header has the licence and the source commit.
-
 ## Cloudflare Computer
 
 - Source: <https://github.com/cloudflare/computer>
@@ -76,17 +69,11 @@ build time. This repository does not include them; each is under its own licence
 - Files: `patches/deps/@alchemy.run__cloudflare@2.0.0-beta.85.patch`, a patch to `@alchemy.run/cloudflare`
   2.0.0-beta.85. The patch itself shows what changed.
 
-## cloudpid
-
-`vendor/cloudpid/` and the files whose headers say they are copied or adapted from `cloudpid` come from cloudpid, an
-unpublished project of Spirit-Led Software LLC. They are licensed under this repository's MIT License
-([`vendor/cloudpid/LICENSE`](vendor/cloudpid/LICENSE)).
-
 ## Licence texts
 
 ### MIT License
 
-Applies to T3 Code, Cloudflare Agents, Cloudflare Computer, Vercel `skills`, pi and pi-extensions, each under the
+Applies to T3 Code, Cloudflare Computer, Vercel `skills`, pi and pi-extensions, each under the
 copyright notice given in its section above.
 
 ```text

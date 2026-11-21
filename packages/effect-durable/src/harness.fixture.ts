@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/effect-durable/src/harness.fixture.ts.
 // pi-durable's Harness and the faux provider are Promise-based, so this file is too.
 // @effect-diagnostics globalTimers:off
 // A pi-durable Harness over memory storage whose model is pi-ai's faux provider, for driving adapted tools, hooks,

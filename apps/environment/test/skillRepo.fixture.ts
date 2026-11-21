@@ -1,7 +1,6 @@
 // A fake GitHub for the Environment skill fetch tests (SPI-1148): repos whose branches move as commits are pushed, read
 // through a `RepoReader` that counts each request, so a test can say how many a run spent. Blob SHAs are made of the
-// content (as git's are), so a file changes its SHA exactly when its text does. Ported from cloudpid@47941c7c
-// (`apps/server/src/github/skill-repo.fixture.ts`), with links and submodules.
+// content (as git's are), so a file changes its SHA exactly when its text does. It also holds links and submodules.
 import { GithubReadError, type RepoReader, type SkillRepo } from "../src/skills/fetch.ts";
 import type { TreeEntry } from "../src/skills/paths.ts";
 

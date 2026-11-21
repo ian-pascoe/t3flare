@@ -231,7 +231,7 @@ export default Alchemy.Stack(
       observability: { enabled: true, logs: { enabled: true, invocationLogs: true } },
     } as never);
 
-    // The MCP Worker (ADR-0028; cloudpid's ADR-0038): the MCP SDK's engine, kept out of the agents and Environment
+    // The MCP Worker (ADR-0028): the MCP SDK's engine, kept out of the agents and Environment
     // isolates. No bindings (review M3), `global_fetch_strictly_public` (review M5), no URL: only the Environment's
     // `MCP_ENGINE` binding reaches it. Bundled by alchemy (ADR-0020's refinement: nothing of t3).
     const mcpWorker = yield* Cloudflare.Worker("McpWorker", {

@@ -1,6 +1,6 @@
 // The harness registry's seam (ADR-0026): what a Session gets from the stored settings (`resolveHarness`), and what the
 // panel may store (`applyChange`): defaults, validation against each entry's schema, locked entries, the revision, and
-// cloudpid ADR-0027's merge (keyed settings merged key by key, lists replaced whole) for the later per-Project overrides.
+// the merge (keyed settings merged key by key, lists replaced whole) for the later per-Project overrides.
 import { describe, expect, it } from "vitest";
 
 import { applyChange, applyToolsChange, BUILTIN_TOOLS, mcpServersOf, EMPTY_HARNESS, extensionOf, EXTENSIONS, resolvedToolsOf, resolveHarness, type StoredHarness, type ToolsChange, withoutQuery } from "./index.ts";

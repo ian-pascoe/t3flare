@@ -23,7 +23,7 @@ export * from "./environment.ts";
 export * from "./tools.ts";
 
 // Settings are Global (the Cloud Environment) now; the stored shape has per-Project `overrides`, empty, resolved with
-// cloudpid ADR-0027's merge (an Override's keyed settings merge over Global's key by key; lists are replaced whole) so a
+// a merge (an Override's keyed settings merge over Global's key by key; lists are replaced whole) so a
 // later step only adds a scope picker.
 
 export interface ExtensionEntry {
@@ -428,7 +428,7 @@ export interface ResolvedHarness extends Partial<ResolvedTools> {
   readonly offered?: ReadonlyArray<string>;
 }
 
-/** cloudpid ADR-0027's merge: the override's switch over Global's, its settings over Global's key by key. */
+/** The merge: the override's switch over Global's, its settings over Global's key by key. */
 const merge = (base: HarnessLayer, over: HarnessLayer | undefined): HarnessLayer => {
   if (over === undefined) return base;
   const extensions = { ...base.extensions };

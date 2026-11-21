@@ -1,8 +1,7 @@
 // The Environment skill set a Workspace holds (SPI-1148, ADR-0033): the files its read-only mount at `SKILLS_MOUNT`
 // serves, kept in the Workspace DO's own storage, one value per file, with the set's hash and its parsed listing. The
 // instance keeps only the hash and the listing in memory; computer reads the files when it copies them. Empty until one
-// is handed over (`WorkspaceDO.takeEnvironmentSkills`). Ported from cloudpid@47941c7c
-// (`apps/server/src/workspace/skill-set.ts`).
+// is handed over (`WorkspaceDO.takeEnvironmentSkills`).
 import { type EagerMount, type MountWriteAPI, WorkerBundle } from "@cloudflare/computer";
 import { EMPTY_SKILL_SET, EMPTY_SKILL_SET_HASH, listingOfSet, type Skill, type SkillSet } from "@t3flare/skills";
 

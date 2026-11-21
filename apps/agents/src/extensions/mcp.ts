@@ -1,7 +1,7 @@
-// The `mcp` extension (ADR-0028; cloudpid's `packages/extensions/src/mcp.ts`, with t3-mcp's approval rule): the MCP
-// server set's tools as the Environment's MCP host lists them (`McpView`), each a pi-durable tool
-// `mcp__<server>__<tool>` that calls through `EnvironmentDO.mcpCall`. Exposure per server and tool: `direct` (offered),
-// `deferred` (loaded with tool_search; scripts call it any time), `codemode` (scripts only), `hidden` (not installed).
+// The `mcp` extension (ADR-0028; with t3-mcp's approval rule): the MCP server set's tools as the Environment's MCP host
+// lists them (`McpView`), each a pi-durable tool `mcp__<server>__<tool>` that calls through `EnvironmentDO.mcpCall`.
+// Exposure per server and tool: `direct` (offered), `deferred` (loaded with tool_search; scripts call it any time),
+// `codemode` (scripts only), `hidden` (not installed).
 //
 // Every call is judged by `decideCall` inside `execute`, so a script's nested call is judged as a direct one: reads run;
 // writes follow the thread's mode (plan refuses; full access runs; otherwise the owner is asked, and may accept the tool

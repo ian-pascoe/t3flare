@@ -1,9 +1,7 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/files.ts.
-// `ComputerFiles`: the file search `ls`, `find`, and `grep` run on (`@cloudpid/extensions/files`). Each search is one
-// of the Workspace DO's file operations (`host.ts`), answered as plain data. Without `reachContainer` it sees only the
-// Workspace's files and can never start a Container; the model's own tools ask for `reachContainer`, which runs a
-// search of a Container-only path on the Container (ADR-0018).
-// pi-durable's tools are Promise-native and stay so (ADR-0003); this adapter follows them.
+// `ComputerFiles`: the file search `ls`, `find`, and `grep` run on. Each search is one of the Workspace DO's file
+// operations (`host.ts`), answered as plain data. Without `reachContainer` it sees only the Workspace's files and can
+// never start a Container; the model's own tools ask for `reachContainer`, which runs a search of a Container-only path
+// on the Container. pi-durable's tools are Promise-native and stay so; this adapter follows them.
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { type Call, caller } from "./client.ts";
 import type { ComputerWorkspaceStub } from "./env.ts";

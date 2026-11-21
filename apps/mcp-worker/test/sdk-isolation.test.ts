@@ -1,13 +1,12 @@
-// The SDK stays in the MCP Worker (OD-T5; cloudpid's packages/mcp/src/sdk-isolation.test.ts, ported): the MCP SDK adds
-// about 9-10 MiB of cold heap to every isolate that loads it, and the agents Worker's isolates hold Sessions and
-// Workspaces (ADR-0014), the Environment Worker's t3. Checked on the module graph, as cloudpid does: a module in the graph
-// is one the isolate may evaluate.
+// The SDK stays in the MCP Worker (OD-T5): the MCP SDK adds about 9-10 MiB of cold heap to every isolate that loads it,
+// and the agents Worker's isolates hold Sessions and Workspaces (ADR-0014), the Environment Worker's t3. Checked on the
+// module graph: a module in the graph is one the isolate may evaluate.
 //
 // - The agents Worker's whole graph, bundled with its own build's Rolldown options: no `@modelcontextprotocol/` module.
-// - `@cloudpid/mcp/types`, `@cloudpid/mcp/oauth` and `@cloudpid/mcp/elicitation-url` (what the Environment's MCP host
+// - `@t3flare/mcp/types`, `@t3flare/mcp/oauth` and `@t3flare/mcp/elicitation-url` (what the Environment's MCP host
 //   may import; the last since SPI-1079): no SDK module.
 // - The Environment Worker's own sources (its full bundle carries t3 and its shims, too slow here): no import of the SDK
-//   or of `@cloudpid/mcp` other than those two entries.
+//   or of `@t3flare/mcp` other than those two entries.
 // A planted import proves each check can fail.
 // @effect-diagnostics asyncFunction:off nodeBuiltinImport:off preferEffectArray:off
 import * as fs from "node:fs";
@@ -20,10 +19,10 @@ const here = (path: string) => resolve(import.meta.dirname, path);
 const SDK = "@modelcontextprotocol/";
 const AGENTS = here("../../agents/src/worker.ts");
 const ENVIRONMENT_SRC = here("../../environment/src");
-const TYPES = here("../../../vendor/cloudpid/mcp/src/types.ts");
-const OAUTH = here("../../../vendor/cloudpid/mcp/src/oauth.ts");
-const ELICITATION_URL = here("../../../vendor/cloudpid/mcp/src/elicitation-url.ts");
-const CORE = here("../../../vendor/cloudpid/mcp/src/index.ts");
+const TYPES = here("../../../packages/mcp/src/types.ts");
+const OAUTH = here("../../../packages/mcp/src/oauth.ts");
+const ELICITATION_URL = here("../../../packages/mcp/src/elicitation-url.ts");
+const CORE = here("../../../packages/mcp/src/index.ts");
 
 const PLANTED = "\0planted";
 const planted = (entry: string, extra: ReadonlyArray<string>): Plugin => ({
@@ -62,11 +61,11 @@ const sources = (dir: string): ReadonlyArray<string> =>
     return entry.isDirectory() ? sources(path) : entry.name.endsWith(".ts") ? [path] : [];
   });
 
-/** An import the Environment Worker may not make: the SDK, or `@cloudpid/mcp` beyond its types and OAuth entries. */
+/** An import the Environment Worker may not make: the SDK, or `@t3flare/mcp` beyond its types and OAuth entries. */
 const forbiddenImports = (text: string): ReadonlyArray<string> =>
   [...text.matchAll(/from\s+"([^"]+)"|import\(\s*"([^"]+)"\s*\)/g)]
     .map((match) => match[1] ?? match[2] ?? "")
-    .filter((source) => source.startsWith(SDK) || (source.startsWith("@cloudpid/mcp") && !["@cloudpid/mcp/types", "@cloudpid/mcp/oauth", "@cloudpid/mcp/elicitation-url"].includes(source)));
+    .filter((source) => source.startsWith(SDK) || (source.startsWith("@t3flare/mcp") && !["@t3flare/mcp/types", "@t3flare/mcp/oauth", "@t3flare/mcp/elicitation-url"].includes(source)));
 
 describe("the MCP SDK stays in the MCP Worker", () => {
   it("the agents Worker's graph has no SDK module, and a planted import is caught", async () => {
@@ -74,16 +73,16 @@ describe("the MCP SDK stays in the MCP Worker", () => {
     expect(sdkModules(await graphOf(AGENTS, ["@modelcontextprotocol/client"])).length).toBeGreaterThan(0);
   }, 120_000);
 
-  it("@cloudpid/mcp/types, /oauth and /elicitation-url load nothing of the SDK", async () => {
+  it("@t3flare/mcp/types, /oauth and /elicitation-url load nothing of the SDK", async () => {
     expect(sdkModules(await graphOf(TYPES))).toEqual([]);
     expect(sdkModules(await graphOf(OAUTH))).toEqual([]);
     expect(sdkModules(await graphOf(ELICITATION_URL))).toEqual([]);
     expect(sdkModules(await graphOf(CORE)).length).toBeGreaterThan(0);
   }, 120_000);
 
-  it("the Environment Worker's sources import neither the SDK nor @cloudpid/mcp's core", () => {
+  it("the Environment Worker's sources import neither the SDK nor @t3flare/mcp's core", () => {
     const found = sources(ENVIRONMENT_SRC).flatMap((file) => forbiddenImports(fs.readFileSync(file, "utf8")).map((source) => `${file}: ${source}`));
     expect(found).toEqual([]);
-    expect(forbiddenImports(`import { connect } from "@cloudpid/mcp";`)).toEqual(["@cloudpid/mcp"]);
+    expect(forbiddenImports(`import { connect } from "@t3flare/mcp";`)).toEqual(["@t3flare/mcp"]);
   });
 });

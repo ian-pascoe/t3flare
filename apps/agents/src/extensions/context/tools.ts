@@ -1,12 +1,12 @@
-// Adapted from cloudpid@93ba45a3:packages/extensions/src/context/tools.ts and store.ts (SPI-1056): `context_notes` and
-// `context_history`, with pi-context-management's parameters and limits, as plain pi-durable tools. Notes live in the
-// conversation's Notes document (`./notes.ts`); History reads the stored entries (`./history.ts`), which a Handoff or a
-// compaction takes out of the model's context but never out of the Session DO's storage.
+// The context tools (SPI-1056): `context_notes` and `context_history`, with pi-context-management's parameters and
+// limits, as plain pi-durable tools. Notes live in the conversation's Notes document (`./notes.ts`); History reads the
+// stored entries (`./history.ts`), which a Handoff or a compaction takes out of the model's context but never out of
+// the Session DO's storage.
 //
-// Changed from cloudpid's: no `lineage` scope (a Durable agent has no subagents in its Session: t3's delegated threads
-// are Sessions of their own), so refs are the conversation's own; History is read in pages of stored entries, each in
-// its own read, `windows`/`list` keep only a short line per entry and `search` stops once its page is full, so a long
-// thread never holds its whole transcript in memory at once; the Notes' total size is bounded.
+// No `lineage` scope (a Durable agent has no subagents in its Session: t3's delegated threads are Sessions of their
+// own), so refs are the conversation's own; History is read in pages of stored entries, each in its own read,
+// `windows`/`list` keep only a short line per entry and `search` stops once its page is full, so a long thread never
+// holds its whole transcript in memory at once; the Notes' total size is bounded.
 // @effect-diagnostics globalDate:off extendsNativeError:off
 import type { Context } from "@earendil-works/chord";
 import { type ConversationId, type Cursor, defineTool, type EntryRecord, type JsonObject, type ToolExecutionApi, type ToolRegistration } from "@earendil-works/pi-durable";

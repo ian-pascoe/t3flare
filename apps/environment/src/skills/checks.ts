@@ -1,7 +1,7 @@
 // What an Environment skill may hold (SPI-1148, ADR-0033): the checks its files pass before the Environment keeps them,
-// the Agent Skills name rules, and the limits. Ported from cloudpid@47941c7c (`packages/extensions/src/skill-checks.ts`)
-// with SPI-1148's added rules: a name needs a letter (so t3 can mention it), a Skill may hold no link or submodule, and
-// every path passes the rule each Workspace applies (`skillFilePathProblem`).
+// the Agent Skills name rules, and the limits, with SPI-1148's added rules: a name needs a letter (so t3 can mention
+// it), a Skill may hold no link or submodule, and every path passes the rule each Workspace applies
+// (`skillFilePathProblem`).
 import { pathAlsoDirectory, skillFilePathProblem } from "@t3flare/skills";
 
 /** The most one file may be: under the 2 MB a Durable Object SQLite row may hold. */

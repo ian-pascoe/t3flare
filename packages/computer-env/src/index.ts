@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/index.ts.
 export { type ComputerEnvHost } from "./client.ts";
 
 export {

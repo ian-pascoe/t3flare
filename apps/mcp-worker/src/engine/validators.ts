@@ -1,7 +1,6 @@
 /**
  * The validator cache, one per isolate: tools' `outputSchema`s compiled with TypeBox, by schema hash, so a
- * `tools/call` result's `structuredContent` is checked in the engine (`docs/architecture/mcp-connections.md` → The
- * engine, Validation and compiling; The MCP core #394 D17, refined by #382 D8, D9.3).
+ * `tools/call` result's `structuredContent` is checked in the engine.
  *
  * TypeBox runs through its interpreted fallback: acceleration (`new Function`) is switched off, since a Worker may
  * not evaluate code once it has started, whatever `allow_eval_during_startup` allows at startup, and nothing compiles
@@ -14,8 +13,8 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import type { McpConnection } from "@cloudpid/mcp";
-import type { McpStructuredOutput, McpToolDefinition, McpToolProblem } from "@cloudpid/mcp/types";
+import type { McpConnection } from "@t3flare/mcp";
+import type { McpStructuredOutput, McpToolDefinition, McpToolProblem } from "@t3flare/mcp/types";
 import { Compile, type Validator, type XSchema } from "typebox/schema";
 import { Settings } from "typebox/system";
 
@@ -43,7 +42,7 @@ export interface ValidatorsApi {
   readonly compileAll: (
     tools: ReadonlyArray<McpToolDefinition>,
   ) => Effect.Effect<ReadonlyArray<McpToolProblem>>;
-  /** How `structuredContent` fits `outputSchema` (D17). */
+  /** How `structuredContent` fits `outputSchema`. */
   readonly check: (
     outputSchema: JsonObject,
     structuredContent: StructuredContent,

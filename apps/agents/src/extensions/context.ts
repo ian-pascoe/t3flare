@@ -1,5 +1,5 @@
-// Adapted from cloudpid@93ba45a3:packages/extensions/src/context.ts (SPI-1056; parity row pi-context-management): the
-// `context` extension, pi-context-management's `context_notes`, `context_history` and `context_rollover` on pi-durable.
+// The `context` extension (SPI-1056; parity row pi-context-management):
+// pi-context-management's `context_notes`, `context_history` and `context_rollover` on pi-durable.
 // Notes are a conversation document in the Session DO's storage (bounded, `./context/notes.ts`), History reads the
 // Session's stored entries, and Rollover hands off with `control: { handoff }`. With `rolloverOnCompaction` (the
 // default), a `beforeCompact` hook turns a background threshold compaction into a Rollover request and a compaction that

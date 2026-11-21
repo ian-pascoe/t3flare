@@ -1,7 +1,6 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/host.ts.
 // The Workspace DO side of `ComputerExecutionEnv`: file operations on the object's own `@cloudflare/computer`
 // Workspace, where a failure still carries its POSIX code, answered as plain data (see `wire.ts`).
-// pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
+// pi-durable's `ExecutionEnv` is Promise-native and stays so; this adapter follows it.
 // @effect-diagnostics cryptoRandomUUID:off globalDate:off
 import type { Workspace } from "@cloudflare/computer";
 import {
@@ -38,7 +37,7 @@ const STALE_READER_MS = 60 * 60 * 1000;
 /**
  * Where `createTempDir` and `createTempFile` (and so exec spills) create their paths: the harness's own directory in
  * the Workspace, synced, so the Worker Shell, the Container and the file tools all see them (outside the Workspace, every
- * path is the Container's: ADR-0018).
+ * path is the Container's).
  */
 export const TEMP_DIR = `${HARNESS_ROOT}/tmp`;
 

@@ -1,4 +1,4 @@
-// Adapted from cloudpid@93ba45a3:packages/extensions/src/todo.ts (SPI-1055; parity row pi-todo): the `todo` extension,
+// The `todo` extension (SPI-1055; parity row pi-todo):
 // its tool, the hooks that keep the list in front of the model, and pi-todo's one prompt line. The list lives in the
 // Session DO's storage (a pi-durable document, at most 200 Tasks and 20,000 characters as the model reads it); the
 // Session pushes it with its state and the Environment's differ shows it as t3's own todo list (parity G5). Changing

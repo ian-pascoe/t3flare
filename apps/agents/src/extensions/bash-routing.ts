@@ -1,11 +1,10 @@
-// Copied from cloudpid@b8097ff0:packages/extensions/src/bash-routing.ts (unchanged but for this line).
-// Which backend a `bash` command runs on when the model names none (docs/architecture/workspace.md → Backends): the Worker Shell, unless
-// the command needs something the Worker Shell does not have, and then the Container. The Container is the costly
-// backend, so the Worker Shell gets every command it can run: a program neither list below holds is asked of the Worker
-// Shell itself (`resolveRoute`), and a command that writes no file is run again on the Container when the Worker Shell
-// turns out not to run it (`workerShellCannot`). A command that is not understood goes to the Container. So does one
-// that names a Container-only path, which only the Container has (`commandPaths`, then the Workspace DO's answer), and
-// one that writes no file runs again there when the Worker Shell did not find such a path (`missingPaths`).
+// Which backend a `bash` command runs on when the model names none: the Worker Shell, unless the command needs
+// something the Worker Shell does not have, and then the Container. The Container is the costly backend, so the Worker
+// Shell gets every command it can run: a program neither list below holds is asked of the Worker Shell itself
+// (`resolveRoute`), and a command that writes no file is run again on the Container when the Worker Shell turns out not
+// to run it (`workerShellCannot`). A command that is not understood goes to the Container. So does one that names a
+// Container-only path, which only the Container has (`commandPaths`, then the Workspace DO's answer), and one that
+// writes no file runs again there when the Worker Shell did not find such a path (`missingPaths`).
 //
 // The command is read the way bash reads it (quotes, pipelines and lists, subshells, substitutions, heredocs, `case`),
 // so a program named inside a string or a heredoc body does not count and one inside `$(…)` does. Every simple command
@@ -65,7 +64,7 @@ export const CONTAINER_PROGRAMS: readonly string[] = names(
     "poetry pytest ruff mypy black cargo rustc rustup go gofmt make cmake ninja gcc g++ cc c++ clang ld java javac",
     "mvn gradle kotlin dotnet ruby gem bundle rake php composer perl lua swift zig gh curl wget ssh scp rsync",
     "docker docker-compose kubectl terraform mise apt apt-get dpkg sudo su nohup nice ps top htop lsof pkill pgrep",
-    "killall sqlite3 psql mysql redis-cli yq unzip zip 7z openssl cloudpid-dockerd",
+    "killall sqlite3 psql mysql redis-cli yq unzip zip 7z openssl",
   ].join(" "),
 );
 
@@ -93,15 +92,14 @@ type GitSubcommand = {
 };
 
 /**
- * The subcommands git runs on the Worker Shell: the few read-only ones whose output is checked against real git's in
- * `apps/server/src/workspace/bash.workerd.test.ts`, in the forms checked. computer's git client is isomorphic-git, not
- * git, so everything else goes to the Container's real git: what writes the index or refs (`add`, `rm`, `commit`,
- * `tag`, `branch <name>`, `init`, `remote add`: two git implementations must not write one `.git`), what it gets
- * wrong (`diff` of a revision prints nothing, `show` has no patch, `log` dates and paths, `status -s`, `cat-file`), what
- * needs the network or credentials (`clone`, `fetch`, `pull`, `push`), and what rewrites the working tree (`checkout`,
- * `switch`, `reset`, `merge`, `stash`, `clean`). Bare `git status` prints one `XY path` line per changed file (`?` for
- * untracked), not git's long format, and `git status` of a repo that tracks files under the `ignore` paths shows them
- * deleted, since those never reach the Workspace.
+ * The subcommands git runs on the Worker Shell: the few read-only ones whose output matches real git's, in the forms it
+ * handles. computer's git client is isomorphic-git, not git, so everything else goes to the Container's real git: what
+ * writes the index or refs (`add`, `rm`, `commit`, `tag`, `branch <name>`, `init`, `remote add`: two git
+ * implementations must not write one `.git`), what it gets wrong (`diff` of a revision prints nothing, `show` has no
+ * patch, `log` dates and paths, `status -s`, `cat-file`), what needs the network or credentials (`clone`, `fetch`,
+ * `pull`, `push`), and what rewrites the working tree (`checkout`, `switch`, `reset`, `merge`, `stash`, `clean`). Bare
+ * `git status` prints one `XY path` line per changed file (`?` for untracked), not git's long format, and `git status`
+ * of a repo that tracks files under the `ignore` paths shows them deleted, since those never reach the Workspace.
  */
 const GIT_ON_WORKER: ReadonlyMap<string, GitSubcommand> = new Map(
   Object.entries({
@@ -1260,7 +1258,7 @@ export type WorkerOutput = { readonly stdout: string; readonly stderr: string };
 /**
  * What the Worker Shell writes to stderr when it cannot do what a command asks, where the Container can: a program it
  * lacks, a syntax its parser does not take, an option its version of a program does not take, a feature it does not
- * support, a repository too big for its git (`apps/server/src/workspace/git.ts`).
+ * support, a repository too big for its git.
  */
 const CANNOT: readonly RegExp[] = [
   /^bash: [^\n:]+: command not found$/m,
@@ -1463,7 +1461,7 @@ const collectPaths = (
 };
 
 /**
- * The paths `command`, run in `cwd`, names (docs/architecture/workspace.md → Backends): the argument words of every simple command,
+ * The paths `command`, run in `cwd`, names: the argument words of every simple command,
  * those inside substitutions and `bash -c` scripts included, the targets of file redirects, the values of `--opt=value`,
  * and the literal part of a glob, each made absolute against the directory it runs in, following the command's `cd`s
  * (a `cd` whose target is unknown stops that). A leading `~` is the Container's home (`/root`). Words that are no path

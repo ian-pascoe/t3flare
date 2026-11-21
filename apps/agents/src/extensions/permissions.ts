@@ -1,12 +1,11 @@
 // The `permissions` extension (step 2a plan, section 3 → Runtime modes and approvals): wraps of `bash`, `edit` and
 // `write` that check the Session's runtime mode, ask the owner when it needs them to, wait, then run the wrapped tool or
-// return the decline. Modelled on cloudpid@b8097ff0:packages/extensions/src/approvals.ts (`withApproval`), without
-// Effect:
+// return the decline. Plain Promise code, without Effect:
 //
 // - A request is stored in the Session DO's storage, keyed by the asking call's task, so a rerun of the call after a
 //   restart finds it still waiting (and waits again), or finds the answer given meanwhile.
-// - Each attempt that reaches the wait marks it as progress (`api.progressed`, cloudpid's pi-durable patch #647), so the
-//   restarts that cut a waiting call off never reach `restartLimit`.
+// - Each attempt that reaches the wait marks it as progress (`api.progressed`), so the restarts that cut a waiting
+//   call off never reach `restartLimit`.
 // - The wait has no deadline. Cancelling it (Stop) withdraws the request; a request whose call ended is settled.
 // - The wrapped tools are replay-safe for the wait only: a memo is committed before the wrapped tool runs, and a rerun
 //   that finds it (the tool started, then the Session restarted) returns an error instead of running an unsafe tool

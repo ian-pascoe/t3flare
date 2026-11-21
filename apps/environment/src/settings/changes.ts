@@ -8,7 +8,7 @@
 // `expiresAt` closes as `expired`, and a closed row goes `CLOSED_KEPT_MS` after it closed (the longest a cap looks back:
 // a run of strikes and the lock after its last). No alarm is added (ADR-0003: one alarm).
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
-import { MCP_ELICITATION_WAIT_MS } from "@cloudpid/mcp/types";
+import { MCP_ELICITATION_WAIT_MS } from "@t3flare/mcp/types";
 import { withoutQuery } from "@t3flare/harness-registry";
 import { sha256Hex } from "@t3flare/skills";
 

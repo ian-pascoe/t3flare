@@ -1,8 +1,7 @@
-// Adapted from cloudpid@93ba45a3:packages/extensions/src/todo/doc.ts (SPI-1055): a conversation's Todo List as a
-// pi-durable conversation document, in the Session DO's storage. Documents are not part of the transcript, so a Handoff
-// or a compaction leaves the list as it is; the projection (`./projection.ts`) puts it back in front of the model. The
-// Session pushes it to the Environment (`SessionState.todo`), where the differ shows it as t3's todo list. The kind is
-// t3flare's own.
+// A conversation's Todo List (SPI-1055) as a pi-durable conversation document, in the Session DO's storage. Documents
+// are not part of the transcript, so a Handoff or a compaction leaves the list as it is; the projection
+// (`./projection.ts`) puts it back in front of the model. The Session pushes it to the Environment
+// (`SessionState.todo`), where the differ shows it as t3's todo list. The kind is t3flare's own.
 import { defineDoc } from "@earendil-works/pi-durable";
 
 /** A Task's state: unconstrained, so several Tasks may be active at once. */

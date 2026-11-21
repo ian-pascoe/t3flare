@@ -1,36 +1,22 @@
-import type { McpBridgeOptions } from "@cloudpid/sandbox-image/mcp-bridge";
-import type { RpcTarget } from "cloudflare:workers";
+import type { McpBridgeOptions } from "@t3flare/sandbox-image/mcp-bridge";
 
-/** The name `Server` binds `McpWorker`'s `McpEngine` entrypoint under, for `McpHost` (ADR-0038). */
+/** The name the Environment Worker binds `McpWorker`'s `McpEngine` entrypoint under, for `McpHost`. */
 export const MCP_ENGINE_BINDING = "MCP_ENGINE";
 
-/** The `McpWorker` entrypoint `Server` binds as `MCP_ENGINE`. */
+/** The `McpWorker` entrypoint the Environment Worker binds as `MCP_ENGINE`. */
 export const MCP_ENGINE_ENTRYPOINT = "McpEngine";
 
-/** The name `Server` binds `McpWorker`'s `McpServer` entrypoint under, for `/mcp` (`docs/architecture/mcp-endpoint.md` → The handler). */
-export const MCP_SERVER_BINDING = "MCP_SERVER";
-
-/** The `McpWorker` entrypoint `Server` binds as `MCP_SERVER`. */
-export const MCP_SERVER_ENTRYPOINT = "McpServer";
-
-/**
- * What `MCP_SERVER` answers: `serve` takes the request the main Worker verified (with no `Cf-Access-*` header or cookie)
- * and its `McpApi` target, and returns the endpoint's response, a stream when the call is. It only gains members.
- */
-export interface McpServerBinding {
-  serve(request: Request, api: RpcTarget): Promise<Response>;
-}
-
-/** The name `McpWorker` binds the Workspaces Worker's `WorkspaceMcpBridge` entrypoint under (`docs/architecture/mcp-connections.md` → The engine). */
+/** The name `McpWorker` would bind the agents Worker's `WorkspaceMcpBridge` entrypoint under. */
 export const MCP_BRIDGE_BINDING = "MCP_BRIDGE";
 
-/** The Workspaces Worker's entrypoint `McpWorker` binds as `MCP_BRIDGE`. */
+/**
+ * The agents Worker's entrypoint `McpWorker` would bind as `MCP_BRIDGE`. The agents Worker has none, so it is unbound.
+ */
 export const WORKSPACE_MCP_BRIDGE_ENTRYPOINT = "WorkspaceMcpBridge";
 
 /**
- * What `MCP_BRIDGE` answers (`apps/server/src/workspace/worker.ts`, `WorkspaceMcpBridge`): `request`, the engine's, from
- * the bridge in the Container of Workspace object `workspace` (`ws:<id>`), or one of its own refusals
- * (`McpBridgeRefusal`). It only gains.
+ * What `MCP_BRIDGE` would answer (`WorkspaceMcpBridge`): `request`, the engine's, from the bridge in the Container of
+ * Workspace object `workspace` (`ws:<id>`), or one of its own refusals (`McpBridgeRefusal`). It only gains.
  */
 export interface McpBridgeBinding {
   mcpBridge(workspace: string, request: Request, options: McpBridgeOptions): Promise<Response>;

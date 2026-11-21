@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/host.test.ts.
 // `WorkspaceEnvHost.readEnv`: the environment code inside the Workspace DO reads files through. Paths resolve against
 // its `cwd` as `ComputerExecutionEnv`'s do, so the same paths reach the same files.
 import type { Workspace } from "@cloudflare/computer";

@@ -1,5 +1,5 @@
 /**
- * What the engine takes out of what a server tells it (`docs/architecture/mcp-connections.md` → Telemetry): the values
+ * What the engine takes out of what a server tells it: the values
  * the call keeps secret (its access tokens, the Secrets the host put into its target, the credentials in its headers),
  * which a server may echo into a log, an error, a result or its own listing. It catches accidents, not a server bent on
  * leaking: a prefix or a suffix of a value, or one cut by the server, is not found.
@@ -17,7 +17,7 @@ import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
-import type { McpPromptProblem, McpToolProblem } from "@cloudpid/mcp/types";
+import type { McpPromptProblem, McpToolProblem } from "@t3flare/mcp/types";
 
 const REDACTED = "[REDACTED]";
 

@@ -1,6 +1,6 @@
-// G11's Container previews (ADR-0031; cloudpid's ADR-0023, ported): what a preview browser's page gets from the Workspace
-// DO for `http://<port>.t3flare.internal/`, over a fake Container port. The carried sockets' streams need workerd's
-// WebSocket and are checked on the stage (`scripts/previews.ts`); their refusals are checked here.
+// G11's Container previews (ADR-0031): what a preview browser's page gets from the Workspace DO for
+// `http://<port>.t3flare.internal/`, over a fake Container port. The carried sockets' streams need workerd's WebSocket
+// and are checked on the stage (`scripts/previews.ts`); their refusals are checked here.
 import { describe, expect, it } from "vitest";
 
 import { ContainerPreview, type ContainerPreviewDeps } from "../src/workspace/containerPreview.ts";

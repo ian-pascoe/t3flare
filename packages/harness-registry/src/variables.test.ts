@@ -33,7 +33,7 @@ describe("Variables", () => {
     expect(resolveEnvironment(removed.environment).variables).toEqual({ A: "1" });
   });
 
-  it("keeps cloudpid's limits: 50 Variables, names up to 128 characters, values up to 4,096", () => {
+  it("keeps the limits: 50 Variables, names up to 128 characters, values up to 4,096", () => {
     const fifty = Object.fromEntries(Array.from({ length: 50 }, (_, at) => [`V${at}`, "x"]));
     expect(apply(fifty)).toMatchObject({ ok: true });
     expect(refusal({ ...fifty, V50: "x" })).toBe("variables: at most 50 Variables (51 given)");
@@ -101,7 +101,7 @@ describe("Variables", () => {
       [`config: password = "${"h".repeat(24)}"`, "an assigned key, token, secret or password"],
     ];
     for (const [value, looksLike] of values) expect(refusal({ SETTING: value })).toBe(`variables: "SETTING"'s value looks like ${looksLike}, and secrets never enter a Container (ADR-0016)`);
-    // cloudpid's local-path patterns are not taken: a path on a machine is a fine value.
+    // Local-path patterns are not taken: a path on a machine is a fine value.
     expect(apply({ CACHE: "/home/runner/.cache", DIR: "/Users/me/x" })).toMatchObject({ ok: true });
   });
 

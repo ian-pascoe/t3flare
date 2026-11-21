@@ -58,7 +58,7 @@ CI, never by updating the Environment in place:
    - a t3 bump's content: `package.json` moves only `packageManager` and `engines.node`; in a worktree of the candidate
      with t3code at the tag (data: none of it runs), `gen-workspace.ts --check` regenerates `pnpm-workspace.yaml`,
      those two fields and `mise.toml` from t3code and requires them equal, and `verify-lock.ts` holds the lock's t3
-     closures to t3's own lock (with its one `effect`, the patches and the vendored links);
+     closures to t3's own lock (with its one `effect` and the patches);
    - a t3 bump's lock against main's (`t3LockRefusal`, review B2): its header is t3's (settings, used catalog entries)
      and the workspace's (overrides with `catalog:` resolved, patches with their files' hashes), pnpm's own document is
      t3's, and outside what t3 moved it is main's. What t3 moved, derived from the t3 side only: its own importers' graph,
@@ -95,7 +95,7 @@ CI, never by updating the Environment in place:
    push starts: its conclusion is the Update's. The key is the one secret of the `land` environment (none of prod's:
    the job can't reach prod's Cloudflare token or the App key, and deploy-prod's install never shares an environment
    with the key), whose branch policy admits `main` alone, so no branch, by-hand dispatch from another ref or opted-in Workspace's workflow reaches it.
-   Ruleset `main` requires pull requests: deploy keys and admins skip it always; the cloudpid and t3flare Apps only when
+   Ruleset `main` requires pull requests: deploy keys and admins skip it always; the Deployment's GitHub Apps only when
    merging a pull request (set before this, for their PR merges). GitHub Actions can't be a bypass actor on a personal
    account's repo, and the t3flare App also mints agents' Container tokens, so it gets no direct-push skip. The key can
    push any ref, workflow files included, and the skip covers the ruleset's other rules (force push, deletion): the

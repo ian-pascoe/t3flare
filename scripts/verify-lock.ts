@@ -4,14 +4,13 @@
 //  - every t3 importer installs exactly what it installs in t3's lock (the transitive closure, by name@version;
 //    peer and patch suffixes aside);
 //  - one copy of `effect`, which duplicate copies break (schema decoding);
-//  - every version t3 patches that our install contains is patched, and so is every `patches/deps` key;
-//  - the vendored `@cloudpid/*` packages link to the workspace, never the registry (review H2).
+//  - every version t3 patches that our install contains is patched, and so is every `patches/deps` key.
 //
 //   node scripts/verify-lock.ts [--list]     prints one JSON line; exit 1 on any failure
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { parse } from "yaml";
-import { bareKey, closure, DEPENDENCY_FIELDS, depPatchKey, readLock, versionsByName, type Json } from "./lock.ts";
+import { bareKey, closure, depPatchKey, readLock, versionsByName, type Json } from "./lock.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const PREFIX = "t3code/";
@@ -71,20 +70,6 @@ for (const file of fs.readdirSync(path.join(root, "patches/deps")).filter((name)
   if (!patched.has(key)) failures.push(`patches/deps/${file} is not in the lock's patchedDependencies`);
 }
 
-// Vendored links.
-const VENDORED = ["@cloudpid/protocol", "@cloudpid/config"];
-let links = 0;
-for (const [dir, importer] of Object.entries<Json>(ours.importers)) {
-  for (const field of DEPENDENCY_FIELDS) {
-    for (const name of VENDORED) {
-      const version = importer[field]?.[name]?.version as string | undefined;
-      if (version === undefined) continue;
-      if (version.startsWith("link:")) links++;
-      else failures.push(`${dir} resolves ${name} to ${version}, not the workspace`);
-    }
-  }
-}
-
 // For information: names both locks hold, at versions t3's lock does not have.
 const t3Names = versionsByName(Object.keys(t3.packages ?? {}));
 const differing: Array<string> = [];
@@ -101,7 +86,6 @@ console.log(
     t3ClosureEntries: compared,
     effectCopies: effect,
     patches: patched.size,
-    vendoredLinks: links,
     sharedNamesAtOtherVersions: differing.length,
     failures: failures.length,
   }),

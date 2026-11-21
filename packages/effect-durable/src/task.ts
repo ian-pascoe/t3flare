@@ -1,5 +1,4 @@
-// Copied from cloudpid@ae5a7b73:packages/effect-durable/src/task.ts.
-// Effect-defined pi-durable tasks (ADR-0003): each phase is an Effect run with the services of the Effect that builds
+// Effect-defined pi-durable tasks: each phase is an Effect run with the services of the Effect that builds
 // the task, and interrupted when pi-durable cancels the invocation. Checkpoints and commits stay native: a phase
 // commits through `runtime`, and Effect never schedules.
 import type * as Chord from "@earendil-works/chord/context";

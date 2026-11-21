@@ -1,6 +1,6 @@
 // Fetching Environment skills from GitHub (SPI-1148): the preview, the fetch of the folders the owner picked, and the
-// update check, over a fake GitHub that counts requests (some cases ported from cloudpid@47941c7c's
-// `skill-fetch.test.ts`). Each request is bounded (plan §3.3), and the counts below say so.
+// update check, over a fake GitHub that counts requests. Each request is bounded
+// (plan §3.3), and the counts below say so.
 import { describe, expect, it } from "vitest";
 
 import { checkSkills, fetchSkills, GithubReadError, previewSkills, readSkillMd } from "../src/skills/fetch.ts";

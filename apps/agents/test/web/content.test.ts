@@ -1,4 +1,3 @@
-// Copied from cloudpid@93ba45a3:packages/extensions/src/web/content.test.ts, imports repointed (SPI-1054).
 // The page fixtures and main-content expectations come from pi-web-tools' `test/web-fetch.test.ts` (MIT; see
 // ../../NOTICE.md); the Markdown expectations are for the Worker-side converter that replaces Turndown.
 // @effect-diagnostics globalDate:off

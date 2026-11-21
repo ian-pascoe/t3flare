@@ -117,7 +117,7 @@ describe("Prompt templates' discovery", () => {
       [`${ROOT}/.pi/prompts/nested/deep.md`]: "nested",
       [`${ROOT}/.pi/prompts/notes.txt`]: "not markdown",
       [`${ROOT}/.pi/prompts/two words.md`]: "a space",
-      [`${ROOT}/.agents/prompts/cloudpid.md`]: "cloudpid's convention",
+      [`${ROOT}/.agents/prompts/agents.md`]: "another harness's convention",
       [`${ROOT}/.claude/commands/claude.md`]: "Claude's",
     });
     expect(await discoverPrompts(files, ROOT)).toEqual([

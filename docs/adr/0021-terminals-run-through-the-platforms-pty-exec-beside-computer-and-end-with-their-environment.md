@@ -5,8 +5,7 @@ t3's own `TerminalManager` and setup-script runner stay stock; t3flare supplies 
 Container with the platform's `ctx.container.exec(…, { pty })`, beside `@cloudflare/computer`, which has no PTY. Output
 is pushed from the Workspace DO to the Environment DO in batches over DO RPC (as ADR-0005's Sessions push), input,
 resize and close go back as RPC, and nothing holds a connection open. The Workspace DO syncs files for its shells
-(pull when a prompt returns or output goes quiet, push its own writes every 2 s), following cloudpid's ADR-0012, which
-designed this and never built it.
+(pull when a prompt returns or output goes quiet, push its own writes every 2 s).
 
 ## Consequences
 

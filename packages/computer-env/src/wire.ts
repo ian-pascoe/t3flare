@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/wire.ts.
 // What `ComputerExecutionEnv` asks of the Workspace Durable Object, and how the answers cross Workers RPC. The
 // Workspace's file errors carry their POSIX code only in the object that raised them, so every file operation runs in
 // the Workspace DO and returns plain data: a result, or a failure with its pi-durable code. Plain data also means no
@@ -189,7 +188,7 @@ export type HostOperation = keyof HostOperations;
 /**
  * One call of a host operation, as `ComputerEnvHost.fileOperation` receives it. With `reachContainer`, an operation on a
  * Container-only path runs on the Container (the model's own tools ask for it; nothing else does, so nothing else
- * starts the Container: ADR-0018).
+ * starts the Container).
  */
 export type EnvRequest = {
   readonly [Operation in HostOperation]: {

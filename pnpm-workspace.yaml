@@ -2,7 +2,6 @@
 packages:
   - apps/*
   - packages/*
-  - vendor/cloudpid/*
   - infra
   - t3code/apps/server
   - t3code/apps/web
@@ -208,8 +207,6 @@ overrides:
   yaml: "catalog:"
   "@vercel/routing-utils>path-to-regexp": 6.3.0
   "@vercel/config>zod": 4.6.7
-  "@cloudpid/protocol": workspace:*
-  "@cloudpid/config": workspace:*
   workerd: 1.20261026.1
   "@cloudflare/workers-types@^5.20261104.1": 5.20261108.1
   "@effect/sql-d1": 4.1.1

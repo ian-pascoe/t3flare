@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/effect-durable/src/frame.ts.
 // The async context a piece of work runs in. Workers tracing nests a span under whichever span is active in the
 // current async context, and Effect runs fibers on a scheduler that does not keep it, so a fiber is run in the frame
 // it was started from (`CallerFrame`), or in that of its current span's native span.

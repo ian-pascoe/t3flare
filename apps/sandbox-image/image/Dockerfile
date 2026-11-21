@@ -1,12 +1,10 @@
-# t3flare's Container image (step 2a; ADR-0015: one image for Durable agents and, later, CLI agents). Copied from
-# cloudpid@ae5a7b73:apps/sandbox-image/image/Dockerfile without Docker, the MCP bridge and the file-change signal's helper;
-# the supervisor and memory guard keep cloudpid's names.
+# t3flare's Container image (step 2a; ADR-0015: one image for Durable agents and, later, CLI agents).
 #
-# The Workspace Container's image (docs/architecture/container.md, ADR-0004): Ubuntu 26.04 LTS with fuse3, the
-# everyday command-line tools, a C toolchain, Docker, computerd under its supervisor with a memory guard and the MCP bridge, the
-# file-change signal's helper, and mise with its installs of the base mise.toml's Toolchains. Every program a project uses is a mise Toolchain; the image's installs are only found by mise for a
-# Workspace that asks for those versions. The image is glibc-based because computerd is a glibc Node SEA, and
-# linux/amd64 because that is what Cloudflare Containers run.
+# The Workspace Container's image: Ubuntu 26.04 LTS with fuse3, the everyday command-line tools, a C toolchain,
+# computerd under its supervisor with a memory guard, and mise with its installs of the base mise.toml's Toolchains.
+# Every program a project uses is a mise Toolchain; the image's installs are only found by mise for a Workspace that
+# asks for those versions. The image is glibc-based because computerd is a glibc Node SEA, and linux/amd64 because
+# that is what Cloudflare Containers run.
 
 # Keep in step with the version of @cloudflare/computer the Workspace DO runs (apps/environment/test/cliManifest.test.ts
 # fails when they differ): the Workspace and computerd speak a sync protocol that is not stable across releases.
@@ -65,7 +63,7 @@ RUN apt-get update \
 
 FROM --platform=linux/amd64 ubuntu:26.04@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c
 
-# The everyday tools agents and scripts expect (#169; some from exe.dev's exeuntu list), build-essential and the
+# The everyday tools agents and scripts expect (some from exe.dev's exeuntu list), build-essential and the
 # headers native npm and pip packages build against, and earlyoom, the memory guard
 # the supervisor runs. Versioned Toolchains
 # (Node, pnpm, Bun, Python, git, gh) are mise's, never apt's: mise's shims come first on PATH anyway, so a git an apt
@@ -86,14 +84,13 @@ RUN apt-get update \
 COPY --from=computerd /usr/local/bin/computerd /usr/local/bin/computerd
 COPY --from=mise /mise /usr/local/bin/mise
 
-# The base mise.toml's Toolchains (a copy of BASE_MISE_TOML, apps/sandbox-image/src/toolchains.ts, which a test keeps
-# equal), installed into mise's system directory, /usr/local/share/mise/installs, where mise looks for a version a
-# config asks for before it downloads one. Its lockfile is made here too and copied by the bootstrap next to the base
-# file it writes, since `mise lock` downloads aqua and Python artifacts to checksum them. A Workspace asking for other
-# versions installs them under /root as before. Refresh the versions in toolchains.ts and here together.
-COPY mise.toml /usr/local/share/cloudpid/mise.toml
-RUN cd /usr/local/share/cloudpid \
- && export MISE_GLOBAL_CONFIG_FILE=/usr/local/share/cloudpid/mise.toml MISE_TRUSTED_CONFIG_PATHS=/usr/local/share/cloudpid \
+# The base mise.toml's Toolchains (`mise.toml`, which commands read as mise's system config), installed into mise's
+# system directory, /usr/local/share/mise/installs, where mise looks for a version a config asks for before it
+# downloads one. Its lockfile is made here too, next to it, since `mise lock` downloads aqua and Python artifacts to
+# checksum them. A Workspace asking for other versions installs them under /root.
+COPY mise.toml /usr/local/share/t3flare/mise.toml
+RUN cd /usr/local/share/t3flare \
+ && export MISE_GLOBAL_CONFIG_FILE=/usr/local/share/t3flare/mise.toml MISE_TRUSTED_CONFIG_PATHS=/usr/local/share/t3flare \
  && mise install --system \
  && mise lock --global --platform linux-x64 \
  && mise reshim --system \
@@ -141,23 +138,28 @@ COPY claude-handle-unset.cjs /opt/t3flare/share/claude-handle-unset.cjs
 COPY --chmod=755 t3flare-opencode /opt/t3flare/bin/opencode
 COPY opencode-key-plugin /opt/t3flare/share/opencode-key-plugin
 
-COPY --chmod=755 supervise /usr/local/bin/cloudpid-supervise
+COPY --chmod=755 supervise /usr/local/bin/t3flare-supervise
 
 # The memory guard, which the supervisor runs: earlyoom (an apt package above), and a note for the commands that run
-# when it stops a process, which the file every command's bash reads first (BASH_ENV) prints when the command ends
-# (docs/architecture/container.md → Memory guard).
-COPY --chmod=755 cloudpid-memory-guard /usr/local/bin/cloudpid-memory-guard
-COPY command.bash /usr/local/share/cloudpid/command.bash
+# when it stops a process, which the file every command's bash reads first (BASH_ENV) prints when the command ends.
+COPY --chmod=755 t3flare-memory-guard /usr/local/bin/t3flare-memory-guard
+COPY command.bash /usr/local/share/t3flare/command.bash
+
+# A copy at the directory's earlier path, for one release: a Workspace Container started on the previous image keeps
+# running after a deploy (Containers run by Durable Objects take no rollout), so the commands' environment
+# (apps/sandbox-image/src/env.ts) names this path until every Container runs this image. Then env.ts moves to
+# /usr/local/share/t3flare and the copy goes. A copy, not a link, so mise sees the same paths as before.
+RUN cp -a /usr/local/share/t3flare /usr/local/share/cloudpid
 
 # computerd mounts its file system at MOUNT_POINT, so commands see the Workspace's files at /workspace. FUSE_MOUNT=auto
 # mounts through /dev/fuse where the platform exposes it (Cloudflare Containers) and falls back to a userspace shim
 # where it does not. mise keeps the Toolchains it installs on the Container's own disk, in its default place under
 # /root, and its shims put them on PATH, before the shims of the image's own installs. PATH is the one variable
 # computerd passes on to a command, so it is the one set here: mise's other settings reach a command in its exec
-# environment (apps/sandbox-image/src/toolchains.ts).
+# environment (`COMMAND_ENV`, apps/sandbox-image/src/env.ts).
 # computerd keeps its copy of the Workspace in COMPUTERD_DB, on the Container's disk, so a snapshot holds it with its
-# sync positions: a Container restored from one is sent only what changed since, not every file (docs/architecture/container.md →
-# Snapshots). In memory, the default, it is rebuilt from the Workspace DO at each start.
+# sync positions: a Container restored from one is sent only what changed since, not every file. In memory, the
+# default, it is rebuilt from the Workspace DO at each start.
 ENV PORT=8080 \
     MOUNT_POINT=/workspace \
     FUSE_MOUNT=auto \
@@ -166,6 +168,6 @@ ENV PORT=8080 \
 RUN mkdir -p /var/lib/computerd
 EXPOSE 8080
 
-# computerd runs under a supervisor that reports why it stopped, when it stops on its own, to the Workspace DO
-# (`supervise`; docs/architecture/container.md → Exit reports).
-ENTRYPOINT ["/usr/local/bin/cloudpid-supervise"]
+# computerd runs under a supervisor (`supervise`) that runs the memory guard beside it and reports why it stopped,
+# when it stops on its own.
+ENTRYPOINT ["/usr/local/bin/t3flare-supervise"]

@@ -1,7 +1,6 @@
 // @effect-diagnostics globalDate:off
 // A repo's commit, tree and blobs, read from GitHub's REST API by the Environment DO alone (SPI-1148, ADR-0033): the
-// `RepoReader` the fetch reads through. Ported from cloudpid@47941c7c (`apps/server/src/github/contents.ts`,
-// `request.ts`), with t3flare's credential (plan §3.2):
+// `RepoReader` the fetch reads through. Its credential is t3flare's (plan §3.2):
 //
 // 1. a token for the repo itself, where the GitHub App is installed on it: the only way to read a private repo;
 // 2. else a token for one installed repo, which reads public repos outside the installation (R1) from the
@@ -156,7 +155,7 @@ export const githubReader = (options: GithubReaderOptions): RepoReader => {
     return new GithubReadError("failed", `GitHub answered ${response.status}${saying}`);
   };
 
-  /** What a 404 says, by what is known of the App on the repo's owner (cloudpid's two variants). */
+  /** What a 404 says, by what is known of the App on the repo's owner (two variants). */
   const gone = (repo: SkillRepo): string =>
     access.ownerInstalled
       ? `GitHub has no repo ${repo.owner}/${repo.name}, or the GitHub App's installation on ${repo.owner} does not include it (install it on all repositories).`

@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off nodeBuiltinImport:off globalDate:off
 // The agents Worker's build (ADR-0020): bundled here with the Rolldown options alchemy's Worker bundling uses (its
-// Cloudflare plugin, minify, strictExecutionOrder, lazyBarrel, inlineConst), and uploaded with `bundle: false`.
-// Unlike the environment Worker it needs no Patch, Shadow or Build shim: it imports nothing of t3.
+// Cloudflare plugin, minify, strictExecutionOrder, lazyBarrel, inlineConst), and uploaded with `bundle: false`. Unlike
+// the environment Worker it needs no Patch, Shadow or Build shim: it imports nothing of t3.
 //
 //   node build.ts      bundle to dist/worker/ and write dist/build-report.json
 import * as fs from "node:fs";

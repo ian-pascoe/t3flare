@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:apps/server/src/github/app.test.ts.
 // @effect-diagnostics nodeBuiltinImport:off globalDate:off -- WebCrypto and `fetch` are Promise APIs; node:crypto makes the test keys.
 import { generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
@@ -87,7 +86,7 @@ const fakeGitHub = (options: {
     });
 
     if (method === "GET" && url === "https://api.github.com/app") {
-      return Response.json({ owner: { login: "ian-pascoe" }, slug: "cloudpid-app" });
+      return Response.json({ owner: { login: "ian-pascoe" }, slug: "t3flare-app" });
     }
 
     if (method === "GET" && url === "https://api.github.com/app/installations?per_page=100") {
@@ -128,8 +127,8 @@ describe("GitHubApp", () => {
       now: () => now,
     });
 
-    expect(await app.botLogin()).toBe("cloudpid-app[bot]");
-    expect(await app.botLogin()).toBe("cloudpid-app[bot]");
+    expect(await app.botLogin()).toBe("t3flare-app[bot]");
+    expect(await app.botLogin()).toBe("t3flare-app[bot]");
     expect(github.seen.map(({ method, url }) => `${method} ${url}`)).toEqual([
       "GET https://api.github.com/app",
     ]);
@@ -494,13 +493,13 @@ describe("GitHubApp", () => {
       fetch: github.fetch,
       now: () => now,
       permissions: { issues: "write" },
-      repositories: ["cloudpid"],
+      repositories: ["t3flare"],
     });
 
     await app.token("ian-pascoe");
 
     expect(JSON.parse(github.seen.at(-1)?.body ?? "")).toEqual({
-      repositories: ["cloudpid"],
+      repositories: ["t3flare"],
       permissions: { issues: "write" },
     });
   });

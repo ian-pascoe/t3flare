@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off
 // The Workspace DO's side of Repo skills and Prompt templates (SPI-1147 §1): discovery run next to its own files, so a
-// request is one RPC and never starts the Container (ADR-0009). The Environment skill set is SPI-1148's; until then
-// it is empty.
+// request is one RPC and never starts the Container (ADR-0009). The Environment skill set is SPI-1148's; until then it
+// is empty.
 import type { ReadEnv } from "@t3flare/computer-env";
 import { CLI_ROOTS, type CliAgent, discoverPrompts, discoverSkills, type PromptTemplate, type Skill, type SkillDiscovery, type SkillFiles } from "@t3flare/skills";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";

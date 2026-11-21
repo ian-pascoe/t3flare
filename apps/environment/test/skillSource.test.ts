@@ -1,4 +1,3 @@
-// Ported from cloudpid@47941c7c (`apps/server/src/github/skill-source.test.ts`).
 import { describe, expect, it } from "vitest";
 
 import { parseSkillSource } from "../src/skills/source.ts";

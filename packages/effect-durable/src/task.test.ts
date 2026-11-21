@@ -1,5 +1,4 @@
-// Copied from cloudpid@ae5a7b73:packages/effect-durable/src/task.test.ts.
-// @effect-diagnostics effectFnOpportunity:off -- tests copied from cloudpid write tasks inline.
+// @effect-diagnostics effectFnOpportunity:off -- tests write tasks inline.
 // pi-durable's Harness is Promise-based, so these tests are too.
 import type { JsonValue } from "@earendil-works/chord";
 import type * as Chord from "@earendil-works/chord/context";

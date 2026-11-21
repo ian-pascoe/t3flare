@@ -1,7 +1,5 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/list-files.test.ts.
 // `listFiles`' walk over an in-memory file tree: what it skips is never walked, and a repository below the listed
-// directory applies its own ignore rules. The conformance cases (`apps/server/src/workspace/env.workerd.test.ts`) check
-// the rest against a real Workspace.
+// directory applies its own ignore rules. The rest needs a real Workspace, which these tests do not have.
 import type { Workspace } from "@cloudflare/computer";
 import { describe, expect, it } from "vitest";
 import { listFiles } from "./list-files.ts";

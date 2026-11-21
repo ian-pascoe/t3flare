@@ -1,7 +1,6 @@
-// An MCP server's questions as t3 cards (SPI-1079, ADR-0028's elicitation refinement; cloudpid ADR-0041's rules as
-// ported). Pure: the MCP host makes a card of each question a server asks during an agent's call, and of each pause an
-// Executor-style server returns, and turns the owner's answer back into what the server gets. The caller (the Session or
-// the CLI relay) only shows the card.
+// An MCP server's questions as t3 cards (SPI-1079, ADR-0028's elicitation refinement). Pure: the MCP host makes a card
+// of each question a server asks during an agent's call, and of each pause an Executor-style server returns, and turns
+// the owner's answer back into what the server gets. The caller (the Session or the CLI relay) only shows the card.
 //
 // - A form with no fields, an Executor `approval-required` and a page (URL mode) are t3's own `mcp-elicitation` approval
 //   cards, as t3's Codex adapter shows an approval-shaped elicitation; a form with fields is a `user_input` card, one
@@ -13,7 +12,7 @@
 //   Sampling request (not offered).
 // - Nothing here keeps an answer; logs name fields, never values.
 // @effect-diagnostics cryptoRandomUUID:off
-import { checkElicitationUrl } from "@cloudpid/mcp/elicitation-url";
+import { checkElicitationUrl } from "@t3flare/mcp/elicitation-url";
 import {
   MCP_INVALID_PARAMS,
   type McpInputAnswer,
@@ -23,7 +22,7 @@ import {
   plainLine,
   plainMessage,
   validateElicitation,
-} from "@cloudpid/mcp/types";
+} from "@t3flare/mcp/types";
 import { cardText } from "@t3flare/harness-registry";
 import { MCP_QUESTION_MARKER, type McpCardQuestion, type McpQuestionAnswer, type McpQuestionCard } from "@t3flare/session-protocol";
 import * as Result from "effect/Result";
@@ -193,7 +192,7 @@ export const planQuestion = (request: typeof McpInputRequest.Encoded, context: Q
     if (typeof params.url !== "string") return refuse("a page question without a URL");
     const page = checkElicitationUrl(params.url, context.isOwnHost);
     if (Result.isFailure(page)) {
-      const reason = page.failure.reason.replace("cloudpid's", "t3flare's");
+      const reason = page.failure.reason;
       return page.failure.kind === "declined" ? decline(`the page was declined unseen: ${reason}`) : refuse(reason);
     }
     const { url, host, domain, warning } = page.success;

@@ -136,7 +136,7 @@ const startSleeper = async (threadId: string) => {
   const tree = new Map<number, Proc>();
   for (const s of call) {
     let at: Proc | undefined = s;
-    while (at !== undefined && !tree.has(at.pid) && !/computerd|cloudpid-supervise/.test(at.args) && at.pid !== 1) {
+    while (at !== undefined && !tree.has(at.pid) && !/computerd|t3flare-supervise/.test(at.args) && at.pid !== 1) {
       tree.set(at.pid, at);
       at = procs.find((p) => p.pid === at!.ppid);
     }

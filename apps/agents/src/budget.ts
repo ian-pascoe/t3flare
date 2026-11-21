@@ -1,10 +1,10 @@
 // @effect-diagnostics globalDate:off
-// The Container budget (step 2a plan, cost guardrails): at most the budget's Containers run at once across the
-// deploy. `max_instances` does not apply under `schedulingPolicy: "durable_object"`, so a singleton DO holds the leases.
-// The budget is an Environment setting (ADR-0032): a Workspace DO carries it with a fresh start's lease request, and
-// this object judges the request by it and keeps the last one for renewals and status reads (MAX_CONTAINERS before
-// any). Lowering it stops nothing: a holder's own lease is always renewed, and only new starts wait until fewer run.
-// A Workspace DO takes a lease before it starts its Container, renews it from its alarm while the Container runs, and
+// The Container budget (step 2a plan, cost guardrails): at most the budget's Containers run at once across the deploy.
+// `max_instances` does not apply under `schedulingPolicy: "durable_object"`, so a singleton DO holds the leases. The
+// budget is an Environment setting (ADR-0032): a Workspace DO carries it with a fresh start's lease request, and this
+// object judges the request by it and keeps the last one for renewals and status reads (MAX_CONTAINERS before any).
+// Lowering it stops nothing: a holder's own lease is always renewed, and only new starts wait until fewer run. A
+// Workspace DO takes a lease before it starts its Container, renews it from its alarm while the Container runs, and
 // releases it when the Container stops. A lease expires LEASE_MS after its last renewal, so a lost release frees its
 // room under the Container budget within that time, and a running Container never loses its lease while it is renewed.
 import { DEFAULT_CONTAINER_BUDGET, fitsEnvironmentSetting } from "@t3flare/harness-registry";

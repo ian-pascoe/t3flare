@@ -1,5 +1,4 @@
-// Copied from cloudpid@ae5a7b73:packages/effect-durable/src/tool.ts.
-// Effect-defined pi-durable tools (ADR-0003): Effect `Schema` parameters, Chord cancellation as fiber interruption, and
+// Effect-defined pi-durable tools: Effect `Schema` parameters, Chord cancellation as fiber interruption, and
 // typed failures as error results.
 import type { JsonValue } from "@earendil-works/chord";
 import type * as Chord from "@earendil-works/chord/context";
@@ -44,12 +43,12 @@ export type EffectToolDefinition<
  * The call `api` runs has reached a durable wait: what it waits for, such as the owner's answer, is in storage, and a
  * rerun after a restart waits for it again. pi-durable then starts the restart count over for the call and its owners
  * (a `codemode` call waiting for it as a nested call), up to the first that is being aborted
- * (`ToolExecutionApi.progressed`, a cloudpid patch: `docs/development/dependencies.md`), so the restarts that cut them
- * off while it waits (a Session that hibernates is started again by each heartbeat) never reach the restart limit
- * (`docs/architecture/overview.md` → Session host). Run it once the wait is stored and the attempt is about to await:
- * an attempt cut off before then still counts, so a call that keeps crashing before its wait still ends; an owner that
- * crashes the instance each time does not, and reruns about once a heartbeat until the wait ends. Never fails: a mark
- * that is not stored (the call is being stopped, or the instance was replaced) leaves the count as it was.
+ * (`ToolExecutionApi.progressed`, `patches/deps/@earendil-works__pi-durable@1.5.0.patch`), so the restarts that cut
+ * them off while it waits (a Session that hibernates is started again by each heartbeat) never reach the restart limit.
+ * Run it once the wait is stored and the attempt is about to await: an attempt cut off before then still counts, so a
+ * call that keeps crashing before its wait still ends; an owner that crashes the instance each time does not, and
+ * reruns about once a heartbeat until the wait ends. Never fails: a mark that is not stored (the call is being stopped,
+ * or the instance was replaced) leaves the count as it was.
  *
  * A tool whose `execute` is not an Effect provides its call's Context as `ChordContext`; an Effect tool's is there.
  */
@@ -61,16 +60,13 @@ export const reachedWait = (api: Pick<ToolExecutionApi, "progressed">): Effect.E
 const SNAKE_CASE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
 
 /**
- * The one exception to the snake_case rule: an MCP tool, `mcp__<server>__<tool>` (ADR-0030). Its server part is the
- * server's name lower-cased with `-` as `_`, so it may hold `__` or begin with `_`; its tool part is runs of `[a-z0-9]` joined by `_`, so it may begin with a digit (`2fa`).
- * `@cloudpid/config`'s `mcpToolName` builds these, and its tests check that its names pass.
+ * The one exception to the snake_case rule: an MCP tool, `mcp__<server>__<tool>`. Its server part is the server's name
+ * lower-cased with `-` as `_`, so it may hold `__` or begin with `_`; its tool part is runs of `[a-z0-9]` joined by
+ * `_`, so it may begin with a digit (`2fa`).
  */
 const MCP_TOOL_NAME = /^mcp__[a-z0-9_]+__[a-z0-9]+(?:_[a-z0-9]+)*$/;
 
-/**
- * Whether `name` may be a model-facing tool name: snake_case, or an MCP tool's `mcp__<server>__<tool>`
- * (`docs/architecture/agent-capabilities.md` → Tool naming; `docs/architecture/mcp-in-a-session.md` → Tool names).
- */
+/** Whether `name` may be a model-facing tool name: snake_case, or an MCP tool's `mcp__<server>__<tool>`. */
 export const isToolName = (name: string): boolean =>
   SNAKE_CASE.test(name) || MCP_TOOL_NAME.test(name);
 

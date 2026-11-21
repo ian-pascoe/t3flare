@@ -1,5 +1,5 @@
 // @effect-diagnostics globalConsole:off
-// Where Browser Run sends a preview browser's requests for the Container preview hosts (ADR-0031; cloudpid's ADR-0023):
+// Where Browser Run sends a preview browser's requests for the Container preview hosts (ADR-0031):
 // `outboundByHost`, fixed when the browser is acquired, maps each of the eight `http://<port>.t3flare.internal/` hosts to
 // this entrypoint, made with `ctx.exports.ContainerPreviews({ props: { workspace } })` for the browser's one Workspace.
 // The props are the browser's identity: nothing in the request (Host, headers, path) can name another Workspace.

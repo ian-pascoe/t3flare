@@ -1,5 +1,4 @@
-// Adapted from cloudpid@93ba45a3:packages/extensions/src/todo/projection.ts (SPI-1055), as plain pi-durable hooks: the
-// Todo List in the model's context. pi-todo keeps hidden snapshots of the list among the messages; here the list is a
+// The Todo List in the model's context (SPI-1055), as plain pi-durable hooks. pi-todo keeps hidden snapshots of the list among the messages; here the list is a
 // document that a Handoff or compaction never touches, and the context needs it back in three cases. The first two are
 // handled at a place that stays the same for as long as the context lasts, so the provider's prompt cache keeps hitting:
 //

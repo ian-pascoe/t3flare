@@ -6,7 +6,7 @@ alchemy 2.0.0-beta.85 passes a Worker's `build.input.plugins` to Rolldown on the
 
 ## Refinement (tools step): the codemode and MCP Workers are bundled by alchemy
 
-`t3flare-codemode-<stage>` and `t3flare-mcp-<stage>` import nothing of t3, so they need none of our Rolldown build's shims. pi-codemode imports `quickjs-wasi/quickjs.wasm`, which alchemy's bundler uploads as a compiled module by its default rule. Both Workers are bundled by alchemy (OD-T5). cloudpid's `sdk-isolation.test.ts` checks that the MCP Worker's bundle keeps the SDK apart.
+`t3flare-codemode-<stage>` and `t3flare-mcp-<stage>` import nothing of t3, so they need none of our Rolldown build's shims. pi-codemode imports `quickjs-wasi/quickjs.wasm`, which alchemy's bundler uploads as a compiled module by its default rule. Both Workers are bundled by alchemy (OD-T5). `apps/mcp-worker/test/sdk-isolation.test.ts` checks that the SDK stays in the MCP Worker.
 
 ## Refinement (2026-11-21): fixed upstream
 
