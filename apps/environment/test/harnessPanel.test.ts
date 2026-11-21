@@ -59,14 +59,14 @@ describe("Settings page", () => {
 
   it("accepts the previous hour's token, refuses an older one", async () => {
     const { store, deps } = setup();
-    expect((await change(deps, { extension: "tool-search", enabled: false }, await ownerHeaders(store, NOW - 60 * 60 * 1000))).status).toBe(200);
-    expect((await change(deps, { extension: "tool-search", enabled: true }, await ownerHeaders(store, NOW - 2 * 60 * 60 * 1000))).status).toBe(403);
+    expect((await change(deps, { extension: "advisor", enabled: false }, await ownerHeaders(store, NOW - 60 * 60 * 1000))).status).toBe(200);
+    expect((await change(deps, { extension: "advisor", enabled: true }, await ownerHeaders(store, NOW - 2 * 60 * 60 * 1000))).status).toBe(403);
   });
 
   it("refuses the owner's change without a token, with another subject's token, without Origin, or from another origin", async () => {
     const { store, deps } = setup();
     const good = await ownerHeaders(store);
-    const body = { extension: "tool-search", enabled: false };
+    const body = { extension: "advisor", enabled: false };
     expect((await change(deps, body, { ...good, [CSRF_HEADER]: "" })).status).toBe(403);
     expect((await change(deps, body, { ...good, [CSRF_HEADER]: await csrfToken(store.csrfKey(), "someone-else", NOW) })).status).toBe(403);
     const { origin: _origin, ...withoutOrigin } = good;
@@ -85,9 +85,40 @@ describe("Settings page", () => {
 
   it("a script (service token + admin token, checked before) changes without a CSRF token; Origin, when sent, must still match", async () => {
     const { store, deps } = setup({ kind: "service-token" });
-    expect((await change(deps, { extension: "offered-tools", settings: { preset: "everything" } }, {})).status).toBe(200);
-    expect((await change(deps, { extension: "offered-tools", settings: { preset: "core" } }, { origin: "https://evil.example" })).status).toBe(403);
+    expect((await change(deps, { extension: "codemode", settings: { inlineBudget: 3000 } }, {})).status).toBe(200);
+    expect((await change(deps, { extension: "codemode", settings: { inlineBudget: 2000 } }, { origin: "https://evil.example" })).status).toBe(403);
     expect(store.auditLog(5)[0]?.caller).toBe("service-token");
+  });
+
+  it("sets tools' Exposures through /api/tools: a preset, built-in tools and t3's, audited; a malformed one refused", async () => {
+    const { store, deps } = setup({ kind: "service-token" });
+    const tools = (body: unknown) =>
+      handleHarness(new Request(`https://${HOST}/_t3flare/settings/api/tools`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }), deps);
+    expect((await tools({ preset: "codemode-only", tools: { ask_user: "hidden" }, t3: { tools: { t3_thread_read: "direct" } }, expectedRevision: 0 })).status).toBe(200);
+    const resolved = resolveHarness(store.load());
+    expect(resolved.tools).toMatchObject({ read: "deferred", ask_user: "hidden", codemode: "direct" });
+    expect(resolved.t3).toEqual({ exposure: "deferred", tools: { t3_thread_read: "direct" } });
+    expect(resolved.extensions["ask-user"]?.enabled).toBe(false);
+    expect(store.auditLog(1)[0]).toMatchObject({ action: "tools.change", target: "preset codemode-only, ask_user, t3-code/t3_thread_read" });
+    const refused = await tools({ tools: { codemode: "deferred" } });
+    expect(refused.status).toBe(400);
+    expect(await refused.text()).toBe("codemode: one of direct, hidden, or null\n");
+    expect((await tools({ tools: "read" })).status).toBe(400);
+    expect(store.load().revision).toBe(1);
+  });
+
+  it("keeps t3's tools as a Session last listed them when well-formed", () => {
+    const { store } = setup();
+    const listing = { listedAt: NOW, tools: [{ name: "t3_thread_read", readOnly: true, asksForDirect: false, description: "x".repeat(1_000) }], left: ["device_list"] };
+    expect(store.noteT3Tools(listing)).toBe(true);
+    expect(store.lastT3Tools()?.tools[0]?.description).toHaveLength(400);
+    expect(store.noteT3Tools({ ...listing, tools: [{ name: "a b", readOnly: true, asksForDirect: false }] })).toBe(false);
+    expect(store.noteT3Tools({ ...listing, left: "device_list" })).toBe(false);
+    expect(store.lastT3Tools()?.left).toEqual(["device_list"]);
+    // The latest listing wins: an older one (a Session waking on its kept catalog) does not replace it.
+    expect(store.noteT3Tools({ ...listing, listedAt: NOW - 1, left: [] })).toBe(false);
+    expect(store.noteT3Tools({ ...listing, listedAt: NOW + 1, left: [] })).toBe(true);
+    expect(store.lastT3Tools()?.left).toEqual([]);
   });
 
   it("refuses an invalid change with the registry's reason and stores nothing", async () => {

@@ -15,10 +15,12 @@ import {
 } from "./mcp.ts";
 
 import { fieldProblem, type SettingEntry, type SettingValue } from "./fields.ts";
+import { EXPOSURES, legacyResolvedTools, type ResolvedTools, resolveTools, type ToolsLayer } from "./tools.ts";
 
 export * from "./mcp.ts";
 export * from "./fields.ts";
 export * from "./environment.ts";
+export * from "./tools.ts";
 
 // Settings are Global (the Cloud Environment) now; the stored shape has per-Project `overrides`, empty, resolved with
 // cloudpid ADR-0027's merge (an Override's keyed settings merge over Global's key by key; lists are replaced whole) so a
@@ -34,23 +36,17 @@ export interface ExtensionEntry {
   /** Why the panel cannot change it at all. */
   readonly locked?: string;
   /**
+   * Its tools (tools.ts): it has no switch of its own, and is on while any of them is not `hidden`. The panel shows it
+   * in the Tools section, its settings beside its tools.
+   */
+  readonly tools?: ReadonlyArray<string>;
+  /**
    * A Guard (ADR-0035 §3, plan D5): it checks what agents do, so turning it off, or any change to its settings, is an
    * asked Change tier.
    */
   readonly guard?: true;
 }
 
-/** The offered-tools presets (plan §2.2, OD-T4): which non-MCP tools the model is offered without a search. */
-export const OFFERED_PRESETS = {
-  /** B, the default: the core coding tools, `ask_user`, code mode, tool search and t3's own tools. */
-  core: ["read", "edit", "write", "bash", "ls", "find", "grep", "ask_user", "codemode", "tool_search", "mcp__t3-code__*", "web_fetch", "web_search", "todo", "context_notes", "context_history", "context_rollover", "terminal_start", "terminal_send", "terminal_stop", "terminal_list", "terminal_wait"],
-  /** A: code mode and tool search; every other tool through a script or a search. */
-  "codemode-only": ["codemode", "tool_search"],
-  /** C: everything direct. */
-  everything: ["*"],
-} as const satisfies Record<string, ReadonlyArray<string>>;
-
-export type OfferedPreset = keyof typeof OFFERED_PRESETS;
 
 const CORE_LOCK = "a core extension: always on";
 
@@ -71,8 +67,9 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
     id: "codemode",
     title: "Code mode",
     description:
-      "The codemode tool: the model writes a JavaScript script whose tool calls run as nested calls, each judged exactly as a direct call (ADR-0027). Scripts run in the codemode sandbox Worker.",
+      "The codemode tool: the model writes a JavaScript script whose tool calls run as nested calls, each judged exactly as a direct call (ADR-0027). Scripts run in the codemode sandbox Worker. Hidden: no code mode, and a tool set to codemode is deferred instead.",
     default: "on",
+    tools: ["codemode"],
     settings: {
       inlineBudget: {
         title: "Inline budget",
@@ -85,38 +82,36 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
   {
     id: "tool-search",
     title: "Tool search",
-    description: "The tool_search tool, which loads a deferred tool for direct use. Off: every tool is offered directly.",
+    description: "The tool_search tool, which loads a deferred tool for direct use. Hidden: a deferred tool is offered directly, since nothing could load it.",
     default: "on",
+    tools: ["tool_search"],
     settings: {},
   },
   {
-    id: "offered-tools",
-    title: "Offered tools",
-    description:
-      "Which tools the model is offered without a search: core (coding tools, ask_user, code mode, tool search, t3's tools), code mode only, or everything. Tools not offered stay callable from scripts and by tool search.",
-    default: "always",
-    settings: {
-      preset: {
-        title: "Preset",
-        description: "core: about 14.5k tokens of declarations per request; codemode-only: about 3k; everything: every tool direct.",
-        schema: { type: "enum", values: Object.keys(OFFERED_PRESETS), default: "core" },
-        tier: "free",
-      },
-    },
+    id: "coding-tools",
+    title: "Coding tools",
+    description: "read, write, edit and bash (Worker Shell or Container).",
+    default: "on",
+    tools: ["read", "edit", "write", "bash"],
+    settings: {},
+  },
+  { id: "files", title: "File tools", description: "ls, find and grep.", default: "on", tools: ["ls", "find", "grep"], settings: {} },
+  {
+    id: "ask-user",
+    title: "Ask user",
+    description: "ask_user: a question to the owner on the thread, answered as t3's user_input request. Hidden: the agent has no ask_user (for a harness whose question tools come from an MCP server).",
+    default: "on",
+    tools: ["ask_user"],
+    settings: {},
   },
   {
     id: "web",
     title: "Web tools",
     description:
-      "web_fetch: one public page as Markdown, text or HTML, through an SSRF guard. web_search, when switched on below: a model on an Anthropic Messages Model endpoint searches with Anthropic's server-side web search tool and cites its sources (no new key). Both are reads, allowed in every mode (SPI-1054).",
+      "web_fetch: one public page as Markdown, text or HTML, through an SSRF guard. web_search: a model on an Anthropic Messages Model endpoint searches with Anthropic's server-side web search tool and cites its sources (no new key); hidden by default, since each search is a model request on the endpoint's spend. Both are reads, allowed in every mode (SPI-1054).",
     default: "on",
+    tools: ["web_fetch", "web_search"],
     settings: {
-      search: {
-        title: "Web search",
-        description: "Offer web_search. Off by default: each search is a model request on the endpoint's spend.",
-        schema: { type: "boolean", default: false },
-        tier: "down-free",
-      },
       searchModel: modelSetting(
         "Search model",
         "The model that runs web_search's searches: an Anthropic Messages Model endpoint's model with an API key or no auth whose server takes Anthropic's web search tool, as <endpointId>/<modelId>, or default (the endpoints' small model).",
@@ -130,6 +125,7 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
     description:
       "todo: the agent's Task list for the thread, kept in the Session and shown as t3's todo list. It survives compaction and rollover, and plan mode allows it (SPI-1055).",
     default: "on",
+    tools: ["todo"],
     settings: {},
   },
   {
@@ -138,6 +134,7 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
     description:
       "context_notes (named Notes kept across compaction and rollover), context_history (the thread's stored History, from before a Handoff too) and context_rollover (the agent hands off to a fresh context it writes itself). Notes and History stay in the Session's storage (SPI-1056).",
     default: "on",
+    tools: ["context_notes", "context_history", "context_rollover"],
     settings: {
       rolloverOnCompaction: {
         title: "Rollover on compaction",
@@ -154,6 +151,7 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
     description:
       "terminal_start, terminal_send, terminal_stop, terminal_list and terminal_wait: interactive programs (REPLs, TUIs, prompts) as PTYs in the Workspace's container, and bash's background: true. Approvals follow the thread's mode as bash's do; nothing starts a container until a Terminal or a job starts. At most 8 run at once in a Workspace, and they end with its container (SPI-1057).",
     default: "on",
+    tools: ["terminal_start", "terminal_send", "terminal_stop", "terminal_list", "terminal_wait"],
     settings: {
       backgroundBash: {
         title: "Background jobs from bash",
@@ -223,8 +221,6 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
     default: "on",
     settings: {},
   },
-  { id: "coding-tools", title: "Coding tools", description: "read, write, edit and bash (Worker Shell or Container).", default: "always", settings: {}, locked: CORE_LOCK },
-  { id: "files", title: "File tools", description: "ls, find and grep.", default: "always", settings: {}, locked: CORE_LOCK },
   {
     id: "permissions",
     title: "Permissions",
@@ -234,8 +230,6 @@ export const EXTENSIONS: ReadonlyArray<ExtensionEntry> = [
     locked: "the thread's modes and the link fence depend on it",
     guard: true,
   },
-  { id: "ask-user", title: "Ask user", description: "ask_user: a question to the owner on the thread.", default: "always", settings: {}, locked: CORE_LOCK },
-  { id: "t3-mcp", title: "T3 Code tools", description: "t3's own MCP tools (ADR-0022), through the Environment DO.", default: "always", settings: {}, locked: CORE_LOCK },
   { id: "project-context", title: "Project context", description: "The repo's AGENTS.md and CLAUDE.md in the prompt.", default: "always", settings: {}, locked: CORE_LOCK },
 ];
 
@@ -253,11 +247,21 @@ export const extensionOf = (
   const entry = entryOf(id);
   if (entry === undefined) return taken ?? { enabled: false, settings: {} };
   const defaults = Object.fromEntries(Object.entries(entry.settings).map(([key, setting]) => [key, setting.schema.default]));
-  return { enabled: taken?.enabled ?? entry.default !== "off", settings: { ...defaults, ...taken?.settings } };
+  const tools = entry.tools === undefined ? undefined : resolvedToolsOf(resolved).tools;
+  const enabled = tools === undefined || entry.tools === undefined ? (taken?.enabled ?? entry.default !== "off") : entry.tools.some((tool) => tools[tool] !== "hidden");
+  return { enabled, settings: { ...defaults, ...taken?.settings } };
 };
 
-/** One scope's stored choices: per extension, its switch and the settings set explicitly. */
-export interface HarnessLayer {
+/** The tools' Exposures of a resolved view, a view kept from before Exposures existed included. */
+export const resolvedToolsOf = (resolved: ResolvedHarness): ResolvedTools =>
+  resolved.tools !== undefined && resolved.t3 !== undefined ? { tools: resolved.tools, t3: resolved.t3 } : legacyResolvedTools(resolved);
+
+/**
+ * One scope's stored choices: per extension, its switch and the settings set explicitly; per tool, its Exposure
+ * (tools.ts). A stored switch of an extension that now has tools, and the retired offered-tools preset, are read only to
+ * resolve a tool with no Exposure of its own.
+ */
+export interface HarnessLayer extends ToolsLayer {
   readonly extensions?: Readonly<Record<string, { readonly enabled?: boolean; readonly settings?: Readonly<Record<string, SettingValue>> }>>;
 }
 
@@ -320,8 +324,6 @@ export type McpChange =
   | { readonly op: "class"; readonly server: string; readonly tool: string; readonly class: ToolClass | null }
   | { readonly op: "add"; readonly server: string; readonly url: string; readonly auth: ServerAuth }
   | { readonly op: "remove"; readonly server: string };
-
-const EXPOSURES: ReadonlyArray<Exposure> = ["direct", "deferred", "codemode", "hidden"];
 
 /** `url` as a direct server may have it (plan §5.3, review M5): HTTPS, a name not an IP literal, no userinfo, no port games. */
 export const directUrlProblem = (url: string): string | undefined => {
@@ -413,21 +415,24 @@ export const applyMcpChange = (
   });
 };
 
-/** What a Session reads: secret-free, every extension resolved. */
-export interface ResolvedHarness {
+/** What a Session reads: secret-free, every extension and tool resolved. */
+export interface ResolvedHarness extends Partial<ResolvedTools> {
   readonly revision: number;
   readonly extensions: Readonly<Record<string, { readonly enabled: boolean; readonly settings: Readonly<Record<string, SettingValue>> }>>;
   readonly codemode: { readonly enabled: boolean; readonly inlineBudget: number };
   readonly toolSearch: { readonly enabled: boolean };
-  /** Names or patterns (`*` matches any run) of the tools offered without a search. */
-  readonly offered: ReadonlyArray<string>;
+  /**
+   * A view from before Exposures existed: names or patterns of the tools offered without a search. A Session keeps the
+   * view it last took (`resolvedToolsOf` reads it); a view resolved now has `tools` and `t3` instead.
+   */
+  readonly offered?: ReadonlyArray<string>;
 }
 
 /** cloudpid ADR-0027's merge: the override's switch over Global's, its settings over Global's key by key. */
 const merge = (base: HarnessLayer, over: HarnessLayer | undefined): HarnessLayer => {
-  if (over?.extensions === undefined) return base;
+  if (over === undefined) return base;
   const extensions = { ...base.extensions };
-  for (const [id, choice] of Object.entries(over.extensions)) {
+  for (const [id, choice] of Object.entries(over.extensions ?? {})) {
     const before = extensions[id];
     extensions[id] = {
       ...before,
@@ -435,28 +440,37 @@ const merge = (base: HarnessLayer, over: HarnessLayer | undefined): HarnessLayer
       settings: { ...before?.settings, ...choice.settings },
     };
   }
-  return { extensions };
+  const t3Exposure = over.t3?.exposure ?? base.t3?.exposure;
+  return {
+    extensions,
+    tools: { ...base.tools, ...over.tools },
+    t3: { ...(t3Exposure === undefined ? {} : { exposure: t3Exposure }), tools: { ...base.t3?.tools, ...over.t3?.tools } },
+  };
 };
 
 /** The settings for a Session of `projectId` (Global only when it has no override). */
-export const resolveHarness = (stored: StoredHarness, scope: { readonly projectId?: string } = {}): ResolvedHarness => {
+export const resolveHarness = (stored: StoredHarness, scope: { readonly projectId?: string } = {}): ResolvedHarness & ResolvedTools => {
   const layer = merge(stored.global, scope.projectId === undefined ? undefined : stored.overrides[scope.projectId]);
+  const tools = resolveTools(layer);
   const extensions: Record<string, { enabled: boolean; settings: Record<string, SettingValue> }> = {};
   for (const entry of EXTENSIONS) {
     const choice = layer.extensions?.[entry.id];
     const settings: Record<string, SettingValue> = {};
     for (const [key, setting] of Object.entries(entry.settings)) settings[key] = choice?.settings?.[key] ?? setting.schema.default;
-    const enabled = entry.default === "always" || entry.locked !== undefined ? true : (choice?.enabled ?? entry.default === "on");
+    const enabled =
+      entry.tools !== undefined
+        ? entry.tools.some((tool) => tools.tools[tool] !== "hidden")
+        : entry.default === "always" || entry.locked !== undefined
+          ? true
+          : (choice?.enabled ?? entry.default === "on");
     extensions[entry.id] = { enabled, settings };
   }
-  const toolSearch = extensions["tool-search"]!.enabled;
-  const preset = extensions["offered-tools"]!.settings.preset as OfferedPreset;
   return {
     revision: stored.revision,
     extensions,
     codemode: { enabled: extensions.codemode!.enabled, inlineBudget: extensions.codemode!.settings.inlineBudget as number },
-    toolSearch: { enabled: toolSearch },
-    offered: toolSearch ? [...(OFFERED_PRESETS[preset] ?? OFFERED_PRESETS.core)] : ["*"],
+    toolSearch: { enabled: extensions["tool-search"]!.enabled },
+    ...tools,
   };
 };
 
@@ -476,6 +490,7 @@ export const applyChange = (
   if (entry === undefined) return { ok: false, error: `${change.extension}: no such extension` };
   if (entry.locked !== undefined) return { ok: false, error: `${entry.id}: locked (${entry.locked})` };
   if (change.enabled !== undefined && entry.default === "always") return { ok: false, error: `${entry.id}: cannot be turned off` };
+  if (change.enabled !== undefined && entry.tools !== undefined) return { ok: false, error: `${entry.id}: on while any of its tools is not hidden; set its tools' Exposure instead` };
   // A stored non-boolean would resolve to the default, which may be on (fails closed here, before any tier is judged).
   if (change.enabled !== undefined && typeof change.enabled !== "boolean") return { ok: false, error: "enabled: true or false" };
   for (const [key, value] of Object.entries(change.settings ?? {})) {

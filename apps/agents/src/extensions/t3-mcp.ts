@@ -24,14 +24,14 @@ import { type ApprovalStore, askOwner, cutOffResult, planRefusal, STARTED_MEMO }
 import { descriptionFor, guidanceFor } from "./t3-guidance.ts";
 
 export const T3_MCP_SERVER = "t3-code";
+/** The extension's name in the Session's registry. */
+export const T3_EXTENSION = "t3-mcp";
 export const t3ToolName = (name: string): string => `mcp__${T3_MCP_SERVER}__${name}`;
 
 /** The T3 tools a Durable agent is not offered: harness-registry's (ADR-0022). */
 export { T3_TOOL_DENYLIST } from "@t3flare/harness-registry";
-import { isDeniedT3Tool } from "@t3flare/harness-registry";
+import { type Exposure, isDeniedT3Tool, MAX_T3_DESCRIPTION, ownEntry, type ResolvedTools, T3_DIRECT_ONLY, type T3ToolListing } from "@t3flare/harness-registry";
 
-/** Tools that wait on t3 for up to `timeoutMs`: sent in pieces of at most WAIT_PIECE_MS. */
-const WAIT_TOOLS: ReadonlySet<string> = new Set(["t3_thread_wait", "t3_background_wait"]);
 /**
  * `PeerForwarding.FORWARDED_WAIT_CHUNK_MS`'s length, from the wait's start. t3 itself holds a wait at most 45 s
  * (`OrchestratorMcpService.MAX_WAIT_TIMEOUT_MS`), so a piece holds 45 s and times out; the next piece follows.
@@ -46,7 +46,18 @@ export interface CatalogTool {
   readonly description?: string;
   readonly inputSchema?: Readonly<Record<string, unknown>>;
   readonly annotations?: { readonly readOnlyHint?: boolean; readonly [key: string]: unknown };
+  /** t3's hints to the client; `anthropic/alwaysLoad` asks for the tool in every request. */
+  readonly _meta?: Readonly<Record<string, unknown>>;
 }
+
+/** Whether t3 asks for the tool in every request (`anthropic/alwaysLoad`, which t3 sets for Claude Code's tool search). */
+export const asksForDirect = (tool: CatalogTool): boolean => tool._meta?.["anthropic/alwaysLoad"] === true;
+
+/**
+ * Tool `tool`'s Exposure (harness-registry's tools.ts): the owner's for it, else direct when t3 asks for it in every
+ * request, else the owner's for t3's tools without their own.
+ */
+export const t3ExposureOf = (t3: ResolvedTools["t3"], tool: CatalogTool): Exposure => ownEntry(t3.tools, tool.name) ?? (asksForDirect(tool) ? "direct" : t3.exposure);
 
 /** The tools offered from one `tools/list`, and the listed ones the denylist left out. */
 export interface T3Catalog {
@@ -54,6 +65,24 @@ export interface T3Catalog {
   readonly hash: string;
   readonly left: ReadonlyArray<string>;
 }
+
+/** The Exposure of the tool the Session registered as `registered` (`mcp__t3-code__…`): by its listing, else the default. */
+export const t3RegisteredExposure = (t3: ResolvedTools["t3"], catalog: T3Catalog | undefined, registered: string): Exposure => {
+  const listed = catalog?.tools.find((each) => t3ToolName(each.name) === registered);
+  return listed === undefined ? t3.exposure : t3ExposureOf(t3, listed);
+};
+
+/** The catalog as the panel's t3-code card lists it (harness-registry's `T3ToolListing`). */
+export const t3ListingOf = (catalog: T3Catalog, listedAt: number): T3ToolListing => ({
+  listedAt,
+  tools: catalog.tools.map((tool) => ({
+    name: tool.name,
+    ...(tool.description === undefined && tool.title === undefined ? {} : { description: (tool.title ?? tool.description ?? "").slice(0, MAX_T3_DESCRIPTION) }),
+    readOnly: tool.annotations?.readOnlyHint === true,
+    asksForDirect: asksForDirect(tool),
+  })),
+  left: catalog.left,
+});
 
 /** A stable hash of the offered tools (FNV-1a over their JSON), to see when the extension must be built again. */
 const hashOf = (text: string): string => {
@@ -123,7 +152,7 @@ const toolOf = (tool: CatalogTool, host: T3McpHost): ToolRegistration => {
     replay: "safe",
     // A wait is direct-only (ADR-0027, as t3's Codex adapter registers them): from a script it would block the script
     // while the model works around it.
-    ...(WAIT_TOOLS.has(tool.name) ? { callers: ["model"] as const } : {}),
+    ...(T3_DIRECT_ONLY.has(tool.name) ? { callers: ["model"] as const } : {}),
     async execute(input: Record<string, unknown>, api: ToolExecutionApi, context: Context) {
       const credential = host.credential();
       if (credential === undefined) return textResult("T3's tools are unavailable in this turn; they come back with the next turn.", true, tool.name);
@@ -145,7 +174,7 @@ const toolOf = (tool: CatalogTool, host: T3McpHost): ToolRegistration => {
         if (!keyed) await api.memo(STARTED_MEMO, true, context);
       }
       const args = keyed && typeof input.clientRequestId !== "string" ? { ...input, clientRequestId: `pi-durable:${String(api.taskId)}` } : input;
-      const answer = WAIT_TOOLS.has(tool.name) ? await waitInPieces(host, tool.name, args, api, context) : await host.call(tool.name, args);
+      const answer = T3_DIRECT_ONLY.has(tool.name) ? await waitInPieces(host, tool.name, args, api, context) : await host.call(tool.name, args);
       if (answer.kind === "unavailable") return textResult(answer.message, true, tool.name);
       return textResult(answer.text, answer.isError, tool.name, answer.images);
     },
@@ -185,7 +214,7 @@ const waitInPieces = async (
  */
 export const t3McpExtension = (catalog: T3Catalog, host: T3McpHost): Extension =>
   defineExtension({
-    name: "t3-mcp",
+    name: T3_EXTENSION,
     tools: catalog.tools.map((tool) => toolOf(tool, host)),
     sections: [
       section("t3_orchestration", () => {

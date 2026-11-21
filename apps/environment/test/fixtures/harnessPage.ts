@@ -3,7 +3,7 @@
 // for a local look. Four MCP servers in every state the page draws: Commissary (added by hand with its `x-api-key`
 // header, SPI-1160) listed with no tools, a direct server listed with tools (one class set by the owner, one tool refused), one whose listing failed, and an OAuth server never
 // signed in. Fixed times, so the render is stable.
-import { applyChange, EMPTY_HARNESS, resolveHarness } from "@t3flare/harness-registry";
+import { applyChange, applyToolsChange, EMPTY_HARNESS, resolveHarness, type T3ToolListing } from "@t3flare/harness-registry";
 
 import type { McpRow, PageInput } from "../../src/harness/page.ts";
 import type { AuditEntry } from "../../src/harness/store.ts";
@@ -11,8 +11,27 @@ import type { AuditEntry } from "../../src/harness/store.ts";
 export const FIXTURE_NOW = Date.UTC(2026, 10, 13, 9, 41);
 const minutes = (count: number) => FIXTURE_NOW - count * 60_000;
 
-const changed = applyChange({ ...EMPTY_HARNESS, revision: 5 }, { extension: "codemode", settings: { inlineBudget: 3000 } });
+const budget = applyChange({ ...EMPTY_HARNESS, revision: 4 }, { extension: "codemode", settings: { inlineBudget: 3000 } });
+if (!budget.ok) throw new Error(budget.error);
+// ask_user hidden (an MCP server asks instead), grep for scripts only, the terminals deferred; one of t3's tools set.
+const changed = applyToolsChange(budget.harness, {
+  tools: { ask_user: "hidden", grep: "codemode", terminal_start: "deferred", terminal_send: "deferred", terminal_stop: "deferred", terminal_list: "deferred", terminal_wait: "deferred" },
+  t3: { tools: { t3_preview_open: "deferred" } },
+});
 if (!changed.ok) throw new Error(changed.error);
+
+/** t3's tools as a Session listed them: two it asks for in every request, a wait, and a denied one left out. */
+export const FIXTURE_T3_TOOLS: T3ToolListing = {
+  listedAt: minutes(9),
+  tools: [
+    { name: "request_secret", description: "Request a secret from the user", readOnly: false, asksForDirect: true },
+    { name: "send_to_user", description: "Send a message to the user", readOnly: true, asksForDirect: true },
+    { name: "t3_preview_open", description: "Open a preview tab", readOnly: false, asksForDirect: false },
+    { name: "t3_thread_read", description: "Read a thread", readOnly: true, asksForDirect: false },
+    { name: "t3_thread_wait", description: "Wait for a thread", readOnly: true, asksForDirect: false },
+  ],
+  left: ["t3_attachment_upload"],
+};
 
 const tool = (upstream: string, cls: "read" | "write", hinted: "read" | "write" = cls) => ({ name: `mcp__fixture__${upstream}`, upstream, class: cls, hinted, exposure: "deferred" });
 
@@ -66,6 +85,7 @@ export const fixturePage = (overrides: Partial<PageInput> = {}): PageInput => ({
   resolved: resolveHarness(changed.harness),
   csrf: "fixture-csrf-token",
   mcp: FIXTURE_MCP,
+  t3Tools: FIXTURE_T3_TOOLS,
   audit: FIXTURE_AUDIT,
   status: {
     "settings revision": changed.harness.revision,

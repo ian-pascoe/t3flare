@@ -140,6 +140,8 @@ input.switch{appearance:none;margin:0}
 .pill-err{background:var(--err-soft);color:var(--err)}
 .pill-warn{background:var(--warn-soft);color:var(--warn)}
 .pill-plain::before{display:none}
+.tools-wide{grid-column:1/-1}
+.presets{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}.presets>span{font-size:.75rem;color:var(--muted-fg)}
 .tag{display:inline-flex;align-items:center;height:1.25rem;padding:0 .375rem;border-radius:.3125rem;border:1px solid var(--border);font-size:.6875rem;font-weight:500;color:var(--muted-fg);white-space:nowrap}
 .tag-read{color:var(--ok);border-color:color-mix(in oklab,var(--ok-dot) 30%,transparent);background:var(--ok-soft)}
 .tag-write{color:var(--warn);border-color:var(--warn-line);background:var(--warn-soft)}

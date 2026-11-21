@@ -803,6 +803,11 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     return { kept: harnessStore(this.ctx.storage.kv).noteGlobalMise(report) };
   }
 
+  /** t3's tools as a Session listed them (the panel's t3-code card). A malformed listing is dropped. Never boots t3. */
+  async noteT3Tools(listing: unknown): Promise<{ readonly kept: boolean }> {
+    return { kept: harnessStore(this.ctx.storage.kv).noteT3Tools(listing) };
+  }
+
   /** Diagnosis and the reboot check: this instance's channel. */
   get processChannel(): ProcessChannel {
     return this.#processes;

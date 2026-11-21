@@ -1,7 +1,7 @@
 // The Settings page's structure (SPI-1086): a snapshot of its markup from the fixture state, and checks over the
 // parsed tags (balanced, ids unique, every section in the navigation, every control named), every state it draws, the
 // CSP's limits (no inline style or handler, one script), and escaping of hostile strings in every server-supplied field.
-import { EMPTY_HARNESS, resolveHarness } from "@t3flare/harness-registry";
+import { applyToolsChange, BUILTIN_TOOLS, EMPTY_HARNESS, resolveHarness } from "@t3flare/harness-registry";
 import { describe, expect, it } from "vitest";
 
 import { escapeHtml, type McpRow, renderPage, type SkillsView } from "../src/harness/page.ts";
@@ -25,6 +25,12 @@ const SKILL: SkillsView["skills"][number] = {
   bytes: 1024,
 };
 import { FIXTURE_MCP, FIXTURE_NOW, fixturePage } from "./fixtures/harnessPage.ts";
+
+/** One section of a rendered page, by its id. */
+const section = (html: string, id: string): string => {
+  const start = html.indexOf(`<section id="${id}"`);
+  return html.slice(start, html.indexOf("</section>", start));
+};
 
 interface Tag {
   readonly name: string;
@@ -89,7 +95,7 @@ describe("harness page", () => {
 
   it("links every section from the navigation, in order, each with its heading", () => {
     const nav = tags.filter((tag) => tag.name === "a" && tag.attrs.href?.startsWith("#") && tag.attrs.href !== "#main" && tag.attrs.href !== "#add-server");
-    expect(nav.map((tag) => tag.attrs.href)).toEqual(["#extensions", "#mcp", "#environment", "#skills", "#status", "#audit"]);
+    expect(nav.map((tag) => tag.attrs.href)).toEqual(["#tools", "#extensions", "#mcp", "#environment", "#skills", "#status", "#audit"]);
     for (const link of nav) {
       const section = tags.find((tag) => tag.name === "section" && tag.attrs.id === link.attrs.href!.slice(1));
       expect(section?.attrs["aria-labelledby"]).toBeDefined();
@@ -159,12 +165,47 @@ describe("harness page", () => {
     expect(tags.find((tag) => tag.attrs.name === "value")?.attrs.type).toBe("password");
   });
 
-  it("draws the extension forms from the registry's schemas: switches, settings, locked core extensions", () => {
-    expect(tags.filter((tag) => tag.name === "form" && tag.attrs["data-extension"] !== undefined).map((tag) => tag.attrs["data-extension"])).toEqual(["codemode", "tool-search", "offered-tools", "web", "todo", "context", "termctrl", "guardian", "advisor", "skills"]);
+  it("draws the extension forms from the registry's schemas: tools first, then switches, settings, locked core extensions", () => {
+    expect(tags.filter((tag) => tag.name === "form" && tag.attrs["data-extension"] !== undefined).map((tag) => tag.attrs["data-extension"])).toEqual([
+      "codemode", "tool-search", "coding-tools", "files", "ask-user", "web", "todo", "context", "termctrl", "guardian", "advisor", "skills",
+    ]);
     expect(tags.find((tag) => tag.attrs["data-setting"] === "inlineBudget")).toMatchObject({ attrs: { type: "number", min: "500", max: "20000", value: "3000" } });
-    expect(tags.find((tag) => tag.attrs["data-setting"] === "preset")?.name).toBe("select");
-    expect(tags.filter((tag) => tag.attrs["data-enabled"] !== undefined)).toHaveLength(9);
+    expect(tags.filter((tag) => tag.attrs["data-enabled"] !== undefined)).toHaveLength(3);
     expect(html).toContain("locked: the thread&#39;s modes and the link fence depend on it");
+  });
+
+  it("draws one Exposure select per built-in tool, codemode and tool_search with only direct or hidden, and the three presets", () => {
+    const selects = tags.filter((tag) => tag.name === "select" && tag.attrs["data-tool-exposure"] !== undefined && tag.attrs["data-t3"] === undefined);
+    expect(selects.map((tag) => tag.attrs["data-tool-exposure"])).toEqual(BUILTIN_TOOLS.map((tool) => tool.name));
+    expect(tags.filter((tag) => tag.attrs["data-tools-preset"] !== undefined).map((tag) => tag.attrs["data-tools-preset"])).toEqual(["core", "codemode-only", "everything"]);
+    const tools = section(html, "tools");
+    expect(tools).toContain('<select class="sel-sm" data-tool-exposure="codemode" aria-label="codemode exposure"><option value="direct" selected title="in every request">direct</option><option value="hidden" title="not offered">hidden</option></select>');
+    expect(tools).toContain('<option value="hidden" selected title="not offered">hidden</option>');
+    expect(tools).toContain('<span class="pill" title="Every tool hidden">Off</span>');
+  });
+
+  it("says an extension's settings do nothing while every one of its tools is hidden", () => {
+    const hidden = applyToolsChange(EMPTY_HARNESS, { tools: Object.fromEntries(["terminal_start", "terminal_send", "terminal_stop", "terminal_list", "terminal_wait"].map((tool) => [tool, "hidden"])) });
+    if (!hidden.ok) throw new Error(hidden.error);
+    const terminals = (resolved: ReturnType<typeof resolveHarness>) => {
+      const tools = section(renderPage(fixturePage({ resolved })), "tools");
+      return tools.slice(tools.indexOf('data-extension="termctrl"'), tools.indexOf("</form>", tools.indexOf('data-extension="termctrl"')));
+    };
+    expect(terminals(resolveHarness(hidden.harness))).toContain("Every tool is hidden, so the extension is not installed and these settings do nothing until a tool is offered.");
+    expect(terminals(resolveHarness(EMPTY_HARNESS))).not.toContain("Every tool is hidden");
+  });
+
+  it("draws t3's tools on the always-on t3-code card: t3's hints as defaults, waits never codemode, denied tools named", () => {
+    const mcp = section(html, "mcp");
+    expect(mcp).toContain('<h3 id="mcp-t3-code">t3-code</h3>');
+    expect(mcp).toContain('<option value="" selected>t3 asks: direct</option>');
+    expect(mcp).toContain('<option value="" selected>Default (direct)</option>');
+    const wait = /data-tool-exposure="t3_thread_wait"[^>]*>(.*?)<\/select>/.exec(mcp)?.[1] ?? "";
+    expect(wait).not.toContain("codemode");
+    expect(mcp).toContain('<option value="deferred" selected title="loaded by tool_search">deferred</option>');
+    expect(mcp).toContain("<code>t3_attachment_upload</code>");
+    const empty = renderPage(fixturePage({ t3Tools: undefined }));
+    expect(section(empty, "mcp")).toContain("Not listed yet: t3 lists its tools for each thread");
   });
 
   it("draws the empty states: no server, no audit entry, no Environment skill (the placeholder gone, SPI-1148)", () => {

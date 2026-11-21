@@ -209,7 +209,8 @@ Environment settings, with Status, the audit log and the Open changes waiting fo
 _Avoid_: Harness panel, dashboard, admin UI
 
 **Harness settings**:
-What agents are offered and how Pi Durable's loop runs: its extensions with their options, and the MCP server set.
+What agents are offered and how Pi Durable's loop runs: each tool's Exposure, its extensions with their options, and the
+MCP server set.
 _Avoid_: harness config, settings (alone)
 
 **Environment settings**:
@@ -262,8 +263,9 @@ Tool handle. t3's own tools reach a CLI as stock t3 hands them, with t3's bearer
 _Avoid_: MCP proxy, bridge
 
 **Exposure**:
-How a Durable agent is offered an MCP tool: `direct` (in its tool list), `deferred` (found by a search), `codemode`
-(from scripts only) or `hidden`.
+How a Durable agent is offered a tool: `direct` (in its tool list), `deferred` (found by a search), `codemode`
+(from scripts only) or `hidden`. Every tool has one: an MCP server's tools, t3's own, and the built-in tools, whose
+extension runs while any of its tools is not `hidden` (ADR-0042). A preset sets every tool that is not hidden and is not a switch (`codemode`, `tool_search`) at once, t3's and MCP servers' included (an MCP server's code-mode-only tools excepted).
 
 **Tool class**:
 Read or write: the tool's own `readOnlyHint` (true is read; anything else, write), unless the Owner overrides it in

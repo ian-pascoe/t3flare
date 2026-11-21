@@ -42,9 +42,12 @@ export interface AskUserHost {
   readonly turn: () => string | null;
 }
 
+/** The extension's name, and its harness registry id: switched off, the agent has no `ask_user`. */
+export const ASK_USER_EXTENSION = "ask-user";
+
 export const askUser = (host: AskUserHost): Extension =>
   defineExtension({
-    name: "ask-user",
+    name: ASK_USER_EXTENSION,
     tools: [
       defineTool({
         name: "ask_user",

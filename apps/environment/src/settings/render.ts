@@ -5,6 +5,11 @@
 // goes straight to the secret store, and a URL is shown without its query (plan D14).
 import {
   applyEnvironmentChange,
+  applyToolsChange,
+  movedServerTools,
+  movedTools,
+  resolveTools,
+  type ToolsChange,
   type EnvironmentKey,
   EXTENSIONS,
   type HarnessChange,
@@ -65,6 +70,19 @@ export const extensionItems = (stored: StoredHarness, change: HarnessChange): { 
   }
   if (entry.guard === true && items.some((item) => item.kind !== "scalar" || item.name !== `${entry.id}: switch`)) lines.push(`This changes the settings of ${entry.title}, a Guard.`);
   return { items, lines };
+};
+
+/** A tools change's items: each tool whose Exposure it moves, against the stored Harness settings. */
+export const toolsItems = (
+  stored: StoredHarness,
+  change: ToolsChange,
+  asksForDirect?: (tool: string) => boolean | undefined,
+): { readonly items: Array<ChangeItem>; readonly lines: Array<string> } => {
+  const applied = applyToolsChange(stored, change);
+  if (!applied.ok) return { items: [], lines: [] };
+  const moves = [...movedTools(resolveTools(stored.global), resolveTools(applied.harness.global), asksForDirect), ...movedServerTools(mcpServersOf(stored), mcpServersOf(applied.harness))];
+  const items: Array<ChangeItem> = moves.map((move) => ({ kind: "scalar", name: `${move.tool}: Exposure`, before: move.before, after: move.after }));
+  return { items, lines: change.preset === undefined ? [] : [`This applies the ${change.preset} preset to every tool that is not hidden, t3's and MCP servers' included (an MCP server's code-mode-only tools excepted).`] };
 };
 
 /** An Environment change's items, against the stored Environment settings it changes. */

@@ -11,6 +11,7 @@
 // outside the panel, and reading any secret.
 import {
   applyChange,
+  applyToolsChange,
   applyEnvironmentChange,
   applyMcpChange,
   digestOf,
@@ -25,6 +26,8 @@ import {
   resolveHarness,
   settingOf,
   type StoredHarness,
+  T3_SERVER,
+  type ToolsChange,
   withoutQuery,
 } from "@t3flare/harness-registry";
 
@@ -105,6 +108,36 @@ export const changeExtension = (deps: OpsDeps, change: HarnessChange, options: O
     target: change.extension,
     before: before.global.extensions?.[change.extension] ?? null,
     after: applied.harness.global.extensions?.[change.extension] ?? null,
+  });
+  return { ok: true, revision: applied.harness.revision, resolved: resolveHarness(applied.harness) };
+};
+
+/**
+ * Tools' Exposures (harness-registry's tools.ts): a preset applied first, then each tool named, built-in or t3's. It
+ * bumps the Harness revision; the audit entry has the tools' stored Exposures before and after.
+ */
+export const changeTools = (deps: OpsDeps, change: ToolsChange, options: OpOptions): Outcome<{ revision: number; resolved: ReturnType<typeof resolveHarness> }> => {
+  const before = deps.store.load();
+  const applied = applyToolsChange(before, change);
+  if (!applied.ok) return refuse(400, applied.error);
+  const stale = moved("Harness", before.revision, options.expectedRevision);
+  if (stale !== undefined) return stale;
+  deps.store.save(applied.harness);
+  // A preset sets MCP servers' Exposures too, and drops an entry the set ignores as any change to the set does.
+  if (change.preset !== undefined) dropIgnored(deps, before, applied.harness);
+  const named = [
+    ...(change.preset === undefined ? [] : [`preset ${change.preset}`]),
+    ...Object.keys(change.tools ?? {}),
+    ...Object.keys(change.t3?.tools ?? {}).map((tool) => `${T3_SERVER}/${tool}`),
+    ...(change.t3?.exposure === undefined ? [] : [T3_SERVER]),
+  ];
+  const servers = (harness: StoredHarness) => (change.preset === undefined ? {} : { mcp: harness.mcp?.servers ?? {} });
+  audit(deps, options.actor, {
+    entity: "harness",
+    action: "tools.change",
+    target: named.join(", ") || "tools",
+    before: { tools: before.global.tools ?? {}, t3: before.global.t3 ?? {}, ...servers(before) },
+    after: { tools: applied.harness.global.tools ?? {}, t3: applied.harness.global.t3 ?? {}, ...servers(applied.harness) },
   });
   return { ok: true, revision: applied.harness.revision, resolved: resolveHarness(applied.harness) };
 };

@@ -8,8 +8,20 @@
 // Layout (SPI-1086), after T3 Code's settings: a quiet sidebar of sections (a sticky row of tabs on a phone), then each
 // section as a 16px title over grouped, divided rows.
 import {
+  BUILTIN_TOOLS,
+  builtinTool,
   EMPTY_ENVIRONMENT,
   ENVIRONMENT_SETTINGS,
+  type Exposure,
+  EXPOSURES,
+  OFFERED_PRESETS,
+  type OfferedPreset,
+  type ResolvedTools,
+  resolvedToolsOf,
+  T3_DIRECT_ONLY,
+  T3_SERVER,
+  t3Exposures,
+  type T3ToolListing,
   type EnvironmentSettingEntry,
   type ExtensionEntry,
   EXTENSIONS,
@@ -141,16 +153,133 @@ const extensionRow = (resolved: ResolvedHarness, entry: ExtensionEntry): string 
   return `<form class="row" data-extension="${escapeHtml(entry.id)}" aria-labelledby="${titleId}" novalidate>${head}<div class="row-control">${control}</div>${extra}</form>`;
 };
 
+/** The extensions with no tools of their own: a switch each, or locked on. Those with tools are in the Tools section. */
+const SWITCHED = EXTENSIONS.filter((entry) => entry.tools === undefined);
+
 const extensionsSection = (resolved: ResolvedHarness): string => {
-  const adjustable = EXTENSIONS.filter((entry) => entry.locked === undefined);
-  const core = EXTENSIONS.filter((entry) => entry.locked !== undefined);
+  const adjustable = SWITCHED.filter((entry) => entry.locked === undefined);
+  const core = SWITCHED.filter((entry) => entry.locked !== undefined);
   return `<section id="extensions" aria-labelledby="extensions-title">
 <div class="section-head"><h2 id="extensions-title">${icon("extensions")}Extensions</h2></div>
-<p class="section-desc">What Pi Durable's harness offers the model. A switch saves at once; a setting saves with its Save button.</p>
+<p class="section-desc">What Pi Durable's harness does beside offering tools. A switch saves at once; a setting saves with its Save button.</p>
 <div class="group">${adjustable.map((entry) => extensionRow(resolved, entry)).join("\n")}</div>
 <h3 class="sub-head">Core, always on</h3>
 <div class="group core">${core.map((entry) => extensionRow(resolved, entry)).join("\n")}</div>
 </section>`;
+};
+
+// ── Tools ───────────────────────────────────────────────────────────────────────────────────────────────────────
+
+/** What each Exposure means, for a select's title and the section's description. */
+const EXPOSURE_WORDS: Readonly<Record<Exposure, string>> = {
+  direct: "in every request",
+  deferred: "loaded by tool_search",
+  codemode: "code mode's scripts only",
+  hidden: "not offered",
+};
+
+/** Why a tool is offered other than as set: code mode or tool search hidden (the Session's fallbacks, codemode.ts). */
+const fallbackNote = (exposure: Exposure, tools: ResolvedTools): string => {
+  const codemodeOff = tools.tools.codemode === "hidden";
+  const searchOff = tools.tools.tool_search === "hidden";
+  if (exposure === "codemode" && codemodeOff) return `Code mode is hidden: offered ${searchOff ? "direct" : "deferred"}.`;
+  if (exposure === "deferred" && searchOff) return "Tool search is hidden: offered direct.";
+  return "";
+};
+
+/**
+ * An Exposure select that saves at once (pageScript.ts): a built-in tool's (`tool`), or one of t3's (`t3`: a tool's
+ * name, or "" for the card's default). `inherit` is the label of the empty option that clears the tool's own.
+ */
+const toolExposureSelect = (input: { readonly tool: string; readonly t3?: true; readonly current: string; readonly allowed: ReadonlyArray<Exposure>; readonly inherit?: string; readonly label: string }): string => {
+  const options: Array<readonly [string, string]> = [...(input.inherit === undefined ? [] : [["", input.inherit] as const]), ...input.allowed.map((value) => [value, value] as const)];
+  return `<select class="sel-sm" data-tool-exposure="${escapeHtml(input.tool)}"${input.t3 === true ? " data-t3" : ""} aria-label="${escapeHtml(input.label)}">${options
+    .map(([value, text]) => `<option value="${escapeHtml(value)}"${value === input.current ? " selected" : ""}${value === "" ? "" : ` title="${escapeHtml(EXPOSURE_WORDS[value as Exposure])}"`}>${escapeHtml(text)}</option>`)
+    .join("")}</select>`;
+};
+
+const toolRow = (name: string, exposure: Exposure, allowed: ReadonlyArray<Exposure>, tools: ResolvedTools): string => {
+  const note = fallbackNote(exposure, tools);
+  return `<tr><td class="tool" data-label="Tool"><code>${escapeHtml(name)}</code></td><td class="exp" data-label="Exposure"><div>${toolExposureSelect({ tool: name, current: exposure, allowed, label: `${name} exposure` })}</div>${
+    note === "" ? "" : `<span class="src">${escapeHtml(note)}</span>`
+  }</td></tr>`;
+};
+
+/** One extension with tools: its tools' Exposures (each saved at once), and its settings (saved with Save). */
+const toolsRow = (resolved: ResolvedHarness, tools: ResolvedTools, entry: ExtensionEntry): string => {
+  const current = resolved.extensions[entry.id];
+  const titleId = escapeHtml(`ext-${entry.id}-title`);
+  const on = (entry.tools ?? []).some((tool) => tools.tools[tool] !== "hidden");
+  const rows = (entry.tools ?? []).map((name) => toolRow(name, tools.tools[name] ?? "hidden", builtinTool(name)?.exposures ?? [], tools)).join("");
+  const settings = Object.entries(entry.settings).map(([key, setting]) => field(entry.id, key, setting, current?.settings[key]));
+  const save =
+    settings.length === 0
+      ? ""
+      : `${on ? "" : `<p class="desc">Every tool is hidden, so the extension is not installed and these settings do nothing until a tool is offered.</p>`}<div class="fields">${settings.join("")}</div><div class="save"><span class="save-note" data-save-note aria-live="polite"></span><button type="submit" class="btn btn-sm" data-save disabled>Save</button></div>`;
+  return `<form class="row" data-extension="${escapeHtml(entry.id)}" aria-labelledby="${titleId}" novalidate><div><div class="row-title"><h3 id="${titleId}">${escapeHtml(entry.title)}</h3><span class="ident">${escapeHtml(entry.id)}</span></div>
+<p class="desc">${escapeHtml(entry.description)}</p></div><div class="row-control">${on ? `<span class="pill pill-ok">On</span>` : `<span class="pill" title="Every tool hidden">Off</span>`}</div>
+<div class="row-extra"><div class="table-wrap tools-wide"><table class="stacked tools-table"><thead><tr><th scope="col">Tool</th><th scope="col">Exposure</th></tr></thead><tbody>${rows}</tbody></table></div>${save}</div></form>`;
+};
+
+const PRESET_WORDS: Readonly<Record<OfferedPreset, string>> = {
+  core: "built-in and t3 tools direct, MCP servers' tools deferred",
+  "codemode-only": "every tool deferred, for code mode and tool search (t3's tools it asks for in every request stay direct unless you set them)",
+  everything: "every tool direct, MCP servers' included",
+};
+
+const toolsSection = (resolved: ResolvedHarness): string => {
+  const tools = resolvedToolsOf(resolved);
+  const presets = (Object.keys(OFFERED_PRESETS) as Array<OfferedPreset>)
+    .map((preset) => `<button type="button" class="btn btn-sm" data-tools-preset="${preset}" title="${escapeHtml(PRESET_WORDS[preset])}">${escapeHtml(preset)}</button>`)
+    .join("");
+  return `<section id="tools" aria-labelledby="tools-title">
+<div class="section-head"><h2 id="tools-title">${icon("extensions")}Tools</h2><div class="presets" role="group" aria-label="Presets"><span>Preset</span>${presets}</div></div>
+<p class="section-desc">How each tool reaches the model: <strong>direct</strong> (in every request), <strong>deferred</strong> (loaded by tool_search; scripts call it any time), <strong>codemode</strong> (code mode's scripts only) or <strong>hidden</strong>. An extension runs while any of its tools is not hidden: hiding codemode turns code mode off, hiding web_search turns searching off. A preset sets every tool that is not hidden at once, t3's and MCP servers' included, except an MCP server's code-mode-only tools (core: direct, MCP servers' deferred; codemode-only: deferred; everything: direct). A change saves at once and applies at each thread's next turn. MCP servers' tools, t3's included, are set on their cards.</p>
+<div class="group">${EXTENSIONS.filter((entry) => entry.tools !== undefined)
+    .map((entry) => toolsRow(resolved, tools, entry))
+    .join("\n")}</div>
+</section>`;
+};
+
+// ── t3's own tools ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/** The t3-code card: t3's tools as a Session last listed them, each with its Exposure; always on. */
+const t3Card = (resolved: ResolvedHarness, listing: T3ToolListing | undefined): string => {
+  const { t3 } = resolvedToolsOf(resolved);
+  const rows = (listing?.tools ?? [])
+    .map((tool) => {
+      const own = ownEntry(t3.tools, tool.name);
+      const inherited = tool.asksForDirect ? "direct" : t3.exposure;
+      const inherit = tool.asksForDirect ? "t3 asks: direct" : `Default (${t3.exposure})`;
+      const exposure = own ?? inherited;
+      const note = [T3_DIRECT_ONLY.has(tool.name) ? "Waits: never code mode only." : "", fallbackNote(exposure, resolvedToolsOf(resolved))].filter((text) => text !== "").join(" ");
+      return `<tr><td class="tool" data-label="Tool"><code>${escapeHtml(tool.name)}</code>${tool.description === undefined ? "" : `<span class="src">${escapeHtml(tool.description)}</span>`}</td><td class="cls" data-label="Class"><div><span class="tag tag-${tool.readOnly ? "read" : "write"}">${tool.readOnly ? "read" : "write"}</span></div></td><td class="exp" data-label="Exposure"><div>${toolExposureSelect({
+        tool: tool.name,
+        t3: true,
+        current: own ?? "",
+        allowed: t3Exposures(tool.name),
+        inherit,
+        label: `${tool.name} exposure`,
+      })}</div>${note === "" ? "" : `<span class="src">${escapeHtml(note)}</span>`}</td></tr>`;
+    })
+    .join("");
+  const reads = (listing?.tools ?? []).filter((tool) => tool.readOnly).length;
+  const table =
+    listing === undefined
+      ? `<p class="empty-tools">Not listed yet: t3 lists its tools for each thread, and a thread's next turn lists them here.</p>`
+      : `<details class="tools"><summary>${icon("chevron")}Tools <span>${plural(listing.tools.length, "tool", "tools")}: ${reads} read, ${listing.tools.length - reads} write</span></summary>
+<div class="table-wrap"><table class="stacked tools-table"><thead><tr><th scope="col">Tool</th><th scope="col">Class</th><th scope="col">Exposure</th></tr></thead><tbody>${rows}</tbody></table></div></details>${
+          listing.left.length === 0
+            ? ""
+            : `<p class="empty-tools">Not offered to Durable agents (ADR-0022): ${listing.left.map((name) => `<code>${escapeHtml(name)}</code>`).join(", ")}.</p>`
+        }`;
+  const listed = listing === undefined ? "Not listed yet" : listing.listedAt === 0 ? "From a thread, before this card existed" : `${time(listing.listedAt)}, from a thread`;
+  return `<article class="group server" aria-labelledby="mcp-t3-code">
+<div class="server-head"><div><div class="server-name"><h3 id="mcp-t3-code">${T3_SERVER}</h3><span class="tag">T3 Code</span></div><p class="desc">t3's own tools (ADR-0022). t3 decides which tools a thread has, and may ask for one in every request; the Exposures are yours.</p></div>
+<span class="state" title="Always on">${icon("lock")}Always on</span>
+<dl class="facts"><div><dt>Last listed</dt><dd>${listed}</dd></div></dl></div>
+<div class="server-actions"><label class="exposure">Default exposure ${toolExposureSelect({ tool: "", t3: true, current: t3.exposure, allowed: EXPOSURES, label: "t3-code default exposure" })}</label></div>
+${table}</article>`;
 };
 
 // ── Environment ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -245,8 +374,6 @@ const action = (label: string, change: unknown, options: { readonly className?: 
   `<button type="button" class="btn ${options.className ?? "btn-sm"}" data-mcp="${escapeHtml(JSON.stringify(change))}"${
     options.ariaLabel === undefined ? "" : ` aria-label="${escapeHtml(options.ariaLabel)}"`
   }>${options.icon === undefined ? "" : icon(options.icon)}${escapeHtml(label)}</button>`;
-
-const EXPOSURES = ["direct", "deferred", "codemode", "hidden"] as const;
 
 /**
  * A select that saves an Exposure through the panel's JSON API (pageScript.ts). A server's carries its name; a tool's
@@ -447,10 +574,11 @@ const ADD_SERVER = `<form class="group add" id="add-server" data-mcp-add autocom
 <div class="form-foot"><p>${icon("key")}Secrets go to the Environment's secret store.</p><button type="submit" class="btn btn-primary">${icon("plus")}Add server</button></div>
 </form>`;
 
-const mcpSection = (rows: ReadonlyArray<McpRow>, owner?: OwnerClientsView): string => `<section id="mcp" aria-labelledby="mcp-title">
+const mcpSection = (rows: ReadonlyArray<McpRow>, t3: string, owner?: OwnerClientsView): string => `<section id="mcp" aria-labelledby="mcp-title">
 <div class="section-head"><h2 id="mcp-title">${icon("server")}MCP servers</h2><a class="btn btn-sm" href="#add-server">${icon("plus")}Add server</a></div>
 <p class="section-desc">Servers whose tools agents get, read at each call. Test lists a server's tools now.</p>
-<div class="stack">${
+<div class="stack">${t3}
+${
   rows.length === 0
     ? `<div class="group"><div class="empty"><span class="empty-icon">${icon("server")}</span><h3>No MCP servers</h3><p>Add a remote server below. Agents get its tools at their next turn.</p></div></div>`
     : rows.map((row) => serverCard(row, owner)).join("\n")
@@ -606,6 +734,8 @@ export interface PageInput {
   readonly openChanges?: ReadonlyArray<OpenChangeRow>;
   /** The Owner clients and the endpoint's URL; shown on the Settings server's card when given. */
   readonly ownerClients?: OwnerClientsView;
+  /** t3's tools as a Session last listed them (the t3-code card); not listed yet when absent. */
+  readonly t3Tools?: T3ToolListing;
 }
 
 const navItem = (id: string, label: string, name: IconName, after = "") => `<a href="#${id}">${icon(name)}${label}${after}</a>`;
@@ -627,7 +757,8 @@ export const renderPage = (input: PageInput): string => {
 <aside class="side">
 ${brand()}
 <nav class="nav" aria-label="Sections">
-${input.openChanges === undefined ? "" : `${navItem("changes", "Open changes", "alert", `<span class="count">${input.openChanges.length}</span>`)}\n`}${navItem("extensions", "Extensions", "extensions", `<span class="count">${EXTENSIONS.length}</span>`)}
+${input.openChanges === undefined ? "" : `${navItem("changes", "Open changes", "alert", `<span class="count">${input.openChanges.length}</span>`)}\n`}${navItem("tools", "Tools", "extensions", `<span class="count">${BUILTIN_TOOLS.length}</span>`)}
+${navItem("extensions", "Extensions", "extensions", `<span class="count">${SWITCHED.length}</span>`)}
 ${navItem("mcp", "MCP servers", "server", failing > 0 ? `<span class="flag" role="img" aria-label="${plural(failing, "server", "servers")} failing"></span>` : `<span class="count">${rows.length}</span>`)}
 ${input.endpoints === undefined ? "" : `${navItem("endpoints", "Model endpoints", "key", `<span class="count">${input.endpoints.endpoints.length}</span>`)}\n`}${navItem("environment", "Environment", "container")}
 ${navItem("skills", "Skills", "skills")}
@@ -637,10 +768,11 @@ ${navItem("audit", "Audit log", "audit", `<span class="count">${input.audit.leng
 <p class="side-foot">Harness revision <strong>${revision}</strong>, applied at each thread's next turn. Environment revision <strong>${environment.revision}</strong>: Container settings apply at each Container's next start, Environment skills at each thread's next turn.</p>
 </aside>
 <main id="main" tabindex="-1"><div class="content">
-<header class="page-head"><div><h1>Settings</h1><p>t3flare's own settings for this Cloud Environment: the Harness settings (Pi Durable's extensions and MCP servers, applied at each thread's next turn) and the Environment settings (what every Container gets, applied at its next start).</p></div><span class="chip">Revision <strong>${revision}</strong></span></header>
+<header class="page-head"><div><h1>Settings</h1><p>t3flare's own settings for this Cloud Environment: the Harness settings (the tools Pi Durable's agents are offered, its extensions and MCP servers, applied at each thread's next turn) and the Environment settings (what every Container gets, applied at its next start).</p></div><span class="chip">Revision <strong>${revision}</strong></span></header>
 <div id="result" class="notice" role="status" aria-live="polite" hidden><span class="notice-ico-ok">${icon("check")}</span><span class="notice-ico-err">${icon("alert")}</span><p class="msg"></p><button type="button" class="btn btn-ghost btn-sm" data-dismiss aria-label="Dismiss">${icon("x")}</button></div>
-${input.openChanges === undefined ? "" : `${openChangesSection(input.openChanges)}\n`}${extensionsSection(input.resolved)}
-${mcpSection(rows, input.ownerClients)}
+${input.openChanges === undefined ? "" : `${openChangesSection(input.openChanges)}\n`}${toolsSection(input.resolved)}
+${extensionsSection(input.resolved)}
+${mcpSection(rows, t3Card(input.resolved, input.t3Tools), input.ownerClients)}
 ${endpointsSection(escapeHtml, input.endpoints)}${environmentSection(environment, input.costs ?? containerCostTable(environment.containerBudget), input.running)}
 ${skillsSection(input.skills)}
 ${statusSection(input.status)}

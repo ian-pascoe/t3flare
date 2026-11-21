@@ -20,6 +20,10 @@
 //   Elicitation mode, which the endpoint (endpoint.ts) delivers and the Change page answers.
 import {
   applyChange,
+  applyToolsChange,
+  BUILTIN_TOOLS,
+  OFFERED_PRESETS,
+  type ToolsChange,
   applyEnvironmentChange,
   applyMcpChange,
   CARD_TEXT_MAX,
@@ -36,6 +40,7 @@ import {
   resolveEnvironment,
   resolveHarness,
   SETTINGS_SERVER,
+  t3AsksForDirect,
   type TierVerdict,
   tierOf,
   type ToolClass,
@@ -51,6 +56,7 @@ import {
   beginMcpSignIn,
   changeEnvironment,
   changeExtension,
+  changeTools,
   changeMcp,
   changeSkills,
   type OpOptions,
@@ -102,7 +108,7 @@ import {
   outcomeOf,
   waitForChange,
 } from "./openChanges.ts";
-import { askedByText, changeText, environmentItems, extensionItems, mcpItems, PAGE_REASON, shownSkill } from "./render.ts";
+import { askedByText, changeText, environmentItems, extensionItems, mcpItems, PAGE_REASON, shownSkill, toolsItems } from "./render.ts";
 import { settingsToolOf } from "./tools.ts";
 import type { ChangeItem, ChangeView, PageReason } from "./types.ts";
 
@@ -227,13 +233,18 @@ const getSettings = async (deps: SettingsServerDeps, args: Readonly<Record<strin
     return read({
       entity: "harness",
       revision: stored.revision,
+      tools: BUILTIN_TOOLS.map((tool) => ({ name: tool.name, extension: tool.extension, exposure: resolved.tools[tool.name], exposures: tool.exposures })),
+      t3: { exposure: resolved.t3.exposure, tools: resolved.t3.tools, listed: deps.ops.store.lastT3Tools() ?? null },
+      presets: OFFERED_PRESETS,
       extensions: EXTENSIONS.map((entry) => ({
         id: entry.id,
         title: entry.title,
         description: entry.description,
         enabled: resolved.extensions[entry.id]?.enabled ?? false,
         switch:
-          entry.locked !== undefined
+          entry.tools !== undefined
+            ? `none: on while any of its tools (${entry.tools.join(", ")}) is not hidden; change_tools sets them`
+            : entry.locked !== undefined
             ? `locked: ${entry.locked}`
             : entry.default === "always"
               ? "always on"
@@ -341,6 +352,7 @@ interface Target {
 const TARGET = {
   extension: { entity: "harness", subject: "the Harness settings", appliesAt: APPLIES_AT.harness },
   mcp: { entity: "harness", subject: "the MCP server set (Harness settings)", appliesAt: APPLIES_AT.harness },
+  tools: { entity: "harness", subject: "the tools' Exposures (Harness settings)", appliesAt: APPLIES_AT.harness },
   environment: { entity: "environment", subject: "the Environment settings", appliesAt: APPLIES_AT.environment },
   skills: { entity: "environment", subject: "the Environment skills", appliesAt: APPLIES_AT.skills },
 } as const satisfies Readonly<Record<string, Target>>;
@@ -391,6 +403,32 @@ const planExtension = (deps: SettingsServerDeps, args: Readonly<Record<string, u
     normalized: { ...change },
     describe: async () => extensionItems(stored, change),
     run: async (options) => fromOutcome(changeExtension(deps.ops, change, options)),
+  };
+};
+
+const planTools = (deps: SettingsServerDeps, args: Readonly<Record<string, unknown>>): PlanOrRefusal => {
+  const tools = args.tools === undefined ? undefined : objectArg(args.tools);
+  const t3 = args.t3 === undefined ? undefined : objectArg(args.t3);
+  if (args.tools !== undefined && tools === undefined) return { refused: "tools is an object of tool names and Exposures" };
+  if (args.t3 !== undefined && t3 === undefined) return { refused: "t3 is an object: exposure, and tools by t3's names" };
+  const t3Tools = t3?.tools === undefined ? undefined : objectArg(t3.tools);
+  if (t3?.tools !== undefined && t3Tools === undefined) return { refused: "t3.tools is an object of t3 tool names and Exposures" };
+  // Only the fields a tools change takes (SPI-1199 review): anything else the call carried is dropped.
+  const change = {
+    ...(args.preset === undefined ? {} : { preset: args.preset }),
+    ...(tools === undefined ? {} : { tools }),
+    ...(t3 === undefined ? {} : { t3: { ...(t3.exposure === undefined ? {} : { exposure: t3.exposure }), ...(t3Tools === undefined ? {} : { tools: t3Tools }) } }),
+  } as ToolsChange;
+  const stored = deps.ops.store.load();
+  const applied = applyToolsChange(stored, change);
+  if (!applied.ok) return { refused: applied.error };
+  const asksForDirect = t3AsksForDirect(deps.ops.store.lastT3Tools());
+  return {
+    ...TARGET.tools,
+    verdict: tierOf({ entity: "tools", stored, change, asksForDirect }),
+    normalized: { ...change },
+    describe: async () => toolsItems(stored, change, asksForDirect),
+    run: async (options) => fromOutcome(changeTools(deps.ops, change, options)),
   };
 };
 
@@ -620,6 +658,8 @@ const planWrite = (deps: SettingsServerDeps, tool: string, args: Readonly<Record
   switch (tool) {
     case "change_extension":
       return planExtension(deps, args);
+    case "change_tools":
+      return planTools(deps, args);
     case "change_mcp":
       return planMcp(deps, args);
     case "start_mcp_sign_in":

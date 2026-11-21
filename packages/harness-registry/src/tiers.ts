@@ -9,7 +9,8 @@
 import { applyEnvironmentChange, type EnvironmentChange, ENVIRONMENT_SETTINGS, resolveEnvironment, settingOf, type StoredEnvironment } from "./environment.ts";
 import type { SettingTier } from "./fields.ts";
 import { EXTENSIONS, type HarnessChange, type McpChange, mcpServersOf, resolveHarness, type StoredHarness } from "./index.ts";
-import { type Exposure, ownEntry, type ToolClass } from "./mcp.ts";
+import { type Exposure, type McpServerSetting, ownEntry, SETTINGS_SERVER, type ToolClass } from "./mcp.ts";
+import { applyToolsChange, builtinTool, movedServerTools, movedTools, resolveTools, type ToolsChange } from "./tools.ts";
 
 export type ChangeTier = "free" | "asked";
 
@@ -39,6 +40,13 @@ export type TierInput =
       readonly change: McpTierChange;
       /** A tool's own class from its `readOnlyHint`, undefined when unknown (not listed, or no inventory). */
       readonly hintedClass?: (server: string, tool: string) => ToolClass | undefined;
+    }
+  | {
+      readonly entity: "tools";
+      readonly stored: StoredHarness;
+      readonly change: ToolsChange;
+      /** Whether t3 asks for its tool in every request (`anthropic/alwaysLoad`), undefined when unknown (not listed). */
+      readonly asksForDirect?: (tool: string) => boolean | undefined;
     }
   | { readonly entity: "environment"; readonly stored: StoredEnvironment; readonly change: EnvironmentChange }
   | { readonly entity: "skills"; readonly change: SkillsTierChange };
@@ -160,6 +168,39 @@ const mcpTier = (stored: StoredHarness, change: McpTierChange, hintedClass: (ser
   return verdictOf(parts);
 };
 
+/** Each tool's Exposure before and after, as MCP tools' are judged: widening is asked, narrowing free. */
+const toolsTier = (stored: StoredHarness, change: ToolsChange, asksForDirect: (tool: string) => boolean | undefined): TierVerdict => {
+  const applied = applyToolsChange(stored, change);
+  // Malformed: the change function refuses it; until then it is asked.
+  if (!applied.ok) return { tier: "asked", reasons: [applied.error] };
+  const moved = (move: { readonly tool: string; readonly before: Exposure; readonly after: Exposure }): Part => ({
+    asked: rankOf(move.after) > rankOf(move.before),
+    reason: `${move.tool}: Exposure ${move.before} to ${move.after}`,
+  });
+  const parts: Array<Part> = [];
+  for (const move of movedTools(resolveTools(stored.global), resolveTools(applied.harness.global), asksForDirect)) {
+    parts.push(moved(move));
+    // Hiding code mode or tool search narrows it but widens the tools that fall back (codemode.ts), MCP servers' too.
+    const widens = builtinTool(move.tool)?.hidingWidens;
+    if (move.after === "hidden" && widens !== undefined) parts.push({ asked: true, reason: `${move.tool} hidden: ${widens}` });
+  }
+  // A preset moves MCP servers' tools too; every change to the Settings server's own entry is asked (plan D5), one
+  // that moves no tool's Exposure (a redundant own Exposure cleared) included.
+  const [before, after] = [mcpServersOf(stored), mcpServersOf(applied.harness)];
+  let settingsMoved = false;
+  for (const move of movedServerTools(before, after)) {
+    const part = moved(move);
+    settingsMoved ||= move.server === SETTINGS_SERVER;
+    parts.push(move.server === SETTINGS_SERVER ? { asked: true, reason: `${part.reason} (the Settings server's own entry)` } : part);
+  }
+  // A preset changes only an entry's Exposures.
+  const exposuresOf = (server: McpServerSetting | undefined) => JSON.stringify([server?.exposure, Object.entries(server?.toolExposure ?? {}).sort(([a], [b]) => a.localeCompare(b))]);
+  if (exposuresOf(before[SETTINGS_SERVER]) !== exposuresOf(after[SETTINGS_SERVER]) && !settingsMoved) {
+    parts.push({ asked: true, reason: `${SETTINGS_SERVER}: its own entry rewritten (the Settings server's own entry)` });
+  }
+  return verdictOf(parts);
+};
+
 const environmentTier = (stored: StoredEnvironment, change: EnvironmentChange): TierVerdict => {
   for (const key of Object.keys(change.settings)) if (ownEntry(ENVIRONMENT_SETTINGS as Readonly<Record<string, unknown>>, key) === undefined) return { tier: "asked", reasons: [`${key}: not a setting this registry knows`] };
   const applied = applyEnvironmentChange(stored, change);
@@ -191,6 +232,8 @@ export const tierOf = (input: TierInput): TierVerdict => {
   switch (input.entity) {
     case "extension":
       return extensionTier(input.stored, input.change);
+    case "tools":
+      return toolsTier(input.stored, input.change, input.asksForDirect ?? (() => undefined));
     case "mcp":
       return mcpTier(input.stored, input.change, input.hintedClass ?? (() => undefined));
     case "environment":

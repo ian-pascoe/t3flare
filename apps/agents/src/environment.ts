@@ -5,7 +5,7 @@ import { ENVIRONMENT_NAME } from "@t3flare/session-protocol";
 
 import type { McpAsker, McpRpcAnswer, McpRpcRequest, SessionPush, SessionPushAnswer } from "@t3flare/session-protocol";
 import type { TerminalPush, TerminalPushAnswer } from "@t3flare/workspace-client";
-import type { GlobalMiseReport, McpRelayAnswer, McpRelayInput, ResolvedEnvironment, ResolvedHarness } from "@t3flare/harness-registry";
+import type { GlobalMiseReport, McpRelayAnswer, McpRelayInput, ResolvedEnvironment, ResolvedHarness, T3ToolListing } from "@t3flare/harness-registry";
 import type { SkillSet } from "@t3flare/skills";
 import type { EndpointCredential, EndpointCredentialRequest, ModelEndpoints } from "@t3flare/models/endpoints";
 import type { LimitReading } from "@t3flare/models/limits";
@@ -54,6 +54,8 @@ export interface EnvironmentRpc {
   skillSetRefused(input: { readonly workspace: string; readonly hash: string; readonly message: string }): Promise<void>;
   /** A Global mise lay-down at a Container start (SPI-1150), for the panel's Status. Never boots t3. */
   noteGlobalMise(report: GlobalMiseReport): Promise<{ readonly kept: boolean }>;
+  /** t3's tools as a Session listed them: the panel's t3-code card lists them for their Exposures. Never boots t3. */
+  noteT3Tools(listing: T3ToolListing): Promise<{ readonly kept: boolean }>;
   /** The MCP tools this Session may install (ADR-0028). */
   mcpView(): Promise<McpView>;
   /** An MCP call the Session's tool has judged (`decideCall`); the server's questions come back through `asker` (SPI-1079). */

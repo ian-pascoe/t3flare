@@ -49,11 +49,12 @@ const harness = async (method: string, pathname: string, body?: unknown) => {
 
 const settings = async () => {
   const before = await harness("GET", "/_t3flare/settings/api/settings");
-  const on = await harness("POST", "/_t3flare/settings/api/extensions", { extension: "web", settings: { search: true } });
+  const on = await harness("POST", "/_t3flare/settings/api/tools", { tools: { web_search: "direct" } });
   const after = await harness("GET", "/_t3flare/settings/api/settings");
   const pick = (json: any) => {
     const extensions = json?.resolved?.extensions ?? json?.extensions ?? {};
-    return Object.fromEntries(["web", "todo", "context"].map((id) => [id, extensions[id] ?? null]));
+    const tools = json?.resolved?.tools ?? {};
+    return { web_search: tools.web_search ?? null, ...Object.fromEntries(["web", "todo", "context"].map((id) => [id, extensions[id] ?? null])) };
   };
   writeEvidence("settings.json", { before: pick(before.json), changed: on.status, after: pick(after.json), ok: on.status < 300 });
 };
