@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/list-files.ts.
 // `ExecutionEnv.listFiles` in the Workspace DO: a walk of one directory at a time (depth first, siblings in byte order of
 // their names, symbolic links listed and not followed), filtered by hidden names, excluded names and git's ignore rules
 // as it goes, so a directory skipped (`node_modules`, an ignored `dist/` or `.venv/`) is never walked. A directory

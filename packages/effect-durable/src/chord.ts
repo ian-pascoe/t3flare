@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/effect-durable/src/chord.ts.
 // Chord `Context` ↔ Effect fibers (ADR-0003). pi-durable passes every invocation a Chord `Context` whose abort signal
 // cancels it; the fiber that runs an invocation's Effect is interrupted by that signal and sees the Context as
 // `ChordContext`, so pi-durable calls it makes inherit both the Context's values and its cancellation.

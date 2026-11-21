@@ -12,24 +12,23 @@
 # so a command never reads half of one. The supervisor removes the notes of an earlier start (a snapshot keeps them)
 # before it starts this script and computerd.
 #
-# The limits are those of `@cloudpid/sandbox-image/memory-guard`, which a test keeps equal. CLOUDPID_EARLYOOM and
-# CLOUDPID_MEMORY_NOTES exist for the tests; the image sets neither.
+# T3FLARE_EARLYOOM and T3FLARE_MEMORY_NOTES let a test point this script elsewhere; the image sets neither.
 set -u
 export TZ=UTC
 
-earlyoom=${CLOUDPID_EARLYOOM:-/usr/bin/earlyoom}
-notes=${CLOUDPID_MEMORY_NOTES:-/run/cloudpid-memory-guard}
+earlyoom=${T3FLARE_EARLYOOM:-/usr/bin/earlyoom}
+notes=${T3FLARE_MEMORY_NOTES:-/run/t3flare-memory-guard}
 # SIGTERM below the lower of 15% of the memory and 1 GiB available, SIGKILL below the lower of 8% and 512 MiB.
 memory_percent=15,8
 memory_kib=1048576,524288
-# Process names (at most 15 characters, as the kernel keeps them) earlyoom never stops: computerd, the supervisor, this
-# script and the MCP bridge.
-avoid='^(computerd|cloudpid-superv|cloudpid-memory|cloudpid-mcp-br)$'
+# Process names (at most 15 characters, as the kernel keeps them) earlyoom never stops: computerd, the supervisor and
+# this script.
+avoid='^(computerd|t3flare-supervi|t3flare-memory-)$'
 
 mkdir -p -- "$notes"
 
 if [ ! -x "$earlyoom" ]; then
-  echo "cloudpid-memory-guard: no memory guard ($earlyoom is missing)" >&2
+  echo "t3flare-memory-guard: no memory guard ($earlyoom is missing)" >&2
   exit 0
 fi
 
@@ -66,6 +65,6 @@ while IFS= read -r line <&4; do
 
   name=${EPOCHREALTIME/[.,]/}
   printf -v when '%(%H:%M:%S)T' -1
-  printf 'cloudpid: the Container was nearly out of memory, so its memory guard stopped %s at %s UTC to keep the Container answering. Run less at once (fewer parallel tasks or test workers, such as turbo'\''s --concurrency or vitest'\''s --maxWorkers), or restart this Container at a larger size with the container_resize tool.\n' \
+  printf 't3flare: the Container was nearly out of memory, so its memory guard stopped %s at %s UTC to keep the Container answering. Run less at once (fewer parallel tasks or test workers, such as turbo'\''s --concurrency or vitest'\''s --maxWorkers), or have the owner raise the Container size in the Environment settings.\n' \
     "$what" "$when" >"$notes/.$name" && mv -f -- "$notes/.$name" "$notes/$name"
 done

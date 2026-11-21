@@ -3,7 +3,7 @@
  * Failures and cuts; #382 D5): the `fetch` the core is given for a stdio target, which hands each request to the
  * Workspaces Worker's `WorkspaceMcpBridge` (`MCP_BRIDGE`), and what the engine does with what comes back.
  *
- * - **Every response must be the bridge's:** it carries `x-cloudpid-bridge: <level>`. One below `MCP_BRIDGE_MIN_LEVEL`
+ * - **Every response must be the bridge's:** it carries `x-t3flare-bridge: <level>`. One below `MCP_BRIDGE_MIN_LEVEL`
  *   (or with none) fails the call as `Unsupported`, "this Container runs an older bridge; restart it", which the host reads as the
  *   server being `failed`. A response without a level is `WorkspaceMcpBridge`'s own refusal (`{ error, message }`) or an
  *   older bridge's.
@@ -13,7 +13,7 @@
  *   which may have run.
  * - **A cut is named** from the bridge's status, asked with `start: false` so it never starts a Container: "Container
  *   stopped", "stdio server exited (code or signal)" with the last 2 KiB of its stderr, or the cut as it was.
- * - **The spawn id** of the last response about the child (`x-cloudpid-spawn`) goes back to the host, which learns of a
+ * - **The spawn id** of the last response about the child (`x-t3flare-spawn`) goes back to the host, which learns of a
  *   restart from it.
  * - **Uses:** a POST is a use of the Container and may start it when the target says `start`; a GET (the Legacy stream) never does either.
  *   A listen's connection is `quiet`: none of its requests is a use or starts a Container, a POST included

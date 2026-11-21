@@ -1,4 +1,3 @@
-// Copied from cloudpid@93ba45a3:packages/extensions/src/web/ssrf.ts, unchanged but for its header (SPI-1054; see ./NOTICE.md).
 // The SSRF guard's address and host rules. Pure: no I/O, so every encoding of a target is tested without a network.
 // `web_fetch` runs them on the URL it was given and again on every redirect hop (see `guarded-fetch.ts`), and `dns.ts`
 // runs the address rule on what a host resolves to.

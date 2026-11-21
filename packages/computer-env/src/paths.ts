@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/paths.ts.
 // POSIX paths of a Workspace's file tree, which is always absolute and `/`-separated.
 // pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
 

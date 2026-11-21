@@ -24,7 +24,7 @@ import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { COMMAND_ENV, GLOBAL_MISE_CONFIG } from "@t3flare/sandbox-image/env";
+import { BASE_MISE_CONFIG, COMMAND_ENV, GLOBAL_MISE_CONFIG, IMAGE_SHARE } from "@t3flare/sandbox-image/env";
 import { GLOBAL_MISE_SCRIPT } from "@t3flare/sandbox-image/globalMise";
 import { expect, it } from "vitest";
 
@@ -42,14 +42,14 @@ const forReport = <T>(measure: () => T): T | undefined => (out === undefined ? u
 const MITMPROXY = "mitmproxy/mitmproxy:12.3.1@sha256:2711066c855659b5af8b1dbb84494ed3eff69b42ece439c60b4fe09a2db829d4";
 
 /** The base mise.toml in the image (`BASE_MISE_CONFIG`, apps/sandbox-image/src/env.ts). */
-const BASE = "/usr/local/share/cloudpid/mise.toml";
+const BASE = BASE_MISE_CONFIG;
 /** Where the lay-down puts the owner's text: the Container's own disk, outside /workspace. */
 const GLOBAL = GLOBAL_MISE_CONFIG;
 
 /** What every command's environment carries today (`COMMAND_ENV` at 660f922, BASH_ENV aside). */
 const TODAY_ENV: Readonly<Record<string, string>> = {
   MISE_GLOBAL_CONFIG_FILE: BASE,
-  MISE_TRUSTED_CONFIG_PATHS: "/usr/local/share/cloudpid:/workspace",
+  MISE_TRUSTED_CONFIG_PATHS: `${IMAGE_SHARE}:/workspace`,
   MISE_YES: "1",
   GIT_TERMINAL_PROMPT: "0",
 };
@@ -58,7 +58,7 @@ const TODAY_ENV: Readonly<Record<string, string>> = {
 const LAYERED_ENV: Readonly<Record<string, string>> = {
   MISE_SYSTEM_CONFIG_FILE: BASE,
   MISE_GLOBAL_CONFIG_FILE: GLOBAL,
-  MISE_TRUSTED_CONFIG_PATHS: "/usr/local/share/cloudpid:/workspace",
+  MISE_TRUSTED_CONFIG_PATHS: `${IMAGE_SHARE}:/workspace`,
   MISE_YES: "1",
   GIT_TERMINAL_PROMPT: "0",
 };

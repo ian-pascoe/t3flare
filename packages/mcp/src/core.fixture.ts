@@ -70,7 +70,7 @@ export const testDeps = (
   eras: memoryStore().store,
   sessions: memoryStore().store,
   capabilities: () => ({}),
-  clientInfo: { name: "cloudpid", version: "test" },
+  clientInfo: { name: "t3flare", version: "test" },
   ...overrides,
 });
 

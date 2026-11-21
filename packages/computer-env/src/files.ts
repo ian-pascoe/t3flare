@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/files.ts.
 // `ComputerFiles`: the file search `ls`, `find`, and `grep` run on (`@cloudpid/extensions/files`). Each search is one
 // of the Workspace DO's file operations (`host.ts`), answered as plain data. Without `reachContainer` it sees only the
 // Workspace's files and can never start a Container; the model's own tools ask for `reachContainer`, which runs a

@@ -161,7 +161,7 @@ export interface McpDeps {
   readonly capabilities: (ctx?: McpCallContext) => ClientCapabilities;
   /** Extensions the connection declares besides MCP Apps, such as OAuth Client Credentials. */
   readonly extensions?: Readonly<Record<string, JSONObject>>;
-  /** `{ name: "cloudpid", version: <deploy> }`. */
+  /** `{ name: "t3flare", version: <deploy> }`. */
   readonly clientInfo: Implementation;
   /**
    * Hears each `notifications/message` the server sends. With it, the core asks a server that declares `logging` for
@@ -990,7 +990,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
   const noSampling = (answer: QuestionAnswer) =>
     answer.kind === "refused"
       ? { code: answer.code ?? MCP_SAMPLING_REFUSED, message: answer.message }
-      : { code: MCP_INTERNAL_ERROR, message: "cloudpid could not answer the sampling request" };
+      : { code: MCP_INTERNAL_ERROR, message: "t3flare could not answer the sampling request" };
 
   /**
    * A Legacy server's question, an elicitation form or a Sampling request: tied by the tap to the call whose POST stream
@@ -1041,7 +1041,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
         Effect.catchCause(() =>
           Effect.succeed(
             sampling
-              ? unsampled("cloudpid could not answer the sampling request", MCP_INTERNAL_ERROR)
+              ? unsampled("t3flare could not answer the sampling request", MCP_INTERNAL_ERROR)
               : cancelled,
           ),
         ),
@@ -1052,7 +1052,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
 
         if (sampling) {
           return given.kind === "answered"
-            ? unsampled("cloudpid could not answer the sampling request", MCP_INTERNAL_ERROR)
+            ? unsampled("t3flare could not answer the sampling request", MCP_INTERNAL_ERROR)
             : given;
         }
 
@@ -1616,7 +1616,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
       if (onInput === undefined || ctx.answers?.sampling !== true) {
         return yield* ProtocolViolation.make({
           message:
-            "The server asked for sampling/createMessage, which cloudpid did not offer on this call",
+            "The server asked for sampling/createMessage, which t3flare did not offer on this call",
         });
       }
 
@@ -1638,7 +1638,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
         message:
           answer.kind === "refused"
             ? answer.message
-            : "cloudpid could not answer the sampling request",
+            : "t3flare could not answer the sampling request",
       });
     });
 
@@ -1668,7 +1668,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
 
       if (method !== "elicitation/create") {
         return yield* ProtocolViolation.make({
-          message: `The server asked for ${Predicate.isString(method) ? method : "something"}, which cloudpid did not offer on this call`,
+          message: `The server asked for ${Predicate.isString(method) ? method : "something"}, which t3flare did not offer on this call`,
         });
       }
 

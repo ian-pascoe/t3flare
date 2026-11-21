@@ -3,7 +3,7 @@
 
 /**
  * The date, and `global_fetch_strictly_public`: the engine's `fetch` goes out as a request from the Internet would, so an
- * MCP server on one of cloudpid's own hosts (its own MCP endpoint, Self-use) or another Worker of the account is reached
+ * MCP server on one of t3flare's own hosts (its own MCP endpoint, Self-use) or another Worker of the account is reached
  * through its front door, Access included, rather than refused (error 1042) or sent to the origin past Access. No
  * `nodejs_compat`: the SDK client, Effect and TypeBox need none.
  */

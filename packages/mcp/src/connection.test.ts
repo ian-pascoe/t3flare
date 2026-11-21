@@ -303,7 +303,7 @@ describe("what the client declares", () => {
         return ctx?.origin === "agent" ? { elicitation: { form: {} } } : {};
       },
       extensions: { "example.test/extension": {} },
-      clientInfo: { name: "cloudpid", version: "deploy-1" },
+      clientInfo: { name: "t3flare", version: "deploy-1" },
     });
 
   const listAndCall = (server: FakeServer, asked: Array<McpCallContext | undefined>) =>
@@ -333,7 +333,7 @@ describe("what the client declares", () => {
       {
         protocolVersion: "2025-11-25",
         capabilities: { extensions: EXTENSIONS },
-        clientInfo: { name: "cloudpid", version: "deploy-1" },
+        clientInfo: { name: "t3flare", version: "deploy-1" },
       },
     ]);
   });
@@ -349,7 +349,7 @@ describe("what the client declares", () => {
     expect(declared("server/discover")).toEqual([
       expect.objectContaining({
         "io.modelcontextprotocol/clientCapabilities": { extensions: EXTENSIONS },
-        "io.modelcontextprotocol/clientInfo": { name: "cloudpid", version: "deploy-1" },
+        "io.modelcontextprotocol/clientInfo": { name: "t3flare", version: "deploy-1" },
       }),
     ]);
     expect(declared("tools/list")).toEqual([

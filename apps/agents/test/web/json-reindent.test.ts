@@ -1,4 +1,3 @@
-// Copied from cloudpid@93ba45a3:packages/extensions/src/web/json-reindent.test.ts, imports repointed (SPI-1054).
 // Ported from @ian-pascoe/pi-web-tools (`test/json-reindent.test.ts`, MIT; see ../../NOTICE.md).
 import { describe, expect, test } from "vitest";
 import { JSON_REINDENT_MAX_BYTES, reindentJson } from "../../src/extensions/web/json-reindent.ts";

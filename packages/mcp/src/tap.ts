@@ -101,7 +101,7 @@ const MAX_RETRY_AFTER_MS = 10_000;
 const DEFAULT_RETRY_AFTER_MS = 1000;
 
 /** The JSON-RPC error data key that carries a verdict's token. */
-export const VERDICT_KEY = "cloudpid/verdict";
+export const VERDICT_KEY = "t3flare/verdict"; // gitleaks:allow: a key name, not a secret
 
 /** The tap's verdicts on requests, by token, until the core reads them back from the SDK's error. */
 export class Verdicts {
@@ -132,13 +132,13 @@ export class Verdicts {
  * before the request goes on, so no server sees it, and ties each server request on that call's response stream to the
  * token (`Ties`).
  */
-export const CALL_HEADER = "x-cloudpid-call";
+export const CALL_HEADER = "x-t3flare-call";
 
 /**
  * The header the core puts on an App's read of its `ui://` resource (`readResource`'s `app`), which `MCP_APP_READ_BYTES`
  * bounds. Removed by the tap like `CALL_HEADER`.
  */
-export const APP_READ_HEADER = "x-cloudpid-app-read";
+export const APP_READ_HEADER = "x-t3flare-app-read";
 
 /**
  * Which call each server request on a POST response stream belongs to (`mcp-server-requests.md` → Questions, Legacy:
@@ -495,7 +495,7 @@ export const eventFields = (event: string) => {
  * dispatch it.
  */
 const discardEvent = (endsInLineEnd: boolean) =>
-  `${endsInLineEnd ? "" : "\n"}event: cloudpid-discard\n\n`;
+  `${endsInLineEnd ? "" : "\n"}event: t3flare-discard\n\n`;
 
 const eventTooLarge = () =>
   TooLarge.make({

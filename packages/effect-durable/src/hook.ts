@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/effect-durable/src/hook.ts.
 // Effect-defined pi-durable hooks (ADR-0003): each handler is an Effect run with the services of the Effect that builds
 // the hook, and interrupted when pi-durable cancels the invocation.
 import type * as Chord from "@earendil-works/chord/context";

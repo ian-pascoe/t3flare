@@ -1,4 +1,3 @@
-// Copied from cloudpid@93ba45a3:packages/extensions/src/web/json-reindent.ts, unchanged but for its header (SPI-1054; see ./NOTICE.md).
 // Ported from @ian-pascoe/pi-web-tools (`src/json-reindent.ts`, MIT, © 2026 Ian Pascoe; see ./NOTICE.md), unchanged but for
 // formatting. The native array methods of the original's hot parse loops stay as they are.
 /**

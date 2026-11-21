@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/exec.ts.
 // `ExecutionEnv.exec` on the Workspace's runtime, through `@cloudflare/computer`'s own RPC client. Every Workspace
 // client and exec handle it takes is disposed (computer's stub-disposal contract), including when a timeout or an
 // abort returns before the command has stopped.

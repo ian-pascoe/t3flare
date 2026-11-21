@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/container-files.ts.
 // The model tools' file operations on Container-only paths (GLOSSARY.md), run on the Container (ADR-0018).
 // `@cloudflare/computer` reaches a Container only through commands, so each operation is a bash script there. Bytes cross
 // through the Workspace's own files: a script copies a file to a stage under `/workspace/.t3flare/tmp`, which computer

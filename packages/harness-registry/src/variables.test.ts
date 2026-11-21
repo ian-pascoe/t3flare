@@ -33,7 +33,7 @@ describe("Variables", () => {
     expect(resolveEnvironment(removed.environment).variables).toEqual({ A: "1" });
   });
 
-  it("keeps cloudpid's limits: 50 Variables, names up to 128 characters, values up to 4,096", () => {
+  it("keeps the limits: 50 Variables, names up to 128 characters, values up to 4,096", () => {
     const fifty = Object.fromEntries(Array.from({ length: 50 }, (_, at) => [`V${at}`, "x"]));
     expect(apply(fifty)).toMatchObject({ ok: true });
     expect(refusal({ ...fifty, V50: "x" })).toBe("variables: at most 50 Variables (51 given)");

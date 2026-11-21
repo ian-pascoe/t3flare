@@ -98,7 +98,7 @@ describe("a tools/call that may start an MCP task", () => {
     expect(call?.headers.get("mcp-param-region")).toBe("eu-west");
     expect(call?.rpc?.params?.["_meta"]).toMatchObject({
       "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-      "io.modelcontextprotocol/clientInfo": { name: "cloudpid" },
+      "io.modelcontextprotocol/clientInfo": { name: "t3flare" },
     });
   });
 
@@ -171,7 +171,7 @@ describe("a tools/call that may start an MCP task", () => {
       failedWith(ServerError, {
         code: -32021,
         message:
-          "reports needs to run this as an MCP task, which cloudpid couldn't offer here: This tool runs only as an MCP task",
+          "reports needs to run this as an MCP task, which t3flare couldn't offer here: This tool runs only as an MCP task",
       }),
     );
   });

@@ -20,7 +20,7 @@ import {
   type OAuthFetch,
 } from "./oauth.ts";
 
-const CLIENT_ID = "cloudpid-prod";
+const CLIENT_ID = "t3flare-prod";
 const SECRET = "s3cr3t-value-3f9a";
 const TOKEN_ENDPOINT = "https://auth.example.com/oauth2/token";
 const NOW = 1_700_000_000_000;
@@ -103,7 +103,7 @@ describe("the assertion's claims", () => {
         }),
       ),
     ).toBe(
-      `{"iss":"cloudpid-prod","sub":"cloudpid-prod","aud":"https://auth.example.com/oauth2/token","iat":1700000000,"exp":1700000060,"jti":"00112233445566778899aabbccddeeff"}`,
+      `{"iss":"t3flare-prod","sub":"t3flare-prod","aud":"https://auth.example.com/oauth2/token","iat":1700000000,"exp":1700000060,"jti":"00112233445566778899aabbccddeeff"}`,
     );
   });
 
@@ -147,7 +147,7 @@ describe("a signed assertion", () => {
 
     expect(parts.header).toBe(`{"alg":"RS256","typ":"JWT","kid":"key-2026"}`);
     expect(parts.payload).toBe(
-      `{"iss":"cloudpid-prod","sub":"cloudpid-prod","aud":"https://auth.example.com/oauth2/token","iat":1700000000,"exp":1700000060,"jti":"00112233445566778899aabbccddeeff"}`,
+      `{"iss":"t3flare-prod","sub":"t3flare-prod","aud":"https://auth.example.com/oauth2/token","iat":1700000000,"exp":1700000060,"jti":"00112233445566778899aabbccddeeff"}`,
     );
     expect(
       await crypto.subtle.verify(
@@ -387,7 +387,7 @@ describe("the token request with a key", () => {
 
     expect(parts.header).toBe(`{"alg":"RS256","typ":"JWT","kid":"k1"}`);
     expect(parts.payload).toBe(
-      `{"iss":"cloudpid-prod","sub":"cloudpid-prod","aud":"${TOKEN_ENDPOINT}","iat":1700000000,"exp":1700000060,"jti":"${JTI}"}`,
+      `{"iss":"t3flare-prod","sub":"t3flare-prod","aud":"${TOKEN_ENDPOINT}","iat":1700000000,"exp":1700000060,"jti":"${JTI}"}`,
     );
   });
 

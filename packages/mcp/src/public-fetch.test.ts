@@ -11,7 +11,7 @@ import {
   publicFetchRefusal,
 } from "./public-fetch.ts";
 
-const URL_OF = "https://pi.ianpascoe.dev/.well-known/cloudflare-access-protected-resource/mcp";
+const URL_OF = "https://t3flare.example.com/.well-known/cloudflare-access-protected-resource/mcp";
 
 /** A `fetch` that answers `response` and records what it was sent. */
 const answering = (response: () => Response) => {
@@ -29,9 +29,9 @@ const answering = (response: () => Response) => {
 describe("a public read's URL", () => {
   it.each([
     ["not a URL", "nope"],
-    ["http", "http://pi.ianpascoe.dev/x"],
-    ["credentials", "https://user:pass@pi.ianpascoe.dev/x"],
-    ["a user alone", "https://user@pi.ianpascoe.dev/x"],
+    ["http", "http://t3flare.example.com/x"],
+    ["credentials", "https://user:pass@t3flare.example.com/x"],
+    ["a user alone", "https://user@t3flare.example.com/x"],
   ])("is refused when it is %s", (_, url) => {
     expect(publicFetchRefusal(url)).toBeDefined();
   });
@@ -44,7 +44,7 @@ describe("a public read's URL", () => {
 describe("fetchPublic", () => {
   it("sends a GET with no redirect followed and only the content-negotiation headers", async () => {
     const { fetch, sent } = answering(() =>
-      Response.json({ resource: "https://pi.ianpascoe.dev/mcp" }),
+      Response.json({ resource: "https://t3flare.example.com/mcp" }),
     );
 
     const answer = await fetchPublic(
@@ -72,7 +72,7 @@ describe("fetchPublic", () => {
     expect(answer).toMatchObject({
       status: "fetched",
       code: 200,
-      body: JSON.stringify({ resource: "https://pi.ianpascoe.dev/mcp" }),
+      body: JSON.stringify({ resource: "https://t3flare.example.com/mcp" }),
     });
     expect(answer.status === "fetched" && answer.headers["content-type"]).toContain(
       "application/json",
@@ -97,8 +97,8 @@ describe("fetchPublic", () => {
 
   it.each([
     ["malformed", { href: URL_OF }],
-    ["not https", { url: "http://pi.ianpascoe.dev/x" }],
-    ["carrying credentials", { url: "https://a:b@pi.ianpascoe.dev/x" }],
+    ["not https", { url: "http://t3flare.example.com/x" }],
+    ["carrying credentials", { url: "https://a:b@t3flare.example.com/x" }],
   ])("refuses a request that is %s and sends nothing", async (_, request) => {
     const { fetch } = answering(() => new Response("{}"));
 

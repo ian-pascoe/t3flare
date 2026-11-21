@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/wire.ts.
 // What `ComputerExecutionEnv` asks of the Workspace Durable Object, and how the answers cross Workers RPC. The
 // Workspace's file errors carry their POSIX code only in the object that raised them, so every file operation runs in
 // the Workspace DO and returns plain data: a result, or a failure with its pi-durable code. Plain data also means no

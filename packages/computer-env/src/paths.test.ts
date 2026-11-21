@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/paths.test.ts.
 import { describe, expect, it } from "vitest";
 import { join, resolve } from "./paths.ts";
 

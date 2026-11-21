@@ -85,7 +85,7 @@ describe("githubReader", () => {
     expect(github.seen.every((request) => request.token)).toBe(true);
   });
 
-  it("tells a repo it cannot read in cloudpid's two ways: private and not installed, or not in the installation", async () => {
+  it("tells a repo it cannot read in two ways: private and not installed, or not in the installation", async () => {
     const github = fakeFetch({});
     await expect(githubReader({ fetch: github.fetch, access: installed }).commit({ owner: "acme", name: "x" }, null)).rejects.toThrow(
       "GitHub has no repo acme/x, or it is private and the GitHub App is not installed on acme (install it there, on all repositories).",

@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:infra/src/github-app.ts.
 // What the GitHub App's setup (`github-app-setup.ts`) computes without GitHub or the disk: the manifest the app is
 // registered from (ADR-0025), and the dev.env the app's secrets are written into.
 import { GITHUB_APP_PERMISSIONS } from "@t3flare/github-app/permissions";

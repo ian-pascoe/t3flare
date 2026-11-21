@@ -190,7 +190,7 @@ export const MCP_INPUT_ROUNDS = 10;
  * one (`docs/architecture/mcp-server-requests.md` → Questions; `docs/architecture/mcp.md` → Deploys).
  */
 export const MCP_RESUME_STATE_EXPIRED =
-  "The question was asked by an older version of cloudpid and can't be resumed; call the tool again";
+  "The question was asked by an older version of t3flare and can't be resumed; call the tool again";
 
 /**
  * A `ResumeState`, format 1 (`docs/architecture/mcp-server-requests.md` → Questions; ADR-0037): what the core needs to
@@ -608,7 +608,7 @@ export type McpEngineState = typeof McpEngineState.Type;
 const EngineLogs = { logs: McpLogEntry.pipe(Schema.Array, Schema.optionalKey) };
 
 /**
- * The spawn id of the stdio server's process the call last heard from (the bridge's `x-cloudpid-spawn`): it changes when
+ * The spawn id of the stdio server's process the call last heard from (the bridge's `x-t3flare-spawn`): it changes when
  * the process is spawned again, so the host learns of a restart (`docs/architecture/mcp-connections.md` → The stdio
  * bridge). Gain-only: absent for an HTTP server and from an engine that does not know it.
  */
@@ -1183,7 +1183,7 @@ export interface McpEngineMethods {
     stop?: ReadableStream<Uint8Array>,
   ) => Promise<typeof McpEngineListenResult.Encoded>;
   /**
-   * A public read for the Registry's MCP sign-in on one of cloudpid's own hosts, from this Worker, which has
+   * A public read for the Registry's MCP sign-in on one of t3flare's own hosts, from this Worker, which has
    * `global_fetch_strictly_public` (`./public-fetch.ts`; `docs/architecture/mcp-sign-in.md` → Code). Not part of a
    * connection. Optional: an engine from before it has no such method, and its stub's call fails as one it does not
    * implement, which the caller reads as "read it yourself".

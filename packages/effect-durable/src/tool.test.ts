@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/effect-durable/src/tool.test.ts.
 // @effect-diagnostics effectFnOpportunity:off -- tests copied from cloudpid write tasks inline.
 // pi-durable's Harness is Promise-based, so these tests are too.
 import { defineExtension, type Harness, ToolTask } from "@earendil-works/pi-durable";

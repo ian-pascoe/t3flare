@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/watch.ts.
 // A polling `FileWatcher`: the Workspace has no change notifications for its files, so the watcher asks the Workspace
 // DO for a snapshot of what it covers at an interval and reports the differences, the way pi-durable's
 // `NodeFileWatcher` does in polling mode.

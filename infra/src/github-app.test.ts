@@ -27,29 +27,29 @@ const KEY =
 describe("the dev.env the setup writes the app's secrets into", () => {
   it("gets them at its end, each read back by bash as written, the key over its lines", () => {
     const written = withDevEnvValues("MODEL_PROXY_URL=https://api.example\n", {
-      CLOUDPID_GITHUB_APP_ID: "123456",
-      CLOUDPID_GITHUB_APP_PRIVATE_KEY: KEY,
+      GITHUB_APP_ID: "123456",
+      GITHUB_APP_PRIVATE_KEY: KEY,
     });
 
     expect(written.startsWith("MODEL_PROXY_URL=https://api.example\n")).toBe(true);
-    expect(sourced(written, "CLOUDPID_GITHUB_APP_ID")).toBe("123456");
-    expect(sourced(written, "CLOUDPID_GITHUB_APP_PRIVATE_KEY")).toBe(KEY);
+    expect(sourced(written, "GITHUB_APP_ID")).toBe("123456");
+    expect(sourced(written, "GITHUB_APP_PRIVATE_KEY")).toBe(KEY);
     expect(sourced(written, "MODEL_PROXY_URL")).toBe("https://api.example");
   });
 
   it("replaces the values it had, a key over several lines included, and keeps every other line", () => {
     const before = withDevEnvValues("A=1\n# a note\n", {
-      CLOUDPID_GITHUB_APP_ID: "1",
-      CLOUDPID_GITHUB_APP_PRIVATE_KEY: KEY,
+      GITHUB_APP_ID: "1",
+      GITHUB_APP_PRIVATE_KEY: KEY,
     });
 
     const after = withDevEnvValues(`${before}B=2`, {
-      CLOUDPID_GITHUB_APP_ID: "2",
-      CLOUDPID_GITHUB_APP_PRIVATE_KEY: "new key",
+      GITHUB_APP_ID: "2",
+      GITHUB_APP_PRIVATE_KEY: "new key",
     });
 
     expect(after).toBe(
-      "A=1\n# a note\nCLOUDPID_GITHUB_APP_ID='2'\nCLOUDPID_GITHUB_APP_PRIVATE_KEY='new key'\nB=2\n",
+      "A=1\n# a note\nGITHUB_APP_ID='2'\nGITHUB_APP_PRIVATE_KEY='new key'\nB=2\n",
     );
   });
 });

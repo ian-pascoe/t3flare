@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/shell.test.ts.
 // The Container's exec runs commands with `/bin/sh -c`, which is dash on Ubuntu; `bash` promises bash. `inBash` is
 // what a command is wrapped in, checked here under dash itself.
 // @effect-diagnostics nodeBuiltinImport:off

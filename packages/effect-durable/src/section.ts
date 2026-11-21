@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/effect-durable/src/section.ts.
 // Effect-defined pi-durable system prompt sections (ADR-0003).
 import { type PromptInput, type PromptSection, section } from "@earendil-works/pi-durable";
 import * as Effect from "effect/Effect";

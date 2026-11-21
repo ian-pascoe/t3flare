@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/effect-durable/src/tool.ts.
 // Effect-defined pi-durable tools (ADR-0003): Effect `Schema` parameters, Chord cancellation as fiber interruption, and
 // typed failures as error results.
 import type { JsonValue } from "@earendil-works/chord";

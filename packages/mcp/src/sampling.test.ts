@@ -337,7 +337,7 @@ describe("a Legacy server's Sampling request", () => {
       SAMPLING,
     );
 
-    expect(server.received.every((received) => !received.headers.has("x-cloudpid-call"))).toBe(
+    expect(server.received.every((received) => !received.headers.has("x-t3flare-call"))).toBe(
       true,
     );
   });

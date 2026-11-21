@@ -650,7 +650,7 @@ describe("A Modern server's Sampling requests", () => {
     );
 
     expect(outcome).toEqual(
-      failedWith(Unsupported, { message: "cloudpid could not answer the sampling request" }),
+      failedWith(Unsupported, { message: "t3flare could not answer the sampling request" }),
     );
     expect(calls(server)).toHaveLength(1);
   });

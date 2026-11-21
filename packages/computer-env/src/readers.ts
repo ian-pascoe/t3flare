@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/readers.ts.
 // Readers over the Workspace DO. A binary reader holds the DO's hard link to the opened file; a directory reader holds
 // the names listed when it opened and reads each entry's metadata as it pages.
 // pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.

@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/failure.ts.
 // Failures raised in the Workspace DO, where `@cloudflare/computer`'s errors still carry their POSIX code.
 // pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
 // @effect-diagnostics extendsNativeError:off

@@ -193,7 +193,7 @@ export const planQuestion = (request: typeof McpInputRequest.Encoded, context: Q
     if (typeof params.url !== "string") return refuse("a page question without a URL");
     const page = checkElicitationUrl(params.url, context.isOwnHost);
     if (Result.isFailure(page)) {
-      const reason = page.failure.reason.replace("cloudpid's", "t3flare's");
+      const reason = page.failure.reason;
       return page.failure.kind === "declined" ? decline(`the page was declined unseen: ${reason}`) : refuse(reason);
     }
     const { url, host, domain, warning } = page.success;

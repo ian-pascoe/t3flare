@@ -1,47 +1,46 @@
-// The contract of the Container MCP bridge (docs/architecture/mcp-connections.md → The stdio bridge), the Node script the
-// image runs beside computerd (`image/cloudpid-mcp-bridge.ts`), with the Workspaces Worker and the MCP engine, which
-// import it: no Node built-ins and no MCP SDK here, since it runs in a Worker. The script repeats these values (it is
-// copied into the image on its own); `mcp-bridge.test.ts` fails when they differ.
+// The contract of a Container MCP bridge for stdio servers, with the Workspaces Worker and the MCP engine: no Node
+// built-ins and no MCP SDK here, since it runs in a Worker. t3flare's image runs no bridge and the MCP Worker has no
+// `MCP_BRIDGE` binding (stdio servers are refused, OD-T12), so the engine's stdio path, which imports this, always fails.
 // @effect-diagnostics asyncFunction:off preferEffectRecord:off preferEffectArray:off
 
 /**
  * The port the bridge listens on, on `0.0.0.0` (computerd's is 8080, and the Container preview ports are
- * `CONTAINER_PREVIEW_PORTS`, `@cloudpid/extensions/browser`). Outside the range of the dev servers a project starts.
+ * `CONTAINER_PREVIEW_PORTS`, `@t3flare/workspace-client`). Outside the range of the dev servers a project starts.
  */
 export const MCP_BRIDGE_PORT = 17_781;
 
-/** Where the image has the bridge's script, which the supervisor starts when the launch has a token. */
-export const MCP_BRIDGE_SCRIPT = "/usr/local/share/cloudpid/mcp-bridge.ts";
+/** Where an image with the bridge would have its script, started when the launch has a token. */
+export const MCP_BRIDGE_SCRIPT = "/usr/local/share/t3flare/mcp-bridge.ts";
 
 /**
  * The variable of the Container's launch environment that carries the bridge token the Workspace DO minted for this
  * launch. The bridge exits without it, and the supervisor starts none; the bridge never passes it to a child.
  */
-export const MCP_BRIDGE_TOKEN_ENV = "CLOUDPID_MCP_BRIDGE_TOKEN";
+export const MCP_BRIDGE_TOKEN_ENV = "T3FLARE_MCP_BRIDGE_TOKEN";
 
 /**
- * The bridge's level, on every response as `x-cloudpid-bridge`. It rises when a change of the bridge's wire contract
+ * The bridge's level, on every response as `x-t3flare-bridge`. It rises when a change of the bridge's wire contract
  * has to be told from an older bridge: the engine fails a server whose bridge answers a level below its minimum.
  */
 export const MCP_BRIDGE_LEVEL = 1;
 
 /** The response header that carries `MCP_BRIDGE_LEVEL`. */
-export const MCP_BRIDGE_LEVEL_HEADER = "x-cloudpid-bridge";
+export const MCP_BRIDGE_LEVEL_HEADER = "x-t3flare-bridge";
 
 /**
  * The response header that carries the spawn id of the child a response is about (also the Legacy `Mcp-Session-Id`):
  * it changes when the child is spawned again, so a caller learns of a restart. Absent where no child is concerned.
  */
-export const MCP_BRIDGE_SPAWN_HEADER = "x-cloudpid-spawn";
+export const MCP_BRIDGE_SPAWN_HEADER = "x-t3flare-spawn";
 
 /**
  * The request header that names the stdio server: `mcpBridgeConfigHeader(config)`. The bridge's key for the server is
  * the hash of its config, so a changed config is another server.
  */
-export const MCP_BRIDGE_CONFIG_HEADER = "x-cloudpid-stdio-config";
+export const MCP_BRIDGE_CONFIG_HEADER = "x-t3flare-stdio-config";
 
 /** The request header that carries the host's cached era of the server, `legacy` or `modern`, so the bridge need not probe. */
-export const MCP_BRIDGE_ERA_HEADER = "x-cloudpid-era";
+export const MCP_BRIDGE_ERA_HEADER = "x-t3flare-era";
 
 /** The path of the Streamable HTTP endpoint: POST, and GET for a Legacy session's stream. */
 export const MCP_BRIDGE_MCP_PATH = "/mcp";
@@ -65,7 +64,7 @@ export const MCP_BRIDGE_PROBE_MS = 15_000;
  * The response header of a 503 from `WorkspaceMcpBridge`: the Workspace's Container is `stopped` and the request did not
  * ask to start it. The answer is the entrypoint's own, not the bridge's (the bridge never sends this header).
  */
-export const MCP_BRIDGE_CONTAINER_HEADER = "x-cloudpid-container";
+export const MCP_BRIDGE_CONTAINER_HEADER = "x-t3flare-container";
 
 /** How a call to `WorkspaceMcpBridge.mcpBridge` reaches the bridge: whether it may start a stopped Container, and whether it is a use of it. */
 export type McpBridgeOptions = {
@@ -148,7 +147,7 @@ export type McpBridgeStatus = {
   readonly children: ReadonlyArray<McpBridgeChild>;
 };
 
-/** The body of `x-cloudpid-stdio-config` for `config`: base64url of its JSON. */
+/** The body of `x-t3flare-stdio-config` for `config`: base64url of its JSON. */
 export const mcpBridgeConfigHeader = (config: McpBridgeConfig): string => {
   const bytes = new TextEncoder().encode(JSON.stringify(config));
 

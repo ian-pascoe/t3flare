@@ -65,7 +65,7 @@ export const CONTAINER_PROGRAMS: readonly string[] = names(
     "poetry pytest ruff mypy black cargo rustc rustup go gofmt make cmake ninja gcc g++ cc c++ clang ld java javac",
     "mvn gradle kotlin dotnet ruby gem bundle rake php composer perl lua swift zig gh curl wget ssh scp rsync",
     "docker docker-compose kubectl terraform mise apt apt-get dpkg sudo su nohup nice ps top htop lsof pkill pgrep",
-    "killall sqlite3 psql mysql redis-cli yq unzip zip 7z openssl cloudpid-dockerd",
+    "killall sqlite3 psql mysql redis-cli yq unzip zip 7z openssl",
   ].join(" "),
 );
 

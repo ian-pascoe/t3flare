@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/container-paths.test.ts.
 import { describe, expect, it } from "vitest";
 import { isContainerOnly, withHarnessKept } from "./container-paths.ts";
 

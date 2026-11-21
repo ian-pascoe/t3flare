@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/computer-env/src/list-files.test.ts.
 // `listFiles`' walk over an in-memory file tree: what it skips is never walked, and a repository below the listed
 // directory applies its own ignore rules. The conformance cases (`apps/server/src/workspace/env.workerd.test.ts`) check
 // the rest against a real Workspace.

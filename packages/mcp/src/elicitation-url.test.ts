@@ -7,10 +7,10 @@ import * as Result from "effect/Result";
 import { describe, expect, it } from "vitest";
 import { checkElicitationUrl, ELICITATION_URL_MAX, registrableDomain } from "./elicitation-url.ts";
 
-const OWN = new Set(["pi.ianpascoe.dev", "cloudpid-server-dev.ian-g-pascoe.workers.dev"]);
+const OWN = new Set(["t3flare.example.com", "t3flare-dev.example.workers.dev"]);
 
 const own = (host: string) =>
-  OWN.has(host) || host === "ianpascoe.app" || host.endsWith(".ianpascoe.app");
+  OWN.has(host) || host === "example.app" || host.endsWith(".example.app");
 
 const problemOf = (url: string) => {
   const checked = checkElicitationUrl(url, own);
@@ -50,12 +50,12 @@ describe("the pages declined unseen", () => {
     });
   });
 
-  it.each(["https://pi.ianpascoe.dev/oauth/mcp/start"])(
-    "%s is one of cloudpid's own hosts",
+  it.each(["https://t3flare.example.com/oauth/mcp/start"])(
+    "%s is one of t3flare's own hosts",
     (url) => {
       expect(problemOf(url)).toEqual({
         kind: "declined",
-        reason: "the page is on one of cloudpid's own hosts",
+        reason: "the page is on one of t3flare's own hosts",
       });
     },
   );

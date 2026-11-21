@@ -200,7 +200,7 @@ export const checkElicitationUrl = (
     return declined("the page is on a local or private address");
   }
 
-  if (isOwnHost(host)) return declined("the page is on one of cloudpid's own hosts");
+  if (isOwnHost(host)) return declined("the page is on one of t3flare's own hosts");
 
   const base = { url: url.href, host, domain: registrableDomain(host) } satisfies ElicitationPage;
 

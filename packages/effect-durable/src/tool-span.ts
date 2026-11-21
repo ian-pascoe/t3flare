@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/effect-durable/src/tool-span.ts.
 // docs/architecture/operations.md → Telemetry; docs/architecture/visuals.md → Telemetry. A tool's own counts on its call's
 // `pi.tool.<name>` span. The span is made by the tracing wrap around the tool (`@cloudpid/telemetry`'s `tracingTools`), which
 // a tool never sees, so the wrap lists its span by the call's ID while the call runs, and a tool adds fixed values and counts

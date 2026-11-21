@@ -1,7 +1,6 @@
-// The SDK stays in the MCP Worker (OD-T5; cloudpid's packages/mcp/src/sdk-isolation.test.ts, ported): the MCP SDK adds
-// about 9-10 MiB of cold heap to every isolate that loads it, and the agents Worker's isolates hold Sessions and
-// Workspaces (ADR-0014), the Environment Worker's t3. Checked on the module graph, as cloudpid does: a module in the graph
-// is one the isolate may evaluate.
+// The SDK stays in the MCP Worker (OD-T5): the MCP SDK adds about 9-10 MiB of cold heap to every isolate that loads it,
+// and the agents Worker's isolates hold Sessions and Workspaces (ADR-0014), the Environment Worker's t3. Checked on the
+// module graph: a module in the graph is one the isolate may evaluate.
 //
 // - The agents Worker's whole graph, bundled with its own build's Rolldown options: no `@modelcontextprotocol/` module.
 // - `@t3flare/mcp/types`, `@t3flare/mcp/oauth` and `@t3flare/mcp/elicitation-url` (what the Environment's MCP host

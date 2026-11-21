@@ -152,7 +152,7 @@ const inputFrom =
         decodeAnswer(answer).pipe(
           Effect.orElseSucceed((): McpInputAnswer => ({
             kind: "refused",
-            message: "cloudpid could not read the answer to the question",
+            message: "t3flare could not read the answer to the question",
           })),
         ),
       ),
@@ -238,7 +238,7 @@ export const openCall = Effect.fn("mcp.engine.openCall")(function* (
                   : { form: {} },
             }
           : {},
-    clientInfo: { name: "cloudpid", version: env.version },
+    clientInfo: { name: "t3flare", version: env.version },
     onLog: logs.hear,
   } satisfies McpDeps;
 

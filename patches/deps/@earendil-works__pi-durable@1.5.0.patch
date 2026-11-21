@@ -6,7 +6,7 @@ index 429bfd1e491008edca6b9ff146ab25a50baa1d9e..fdbc3c1e245a226eb6eb02d0b1f8b353
   */
  export type CodemodeToolDetails = {
      calls: CodemodeNestedCall[];
-+    /** cloudpid patch (#97): the calls after those listed, which did not fit the list's bytes, and how many failed. */
++    /** t3flare patch: the calls after those listed, which did not fit the list's bytes, and how many failed. */
 +    omittedCalls?: {
 +        count: number;
 +        failed: number;
@@ -22,7 +22,7 @@ index 9ef1da0d2b59fd84ee03aae503c308cf73f6d641..8b28888619e37c70f6be4659f2083c40
  });
  const ARGS_PREVIEW_CHARS = 200;
  const ERROR_PREVIEW_CHARS = 500;
-+// cloudpid patch (#97): a result is one SQLite row (8 MiB: workerd#7493, cloudflare-docs#34502), stored in the run's
++// t3flare patch: a result is one SQLite row (8 MiB: workerd#7493, cloudflare-docs#34502), stored in the run's
 +// document and in its entry, so the call list its details carry is held to this many stored bytes (JSON, UTF-8), in call
 +// order; the calls after it are counted.
 +const MAX_DETAILS_CALLS_BYTES = 64 * 1024;
@@ -35,7 +35,7 @@ index 9ef1da0d2b59fd84ee03aae503c308cf73f6d641..8b28888619e37c70f6be4659f2083c40
              wallMs: this.api.now() - this.start.startedAt,
              maxOutputTokens: this.start.maxOutputTokens,
 -            calls: details.calls,
-+            // cloudpid patch (#97): the model's error summary names every call, within its token budget.
++            // t3flare patch: the model's error summary names every call, within its token budget.
 +            calls: this.calledRows(),
              limits: OUTPUT_LIMITS,
              write: this.outputFiles(),
@@ -53,7 +53,7 @@ index 9ef1da0d2b59fd84ee03aae503c308cf73f6d641..8b28888619e37c70f6be4659f2083c40
 -        return { calls };
 +    }
 +    /**
-+     * cloudpid patch (#97): the rows from the first while they fit `MAX_DETAILS_CALLS_BYTES`; the calls after them are
++     * t3flare patch: the rows from the first while they fit `MAX_DETAILS_CALLS_BYTES`; the calls after them are
 +     * counted in `omittedCalls`, with how many of those failed.
 +     */
 +    details() {
@@ -85,7 +85,7 @@ index 365ea3ab42dd4406ab11a03d6702b238dfd0776b..b0d0c581df0904bbd5fe957bfe7706de
                      return candidate;
                  }, rest[1]);
              }),
-+            // cloudpid patch (#647): a durable wait the task reached (an owner's answer kept in storage, which a rerun waits
++            // t3flare patch: a durable wait the task reached (an owner's answer kept in storage, which a rerun waits
 +            // for again) is progress: its restart count starts over, as after a new state. So does its owners', which wait
 +            // for it in memory (a code mode call waiting for its nested call), up to the first that is being aborted: its
 +            // abort handler keeps its own limit. Gated like a memo write.
@@ -115,7 +115,7 @@ index 225b96f1174dfb71a8efe4a589041ee377bf78c7..cc81a79f1bb16d3058180bd7e028a066
              return result;
          },
          memo: runtime.memo,
-+        // cloudpid patch (#647): the call reached a durable wait (`TaskRuntime.progressed`).
++        // t3flare patch: the call reached a durable wait (`TaskRuntime.progressed`).
 +        progressed: async (progressContext) => {
 +            assertLive();
 +            await runtime.progressed(progressContext);
@@ -132,7 +132,7 @@ index eb64e474162b158a43563e6c68d8ffea8c18b74a..05e2d9155b051c57fcb992204112d4b4
      memo<T extends JsonValue>(name: string, context: Context): Promise<T | undefined>;
      memo<T extends JsonValue>(name: string, candidate: T, context: Context): Promise<T>;
 +    /**
-+     * cloudpid patch (#647): commit that this call reached a durable wait, such as an owner's answer kept in storage that
++     * t3flare patch: commit that this call reached a durable wait, such as an owner's answer kept in storage that
 +     * a rerun waits for again. The call's restart count starts over, as after a new state, and so do the counts of the
 +     * calls that wait for it in memory (a code mode call, for its nested call) up to the first that is being aborted, so
 +     * the restarts that cut them off while it waits do not reach `settings.restartLimit`; an attempt cut off before it
@@ -152,7 +152,7 @@ index b43143c5e7998b36034ffe9577f74f3d88ab932b..24aa8b21188229bca19acba8758e762d
      /** Store `candidate` unless a memo already exists; return the durable winner. */
      memo<T extends JsonValue>(name: string, candidate: T, context: Context): Promise<T>;
 +    /**
-+     * cloudpid patch (#647): commit that the task reached a durable wait, so its restart count starts over, as after a new
++     * t3flare patch: commit that the task reached a durable wait, so its restart count starts over, as after a new
 +     * state, and so do its owners', which wait for it in memory, up to the first that is being aborted. Gated like a
 +     * memo write: it rejects once the invocation has ended.
 +     */

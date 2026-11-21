@@ -92,12 +92,12 @@ export const importSigningKey = async (pem: string): Promise<SigningKey | KeyPro
   const label = armored[1] ?? "";
 
   if (label === "ENCRYPTED PRIVATE KEY") {
-    return { problem: "The private key is encrypted: cloudpid needs an unencrypted PKCS#8 key" };
+    return { problem: "The private key is encrypted: t3flare needs an unencrypted PKCS#8 key" };
   }
 
   if (label !== "PRIVATE KEY") {
     return {
-      problem: `The private key is a ${label} block: cloudpid needs PKCS#8 (-----BEGIN PRIVATE KEY-----); convert it with openssl pkcs8 -topk8 -nocrypt`,
+      problem: `The private key is a ${label} block: t3flare needs PKCS#8 (-----BEGIN PRIVATE KEY-----); convert it with openssl pkcs8 -topk8 -nocrypt`,
     };
   }
 
@@ -123,7 +123,7 @@ export const importSigningKey = async (pem: string): Promise<SigningKey | KeyPro
     return modulusLength >= MIN_RSA_MODULUS_BITS
       ? { key: asRsa, algorithm: "RS256" }
       : {
-          problem: `The RSA private key has ${modulusLength} bits: cloudpid needs at least ${MIN_RSA_MODULUS_BITS}`,
+          problem: `The RSA private key has ${modulusLength} bits: t3flare needs at least ${MIN_RSA_MODULUS_BITS}`,
         };
   }
 

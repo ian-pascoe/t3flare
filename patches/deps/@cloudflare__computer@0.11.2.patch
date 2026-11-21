@@ -8,8 +8,8 @@ index 5294407143ae9004c9d661d574b4595f3a1ded40..8ae6d968a0cab948dbed01bf1f339435
    ensureMountsIndexed(): Promise<void>;
 +  /**
 +   * Check every mount's version again, as the first `ready()` does, and materialize again each one whose version
-+   * changed (its root cleared first). Later `ready()` calls wait for it. Added by t3flare's patch (SPI-1148), ported
-+   * from cloudpid's.
++   * changed (its root cleared first). Later `ready()` calls wait for it. Added by t3flare's patch
++   * (SPI-1148).
 +   */
 +  remount(): Promise<void>;
    mounts(): Map<string, Mount>;

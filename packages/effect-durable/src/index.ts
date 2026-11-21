@@ -1,4 +1,3 @@
-// Copied from cloudpid@ae5a7b73:packages/effect-durable/src/index.ts.
 // Effect ↔ pi-durable adapters and service facades (`docs/architecture/overview.md` → Effect boundary, ADR-0003).
 export { ChordContext } from "./chord.ts";
 

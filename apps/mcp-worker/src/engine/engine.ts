@@ -1,9 +1,8 @@
 /**
  * `McpEngine`, the stateless `WorkerEntrypoint` that runs `@t3flare/mcp` for `McpHost` (ADR-0038;
  * `docs/architecture/mcp-connections.md` → The engine; #382 D1, D13.2). `discover`, `request` and `listen` are here;
- * `control` lands with its first user. `fetchPublic` is not the core's: it is the Registry's sign-in read on one of
- * cloudpid's own hosts, made here for this Worker's `global_fetch_strictly_public` (`docs/architecture/mcp-sign-in.md` →
- * Code). One `ManagedRuntime` per isolate holds the byte budget and the validator cache, built at the first call.
+ * `control` lands with its first user. `fetchPublic` is not the core's: it is a sign-in's public read, made here for
+ * this Worker's `global_fetch_strictly_public` (`docs/architecture/mcp-sign-in.md` → Code). One `ManagedRuntime` per isolate holds the byte budget and the validator cache, built at the first call.
  *
  * Each call's work is held under `ctx.waitUntil` as well as returned: without it, a host that dies mid-call has the
  * engine's invocation cancelled silently, its fetches with it, and a Legacy server is never told; with it, the call's

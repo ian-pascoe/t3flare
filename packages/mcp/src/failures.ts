@@ -226,7 +226,7 @@ const taskNeeded = (
       requiredCapabilities.extensions?.[MCP_TASKS_EXTENSION] !== undefined,
   )
     ? ServerError.make({
-        message: `${request.serverName ?? "The server"} needs to run this as an MCP task, which cloudpid couldn't offer here: ${message}`,
+        message: `${request.serverName ?? "The server"} needs to run this as an MCP task, which t3flare couldn't offer here: ${message}`,
         code: MISSING_CAPABILITY,
       })
     : undefined;

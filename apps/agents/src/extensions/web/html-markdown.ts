@@ -1,4 +1,3 @@
-// Copied from cloudpid@93ba45a3:packages/extensions/src/web/html-markdown.ts, unchanged but for its header (SPI-1054; see ./NOTICE.md).
 // HTML to Markdown in one linear pass over htmlparser2 events, with no DOM.
 //
 // The original pi-web-tools used Turndown, which needs a DOM (not in Workers) and re-reads its accumulated output for
