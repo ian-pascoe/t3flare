@@ -187,13 +187,15 @@ const toolsTier = (stored: StoredHarness, change: ToolsChange, asksForDirect: (t
   // A preset moves MCP servers' tools too; every change to the Settings server's own entry is asked (plan D5), one
   // that moves no tool's Exposure (a redundant own Exposure cleared) included.
   const [before, after] = [mcpServersOf(stored), mcpServersOf(applied.harness)];
+  let settingsMoved = false;
   for (const move of movedServerTools(before, after)) {
     const part = moved(move);
+    settingsMoved ||= move.server === SETTINGS_SERVER;
     parts.push(move.server === SETTINGS_SERVER ? { asked: true, reason: `${part.reason} (the Settings server's own entry)` } : part);
   }
   // A preset changes only an entry's Exposures.
   const exposuresOf = (server: McpServerSetting | undefined) => JSON.stringify([server?.exposure, Object.entries(server?.toolExposure ?? {}).sort(([a], [b]) => a.localeCompare(b))]);
-  if (exposuresOf(before[SETTINGS_SERVER]) !== exposuresOf(after[SETTINGS_SERVER]) && !parts.some((part) => part.reason.endsWith("(the Settings server's own entry)"))) {
+  if (exposuresOf(before[SETTINGS_SERVER]) !== exposuresOf(after[SETTINGS_SERVER]) && !settingsMoved) {
     parts.push({ asked: true, reason: `${SETTINGS_SERVER}: its own entry rewritten (the Settings server's own entry)` });
   }
   return verdictOf(parts);

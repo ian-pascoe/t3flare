@@ -143,7 +143,7 @@ export const SETTINGS_TOOLS: ReadonlyArray<SettingsTool> = [
   {
     name: "change_tools",
     class: "write",
-    description: `Sets tools' Exposures (the Harness settings): direct (in every request), deferred (loaded by tool_search), codemode (code mode's scripts only) or hidden; null returns a tool to its default. tools: built-in tools by name (${BUILTIN_TOOLS.map((tool) => tool.name).join(", ")}; codemode and tool_search are direct or hidden). t3: t3's own tools, exposure for those without their own and tools by t3's name (t3_thread_wait and t3_background_wait are never codemode). preset (core, codemode-only, everything) sets every tool that is not hidden first, MCP servers' included (core defers theirs). An extension runs while any of its tools is not hidden. Applies at each thread's next turn. ${ASKED_NOTE}`,
+    description: `Sets tools' Exposures (the Harness settings): direct (in every request), deferred (loaded by tool_search), codemode (code mode's scripts only) or hidden; null returns a tool to its default. tools: built-in tools by name (${BUILTIN_TOOLS.map((tool) => tool.name).join(", ")}; codemode and tool_search are direct or hidden). t3: t3's own tools, exposure for those without their own and tools by t3's name (t3_thread_wait and t3_background_wait are never codemode). preset (core, codemode-only, everything) sets every tool that is not hidden first, t3's and MCP servers' included (core defers MCP servers'; an MCP server's code-mode-only tools are left). An extension runs while any of its tools is not hidden. Applies at each thread's next turn. ${ASKED_NOTE}`,
     inputSchema: {
       type: "object",
       required: ["expectedRevision"],

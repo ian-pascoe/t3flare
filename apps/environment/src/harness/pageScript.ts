@@ -67,7 +67,7 @@ for (const select of document.querySelectorAll("select[data-tool-exposure]")) {
 for (const button of document.querySelectorAll("button[data-tools-preset]")) {
   button.addEventListener("click", async () => {
     const preset = button.dataset.toolsPreset;
-    if (!confirm("Apply the " + preset + " preset? Every tool that is not hidden takes its Exposure, t3's and MCP servers' too (a server's own tool Exposures go back to the server's); hidden tools, and MCP servers' code-mode-only ones, stay.")) return;
+    if (!confirm("Apply the " + preset + " preset? Every tool that is not hidden takes its Exposure, t3's and MCP servers' too; hidden tools, and an MCP server's code-mode-only ones, stay as they are.")) return;
     if (await post("/_t3flare/settings/api/tools", { preset }, button)) done();
   });
 }

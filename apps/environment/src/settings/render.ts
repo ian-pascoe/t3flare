@@ -82,7 +82,7 @@ export const toolsItems = (
   if (!applied.ok) return { items: [], lines: [] };
   const moves = [...movedTools(resolveTools(stored.global), resolveTools(applied.harness.global), asksForDirect), ...movedServerTools(mcpServersOf(stored), mcpServersOf(applied.harness))];
   const items: Array<ChangeItem> = moves.map((move) => ({ kind: "scalar", name: `${move.tool}: Exposure`, before: move.before, after: move.after }));
-  return { items, lines: change.preset === undefined ? [] : [`This applies the ${change.preset} preset to every tool that is not hidden, MCP servers' included.`] };
+  return { items, lines: change.preset === undefined ? [] : [`This applies the ${change.preset} preset to every tool that is not hidden, t3's and MCP servers' included (an MCP server's code-mode-only tools excepted).`] };
 };
 
 /** An Environment change's items, against the stored Environment settings it changes. */
