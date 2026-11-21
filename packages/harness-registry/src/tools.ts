@@ -301,10 +301,10 @@ export const movedTools = (
     const own = [ownEntry(before.t3.tools, tool), ownEntry(after.t3.tools, tool)] as const;
     const from = own[0] ?? (asks === true ? "direct" : before.t3.exposure);
     const to = own[1] ?? (asks !== false ? "direct" : after.t3.exposure);
-    // Its hint unknown where a side has no Exposure of its own, the move is judged at its worst case, and says so; a
-    // stored change judged as no move still moves something, so it is shown.
+    // Its hint unknown where a side has no Exposure of its own, the move is judged at its worst case, and says so. A
+    // tool's own Exposure set or cleared to what it resolves to is shown too (it stays), as MCP servers' tools' are.
     const label = `${T3_SERVER}/${tool}${asks === undefined && (own[0] === undefined || own[1] === undefined) ? " (t3's hint unknown)" : ""}`;
-    if (from !== to || (asks === undefined && own[0] !== own[1])) moves.push({ tool: label, before: from, after: to });
+    if (from !== to || own[0] !== own[1]) moves.push({ tool: label, before: from, after: to });
   }
   return moves;
 };

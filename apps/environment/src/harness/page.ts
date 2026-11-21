@@ -223,7 +223,7 @@ const toolsRow = (resolved: ResolvedHarness, tools: ResolvedTools, entry: Extens
 
 const PRESET_WORDS: Readonly<Record<OfferedPreset, string>> = {
   core: "built-in and t3 tools direct, MCP servers' tools deferred",
-  "codemode-only": "every tool deferred, for code mode and tool search (t3's tools it asks for in every request stay direct)",
+  "codemode-only": "every tool deferred, for code mode and tool search (t3's tools it asks for in every request stay direct unless you set them)",
   everything: "every tool direct, MCP servers' included",
 };
 
