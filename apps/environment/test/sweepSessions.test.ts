@@ -30,7 +30,7 @@ const servicesWith = (rows: Array<WorkspaceRecord>, destroyedSessions: Array<str
     setUnreferencedSince: () => undefined,
     remove: (id: string) => void rows.splice(rows.findIndex((row) => row.id === id), 1),
   };
-  // A stand-in for the few registry and namespace methods the Sweep calls, not the whole EnvironmentServices.
+  // SAFETY: a stand-in for the few registry and namespace methods the Sweep calls, not the whole EnvironmentServices.
   bindEnvironmentServices({
     workspaces: registry,
     agents: {
@@ -41,6 +41,7 @@ const servicesWith = (rows: Array<WorkspaceRecord>, destroyedSessions: Array<str
 };
 
 // The binding outlives each test: unbind it, so the default access finds no services.
+// SAFETY: `undefined` is the binding's unset state, which its type does not name.
 afterEach(() => bindEnvironmentServices(undefined as unknown as EnvironmentServices));
 
 describe("the Sweep's Purge of a deleted project with a worktree thread", () => {

@@ -28,15 +28,15 @@ could change either. The Owner decided:
 4. **Turning purging on starts a full Grace for everything.** Nothing is purged sooner than one Grace after purging was
    last turned on, and a Stage's first Sweep under this ADR counts as turning it on. Two kinds of row are exempt, since
    neither waits out a Grace: a row left in `deleting` (a Purge already under way) and a `provisioning` or `failed` row
-   more than an hour old, which nothing references. A Deployment whose `prod` only
-   reported until now therefore gets a Grace of warning, on the Settings page, before anything goes. With purging off
-   the Sweep still marks and clears what nothing references, and finishes a Purge already under way; it starts none.
-   Turning purging off forgets when it was turned on at once, so off and on again starts a new Grace.
+   more than an hour old, which nothing references. A Deployment whose `prod` only reported until now therefore gets a
+   Grace of warning, on the Settings page, before anything goes. With purging off the Sweep still marks and clears what
+   nothing references, and finishes a Purge already under way; it starts none. Turning purging off forgets when it was
+   turned on at once, so off and on again starts a new Grace.
 5. **A deletion wakes the Sweep; nothing else purges on a schedule.** A Layer over t3's events asks the Environment DO
    to run the Sweep when a project or a thread is deleted, so what the deletion left unreferenced is marked then, not up
    to a day later. The Sweep's next run is the earlier of a day ahead and the earliest purge date, on the one alarm, or
-   five minutes ahead when the Sweep leaves a row in `deleting`; never sooner than a minute ahead. A
-   purge on its date is therefore the Sweep's, behind its reference read, which fails closed. The Environment DO runs
+   five minutes ahead when the Sweep leaves a row in `deleting`; never sooner than a minute ahead. A purge on its date
+   is therefore the Sweep's, behind its reference read, which fails closed. The Environment DO runs
    a woken Sweep after 5 s of quiet, since one project deletion emits an event per thread, and a wake during a Sweep
    runs one more after it. A change to the Grace wakes the Sweep too, since it moves every date.
 6. **Through the Settings server, shortening the Grace or turning purging on is an asked change**; lengthening it or

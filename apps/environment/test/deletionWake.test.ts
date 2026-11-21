@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { layerDeletionWake, wakesSweep } from "../src/t3/deletionWake.ts";
 
-// The events carry only the fields `wakesSweep` reads, not a whole stored event.
+// SAFETY: the events carry only the fields `wakesSweep` reads, not a whole stored event.
 const projectEvent = (type: "project.created" | "project.meta-updated" | "project.deleted", sequence: number) =>
   ({ sequence, type, aggregateKind: "project", aggregateId: "p1" }) as unknown as ApplicationStoredEvent;
 const threadEvent = (type: string, sequence: number) =>
@@ -19,7 +19,7 @@ const threadEvent = (type: string, sequence: number) =>
 /** A fake event store: the cursor, and the events after it, then the stream's end (or its failure). */
 const fakeStore = (latest: number, events: ReadonlyArray<ApplicationStoredEvent>, fail = false) => {
   const asked: Array<number | undefined> = [];
-  // The two methods the Layer calls, not the whole event store.
+  // SAFETY: the two methods the Layer calls, not the whole event store.
   const service = {
     latestApplicationSequence: Effect.succeed(latest),
     streamApplicationEvents: (input?: { readonly afterSequence?: number }) => {
