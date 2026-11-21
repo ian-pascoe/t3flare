@@ -1,11 +1,20 @@
 // Step 3+ (review finding 1): the CloudLink t3's HTTP routes get refuses the four relay-initiated calls, as t3's own
 // managed-policy variant does, and passes the rest through to the real one.
+import type { RelayLinkProofRequest } from "@t3tools/contracts/relay";
 import * as CloudLink from "t3/src/cloud/CloudLink.ts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { expect, it } from "vitest";
 
 import { layerRefusingCloudLink } from "../src/connect/service.ts";
+
+/** A well-formed proof request, as t3's own `cloud/http.test.ts` makes one: refused before it is read. */
+const PROOF_REQUEST: RelayLinkProofRequest = {
+  challenge: "challenge-1",
+  relayIssuer: "https://relay.example.test",
+  endpoint: { providerKind: "cloudflare_tunnel", httpBaseUrl: "https://environment.example.test", wsBaseUrl: "wss://environment.example.test" },
+  origin: { localHttpHost: "127.0.0.1", localHttpPort: 3773 },
+};
 
 it("refuses linkProof, applyRelayConfig, answerHealthRequest and mintCredential; keeps linkState, unlink and preferences", async () => {
   const calls: Array<string> = [];
@@ -22,7 +31,7 @@ it("refuses linkProof, applyRelayConfig, answerHealthRequest and mintCredential;
     Effect.gen(function* () {
       const link = yield* CloudLink.CloudLink;
       const refused = yield* Effect.all({
-        linkProof: Effect.flip(link.linkProof({} as never)),
+        linkProof: Effect.flip(link.linkProof(PROOF_REQUEST)),
         applyRelayConfig: Effect.flip(link.applyRelayConfig({} as never)),
         answerHealthRequest: Effect.flip(link.answerHealthRequest({} as never)),
         mintCredential: Effect.flip(link.mintCredential({} as never)),

@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off effectFnOpportunity:off globalJsonInEffect:off processEnvInEffect:off
+// @effect-diagnostics nodeBuiltinImport:off
 // A picked Skill in a CLI agent's message (SPI-1151 §3): Claude Code gets stock's rewrite (`planClaudeSkillDispatch`)
 // in the wrapper's `startTurn`, a mention that opens the message becoming the native `/name rest` and any other an inline
 // `/name` with a note in stock's wording naming its `SKILL.md`; OpenCode gets the Skill embedded as its own skill tool returns it.
@@ -13,11 +13,13 @@ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderS
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import { type CliAgent, type PromptTemplate, SKILL_TOKEN_REGEX, type SkillDiscovery } from "@t3flare/skills";
+import * as Config from "effect/Config";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -31,6 +33,7 @@ import { CLAUDE_SKILL_NOTE, claudeMentionRewrite, claudeSkillText } from "../src
 import { wrapCliAdapter } from "../src/provider/cli/wrapper.ts";
 import type { SkillsAccess } from "../src/provider/skills.ts";
 
+const encodeJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 const AGENT = path.join(import.meta.dirname, "fixtures/fake-acp-agent.mjs");
 const INNER = "/workspace/repo/.claude/skills";
 const T3 = "/w/proj/.claude/skills";
@@ -135,81 +138,80 @@ const SESSION_NEW = {
 
 /** The prompt the scripted agent received for one turn of `text`, through the wrapper and t3's adapter. */
 /** `rows`: the Environment skills (SPI-1153), each name's `SKILL.md`. */
-const promptFor = (cli: "claude" | "opencode", text: string, files: Record<string, string>, rows: Record<string, string> = {}, order?: Array<string>) =>
-  Effect.gen(function* () {
-    const fileSystem = yield* FileSystem.FileSystem;
-    const dir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3flare-skill-" });
-    const scriptPath = path.join(dir, "script.json");
-    const logPath = path.join(dir, "agent.log");
-    fs.writeFileSync(scriptPath, JSON.stringify({ initialize: INITIALIZE, sessionNew: SESSION_NEW, prompts: [[]] }));
-    fs.writeFileSync(logPath, "");
-    const cwd = "/w/proj";
-    const asked: Array<CliAgent | undefined> = [];
-    const access: SkillsAccess = {
-      enabled: () => false,
-      environment: {
-        entries: () => Object.keys(rows).map((name) => ({ name, description: `The Environment's ${name}.`, disableModelInvocation: false })),
-        skillMd: (name) => rows[name],
-        hash: () => "h",
-      },
-      locate: (at) =>
-        at === cwd
-          ? {
-              id: "proj",
-              inner: "/workspace/repo",
-              workspace: {
-                skills: (_inner, agent) => (asked.push(agent), order?.push(`skills ${agent}`), Promise.resolve(discovery(Object.keys(files).filter((file) => file.endsWith("/SKILL.md"))))),
-                prompts: (_inner, agent): Promise<ReadonlyArray<PromptTemplate>> => (asked.push(agent), Promise.resolve([])),
-                readText: (file) => Promise.resolve(files[file] ?? null),
-              },
-            }
-          : undefined,
-    };
-    const spawn = (input: AcpAdapterV2RuntimeInput) =>
-      Effect.gen(function* () {
-        const { processEnvironment: _env, runtimePolicy: _policy, mcpServers: _mcp, acpMcpServers: _acp, httpMcpServers: _http, ...options } = input;
-        const context = yield* Layer.build(
-          AcpSessionRuntime.layer({
-            ...options,
-            cwd: dir,
-            spawn: { command: process.execPath, args: [AGENT], cwd: dir, env: { PATH: process.env.PATH ?? "", FAKE_ACP_SCRIPT: scriptPath, FAKE_ACP_LOG: logPath }, extendEnv: false },
-            authenticateOnAuthRequired: false,
-            ownDetachedProcessGroup: true,
-            processGroupPlatform: process.platform,
-          }),
-        );
-        return yield* Effect.service(AcpSessionRuntime.AcpSessionRuntime).pipe(Effect.provide(context));
-      });
-    const driver = ProviderDriverKind.make(cli === "claude" ? "claudeAgent" : "opencode");
-    const instanceId = ProviderInstanceId.make(cli === "claude" ? "claudeAgent" : "opencode");
-    const promptHooks = acpPromptBuilder(yield* ProviderHost.ProviderHost, fileSystem, cli === "opencode" ? access : undefined);
-    const adapter = yield* makeAcpAdapterV2({ instanceId, flavor: acpFlavor(cli, driver, { spawn, prompt: promptHooks }), selfInvocation: { command: "none", entrypoint: undefined } });
-    const wrapped = wrapCliAdapter(adapter, {
-      sessions: new Map(),
-      ...(cli === "claude" ? { rewriteTurnText: claudeMentionRewrite(access) } : {}),
-      ...(order === undefined ? {} : { takeEnvironmentSkills: (at: string | null) => Effect.sync(() => void order.push(`take ${at}`)) }),
-    });
-    const threadId = ThreadId.make(`thread-${cli}`);
-    const modelSelection = { instanceId, model: "comm/claude-sonnet-5-5" } as const;
-    const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({ runtimeMode: "full-access", interactionMode: "default", cwd });
-    const runtime = yield* wrapped.openSession({ threadId, providerSessionId: ProviderSessionId.make(`session-${cli}`), modelSelection, runtimePolicy });
-    const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
-    yield* runtime.events.pipe(Stream.runForEach((event) => Queue.offer(events, event)), Effect.forkScoped);
-    const providerThread = yield* runtime.ensureThread({ threadId, modelSelection, runtimePolicy });
-    yield* runtime.startTurn(makeTurnInput({ threadId, providerThread, instanceId, runtimePolicy, now: yield* DateTime.now, modelSelection, messageText: text }));
-    yield* Effect.gen(function* () {
-      while ((yield* Queue.take(events)).type !== "turn.terminal");
-    }).pipe(Effect.timeout("20 seconds"));
-    const prompt = fs
-      .readFileSync(logPath, "utf8")
-      .split("\n")
-      .filter((line) => line.length > 0)
-      .map((line) => JSON.parse(line) as { received?: string; params?: { prompt?: ReadonlyArray<{ type: string; text?: string }> } })
-      .find((entry) => entry.received === "session/prompt")?.params?.prompt;
-    return { blocks: prompt ?? [], asked };
+const promptFor = Effect.fn("promptFor")(function* (cli: "claude" | "opencode", text: string, files: Record<string, string>, rows: Record<string, string> = {}, order?: Array<string>) {
+  const fileSystem = yield* FileSystem.FileSystem;
+  const dir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3flare-skill-" });
+  const scriptPath = path.join(dir, "script.json");
+  const logPath = path.join(dir, "agent.log");
+  yield* fileSystem.writeFileString(scriptPath, yield* encodeJson({ initialize: INITIALIZE, sessionNew: SESSION_NEW, prompts: [[]] }));
+  yield* fileSystem.writeFileString(logPath, "");
+  const PATH = yield* Config.String("PATH").pipe(Config.withDefault(""));
+  const cwd = "/w/proj";
+  const asked: Array<CliAgent | undefined> = [];
+  const access: SkillsAccess = {
+    enabled: () => false,
+    environment: {
+      entries: () => Object.keys(rows).map((name) => ({ name, description: `The Environment's ${name}.`, disableModelInvocation: false })),
+      skillMd: (name) => rows[name],
+      hash: () => "h",
+    },
+    locate: (at) =>
+      at === cwd
+        ? {
+            id: "proj",
+            inner: "/workspace/repo",
+            workspace: {
+              skills: (_inner, agent) => (asked.push(agent), order?.push(`skills ${agent}`), Promise.resolve(discovery(Object.keys(files).filter((file) => file.endsWith("/SKILL.md"))))),
+              prompts: (_inner, agent): Promise<ReadonlyArray<PromptTemplate>> => (asked.push(agent), Promise.resolve([])),
+              readText: (file) => Promise.resolve(files[file] ?? null),
+            },
+          }
+        : undefined,
+  };
+  const spawn = Effect.fn("spawn")(function* (input: AcpAdapterV2RuntimeInput) {
+    const { processEnvironment: _env, runtimePolicy: _policy, mcpServers: _mcp, acpMcpServers: _acp, httpMcpServers: _http, ...options } = input;
+    const context = yield* Layer.build(
+      AcpSessionRuntime.layer({
+        ...options,
+        cwd: dir,
+        spawn: { command: process.execPath, args: [AGENT], cwd: dir, env: { PATH, FAKE_ACP_SCRIPT: scriptPath, FAKE_ACP_LOG: logPath }, extendEnv: false },
+        authenticateOnAuthRequired: false,
+        ownDetachedProcessGroup: true,
+        processGroupPlatform: process.platform,
+      }),
+    );
+    return yield* Effect.service(AcpSessionRuntime.AcpSessionRuntime).pipe(Effect.provide(context));
   });
+  const driver = ProviderDriverKind.make(cli === "claude" ? "claudeAgent" : "opencode");
+  const instanceId = ProviderInstanceId.make(cli === "claude" ? "claudeAgent" : "opencode");
+  const promptHooks = acpPromptBuilder(yield* ProviderHost.ProviderHost, fileSystem, cli === "opencode" ? access : undefined);
+  const adapter = yield* makeAcpAdapterV2({ instanceId, flavor: acpFlavor(cli, driver, { spawn, prompt: promptHooks }), selfInvocation: { command: "none", entrypoint: undefined } });
+  const wrapped = wrapCliAdapter(adapter, {
+    sessions: new Map(),
+    ...(cli === "claude" ? { rewriteTurnText: claudeMentionRewrite(access) } : {}),
+    ...(order === undefined ? {} : { takeEnvironmentSkills: (at: string | null) => Effect.sync(() => void order.push(`take ${at}`)) }),
+  });
+  const threadId = ThreadId.make(`thread-${cli}`);
+  const modelSelection = { instanceId, model: "comm/claude-sonnet-5-5" } as const;
+  const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({ runtimeMode: "full-access", interactionMode: "default", cwd });
+  const runtime = yield* wrapped.openSession({ threadId, providerSessionId: ProviderSessionId.make(`session-${cli}`), modelSelection, runtimePolicy });
+  const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
+  yield* runtime.events.pipe(Stream.runForEach((event) => Queue.offer(events, event)), Effect.forkScoped);
+  const providerThread = yield* runtime.ensureThread({ threadId, modelSelection, runtimePolicy });
+  yield* runtime.startTurn(makeTurnInput({ threadId, providerThread, instanceId, runtimePolicy, now: yield* DateTime.now, modelSelection, messageText: text }));
+  yield* Effect.gen(function* () {
+    while ((yield* Queue.take(events)).type !== "turn.terminal");
+  }).pipe(Effect.timeout("20 seconds"));
+  const prompt = fs
+    .readFileSync(logPath, "utf8")
+    .split("\n")
+    .filter((line) => line.length > 0)
+    .map((line) => JSON.parse(line) as { received?: string; params?: { prompt?: ReadonlyArray<{ type: string; text?: string }> } })
+    .find((entry) => entry.received === "session/prompt")?.params?.prompt;
+  return { blocks: prompt ?? [], asked };
+});
 
-const run = <A, E>(body: Effect.Effect<A, E, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => Effect.runPromise(body.pipe(Effect.scoped, Effect.provide(layerTest)) as never) as Promise<A>;
+const run = <A, E>(body: Effect.Effect<A, E, Layer.Success<typeof layerTest> | import("effect/Scope").Scope>) => Effect.runPromise(body.pipe(Effect.scoped, Effect.provide(layerTest)));
 
 const ENVIRONMENT_SKILL = "---\nname: env\ndescription: The Environment's.\n---\n\nInterview the owner.\n";
 const SKILL = "---\nname: fruit-code\ndescription: The fruit code.\n---\n\nRead reference/code.md for the code.\n";

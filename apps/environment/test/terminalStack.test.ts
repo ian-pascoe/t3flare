@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDateInEffect:off
 // t3's real terminal stack over ours (step 2b, plan M1/M3 "Node with real processes"): t3's `makeWithOptions` with our
 // options, t3's real `ProjectSetupScriptRunner`, our PTY adapter, and our Workspace DO terminal host, wired in process,
 // whose shells are a real bash under a real PTY (`script`) with our rc file (its markers). Covers open, write, the
@@ -14,6 +13,7 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { ProjectId } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
@@ -225,12 +225,13 @@ describe.skipIf(BASH === undefined || PYTHON === undefined)("t3's terminal and s
           }),
         );
         yield* terminals.open({ threadId: "thread-busy", terminalId: "default", cwd: demo(), cols: 80, rows: 24 });
-        const until = (pattern: RegExp, ms = 15_000) =>
-          Effect.promise(async () => {
-            const end = Date.now() + ms;
-            while (Date.now() < end && !pattern.test(seen.join(""))) await new Promise((resolve) => setTimeout(resolve, 20));
-            return pattern.test(seen.join(""));
-          });
+        /** Polls `check` every 20 ms for up to `ms`; its last answer. */
+        const waitFor = Effect.fn("waitFor")(function* (check: () => boolean, ms: number) {
+          const end = (yield* Clock.currentTimeMillis) + ms;
+          while ((yield* Clock.currentTimeMillis) < end && !check()) yield* Effect.sleep("20 millis");
+          return check();
+        });
+        const until = (pattern: RegExp, ms = 15_000) => waitFor(() => pattern.test(seen.join("")), ms);
         yield* until(/\$ $/);
         yield* terminals.write({ threadId: "thread-busy", terminalId: "default", data: "sleep 2; echo SL$((1))EPT\r" });
         yield* Effect.sleep("500 millis");
@@ -240,11 +241,7 @@ describe.skipIf(BASH === undefined || PYTHON === undefined)("t3's terminal and s
         const finished = yield* until(/SL1EPT[\s\S]*\$ $/, 10_000);
         yield* Effect.sleep("300 millis");
         yield* terminals.closeIdle({ threadId: "thread-busy" });
-        const closed = yield* until(/./, 10).pipe(Effect.andThen(Effect.promise(async () => {
-          const end = Date.now() + 5000;
-          while (Date.now() < end && exits.length === 0) await new Promise((resolve) => setTimeout(resolve, 20));
-          return exits.length > 0;
-        })));
+        const closed = yield* until(/./, 10).pipe(Effect.andThen(waitFor(() => exits.length > 0, 5000)));
         return { keptWhileBusy, finished, closed };
       }),
     );

@@ -1,4 +1,4 @@
-// @effect-diagnostics effectFnOpportunity:off globalTimers:off
+// @effect-diagnostics globalTimers:off
 // SPI-1170: the pi driver's model list (`provider/cli/piDriver.ts` `piSnapshot`): the endpoints' models when one lists a
 // model, else none and the provider needs setup (SPI-1176), and the list follows each endpoint change at once while the
 // driver's scope is open.
@@ -24,8 +24,10 @@ const endpoint = (id: string, api: EndpointApi, models: ReadonlyArray<string>) =
 const host = ProviderHost.ProviderHost.of({
   paths: { cwd: "/", baseDir: "/tmp", stateDir: "/tmp", providerStatusCacheDir: "/tmp", attachmentsDir: "/tmp" },
   settings: { get: Effect.succeed(DEFAULT_SERVER_SETTINGS), withSnapshot: (use) => use(DEFAULT_SERVER_SETTINGS), changes: Stream.empty, subscribe: Effect.succeed(Stream.empty) },
+  // @effect-diagnostics-next-line effectFnOpportunity:off -- a fake service's stub method: Effect.fn's span adds nothing to a stand-in
   shouldRunBackgroundWork: () => Effect.succeed(true),
   resolveAttachmentPath: () => null,
+  // @effect-diagnostics-next-line effectFnOpportunity:off -- a fake service's stub method: Effect.fn's span adds nothing to a stand-in
   credentials: () => Effect.die("not used"),
   compatibility: noCompatibilityPolicy,
 });

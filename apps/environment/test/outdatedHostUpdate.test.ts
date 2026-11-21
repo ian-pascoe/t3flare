@@ -1,4 +1,3 @@
-// @effect-diagnostics effectFnOpportunity:off
 // A stock client blocked from the Cloud Environment by an orchestration-protocol mismatch (in-app updates plan D16; t3
 // `client-runtime/src/connection/outdatedHostUpdate.ts`): with the descriptor t3flare advertises on prod, the client does
 // not tell the owner to update by hand; it opens its bare socket and calls the unary server Update (no progress stream:
@@ -125,7 +124,9 @@ describe("a client blocked by a protocol mismatch", () => {
           setEnabled: () => Effect.void,
         } as unknown as EnvironmentRegistry.EnvironmentRegistry["Service"]);
         const resolver = ConnectionResolver.ConnectionResolver.of({
+          // @effect-diagnostics-next-line effectFnOpportunity:off -- a fake service's stub method: Effect.fn's span adds nothing to a stand-in
           prepare: () => Effect.die(new Error("The update must bypass the protocol gate.")),
+          // @effect-diagnostics-next-line effectFnOpportunity:off -- a fake service's stub method: Effect.fn's span adds nothing to a stand-in
           prepareForUpdate: () =>
             Effect.sync(() => ({
               descriptor: served,

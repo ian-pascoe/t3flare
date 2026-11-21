@@ -1,4 +1,5 @@
-// @effect-diagnostics effectFnOpportunity:off globalJsonInEffect:off multipleEffectProvide:off nodeBuiltinImport:off
+// @effect-diagnostics nodeBuiltinImport:off
+// @effect-diagnostics effectFnOpportunity:off -- the fake services' one-line stub methods: Effect.fn's span adds nothing to a stand-in
 // Step 3+ (P4; review findings 1, 2 and 5): the Connect service's link step with t3's real CloudLink and signing key
 // against a fake relay. The link is publish-only whatever was stored before (relink after unlink included), a relay
 // that hands back a tunnel is undone, the mint key is gone after the link, and the account token is kept or discarded
@@ -11,6 +12,7 @@ import { EnvironmentId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { HttpClient, HttpClientResponse, HttpServer } from "effect/http";
 import * as NetAddress from "effect/net/NetAddress";
@@ -35,6 +37,7 @@ const MINT_KEY = generateKeyPairSync("ed25519").publicKey.export({ type: "spki",
 const ENVIRONMENT = EnvironmentId.make("env_123");
 const TOKEN: CliTokenManager.PersistedToken = { accessToken: "account-access-token", refreshToken: "account-refresh", expiresAtEpochMs: Number.MAX_SAFE_INTEGER };
 
+const decodeJsonObject = Schema.decodeEffect(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)));
 const decodeJwt = (jwt: string) => JSON.parse(Buffer.from(jwt.split(".")[1]!, "base64url").toString("utf8")) as Record<string, any>;
 
 interface Harness {
@@ -56,10 +59,10 @@ const run = <A, E>(h: Harness, policy: ConnectService.ConnectPolicy, use: (conne
     getOrCreateRandom: () => Effect.die("unused"),
     remove: (name) => Effect.sync(() => void h.secrets.delete(name)),
   };
-  const relay = HttpClient.make((request) =>
-    Effect.sync(() => {
+  const relay = HttpClient.make(
+    Effect.fn("relay")(function* (request) {
       const url = new URL(request.url);
-      const body = request.body._tag === "Uint8Array" ? JSON.parse(new TextDecoder().decode(request.body.body)) : null;
+      const body = request.body._tag === "Uint8Array" ? yield* decodeJsonObject(new TextDecoder().decode(request.body.body)).pipe(Effect.orDie) : null;
       h.relayCalls.push({ method: request.method, path: url.pathname, body });
       const answer =
         url.pathname === "/v1/client/environment-link-challenges"
@@ -69,7 +72,7 @@ const run = <A, E>(h: Harness, policy: ConnectService.ConnectPolicy, use: (conne
                 ok: true,
                 cloudUserId: "user_owner",
                 environmentId: ENVIRONMENT,
-                endpoint: decodeJwt(body.proof).endpoint,
+                endpoint: decodeJwt(String(body?.proof)).endpoint,
                 endpointRuntime: h.endpointRuntime,
                 relayIssuer: "https://relay.t3.codes",
                 environmentCredential: "environment-credential-1",
@@ -86,52 +89,48 @@ const run = <A, E>(h: Harness, policy: ConnectService.ConnectPolicy, use: (conne
     store: (token) => Effect.sync(() => void (h.token = token)),
     clear: Effect.sync(() => void (h.token = undefined)),
   });
-  return Effect.runPromise(
-    Effect.flatMap(ConnectService.Connect, use).pipe(
-      Effect.provide(ConnectService.layer(policy, makePublishRecorder({ read: () => undefined, write: () => undefined }))),
-      Effect.provide(
-        CloudLink.layer.pipe(
-          Layer.provide(EnvironmentKeys.layer),
-          Layer.provide(ManagedPolicy.layerTest()),
-          // t3 reads its settings since v0.1.11-nightly.20261117.4825.
-          Layer.provide(ServerSettings.layerTest({})),
-        ),
-      ),
-      Effect.provideService(ConnectReachability.ConnectReachability, ConnectReachability.ConnectReachability.of({ check: Effect.die("unused"), latest: Effect.succeedNone })),
-      Effect.provideService(HttpServer.HttpServer, HttpServer.HttpServer.of({ address: NetAddress.inetAddressFromIpStringUnsafe("127.0.0.1", 443), serve: (() => Effect.void) as never })),
-      Effect.provideService(ServerSecretStore.ServerSecretStore, store),
-      Effect.provideService(
-        AgentAwarenessRelay.AgentAwarenessRelay,
-        AgentAwarenessRelay.AgentAwarenessRelay.of({ publishThread: () => Effect.void, drain: Effect.void, requestCatchUp: () => Effect.void, start: () => Effect.void }),
-      ),
-      Effect.provideService(
-        ServerEnvironment.ServerEnvironment,
-        ServerEnvironment.ServerEnvironment.of({
-          getEnvironmentId: Effect.succeed(ENVIRONMENT),
-          getDescriptor: Effect.succeed({ environmentId: ENVIRONMENT, label: "t3flare" } as never),
-        }),
-      ),
-      Effect.provideService(
-        ManagedEndpointRuntime.CloudManagedEndpointRuntime,
-        ManagedEndpointRuntime.CloudManagedEndpointRuntime.of({
-          // As the Worker's: no cloudflared, so a tunnel never runs.
-          applyConfig: (config) => Effect.sync(() => (h.tunnels.push(config), config === null ? { status: "disabled" } : { status: "unsupported", providerKind: "cloudflare_tunnel" }) as never),
-          recoveryRequests: Stream.empty,
-          requestRecovery: () => Effect.void,
-          restartConnector: () => Effect.succeed(false),
-          tunnelConnected: Stream.empty,
-          inspectConnector: Effect.succeed(null),
-          readinessChanged: Stream.empty,
-          withLinkStateLock: (effect) => effect,
-        }),
-      ),
-      Effect.provideService(EnvironmentAuth.EnvironmentAuth, EnvironmentAuth.EnvironmentAuth.of({} as never)),
-      Effect.provideService(CliTokenManager.CloudCliTokenManager, tokens),
-      Effect.provideService(HttpClient.HttpClient, relay),
-      Effect.provide(ServerConfigModule.layerTest("/", { prefix: "t3flare-connect-test-" }).pipe(Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)))),
-      Effect.scoped,
-    ),
+  const cloudLink = CloudLink.layer.pipe(
+    Layer.provide(EnvironmentKeys.layer),
+    Layer.provide(ManagedPolicy.layerTest()),
+    // t3 reads its settings since v0.1.11-nightly.20261117.4825.
+    Layer.provide(ServerSettings.layerTest({})),
   );
+  const services = Layer.mergeAll(
+    Layer.succeed(ConnectReachability.ConnectReachability, ConnectReachability.ConnectReachability.of({ check: Effect.die("unused"), latest: Effect.succeedNone })),
+    Layer.succeed(HttpServer.HttpServer, HttpServer.HttpServer.of({ address: NetAddress.inetAddressFromIpStringUnsafe("127.0.0.1", 443), serve: (() => Effect.void) as never })),
+    Layer.succeed(ServerSecretStore.ServerSecretStore, store),
+    Layer.succeed(
+      AgentAwarenessRelay.AgentAwarenessRelay,
+      AgentAwarenessRelay.AgentAwarenessRelay.of({ publishThread: () => Effect.void, drain: Effect.void, requestCatchUp: () => Effect.void, start: () => Effect.void }),
+    ),
+    Layer.succeed(
+      ServerEnvironment.ServerEnvironment,
+      ServerEnvironment.ServerEnvironment.of({
+        getEnvironmentId: Effect.succeed(ENVIRONMENT),
+        getDescriptor: Effect.succeed({ environmentId: ENVIRONMENT, label: "t3flare" } as never),
+      }),
+    ),
+    Layer.succeed(
+      ManagedEndpointRuntime.CloudManagedEndpointRuntime,
+      ManagedEndpointRuntime.CloudManagedEndpointRuntime.of({
+        // As the Worker's: no cloudflared, so a tunnel never runs.
+        applyConfig: (config) => Effect.sync(() => (h.tunnels.push(config), config === null ? { status: "disabled" } : { status: "unsupported", providerKind: "cloudflare_tunnel" }) as never),
+        recoveryRequests: Stream.empty,
+        requestRecovery: () => Effect.void,
+        restartConnector: () => Effect.succeed(false),
+        tunnelConnected: Stream.empty,
+        inspectConnector: Effect.succeed(null),
+        readinessChanged: Stream.empty,
+        withLinkStateLock: (effect) => effect,
+      }),
+    ),
+    Layer.succeed(EnvironmentAuth.EnvironmentAuth, EnvironmentAuth.EnvironmentAuth.of({} as never)),
+    Layer.succeed(CliTokenManager.CloudCliTokenManager, tokens),
+    Layer.succeed(HttpClient.HttpClient, relay),
+    ServerConfigModule.layerTest("/", { prefix: "t3flare-connect-test-" }).pipe(Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+  );
+  const layer = ConnectService.layer(policy, makePublishRecorder({ read: () => undefined, write: () => undefined })).pipe(Layer.provideMerge(cloudLink), Layer.provideMerge(services));
+  return Effect.runPromise(Effect.flatMap(ConnectService.Connect, use).pipe(Effect.provide(layer), Effect.scoped));
 };
 
 const STAGE = { keepAccountToken: true };

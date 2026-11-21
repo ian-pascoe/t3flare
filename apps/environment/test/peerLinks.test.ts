@@ -1,4 +1,4 @@
-// @effect-diagnostics effectFnOpportunity:off nodeBuiltinImport:off
+// @effect-diagnostics nodeBuiltinImport:off
 // SPI-1061 (ADR-0029): the Outbound link is t3's own. Through our one Layer, t3's real `PeerLinks` links, lists,
 // resolves and unlinks as stock t3 does (Pre-B's refusals are gone); every error it answers carries no `cause`, which
 // can hold the request with a pairing code or the bearer (review M6, plan §5.4). `t3_environment_links`' `notListed` is
@@ -62,7 +62,9 @@ it("answers every error with t3's reason, message and answeredAs, and no cause",
     get: fail,
     unlink: fail,
     resolve: fail,
+    // @effect-diagnostics-next-line effectFnOpportunity:off -- a fake service's stub method: Effect.fn's span adds nothing to a stand-in
     recordOutcome: () => Effect.void,
+    // @effect-diagnostics-next-line effectFnOpportunity:off -- a fake service's stub method: Effect.fn's span adds nothing to a stand-in
     recordExpiry: () => Effect.void,
   });
   const errors = await Effect.runPromise(
