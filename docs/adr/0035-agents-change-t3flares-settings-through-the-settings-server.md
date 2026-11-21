@@ -136,6 +136,12 @@ be picked there either. So, as Executor keeps a connection's mode on its own pag
 - **A mode change applies at the client's next request.** An Open change keeps the mode it was asked in: a retry or a
   form answer in another mode is refused as before, and the Change page still answers it.
 
+## Refinement: the Settings server also carries a Workspace's Purge (2026-11-21, not built)
+
+[ADR-0044](0044-a-workspace-is-purged-by-the-owner-or-at-an-agents-asking-through-the-settings-server.md) adds
+`list_workspaces` and `purge_workspace`: the server's first action that is no Settings change. It is always asked, waits
+as an Open change, and names no revision (§10 does not apply to it).
+
 The client name is the client's own label and carries no security weight. That changes nothing in the Consequences
 above: the mode was always the client's choice, trusted as sent (E1); a client that names itself as another gets that
 client's mode, which it could already have asked for with the query.
