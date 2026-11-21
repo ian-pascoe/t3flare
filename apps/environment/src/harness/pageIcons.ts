@@ -19,6 +19,7 @@ const SYMBOLS: Record<string, string> = {
   chevron: '<path d="M9.5 6l6 6-6 6"/>',
   key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l8.5-8.5M16 7l2.5 2.5"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  folder: '<path d="M3.5 7A1.5 1.5 0 0 1 5 5.5h4l2 2h8A1.5 1.5 0 0 1 20.5 9v9a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18z"/>',
 };
 
 export type IconName = keyof typeof SYMBOLS;

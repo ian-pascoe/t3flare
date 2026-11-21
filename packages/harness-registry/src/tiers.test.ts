@@ -54,6 +54,9 @@ const ENVIRONMENT: Readonly<Record<EnvironmentKey, { readonly up: readonly [unkn
   containerBudget: { up: [3, 4, "asked"], down: [3, 2, "free"] },
   variables: { up: [{}, { A: "1" }, "asked"], down: [{ A: "1" }, {}, "asked"] },
   globalMiseConfig: { up: ["", "[tools]\nnode = '24'\n", "asked"], down: ["[tools]\nnode = '24'\n", "", "asked"] },
+  // ADR-0043 §6: turning purging on and shortening the Grace destroy sooner, so they are asked.
+  sweepPurges: { up: [false, true, "asked"], down: [true, false, "free"] },
+  graceDays: { up: [7, 30, "free"], down: [7, 1, "asked"] },
 };
 
 /** Two values of `schema` with `low` below `high` where that has a meaning (a boolean's false, a smaller integer). */
@@ -350,6 +353,11 @@ describe("tierOf: the Environment settings", () => {
         expect([key, from, tier({ entity: "environment", stored: stored(key, from), change: { settings: { [key]: to } } })]).toEqual([key, from, expected]);
       }
     }
+  });
+
+  it("up-free: a number raised is free, lowered is asked, with the reason in words", () => {
+    expect(tierOf({ entity: "environment", stored: EMPTY_ENVIRONMENT, change: { settings: { graceDays: 8 } } })).toEqual({ tier: "free", reasons: ["graceDays: 7 to 8 (turned up)"] });
+    expect(tierOf({ entity: "environment", stored: EMPTY_ENVIRONMENT, change: { settings: { graceDays: 6 } } })).toEqual({ tier: "asked", reasons: ["graceDays: 7 to 6 (turned down)"] });
   });
 
   it("a multi-key change is asked when any key is; nothing moved is unchanged", () => {

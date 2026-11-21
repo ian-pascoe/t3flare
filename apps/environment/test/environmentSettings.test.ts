@@ -139,6 +139,29 @@ describe("Environment settings in the panel", () => {
     expect(answer.running).toEqual({ count: 2, holders: ["web-app", "b2"] });
   });
 
+  it("tells the Environment DO when a save moved the Grace, and only then (ADR-0043 §5)", async () => {
+    const { deps } = setup({ kind: "service-token" });
+    let moved = 0;
+    const told = { ...deps, sweepSettingsChanged: () => void moved++ };
+    await post(told, "environment", { settings: { containerIdleMinutes: 5 } }, {});
+    expect(moved).toBe(0);
+    await post(told, "environment", { settings: { graceDays: 3 } }, {});
+    expect(moved).toBe(1);
+    await post(told, "environment", { settings: { graceDays: 3, sweepPurges: true } }, {});
+    expect(moved).toBe(1);
+    await post(told, "environment", { settings: { sweepPurges: false } }, {});
+    expect(moved).toBe(2);
+    expect((await post(told, "environment", { settings: { graceDays: 0 } }, {})).status).toBe(400);
+    expect(moved).toBe(2);
+  });
+
+  it("keeps the Grace out of the Environment section's form: the Workspaces section shows it (ADR-0044 §1)", async () => {
+    const { deps } = setup();
+    const html = await (await handleHarness(new Request(`https://${HOST}/_t3flare/settings`), deps)).text();
+    expect(html).not.toContain('data-setting="graceDays"');
+    expect(html).not.toContain('data-setting="sweepPurges"');
+  });
+
   it("refuses a budget out of 1 to 10", async () => {
     const { deps } = setup({ kind: "service-token" });
     for (const budget of [0, 11]) expect((await post(deps, "environment", { settings: { containerBudget: budget } }, {})).status).toBe(400);

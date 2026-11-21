@@ -82,6 +82,11 @@ const settingPart = (name: string, tier: SettingTier | undefined, before: unknow
     const down = (typeof after === "boolean" && after === false) || (typeof after === "number" && typeof before === "number" && after < before);
     return down ? { asked: false, reason: `${shown} (turned down)` } : { asked: true, reason: `${shown} (turned up)` };
   }
+  if (tier === "up-free") {
+    // Only an integer raised is free; anything else (a lowered one, a value that is not a number) is asked.
+    const up = typeof after === "number" && typeof before === "number" && after > before;
+    return up ? { asked: false, reason: `${shown} (turned up)` } : { asked: true, reason: `${shown} (turned down)` };
+  }
   return { asked: true, reason: `${shown} (every change to it is asked)` };
 };
 

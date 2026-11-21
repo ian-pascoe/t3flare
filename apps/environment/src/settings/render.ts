@@ -1,4 +1,5 @@
-// What an asked Settings change shows (plan D9, D10): the Open change's `shown`, built by the server from the stored
+// @effect-diagnostics globalDate:off
+// What an asked Settings change shows (ADR-0035 §7): the Open change's `shown`, built by the server from the stored
 // settings before the change and the change as the registry will apply it, never from the agent's words. The card's text
 // and the Change page are both rendered from it: this file renders the text (the card's prompt, and an Owner client's
 // message `M`); `harness/changePage.ts` renders the page. No secret is ever in it: a header value is typed on the page and
@@ -267,8 +268,33 @@ const itemText = (item: ChangeItem): Array<string> => {
       ];
     case "skill":
       return [`- ${item.op === "enable" ? "Enable" : item.op === "disable" ? "Disable" : "Remove"} the Environment skill ${item.name}${item.repo === undefined ? "" : ` (from ${item.repo}${item.commit === undefined ? "" : ` at ${item.commit.slice(0, 7)}`})`}.`];
+    case "purge":
+      return [
+        `- Purge the ${item.workspaceKind === "project" ? "project" : "Worktree"} Workspace ${item.id} (${JSON.stringify(item.title)}, ${item.status}) now, with its files, for good.`,
+        ...(item.worktrees.length === 0 ? [] : [`  With it, its Worktree Workspaces: ${item.worktrees.map((worktree) => `${worktree.id} (${worktree.status})`).join(", ")}.`]),
+        ...keptOf(item).map((ids) => `  ${keptText(ids)}`),
+        `  Deleted threads' Sessions destroyed: ${item.sessions}.`,
+        `  ${purgeDueText(item.purgeDue)}`,
+      ];
   }
 };
+
+/** The kept Tombstones in a Purge's set (work a removal could not check), as one list when there are any. */
+export const keptOf = (item: Extract<ChangeItem, { readonly kind: "purge" }>): ReadonlyArray<ReadonlyArray<string>> => {
+  const kept = [...item.worktrees, item].filter((member) => member.status === "tombstone (kept)").map((member) => member.id);
+  return kept.length === 0 ? [] : [kept];
+};
+
+/** A kept Tombstone's call-out, the same on the card and the Change page. */
+export const keptText = (ids: ReadonlyArray<string>): string => `Kept Tombstones, holding work a removal could not check, go with it for good: ${ids.join(", ")}.`;
+
+/** When the Sweep would have purged a Workspace (ADR-0044 §5), as the card and the Change page say it. */
+export const purgeDueText = (due: number | null): string =>
+  due === null ? "The Sweep has no date to purge it now (purging is off, the Tombstone is kept, or it is not yet marked unreferenced)." : `The Sweep would purge it at ${new Date(due).toISOString()}.`;
+
+/** An asked change's first line: a Purge names no revision (ADR-0044 §5). */
+export const changeHead = (view: Pick<ChangeView, "entity" | "subject" | "revision">): string =>
+  view.entity === "workspaces" ? `A Purge of ${view.subject}` : `A change to ${view.subject} (revision ${view.revision})`;
 
 /** Who asked a change, as every place names them: the card, the Change page, the panel's list, an Owner client's message. */
 export interface AskedBy {
@@ -292,7 +318,7 @@ export const askedByText = (caller: AskedBy): string =>
  */
 export const changeText = (view: ChangeView): string =>
   [
-    `A change to ${view.subject} (revision ${view.revision}):`,
+    `${changeHead(view)}:`,
     ...view.items.flatMap(itemText),
     "",
     "It waits for the owner because:",

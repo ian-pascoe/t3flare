@@ -3,6 +3,8 @@
 // only, so the modules that build, keep and render a change import each other's shapes without a cycle.
 import type { NeedsPage } from "@t3flare/harness-registry";
 
+import type { WorkspaceStatus } from "../agents/workspaceView.ts";
+
 /**
  * Why a change is answered on the Change page alone (plan D6): what its tier says (a secret, a sign-in, skills' text),
  * or `oversize`, text a card would cut.
@@ -59,12 +61,30 @@ export type ChangeItem =
       readonly from?: string;
       readonly skills: ReadonlyArray<ShownSkill>;
     }
-  | { readonly kind: "skill"; readonly op: "enable" | "disable" | "remove"; readonly name: string; readonly repo?: string; readonly commit?: string };
+  | { readonly kind: "skill"; readonly op: "enable" | "disable" | "remove"; readonly name: string; readonly repo?: string; readonly commit?: string }
+  /**
+   * A Purge asked through the Settings server (ADR-0044 §5): the Workspace, its t3 title, the Worktree
+   * Workspaces that go with it, each with its status (a `tombstone (kept)` is called out), the deleted threads' Sessions
+   * destroyed, and when the Sweep would have purged it (null: never, or not yet known).
+   */
+  | {
+      readonly kind: "purge";
+      readonly id: string;
+      readonly workspaceKind: "project" | "worktree";
+      readonly title: string;
+      readonly status: WorkspaceStatus;
+      readonly worktrees: ReadonlyArray<{ readonly id: string; readonly status: WorkspaceStatus }>;
+      readonly sessions: number;
+      readonly purgeDue: number | null;
+    };
+
+/** What an Open change is to: a settings entity with a revision, or the Workspaces (a Purge, whose revision is always 0). */
+export type ChangeEntity = "harness" | "environment" | "workspaces";
 
 /** What an Open change's card and page render (plan D8's `shown`). */
 export interface ChangeView {
-  readonly entity: "harness" | "environment";
-  /** What is changed, in words: "the Environment settings", "the MCP server set", "the Environment skills". */
+  readonly entity: ChangeEntity;
+  /** What is changed, in words: "the Environment settings", "the MCP server set", "the Environment skills", "the Workspace acme". */
   readonly subject: string;
   readonly revision: number;
   /** When it applies (plan D17). */

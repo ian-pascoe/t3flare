@@ -116,6 +116,7 @@ import { EMPTY_ENDPOINTS } from "@t3flare/models/endpoints";
 import * as LimitSources from "../usage/limitSources.ts";
 import { layerAcpRegistry } from "../provider/acpRegistry.ts";
 import * as DurableObjectDatabaseStorage from "./databaseStorage.ts";
+import * as DeletionWake from "./deletionWake.ts";
 import { otlpConfigFromSettings } from "./otlp.ts";
 import * as ProjectFaviconResolver from "t3/src/project/ProjectFaviconResolver.ts";
 import * as T3ProjectFileLoader from "t3/src/project/T3ProjectFileLoader.ts";
@@ -614,6 +615,8 @@ export const make = (options: CompositionOptions) => {
     HeldHooksWaker.layer,
     layerThreadSettlementWorker,
     StorageCleanup.layer.pipe(Layer.provide(ProjectionStoreV2.layer)),
+    // t3flare: a project's or a thread's deletion wakes the Workspace Sweep (ADR-0043 §5).
+    DeletionWake.layer,
     // t3flare: the size from Durable Object storage, no repair (DO SQLite refuses the storage PRAGMAs).
     DurableObjectDatabaseStorage.layer(
       DatabaseStorage.layer.pipe(Layer.provide(ProjectionMaintenance.layer), Layer.provide(layerServerRestart)),

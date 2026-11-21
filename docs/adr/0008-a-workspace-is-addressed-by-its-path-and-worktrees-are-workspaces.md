@@ -37,3 +37,11 @@ A cloud Project is one repo. Its files live in a Workspace: a Workspace DO holdi
   `deleting` (retried within 5 minutes), and stops any Container whose budget lease no Workspace holds. On prod it
   reports only, until `T3FLARE_SWEEP_PURGE=1`. t3 re-creating a worktree at a tombstone's path restores it.
 - **What does not carry over.** The project's copy of a worktree's branch does not advance while the worktree lives.
+
+## Refinement (2026-11-21)
+
+The 7-day grace becomes the **Grace**, an Environment setting; `T3FLARE_SWEEP_PURGE` is retired; a deleted project or
+thread wakes the sweep, which also runs on the earliest purge date
+([ADR-0043](0043-the-grace-is-an-environment-setting-and-a-deletion-wakes-the-sweep.md)). The Owner purges, restores
+and runs the sweep on the Settings page, and an agent asks for a purge through the Settings server
+([ADR-0044](0044-a-workspace-is-purged-by-the-owner-or-at-an-agents-asking-through-the-settings-server.md)).

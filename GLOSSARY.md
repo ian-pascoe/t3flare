@@ -170,12 +170,20 @@ A Worktree Workspace's copy of its project's untracked files, at the project's p
 _Avoid_: project mount, shared root
 
 **Tombstone**:
-A removed Workspace whose files are kept for the grace (uncommitted work, or a removal step that could not run): gone for t3, restorable.
+A removed Workspace whose files are kept for the Grace (uncommitted work, or a removal step that could not run): gone for t3, restorable.
 _Avoid_: trash, soft delete
 
 **Sweep**:
-The Environment's daily pass over the Workspace registry that purges what nothing references past the grace, and stops Containers no Workspace holds.
+The Environment's pass over the Workspace registry, daily and after a project or thread is deleted, that purges what nothing references past the Grace, and stops Containers no Workspace holds.
 _Avoid_: garbage collection, cleanup job
+
+**Purge**:
+The destruction for good of a Workspace: its files, its Container and its deleted threads' Sessions. The Sweep purges past the Grace; the Owner purges at once, on the Settings page or by answering an agent's asking. Nothing but the admin route starts a Purge of a Workspace something references.
+_Avoid_: delete (t3's, of a project or thread, which removes no files), remove (t3's worktree removal, which may leave a Tombstone), wipe
+
+**Grace**:
+How many days the Environment keeps a Workspace nothing references, a Tombstone, and a deleted thread's Session before the Sweep purges them, or that it never does; an Environment setting, 7 days unless the Owner changes it.
+_Avoid_: retention, trash period, TTL
 
 **CLI agent**:
 A stock coding-agent CLI (Codex, Claude Code, OpenCode, pi) running as a process in a Container, through t3's own provider for it.
@@ -204,7 +212,7 @@ Claude Code's highest settings source, shared by every Claude process in a Conta
 
 **Settings page**:
 The Owner's page at `/_t3flare/settings` on the t3 host for t3flare's own settings: the Harness settings and the
-Environment settings, with Status, the audit log and the Open changes waiting for them. It was the Harness panel, at
+Environment settings, with the Workspaces and their Purges, Status, the audit log and the Open changes waiting for the Owner. It was the Harness panel, at
 `/_t3flare/harness`, until 2026-11-20; that path redirects here.
 _Avoid_: Harness panel, dashboard, admin UI
 
@@ -214,8 +222,9 @@ MCP server set.
 _Avoid_: harness config, settings (alone)
 
 **Environment settings**:
-What the Cloud Environment gives every Workspace and its Container: the Container size, idle time and budget, the Global
-mise config, the Environment skills and the Variables. t3flare's own, not t3's server settings.
+What the Cloud Environment gives every Workspace and its Container, and how long it keeps one: the Container size, idle
+time and budget, the Global mise config, the Environment skills, the Variables and the Grace. t3flare's own, not t3's
+server settings.
 _Avoid_: environment config, server settings, Container settings
 
 **Variable**:
@@ -293,8 +302,9 @@ t3flare's agents reach one, its `resume` is t3flare's to call, never theirs. The
 client in the `model` Elicitation mode.
 
 **Settings server**:
-t3flare's own MCP server for the Harness settings, the Environment settings and the Environment skills. t3flare's agents
-reach it as a member of the MCP server set; Owner clients reach it at its own endpoint.
+t3flare's own MCP server for the Harness settings, the Environment settings and the Environment skills, and for asking
+to purge a Workspace. t3flare's agents reach it as a member of the MCP server set; Owner clients reach it at its own
+endpoint.
 _Avoid_: admin MCP, builtin MCP, config server, Harness server
 
 **Door**:
@@ -321,7 +331,8 @@ server's own entry). In full access a free change runs unasked; an asked change 
 _Avoid_: risk level, permission level, direct (that is an Exposure), confirmation tier
 
 **Open change**:
-An asked Settings change waiting for its answer, kept for at most 10 minutes and answered once.
+An asked Settings change, or a Purge asked through the Settings server, waiting for its answer, kept for at most 10
+minutes and answered once.
 _Avoid_: Proposal (cloudpid's, a queue), pending request (t3's), draft
 
 **Change page**:

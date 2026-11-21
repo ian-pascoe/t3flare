@@ -294,6 +294,36 @@ form[data-skill-install] .skill-out{padding:.75rem 1rem}
 .skill-pick{display:flex;gap:.5rem;align-items:flex-start;padding:.5rem 0;border-top:1px solid var(--row-border)}
 .skill-pick:first-of-type{border-top:0}
 .skill-pick .note{display:block;font-size:.75rem;color:var(--muted-fg)}
+.section-actions{display:flex;flex-wrap:wrap;gap:.5rem}
+.grace-choices{display:flex;flex-direction:column;gap:.5rem}
+.grace-choices input[type=number]{width:5.5rem}
+.grace-choices .hint{font-size:.75rem;color:var(--muted-fg)}
+table.workspaces td>div{min-width:0;overflow-wrap:break-word}
+table.workspaces td[data-label=Purged],table.workspaces td[data-label="Referenced by"]{min-width:8.5rem}
+table.workspaces td.actions{padding-left:.5rem}
+table.workspaces td[data-label=Workspace] strong,table.workspaces code{overflow-wrap:normal;word-break:keep-all}
+table.workspaces td:is([data-label=Status],[data-label=Purged]) .src{overflow-wrap:anywhere}
+table.workspaces .files{min-width:5.5rem;white-space:nowrap;font-variant-numeric:tabular-nums}
+table.workspaces td.files>div{white-space:nowrap;overflow-wrap:normal;word-break:keep-all}
+table.workspaces tr.wt>td:first-child{padding-left:2rem;position:relative}
+table.workspaces tr.wt>td:first-child::after{content:"";position:absolute;left:1.125rem;top:0;bottom:50%;width:.5rem;border-left:1px solid var(--border);border-bottom:1px solid var(--border);border-bottom-left-radius:.25rem}
+.workspace-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:.25rem .5rem}
+.workspace-actions .hint{font-size:.6875rem;color:var(--err)}
+.sweep-out{display:flex;flex-direction:column;gap:.375rem;padding:.75rem 1rem;font-size:.8125rem}
+.sweep-out ul{margin:0;padding-left:1.125rem}
+.sweep-out .note{font-size:.75rem;color:var(--muted-fg)}
+.sweep-out .err{color:var(--err)}
+.dialog{max-width:28rem;width:calc(100% - 2rem);padding:1.25rem;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--card);color:var(--fg);box-shadow:0 24px 48px -12px rgb(0 0 0/35%)}
+.dialog::backdrop{background:rgb(0 0 0/45%)}
+.dialog h3{font-size:.9375rem;font-weight:600;margin-bottom:.5rem}
+.dialog .field{margin-top:.75rem}
+.dialog .callout{margin:.75rem 0 0}
+.dialog .field input{width:100%}
+.purge-goes{margin:.375rem 0;padding-left:1.125rem;font-family:var(--mono);font-size:.75rem;overflow-wrap:anywhere}
+.btn-destroy{background:var(--err);border-color:var(--err);color:#fff}
+.btn-destroy:hover{background:color-mix(in oklab,var(--err) 88%,var(--bg))}
+.dialog-foot{display:flex;justify-content:flex-end;gap:.5rem;margin-top:1rem}
+@media (max-width:640px){table.workspaces td[data-label=Purged],table.workspaces td[data-label="Referenced by"],table.workspaces .files{min-width:0}table.workspaces tr.wt>td:first-child{padding-left:0}table.workspaces tr.wt>td:first-child::after{display:none}table.workspaces tr.wt{padding-left:1.5rem}.workspace-actions{justify-content:flex-start}}
 .change-main{max-width:var(--content-w);margin:0 auto;padding:2.5rem 1.25rem 4rem;display:flex;flex-direction:column;gap:1.5rem}
 .change-block{padding:.75rem 1rem;display:flex;flex-direction:column;gap:.5rem;min-width:0}
 .change-block h3{font-size:.875rem;font-weight:600}

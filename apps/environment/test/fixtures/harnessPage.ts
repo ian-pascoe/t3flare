@@ -5,6 +5,7 @@
 // signed in. Fixed times, so the render is stable.
 import { applyChange, applyToolsChange, EMPTY_HARNESS, resolveHarness, type T3ToolListing } from "@t3flare/harness-registry";
 
+import type { WorkspaceRow, WorkspacesView } from "../../src/agents/workspaceView.ts";
 import type { McpRow, PageInput } from "../../src/harness/page.ts";
 import type { AuditEntry } from "../../src/harness/store.ts";
 
@@ -81,6 +82,90 @@ export const FIXTURE_AUDIT: ReadonlyArray<AuditEntry> = [
   { at: minutes(40), entity: "harness", caller: "owner:7f3c9a", action: "mcp.add", target: "docs", after: { kind: "direct", url: "https://mcp.docs-fixture.invalid/mcp", auth: { kind: "header", header: "Authorization" }, secret: { set: true, fingerprint: "232d" } } },
 ];
 
+const DAY = 24 * 60 * 60_000;
+
+const workspace = (overrides: Partial<WorkspaceRow> & Pick<WorkspaceRow, "id" | "title" | "status">): WorkspaceRow => ({
+  kind: "project",
+  parent: null,
+  branch: null,
+  repo: "acme/app",
+  createdAt: FIXTURE_NOW - 40 * DAY,
+  confirmName: overrides.id.split("/").at(-1)!,
+  references: [],
+  unreferencedSince: null,
+  deletedAt: null,
+  lastError: null,
+  purgeDue: null,
+  planned: { action: "skip", why: "" },
+  sessions: 0,
+  worktrees: [],
+  can: { purge: false, restore: false, stop: true },
+  ...overrides,
+});
+
+/**
+ * The Workspaces section (ADR-0044 §1): a deleted project with a worktree waiting out its Grace and a Tombstone, a project
+ * in use, and a Tombstone kept because a removal step could not run.
+ */
+export const FIXTURE_WORKSPACES: WorkspacesView = {
+  purging: true,
+  graceDays: 7,
+  graceMs: 7 * DAY,
+  overridden: false,
+  purgingSince: FIXTURE_NOW - 20 * DAY,
+  rows: [
+    workspace({
+      id: "acme",
+      title: "Acme",
+      status: "unreferenced",
+      unreferencedSince: FIXTURE_NOW - 2 * DAY,
+      purgeDue: FIXTURE_NOW + 5 * DAY,
+      planned: { action: "skip", why: "unreferenced since 2026-11-11T09:41:00.000Z, in its Grace until 2026-11-18T09:41:00.000Z" },
+      sessions: 3,
+      can: { purge: true, restore: false, stop: true },
+      worktrees: [
+        workspace({
+          id: ".wt/acme/feat-a",
+          kind: "worktree",
+          parent: "acme",
+          branch: "feat-a",
+          title: "feat-a",
+          status: "unreferenced",
+          unreferencedSince: FIXTURE_NOW - 2 * DAY,
+          purgeDue: FIXTURE_NOW + 5 * DAY,
+          sessions: 1,
+          can: { purge: true, restore: false, stop: true },
+        }),
+        workspace({
+          id: ".wt/acme/feat-b",
+          kind: "worktree",
+          parent: "acme",
+          branch: "t3/feat-b",
+          title: "t3/feat-b",
+          status: "tombstone",
+          deletedAt: FIXTURE_NOW - 3 * DAY,
+          purgeDue: FIXTURE_NOW + 4 * DAY,
+          lastError: "uncommitted work (--force)",
+          can: { purge: true, restore: true, stop: false },
+        }),
+      ],
+    }),
+    workspace({ id: "live", title: "Live app", repo: "acme/live", status: "in use", references: ["project “Live app”", "thread “Fix the bug”", "2 open terminals"], planned: { action: "skip", why: "project p-live" } }),
+    workspace({
+      id: ".wt/old/kept",
+      kind: "worktree",
+      parent: "old",
+      branch: "kept",
+      title: "kept",
+      status: "tombstone (kept)",
+      deletedAt: FIXTURE_NOW - 9 * DAY,
+      lastError: "the removal could not check the worktree: no Container",
+      planned: { action: "skip", why: "tombstone kept (a removal step could not run)" },
+      can: { purge: true, restore: true, stop: false },
+    }),
+  ],
+};
+
 export const fixturePage = (overrides: Partial<PageInput> = {}): PageInput => ({
   resolved: resolveHarness(changed.harness),
   csrf: "fixture-csrf-token",
@@ -123,5 +208,6 @@ export const fixturePage = (overrides: Partial<PageInput> = {}): PageInput => ({
     totals: { count: 2, enabled: 1, disabled: 1, bytes: 12_150, disabledBytes: 9_840, maxBytes: 8_388_608, maxSkills: 100 },
     unauthenticated: false,
   },
+  workspaces: FIXTURE_WORKSPACES,
   ...overrides,
 });

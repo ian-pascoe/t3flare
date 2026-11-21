@@ -2,6 +2,7 @@
 // the page's controls into calls to the panel's JSON API (with the CSRF token from the page's meta tag) and shows their
 // progress and outcome. It writes server answers with `textContent`, never as HTML. Without it the page still reads.
 import { ENDPOINTS_SCRIPT } from "./pageEndpoints.ts";
+import { WORKSPACES_SCRIPT } from "./pageWorkspaces.ts";
 
 export const SCRIPT = `"use strict";
 const csrf = document.querySelector('meta[name="t3flare-csrf"]').getAttribute("content");
@@ -389,4 +390,4 @@ if ("IntersectionObserver" in window) {
     if (first !== undefined) mark(first);
   }, { rootMargin: "-20% 0px -60% 0px" });
   for (const id of links.keys()) { const section = document.getElementById(id); if (section !== null) observer.observe(section); }
-}` + ENDPOINTS_SCRIPT;
+}` + ENDPOINTS_SCRIPT + WORKSPACES_SCRIPT;

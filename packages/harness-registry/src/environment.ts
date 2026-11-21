@@ -1,7 +1,8 @@
 // The Environment settings (SPI-1149, ADR-0032): what the Cloud Environment gives every Workspace and its Container,
 // apart from the Harness settings (ADR-0026). Kept in the Environment DO under their own key and revision, so a change
 // here never makes a Session take the Harness settings again. Edited in the Settings page's Environment section; read by
-// each Workspace DO before a Container start. Imported by both Workers.
+// each Workspace DO before a Container start, and by the Environment DO's Sweep for the Grace (ADR-0043), which the page
+// edits in its Workspaces section. Imported by both Workers.
 //
 // One schema (`ENVIRONMENT_SETTINGS`), one resolve (`resolveEnvironment`), one change (`applyEnvironmentChange`): a later
 // setting (the Global mise config, SPI-1150; Variables, SPI-1152) is one entry in `ENVIRONMENT_SETTINGS`. The resolved
@@ -23,6 +24,16 @@ export const MAX_CONTAINER_BUDGET = 10;
 
 /** The largest Global mise config, in bytes of UTF-8 (cloudpid's `MAX_TOOLCHAINS_BYTES`). */
 export const MAX_GLOBAL_MISE_BYTES = 16 * 1024;
+
+/** The Grace's default and bounds, in days (ADR-0043 §1): no zero, since at once is the Owner's own Purge. */
+export const DEFAULT_GRACE_DAYS = 7;
+export const MAX_GRACE_DAYS = 3650;
+
+/**
+ * The Environment settings the Sweep reads (ADR-0043) and no Container does: they apply at the next Sweep, not at a
+ * Container start, and the Settings page shows them in its Workspaces section, not its Environment section.
+ */
+export const SWEEP_SETTING_KEYS = ["sweepPurges", "graceDays"] as const;
 
 /** A Container's resources, as `ctx.container.start({ instance })` takes a custom size. */
 export interface ContainerResources {
@@ -110,6 +121,20 @@ export const ENVIRONMENT_SETTINGS = {
     description:
       "A mise.toml every Container's commands get, under a repository's own and over the image's base tools. Laid down and installed at each Workspace's next Container start; a running Container keeps what it started with. Kept only if git and gh still run under it. disable_tools and disable_backends are ignored. Agents can read this file: put no secret in it, [env] included.",
     schema: { type: "file", maxBytes: MAX_GLOBAL_MISE_BYTES, default: "" },
+  },
+  sweepPurges: {
+    title: "Purge after the Grace",
+    description:
+      "Whether the Sweep purges a Workspace nothing references, a Tombstone with a date, and a deleted thread's Session once the Grace has passed. Off, the Sweep still marks what is unreferenced and purges nothing. Turned on, nothing is purged until one Grace after. Applies at the next Sweep.",
+    schema: { type: "boolean", default: true },
+    tier: "down-free",
+  },
+  graceDays: {
+    title: "Grace (days)",
+    description:
+      "How many days the Sweep keeps a Workspace nothing references, a Tombstone with a date, and a deleted thread's Session before it purges them. A change moves the date of everything already waiting. Applies at the next Sweep.",
+    schema: { type: "integer", minimum: 1, maximum: MAX_GRACE_DAYS, default: DEFAULT_GRACE_DAYS },
+    tier: "up-free",
   },
 } as const satisfies Readonly<Record<string, EnvironmentSettingEntry>>;
 

@@ -26,6 +26,7 @@ import {
   resolveHarness,
   settingOf,
   type StoredHarness,
+  SWEEP_SETTING_KEYS,
   T3_SERVER,
   type ToolsChange,
   withoutQuery,
@@ -48,6 +49,11 @@ export interface OpsDeps {
   readonly oauth?: Pick<HarnessOAuth, "begin" | "forget">;
   /** The Environment skills (SPI-1148): their store and GitHub reads. */
   readonly skills?: Omit<SkillsApiDeps, "caller" | "now" | "expectedRevision">;
+  /**
+   * Called after a change that moved the Grace (`sweepPurges` or `graceDays`, ADR-0043): every purge date moved, so the
+   * Environment DO runs the Sweep again soon (ADR-0043 §5).
+   */
+  readonly sweepSettingsChanged?: () => void;
   readonly now: () => number;
 }
 
@@ -145,7 +151,8 @@ export const changeTools = (deps: OpsDeps, change: ToolsChange, options: OpOptio
 /**
  * Some of the Environment settings (ADR-0032): validated against their schema, it bumps only their revision, and the
  * audit entry has the changed settings as they resolved before and after. A change that moves nothing is stored, bumped
- * and audited as nothing (`unchanged`). Applies at each Workspace's next Container start.
+ * and audited as nothing (`unchanged`). Applies at each Workspace's next Container start; the Grace at the next Sweep,
+ * which a change to it brings forward (ADR-0043 §5).
  */
 export const changeEnvironment = async (
   deps: OpsDeps,
@@ -172,6 +179,7 @@ export const changeEnvironment = async (
     before: await pick(resolveEnvironment(before)),
     after: await pick(resolved),
   });
+  if (keys.some((key) => (SWEEP_SETTING_KEYS as ReadonlyArray<string>).includes(key))) deps.sweepSettingsChanged?.();
   return { ok: true, revision: applied.environment.revision, resolved };
 };
 

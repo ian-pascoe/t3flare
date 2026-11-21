@@ -115,6 +115,23 @@ terminal must. It reads `dev.env` and sets up:
 Run it again after changing or rotating any of those. The `land` environment and its deploy key, which an in-app Update
 needs, are set by hand ([ADR-0037](adr/0037-stock-clients-update-buttons-land-a-bump-the-do-dispatches-ci-which-proves-and-fast-forwards-main.md) §7).
 
+## The Grace: when deleted projects' files go
+
+Deleting a project or a thread in t3 removes no files. The Environment's Sweep purges a Workspace nothing references
+(its files, its Container and its deleted threads' Sessions) once the **Grace** has passed: 7 days unless you change
+it. The Grace is an Environment setting, not a Deployment setting, so it is set on the Settings page, for every Stage
+`prod` included ([ADR-0043](adr/0043-the-grace-is-an-environment-setting-and-a-deletion-wakes-the-sweep.md)):
+
+- `graceDays`: any whole number of days from 1. A change moves the date of everything already waiting.
+- `sweepPurges`: off, the Sweep still marks what is unreferenced and purges nothing.
+
+Nothing is purged sooner than one Grace after purging was last turned on, and the first Sweep after a deploy that
+carries this counts as turning it on. A test Stage may shorten the Grace for its checks with `T3FLARE_SWEEP_GRACE_MS`
+(milliseconds, in the shell of its deploy), which overrides the days on that Stage.
+
+`T3FLARE_SWEEP_PURGE` is retired: no deploy reads it. A Deployment repository that set it as a `prod` environment
+variable can delete it.
+
 ## Updating
 
 A Deployment runs the commit it was deployed from. To update it, pull the Canonical repository's `main` into your

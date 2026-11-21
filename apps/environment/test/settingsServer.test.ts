@@ -179,6 +179,20 @@ describe("the Settings server's card for a free change", () => {
     expect(card!.prompt).toContain("Applies when each Workspace's Container next starts");
   });
 
+  it("a change to the Grace applies at the next Sweep, not at a Container start (ADR-0043 §2)", async () => {
+    const run = setup();
+    recordModes(durable(), "approval-required");
+    const answer = await run.call(durable(), "change_environment", { expectedRevision: 0, settings: { graceDays: 14 } });
+    expect(structured(answer)).toMatchObject({ status: "applied", appliesAt: expect.stringContaining("next Sweep") });
+    expect(run.cards[0]!.prompt).toContain("Applies at the next Sweep");
+    expect(run.cards[0]!.prompt).not.toContain("Container next starts");
+    // Both kinds in one change: both texts.
+    await run.call(durable(), "change_environment", { expectedRevision: 1, settings: { graceDays: 15, containerIdleMinutes: 9 } });
+    expect(run.cards[1]!.prompt).toContain("Applies at the next Sweep");
+    expect(run.cards[1]!.prompt).toContain("Container next starts");
+    expect(SETTINGS_TOOLS.find((tool) => tool.name === "change_environment")!.description).toContain("next Sweep");
+  });
+
   it("a decline changes nothing; an unanswered card is withdrawn and changes nothing", async () => {
     const declined = setup({ answer: { decision: "decline" } });
     recordModes(durable(), "approval-required");
