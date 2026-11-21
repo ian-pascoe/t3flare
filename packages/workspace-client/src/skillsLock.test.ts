@@ -2,7 +2,7 @@
 // The Container lock's snippet (SPI-1148): whatever happens to the lock, the command after it prints and exits as it
 // would alone, and a lock that cannot be made leaves its marker once. Run here with the host's sh, where the bind cannot
 // be made (no `/proc/self/mountinfo` or no permission): the failure path. The stage shows the bind made
-// (docs/steps/spi-1001/env-readonly.json).
+// (steps-evidence-1:docs/steps/spi-1001/env-readonly.json).
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 

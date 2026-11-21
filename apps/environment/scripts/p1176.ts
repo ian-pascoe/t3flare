@@ -3,7 +3,7 @@
 // owner adds a Model endpoint, then every agent kind runs a turn, and a selection from before the cut falls back.
 //
 //   node scripts/stage.ts deploy p1176
-//   node scripts/stage.ts run p1176 p1176 [--out ../../docs/steps/spi-1176/p1176.json]
+//   node scripts/stage.ts run p1176 p1176 [--out ../../.evidence/spi-1176/p1176.json]
 //
 // 1. The setup state: every endpoint is removed (the deploy sets one up when dev.env has T3FLARE_MODEL_ENDPOINT). Every
 //    agent's provider (Pi Durable, Codex, Claude Code, OpenCode, pi) is `warning` with no model, its message pointing

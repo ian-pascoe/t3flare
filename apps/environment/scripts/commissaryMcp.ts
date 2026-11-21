@@ -16,7 +16,7 @@ import * as path from "node:path";
 import { cliTurn, enable as enableCli, ensureProject } from "./lib/cliTurn.ts";
 import { admin, dispatch, itemsOf, pair, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid, wsCall } from "./lib/client.ts";
 
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/spi-1160");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../../.evidence/spi-1160");
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
 const KEY = process.env.T3FLARE_MCP_KEY ?? "";
 const API = (process.env.T3FLARE_MCP_API_URL ?? "").replace(/\/+$/, "");
@@ -38,7 +38,7 @@ const writeEvidence = (name: string, value: unknown) => {
   if (text.includes(KEY)) throw new Error(`commissaryMcp: ${name} would hold the key; not written`);
   fs.mkdirSync(EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(EVIDENCE, name), text);
-  console.log(`wrote docs/steps/spi-1160/${name}`);
+  console.log(`wrote .evidence/spi-1160/${name}`);
 };
 
 /** The panel's JSON API, as a script calls it: the stage's Access service token and admin token. */

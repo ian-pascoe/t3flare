@@ -2,7 +2,7 @@
 // SPI-1168's evidence on its stage: Claude Code through the model relay.
 //
 //   node scripts/stage.ts deploy p1168
-//   node scripts/stage.ts run p1168 p1168 [--out ../../docs/steps/spi-1168/p1168.json]
+//   node scripts/stage.ts run p1168 p1168 [--out ../../.evidence/spi-1168/p1168.json]
 //
 // 1. Two Anthropic Messages Model endpoints saved through the Settings page's API, both Commissary's Anthropic API with
 //    the proxy key (SPI-1162's approach): `comm` and `comm2`, each with its own model.

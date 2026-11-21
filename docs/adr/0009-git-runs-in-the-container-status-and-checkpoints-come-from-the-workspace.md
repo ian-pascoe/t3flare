@@ -16,7 +16,7 @@ The journal is applied to the repo-scoped reads t3 polls, each entry recomputed 
 
 **Checkpoints and the turn diff come from the Workspace DO**, not a Container per turn and not a user action that starts it: t3's `VcsDriverRegistry` is wrapped so `checkpoints.*` for a `/w` cwd go to the Workspace DO, which captures with isomorphic-git (a commit of the working tree, HEAD its parent, as t3's `captureCheckpoint`) and makes the diff text itself, in git's format, unless the Container is running (then its git makes it). Above the guard a capture with nothing written since the previous one is an alias of it, else runs in the Container. Restores and the authored paths of a range where HEAD moved run in the Container.
 
-Evidence (`docs/steps/step-2a/m3-acceptance.json`): an edit-only turn and a question-only turn, each followed by a client watching status, left the Container stopped, with every checkpoint made by the DO and the status reads served `stale-patched`; the DO's checkpoint diffs were byte-identical to the Container's git for 55 ref pairs in patch and numstat (110 of 110); the Node tests compare both the patch writer and the journal patches with real git byte for byte (`apps/agents/test/gitPatch.test.ts`, `staleReads.test.ts`).
+Evidence (`steps-evidence-1:docs/steps/step-2a/m3-acceptance.json`): an edit-only turn and a question-only turn, each followed by a client watching status, left the Container stopped, with every checkpoint made by the DO and the status reads served `stale-patched`; the DO's checkpoint diffs were byte-identical to the Container's git for 55 ref pairs in patch and numstat (110 of 110); the Node tests compare both the patch writer and the journal patches with real git byte for byte (`apps/agents/test/gitPatch.test.ts`, `staleReads.test.ts`).
 
 ## Refinement (step 2b; root's ruling on M2)
 
@@ -32,14 +32,14 @@ the base commit) before anything else starts its Container, and a read never ans
   nothing; `git remote` is also answered from the Workspace's own files;
 - working-tree reads (status, diffs, t3's temporary indexes) are unchanged: stale only.
 
-Evidence: `docs/steps/step-2b/m2-watch.json` (a primed worktree with its Container stopped, watched by a client: 147 then
+Evidence: `steps-evidence-1:docs/steps/step-2b/m2-watch.json` (a primed worktree with its Container stopped, watched by a client: 147 then
 174 reads, all from the cache, the Container still stopped, before and after an Environment restart);
 `apps/agents/test/gitDirReads.test.ts`.
 
 **A worktree Workspace has its own `.git`** (a full clone, not `gitdir:`/`commondir`), so checkpoints, stale reads, the
 read cache and the 2,000-file guard work per Workspace unchanged. `rev-parse --git-common-dir` in a worktree answers its
 own `.git`; t3 uses it only for its config lock and the worktree directory's hash (the router trace audit in
-`docs/steps/step-2b/m2-trace.json`).
+`steps-evidence-1:docs/steps/step-2b/m2-trace.json`).
 
 ## Refinement (large repos and submodules, the prod bug of 2026-11-11)
 
@@ -68,7 +68,7 @@ journal ran past the DO's CPU limit, and the removal's check died with it (a tom
   Workspace's files when it has never been answered, as `git remote` is: a project left idle before its first worktree
   launch could not resolve its VCS driver.
 
-Evidence: `docs/steps/bigrepo/` (the stage `bigrepo` before and after, through `scripts/bigrepo.ts`);
+Evidence: `steps-evidence-1:docs/steps/bigrepo/` (the stage `bigrepo` before and after, through `scripts/bigrepo.ts`);
 `apps/environment/test/statusOverStale.test.ts` (t3's real `GitVcsDriver` over the router and `staleRead`, on a repo
 with a submodule); `apps/agents/test/staleReads.test.ts`, `containerOnly.test.ts`.
 
@@ -82,7 +82,7 @@ seven shapes) for the Workspace never primed: without it, a commit after the Con
 read with no answer, every time. The rest of the draft runs on a temporary index and object directory that the process
 router bridges into the Workspace's harness `tmp/` (`apps/environment/src/agents/gitBridge.ts`).
 
-Evidence: `docs/steps/spi-1186/stopped.json` and `fresh.json` (primed, the latter by t3's status refresh on a new
+Evidence: `steps-evidence-1:docs/steps/spi-1186/stopped.json` and `fresh.json` (primed, the latter by t3's status refresh on a new
 clone: neither read ran in the Container). The allow-list path itself (a never-primed Workspace) ran only in
 `apps/agents/test/gitDirReads.test.ts`.
 

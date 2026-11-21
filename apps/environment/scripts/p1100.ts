@@ -7,7 +7,7 @@
 // - a rollback to turn 1's checkpoint with files restored (`checkpoint.rollback`, "Revert to this message") puts
 //   notes.txt back to `one`, and the agent no longer recalls turn 2's code word (skipped with --no-rollback).
 // The checkpoint operations the Workspace DOs answered, and by which side, are in each agent's evidence.
-// Evidence goes to docs/steps/spi-1100/<out>.json, tokens and cookies redacted.
+// Evidence goes to .evidence/spi-1100/<out>.json, tokens and cookies redacted.
 //
 //   node scripts/stage.ts run p1100 p1100 [codex,pi,claude,opencode,durable] [--out <name>] [--no-rollback]
 import * as fs from "node:fs";
@@ -17,7 +17,7 @@ import { enable as enableAcp, INSTANCE } from "./lib/acpTurn.ts";
 import { enable as enableCli, ensureProject, modelOf } from "./lib/cliTurn.ts";
 import { admin, dispatch, itemsOf, pair, projectionOf, runsOf, sendMessage, sleep, threadWindow, uuid, wsCall, wsFirst } from "./lib/client.ts";
 
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/spi-1100");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../../.evidence/spi-1100");
 const SETTLED = new Set(["completed", "failed", "interrupted", "cancelled", "rolled_back"]);
 const DURABLE_SLUG = process.env.T3FLARE_P1100_MODEL ?? "anthropic/claude-haiku-5-5";
 
@@ -33,7 +33,7 @@ const redact = (value: unknown): unknown => {
 const writeEvidence = (name: string, value: unknown) => {
   fs.mkdirSync(EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(EVIDENCE, name), `${JSON.stringify(redact({ at: new Date().toISOString(), ...(value as object) }), null, 1)}\n`);
-  console.log(`wrote docs/steps/spi-1100/${name}`);
+  console.log(`wrote .evidence/spi-1100/${name}`);
 };
 
 const args = process.argv.slice(2);

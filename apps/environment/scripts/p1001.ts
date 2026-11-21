@@ -11,7 +11,7 @@
 //   kept as typed; `/echo a` answers `ECHO a none`; `$nope` is left untouched; a skill written mid-thread expands by
 //   mention on the next message.
 // - switch: with the Harness `skills` extension off, the snapshot is empty, and there is no listing and no expansion.
-// Evidence goes to docs/steps/spi-1001/<file>.json, tokens and cookies redacted.
+// Evidence goes to .evidence/spi-1001/<file>.json, tokens and cookies redacted.
 //
 //   node scripts/stage.ts run p1001 p1001 [snapshot|turns|switch]
 import * as fs from "node:fs";
@@ -22,7 +22,7 @@ import { admin, dispatch, itemsOf, pair, projectionOf, runsOf, sendMessage, slee
 
 const SLUG = process.env.T3FLARE_P1001_MODEL ?? "anthropic/claude-sonnet-5-5";
 const DURABLE = { instanceId: "piDurable", model: SLUG, options: [] };
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/spi-1001");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../../.evidence/spi-1001");
 const FIXTURE = path.resolve(import.meta.dirname, "../test/fixtures/skills");
 const SETTLED = new Set(["completed", "failed", "interrupted", "cancelled"]);
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
@@ -40,7 +40,7 @@ const redact = (value: unknown): unknown => {
 const writeEvidence = (name: string, value: unknown) => {
   fs.mkdirSync(EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(EVIDENCE, name), `${JSON.stringify(redact({ at: new Date().toISOString(), model: SLUG, ...(value as object) }), null, 1)}\n`);
-  console.log(`wrote docs/steps/spi-1001/${name}`);
+  console.log(`wrote .evidence/spi-1001/${name}`);
 };
 
 const harness = async (method: string, pathname: string, body?: unknown) => {

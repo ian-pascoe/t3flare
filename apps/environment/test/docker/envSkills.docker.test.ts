@@ -7,7 +7,7 @@
 // `skills.docker.test.ts`); the test holds that every CLI reads the set through its link, that each root's winner is
 // that root's `environment` in `CLI_ROOTS`, and that a write through the link fails. Codex is also run with its whole
 // user-level root linked, the layout SPI-1153 did not take (`CODEX_ENVIRONMENT_SKILLS`). No model is called.
-// T3FLARE_ENV_SKILLS_PROBE_OUT=<file> writes the report (docs/steps/env-skills-cli/m0-probe.json).
+// T3FLARE_ENV_SKILLS_PROBE_OUT=<file> writes the report (steps-evidence-1:docs/steps/env-skills-cli/m0-probe.json).
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";

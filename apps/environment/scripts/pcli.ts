@@ -3,7 +3,7 @@
 // through t3's own calls as the web client makes them. The fixture (apps/environment/test/fixtures/cli-skills/) is
 // written, uncommitted, into a clone of the fixture project with t3's file write.
 //
-// Per CLI (codex, pi, claude, opencode), into docs/steps/spi-1151/<cli>.json:
+// Per CLI (codex, pi, claude, opencode), into .evidence/spi-1151/<cli>.json:
 // - snapshot: the composer's snapshot of the project lists fruit-code at that CLI's root and its repo command (`/echo`,
 //   but Codex, which has none), after the built-ins, with the Container stopped before and after;
 // - described: on a fresh thread, "what is the fruit code?" reads the Skill and answers KIWI-7;
@@ -29,7 +29,7 @@ const CLIS: Readonly<Record<Cli, { readonly instanceId: string; readonly driver:
   // OpenCode's `/echo` is run, not listed: over ACP its reply never reaches t3.
   opencode: { instanceId: "opencode", driver: "opencode", model: SONNET, root: ".agents/skills", echo: "ECHO a" },
 };
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/spi-1151");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../../.evidence/spi-1151");
 const FIXTURE = path.resolve(import.meta.dirname, "../test/fixtures/cli-skills");
 const SETTLED = new Set(["completed", "failed", "interrupted", "cancelled"]);
 
@@ -44,7 +44,7 @@ const redact = (value: unknown): unknown => {
 const writeEvidence = (name: string, value: unknown) => {
   fs.mkdirSync(EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(EVIDENCE, name), `${JSON.stringify(redact({ at: new Date().toISOString(), ...(value as object) }), null, 1)}\n`);
-  console.log(`wrote docs/steps/spi-1151/${name}`);
+  console.log(`wrote .evidence/spi-1151/${name}`);
 };
 
 let cookie = "";

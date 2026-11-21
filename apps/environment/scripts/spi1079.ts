@@ -2,7 +2,7 @@
 // SPI-1079's stage harness: MCP servers' questions reach the owner as t3 cards, on a Durable thread and on a Codex
 // thread, and an Executor-style pause is resumed only after the owner's card. The stage's fixture MCP Worker
 // (`scripts/tools/fixtureMcp.ts`) is added twice as a direct server: `fixture` (its questions) and `exefix` (Executor's
-// model mode in miniature). Evidence goes to docs/steps/spi-1079/<file>.json, tokens and cookies redacted.
+// model mode in miniature). Evidence goes to .evidence/spi-1079/<file>.json, tokens and cookies redacted.
 //
 //   node scripts/stage.ts run spi1079 spi1079 setup      add the two servers through the panel's API and list them
 //   node scripts/stage.ts run spi1079 spi1079 durable    the Durable cases (durable.json)
@@ -19,7 +19,7 @@ const STAGE = process.env.T3FLARE_STAGE ?? "spi1079";
 const FIXTURE_URL = process.env.T3FLARE_FIXTURE_URL ?? workersDevUrl(`t3flare-mcpfixture-${STAGE}`);
 const SLUG = process.env.T3FLARE_TOOLS_MODEL ?? "anthropic/claude-sonnet-5-5";
 const MODEL = { instanceId: "piDurable", model: SLUG, options: /claude/.test(SLUG) ? [{ id: "thinking", value: "low" }] : [] };
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/spi-1079");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../../.evidence/spi-1079");
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
 const accessHeaders = { "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID ?? "", "cf-access-client-secret": process.env.T3FLARE_ACCESS_CLIENT_SECRET ?? "" };
 const MARKER = "t3flare-elicit";
@@ -36,7 +36,7 @@ const redact = (value: unknown): unknown => {
 const writeEvidence = (name: string, value: unknown) => {
   fs.mkdirSync(EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(EVIDENCE, name), `${JSON.stringify(redact({ at: new Date().toISOString(), ...(value as object) }), null, 1)}\n`);
-  console.log(`wrote docs/steps/spi-1079/${name}`);
+  console.log(`wrote .evidence/spi-1079/${name}`);
 };
 
 const harness = async (method: string, pathname: string, body?: unknown) => {

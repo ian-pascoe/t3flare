@@ -7,7 +7,7 @@
 // - rollback: a worktree thread writes notes.txt in each of three turns, with a code word each; a rollback to the first
 //   turn's checkpoint (`checkpoint.rollback`, files restored) marks the later runs rolled back, puts notes.txt back as
 //   the first turn left it, and the agent no longer has the later code words.
-// Evidence goes to docs/steps/spi-997/<file>.json, tokens and cookies redacted.
+// Evidence goes to .evidence/spi-997/<file>.json, tokens and cookies redacted.
 //
 // - rollback-claude: the same rollback on a Claude thread (ACP; files restored, a fresh agent session).
 //
@@ -21,7 +21,7 @@ import { dispatch, itemsOf, pair, projectionOf, runsOf, sendMessage, sleep, thre
 
 const SLUG = process.env.T3FLARE_P997_MODEL ?? "anthropic/claude-haiku-5-5";
 const DURABLE = { instanceId: "piDurable", model: SLUG, options: [] };
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/spi-997");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../../.evidence/spi-997");
 const SETTLED = new Set(["completed", "failed", "interrupted", "cancelled", "rolled_back"]);
 const WORDS = ["FIG-3", "PLUM-9", "KIWI-7"];
 
@@ -37,7 +37,7 @@ const redact = (value: unknown): unknown => {
 const writeEvidence = (name: string, value: unknown) => {
   fs.mkdirSync(EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(EVIDENCE, name), `${JSON.stringify(redact({ at: new Date().toISOString(), model: SLUG, ...(value as object) }), null, 1)}\n`);
-  console.log(`wrote docs/steps/spi-997/${name}`);
+  console.log(`wrote .evidence/spi-997/${name}`);
 };
 
 let cookie = "";

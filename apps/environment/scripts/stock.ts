@@ -1,7 +1,7 @@
 // @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
 // The back-to-stock step's stage cases (docs-archive-1:docs/steps/stock-plan.md): pushes land from the agent's own shell with no card
 // of t3flare's, under the thread's mode (Durable, Codex, and a linked thread under its link's mode); Claude Code runs a
-// repository's own `.claude/settings.json` hook; Codex's `auto` runs as t3 runs it. Evidence goes to docs/steps/stock/.
+// repository's own `.claude/settings.json` hook; Codex's `auto` runs as t3 runs it. Evidence goes to .evidence/stock/.
 //
 //   node scripts/stage.ts run stock stock push|linked|hook|auto|claude-auto|all
 import { spawnSync } from "node:child_process";
@@ -16,7 +16,7 @@ import { fixtureRepo } from "./lib/scriptSettings.ts";
 
 const FIXTURE = fixtureRepo();
 const DURABLE = { instanceId: "piDurable", model: "anthropic/claude-sonnet-5-5", options: [{ id: "thinking", value: "low" }] };
-const EVIDENCE = path.resolve(import.meta.dirname, "../../../docs/steps/stock");
+const EVIDENCE = path.resolve(import.meta.dirname, "../../../.evidence/stock");
 const marker = Date.now().toString(36);
 
 const SECRET_KEYS = /token|authorization|cookie|secret|handle|bearer|credential|csrf/i;
@@ -29,7 +29,7 @@ const redact = (value: unknown): unknown => {
 const writeEvidence = (name: string, value: unknown) => {
   fs.mkdirSync(EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(EVIDENCE, name), `${JSON.stringify(redact({ at: new Date().toISOString(), ...(value as object) }), null, 1)}\n`);
-  console.log(`wrote docs/steps/stock/${name}`);
+  console.log(`wrote .evidence/stock/${name}`);
 };
 
 const cookie = await pair();

@@ -3,7 +3,7 @@
 //
 //   node scripts/stage.ts run step4a probe4a workspace            clone the fixture project (once); prints its Workspace id
 //   (P1, a 35-minute non-PTY exec and the Workspace DO's abort, ran on M0's stage code, since replaced by the process
-//    channel: docs/steps/step-4a/m0-p1.json, m0-p1-abort.json; the channel's own checks are scripts/cli4a.ts)
+//    channel: .evidence/step-4a/m0-p1.json, m0-p1-abort.json; the channel's own checks are scripts/cli4a.ts)
 //   node scripts/stage.ts run step4a probe4a p2 --workspace <id>   bwrap and user namespaces in the Container
 //   node scripts/stage.ts run step4a probe4a p8 --workspace <id>   SQLite on computer's FUSE mount; rollouts of 5, 20,
 //       50 MB appended in the synced dir and pulled (the DO's CPU and rows per pull, from the agents Worker's logs)
@@ -13,7 +13,7 @@ import * as path from "node:path";
 
 import { writeEvidence as writeAt } from "./lib/evidence.ts";
 
-const writeEvidence = (name: string, value: unknown) => writeAt(path.resolve(import.meta.dirname, "../../../docs/steps/step-4a", name), value);
+const writeEvidence = (name: string, value: unknown) => writeAt(path.resolve(import.meta.dirname, "../../../.evidence/step-4a", name), value);
 
 const [scenario = "workspace", ...args] = process.argv.slice(2);
 const arg = (name: string) => {

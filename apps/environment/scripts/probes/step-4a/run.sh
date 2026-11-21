@@ -5,7 +5,7 @@
 #   OUT=<dir> ./run.sh <command…>        (keyhost stays up; ./run.sh --down removes it)
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
-out=${OUT:-$here/../../../../../docs/steps/step-4a/out}
+out=${OUT:-$here/../../../../../.evidence/step-4a/out}
 mkdir -p "$out"
 if [ "${1:-}" = "--down" ]; then docker rm -f t3flare-keyhost >/dev/null 2>&1 || true; docker network rm t3flare-probe t3flare-probe-int >/dev/null 2>&1 || true; exit 0; fi
 docker network inspect t3flare-probe >/dev/null 2>&1 || docker network create t3flare-probe >/dev/null

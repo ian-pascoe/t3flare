@@ -4,8 +4,8 @@
 // stage's service token and admin token (never printed):
 //
 //   node scripts/stage.ts run panel panel seed              # MCP servers (one failing), a class override, an extension change
-//   node scripts/stage.ts run panel panel shoot <label>     # docs/steps/panel/<label>-<desktop|phone>-<light|dark>.png
-//   node scripts/stage.ts run panel panel states            # docs/steps/panel/states-<state>-…png (tests, a refusal, the form)
+//   node scripts/stage.ts run panel panel shoot <label>     # .evidence/panel/<label>-<desktop|phone>-<light|dark>.png
+//   node scripts/stage.ts run panel panel states            # .evidence/panel/states-<state>-…png (tests, a refusal, the form)
 //
 // Screenshots are resized to at most 1400 px wide (sips).
 import { spawnSync } from "node:child_process";
@@ -15,7 +15,7 @@ import path from "node:path";
 import { workersDevUrl } from "./lib/scriptSettings.ts";
 
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
-const OUT = path.resolve(import.meta.dirname, "../../../docs/steps/panel");
+const OUT = path.resolve(import.meta.dirname, "../../../.evidence/panel");
 const headers = {
   "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID ?? "",
   "cf-access-client-secret": process.env.T3FLARE_ACCESS_CLIENT_SECRET ?? "",

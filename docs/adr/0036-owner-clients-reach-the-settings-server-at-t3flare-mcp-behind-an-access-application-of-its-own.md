@@ -3,13 +3,13 @@
 Status: accepted (SPI-1196's M0 spike and SPI-1200, 2026-11-14), confirmed on 2026-11-15: **owner step 1**
 ([`docs-archive-1:docs/steps/settings-mcp-m0-owner-steps.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/settings-mcp-m0-owner-steps.md)), a real OAuth token's exchange
 for the endpoint's path and its refusal at the panel's paths, **passed** on the `psmcp` stage (P6, P11 at 900 s, P12,
-P13 the same `sub`; recorded in `docs/steps/settings-mcp/m5a-settings-owner-browser.json`). Owner step 2 (Cursor's
+P13 the same `sub`; recorded in `steps-evidence-1:docs/steps/settings-mcp/m5a-settings-owner-browser.json`). Owner step 2 (Cursor's
 redirect URI) is still open. **Prod is still deployed without the endpoint**: no `SettingsAccess`, the admin
 application exactly as before, no `T3FLARE_ACCESS_SETTINGS_AUD`, so `/_t3flare/mcp` on prod answers 404 `not_configured`
 (`OWNER_ENDPOINT_EXCLUDED_STAGES` in `apps/environment/src/settings/endpointLayout.ts`). Enabling prod is removing it
 from that list, when the owner turns the endpoint on. The nightly job's `bump` stage is on that list for good. Plan:
 [`docs-archive-1:docs/steps/settings-mcp-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/settings-mcp-plan.md) D13. Evidence:
-`docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json` (copied from the spike branch). Refines
+`steps-evidence-1:docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json` (copied from the spike branch). Refines
 [ADR-0010](0010-the-endpoint-is-public-behind-t3s-own-auth.md) ("Access only on the admin path"),
 [ADR-0026](0026-pi-durable-harness-settings-live-in-the-environment-and-an-owner-only-panel-edits-them.md) §1-2 (one
 Access application, no second one; its SPI-1200 refinement) and

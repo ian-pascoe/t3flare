@@ -2,7 +2,7 @@
 // SPI-1175's evidence on its stage, deployed with `stage.ts deploy p1175` (with `--no-model-proxy` before the hard cut,
 // SPI-1176) and passed by `acceptance`: what stage.ts set up through the panel's API, and that the stage has no Model proxy.
 //
-//   node scripts/stage.ts run p1175 p1175 [--out ../../docs/steps/spi-1175/p1175.json]
+//   node scripts/stage.ts run p1175 p1175 [--out ../../.evidence/spi-1175/p1175.json]
 //
 // 1. The endpoint stage.ts saved is in the panel, its key set and readable, and the audit log has it under `endpoints`,
 //    by the service token, with no key.

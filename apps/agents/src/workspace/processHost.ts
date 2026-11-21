@@ -87,7 +87,7 @@ export interface ProcessHostDeps {
 /**
  * Step 4b: what a CLI process counts against the Workspace's cap, in Codex processes. Claude Code (its Node adapter and
  * `claude`) peaked at 344 MiB and OpenCode (`opencode acp` and its `serve` child) at 439 MiB in a turn running
- * `npm ci && npm test` (docs/steps/step-4b/m0-local.json P7), about twice an idle Codex app-server.
+ * `npm ci && npm test` (steps-evidence-1:docs/steps/step-4b/m0-local.json P7), about twice an idle Codex app-server.
  */
 export const CLI_WEIGHT: Readonly<Record<string, number>> = { claude: 2, opencode: 2 };
 const weightOf = (cli: string) => CLI_WEIGHT[cli] ?? 1;

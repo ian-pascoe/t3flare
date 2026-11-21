@@ -1,6 +1,6 @@
 // @effect-diagnostics nodeBuiltinImport:off
 // Claude Code's and OpenCode's profiles (step 4b, plan §4 with review F3, F5, F6 and M0's findings): what each process
-// gets, whatever t3 asked. Expected values are M0's (docs/steps/step-4b/m0-local.json), not recomputed here. Both run
+// gets, whatever t3 asked. Expected values are M0's (steps-evidence-1:docs/steps/step-4b/m0-local.json), not recomputed here. Both run
 // on their Model endpoints through the model relay, and are refused without one (SPI-1176).
 import * as fs from "node:fs";
 import * as path from "node:path";

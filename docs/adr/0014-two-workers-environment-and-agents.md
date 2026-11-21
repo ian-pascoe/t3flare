@@ -4,7 +4,7 @@ The `environment` Worker holds the front door, the Environment DO and the t3 web
 
 ## Refinement (step 2a, R5)
 
-Measured in step 2a (`docs/steps/step-2a/m3-memory.json`): the Workspace DO's isomorphic-git work fits the agents isolate. A checkpoint capture of a 2,000-file working tree (the guard) peaks at 40–52 MB of heap above the baseline in V8 and releases it; a checkpoint diff or a stale status patch peaks under 20 MB. Deployed, a 2,000-file capture took 2.3–2.9 s with no memory errors. Two live Sessions and one capture fit in 128 MB with room; the guard stays at 2,000 tracked files and 16 MB of packs, and no third Worker is needed.
+Measured in step 2a (`steps-evidence-1:docs/steps/step-2a/m3-memory.json`): the Workspace DO's isomorphic-git work fits the agents isolate. A checkpoint capture of a 2,000-file working tree (the guard) peaks at 40–52 MB of heap above the baseline in V8 and releases it; a checkpoint diff or a stale status patch peaks under 20 MB. Deployed, a 2,000-file capture took 2.3–2.9 s with no memory errors. Two live Sessions and one capture fit in 128 MB with room; the guard stays at 2,000 tracked files and 16 MB of packs, and no third Worker is needed.
 
 ## Refinement (tools step): four Workers
 

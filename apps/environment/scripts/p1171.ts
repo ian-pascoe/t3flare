@@ -9,7 +9,7 @@
 //   node scripts/stage.ts run p1171 p1171 complete <kind> <file>  completes it with what the owner pasted, from <file>
 //                                                                 (0600, deleted after)
 //   node scripts/stage.ts run p1171 p1171 status                  the sign-ins and their endpoints, as the panel lists them
-//   node scripts/stage.ts run p1171 p1171 run [--out ../../docs/steps/spi-1171/p1171.json]
+//   node scripts/stage.ts run p1171 p1171 run [--out ../../.evidence/spi-1171/p1171.json]
 //
 // `run`, with the sign-ins the stage has (one not signed in is recorded as unverified):
 // 1. The stage's own API-key endpoint is removed, so every CLI's list is the sign-ins' (and the relay's log names them).

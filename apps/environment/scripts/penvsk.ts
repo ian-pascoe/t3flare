@@ -15,7 +15,7 @@
 //   node scripts/stage.ts run penvsk penvsk shoot        the panel's Skills section (skills-<desktop|phone>-<light|dark>.png)
 //
 // M0's probes (env-probe.json at f64889a, env-sync.json at 1fdd389) ran through a temporary admin route, removed in M2;
-// see this file's history at those commits. Evidence goes to docs/steps/spi-1001/, tokens and cookies redacted; each
+// see this file's history at those commits. Evidence goes to .evidence/spi-1001/, tokens and cookies redacted; each
 // file names the deployed commit.
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
@@ -30,7 +30,7 @@ const SLUG = process.env.T3FLARE_PENVSK_MODEL ?? "anthropic/claude-sonnet-5-5";
 const DURABLE = { instanceId: "piDurable", model: SLUG, options: [] };
 const T3 = process.env.T3_URL ?? "";
 const HARNESS = process.env.T3FLARE_HARNESS_URL ?? "";
-const OUT = path.resolve(import.meta.dirname, "../../../docs/steps/spi-1001");
+const OUT = path.resolve(import.meta.dirname, "../../../.evidence/spi-1001");
 const REPO_FIXTURE = path.resolve(import.meta.dirname, "../test/fixtures/skills");
 const accessHeaders = { "cf-access-client-id": process.env.T3FLARE_ACCESS_CLIENT_ID ?? "", "cf-access-client-secret": process.env.T3FLARE_ACCESS_CLIENT_SECRET ?? "" };
 const scriptHeaders = { ...accessHeaders, authorization: `Bearer ${process.env.T3FLARE_ADMIN_TOKEN ?? ""}` };
@@ -55,7 +55,7 @@ const deployedCommit = async (): Promise<string | null> => (await admin("GET", "
 const writeEvidence = async (name: string, value: Record<string, unknown>) => {
   fs.mkdirSync(OUT, { recursive: true });
   fs.writeFileSync(path.join(OUT, name), `${JSON.stringify(redact({ at: new Date().toISOString(), host: new URL(T3).host, commit: await deployedCommit(), model: SLUG, ...value }), null, 1)}\n`);
-  console.log(`wrote docs/steps/spi-1001/${name} (ok: ${String(value.ok)})`);
+  console.log(`wrote .evidence/spi-1001/${name} (ok: ${String(value.ok)})`);
 };
 
 /** The panel's JSON API as a script calls it: the service token and the admin token. */

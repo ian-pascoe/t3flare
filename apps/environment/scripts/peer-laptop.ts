@@ -3,7 +3,7 @@
 // the stage with the stock CLI (`t3 environment link`, a plain pairing code the stage's owner session mints, access
 // auto-accept-edits), lists the link, and, as an outside MCP client of the laptop, forwards t3_project_list,
 // t3_thread_launch and t3_thread_wait to the stage. R4: the stage's fixture project and the laptop's local clone of
-// the fixture report the same repository identity. Writes docs/steps/step-3/<--out>.
+// the fixture report the same repository identity. Writes .evidence/step-3/<--out>.
 //
 //   node scripts/stage.ts run step3 peer-laptop --version 0.1.9-nightly.20261111.4515 --out m0-laptop-link.json
 import { spawnSync } from "node:child_process";

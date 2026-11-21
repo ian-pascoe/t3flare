@@ -39,7 +39,7 @@ const OUR_OVERRIDES: Record<string, string> = {
   // The vendored packages ask for each other as "*" (vendor/ is not edited); pnpm would fetch those from the registry.
   "@cloudpid/protocol": "workspace:*",
   "@cloudpid/config": "workspace:*",
-  // Our core packages stay where Bun's per-name pins held them (plan §2.6's no-move rule; docs/steps/pnpm/lock-diff.ts).
+  // Our core packages stay where Bun's per-name pins held them (plan §2.6's no-move rule; steps-evidence-1:docs/steps/pnpm/lock-diff.ts).
   // wrangler and miniflare (tests only) ask for a newer workerd; the deploy uses @alchemy.run/cloudflare-runtime's.
   workerd: "1.20261026.1",
   "@cloudflare/workers-types@^5.20261104.1": "5.20261108.1",

@@ -1,5 +1,5 @@
 // Where the Owner-client endpoint lives: ADR-0036 (layout (B), its Access application, and when to move to (C)); plan
-// D13; M5a (SPI-1200), chosen by M0 (SPI-1196, `docs/steps/settings-mcp/m0-access-oauth.json`). Everything that knows
+// D13; M5a (SPI-1200), chosen by M0 (SPI-1196, `steps-evidence-1:docs/steps/settings-mcp/m0-access-oauth.json`). Everything that knows
 // the layout is here, in `worker.ts`'s one branch, and in `alchemy.run.ts`'s `SettingsAccess` application, so layout
 // (C) (a Worker on its own host serving its own well-known documents, which calls `EnvironmentDO.settingsMcp` the same
 // way) would replace these and nothing else: the DO takes an already-verified caller either way, and moving costs only

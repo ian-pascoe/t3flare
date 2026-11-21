@@ -210,7 +210,7 @@ const cliAgentArgument = (agent: unknown): void => {
 
 /**
  * CLI processes per Workspace (plan §2.1, review F7): an idle Codex app-server measured 157–160 MB RSS on step4a
- * (docs/steps/step-4a/m3-memory.json), so four take about 0.65 GB of 3 GiB, beside computerd (~100 MB) and the agents'
+ * (steps-evidence-1:docs/steps/step-4a/m3-memory.json), so four take about 0.65 GB of 3 GiB, beside computerd (~100 MB) and the agents'
  * own commands (an `npm ci` and its tests peak at 1–1.5 GB). A fifth start is refused with this reason.
  */
 export const MAX_CLI_PROCESSES = 4;

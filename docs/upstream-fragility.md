@@ -636,7 +636,7 @@ and field shapes it leans on fail typecheck rather than silently.
   - Environment skills (SPI-1148): the snapshot lists them with `scope: "user"` and a `path` outside `/w/<id>`
     (`/workspace/.agents/skills/<name>/SKILL.md`), which t3's chip opens with `projects.readFile` in the project's cwd
     (`apps/web/src/components/chat/SkillInlineText.tsx` `skillInstructionsOpener`) and answers with its own read error
-    (`docs/steps/spi-1001/env-install-public.json`); their expansion embeds the Environment's own row under that path.
+    (`steps-evidence-1:docs/steps/spi-1001/env-install-public.json`); their expansion embeds the Environment's own row under that path.
 - **Breaks when**: t3 renames or re-types the hook, `ProviderDriverError` or the snapshot's fields; changes the mention
   grammar or what the composer inserts for a picked skill; changes its Pi provider's skill block; passes the hook
   another directory; filters or re-scopes a snapshot skill by its `scope` or its path being outside the project, or
@@ -877,7 +877,7 @@ cut, SPI-1176: a model from before it, a bare id, runs on the default model, the
   user-level file: one `mcpServers.<server>` per relayed server with `url` (`relayUrl`), `headers.Authorization: "Bearer
   ${T3FLARE_TOOL_HANDLE}"` (pi expands `${VAR}` in a header from the process's environment; the handle is in no file),
   `timeout` 900 (pi's per-request timeout, which progress notifications reset) and `exposure: "deferred"` (found through
-  pi's `tool_search`). It rests on pi's behaviour as M0's P16 found it (`docs/steps/settings-mcp/m0-pi.json`, spike
+  pi's `tool_search`). It rests on pi's behaviour as M0's P16 found it (`steps-evidence-1:docs/steps/settings-mcp/m0-pi.json`, spike
   branch `settings-mcp-m0-spike`): `PI_OFFLINE=1` does not stop MCP connects; `--mode rpc` loads the built-in MCP;
   `--no-extensions` (t3's fork launch, which gets no `mcp.json`) turns it off; a project's `.pi/mcp.json` is read only
   under project trust, which `PI_SETTINGS`' `defaultProjectTrust: "never"` and `--no-approve` keep off.
@@ -935,7 +935,7 @@ cut, SPI-1176: a model from before it, a bare id, runs on the default model, the
   checked against the spec's `schema/2026-07-28/schema.ts` and its Streamable HTTP page on 2026-11-14, SPI-1200 review)
   and 2025-11-25 to 2024-11-05 (session id, an unknown `MCP-Protocol-Version` answered 400 and a missing one read as
   2025-03-26, `elicitation/create` with `mode: "url"` and `elicitationId` on the call's SSE stream, the response POST
-  answered 202). It rests on M0 (`docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json`, copied from the
+  answered 202). It rests on M0 (`steps-evidence-1:docs/steps/settings-mcp/m0-access-oauth.json`, `m0-clients.json`, copied from the
   spike branch `settings-mcp-m0-spike`): the more specific Access application wins a path; a token of one application is
   refused at another's (tested with a service-token stand-in only; the OAuth bearer case is owner step 1,
   `docs-archive-1:docs/steps/settings-mcp/m5a-stage-run.md` items 1-4, so layout (B) is unproven until then); Access answers no root or
@@ -1069,7 +1069,7 @@ environment or file holds it beyond that.
   turn of that thread, compaction included, since Claude Code re-sends the history (a new thread is the way out; the
   cap is `MAX_ROUTED_BODY_BYTES` in `routedBody.ts`, the body held whole while it is scanned: one buffer with a declared
   length, under twice the cap while a buffer without one grows); or Claude Code starts requiring a header the allowlist drops (the relay log's `dropped` names
-  it; p1168's list is in `docs/steps/spi-1168/p1168.json`).
+  it; p1168's list is in `steps-evidence-1:docs/steps/spi-1168/p1168.json`).
 - **Detection**: `test/acpProfiles.test.ts`, `test/claudeEndpoints.test.ts`, `test/claudeSpawn.test.ts`,
   `apps/agents/test/modelRelayRoute.test.ts` and `routedBody.test.ts` (the routed URL);
   `test/docker/claudeRelay.docker.test.ts` in `test:docker` (the real launcher, preload and helper: the routed
@@ -1151,7 +1151,7 @@ other environment or file holds it, and that it goes into no request but the rel
   its prompts, elsewhere; still without the handle); runs a plugin in a process that is not a child of `opencode acp`
   under the launch chain's setsid (no handle: 401); starts writing provider settings back to a file (the placeholder
   on disk, not the handle); or starts requiring a header the allowlist drops (the relay log's `dropped` names it;
-  p1169's list is in `docs/steps/spi-1169/p1169.json`).
+  p1169's list is in `steps-evidence-1:docs/steps/spi-1169/p1169.json`).
 - **Detection**: `test/acpProfiles.test.ts` (the configuration and its pins, against the pinned schema),
   `test/opencodeEndpoints.test.ts`, `test/opencodeSpawn.test.ts`, `test/opencodeKeyPlugin.test.ts` (the plugin's
   provider guard, its request guard, where it reads the handle, and its constants against their TypeScript sources);
@@ -1274,7 +1274,7 @@ holds it, and that it goes into no request but the relay's.
   RPC field carrying a provider that t3 reads (t3 shows `t3flare-endpoint-<id>/…` there; the turn still runs) or a
   command naming a model that is not `set_model` (pi gets t3's endpoint id as a provider: "Model not found"); the
   launcher loses its `env -u` (the handle reaches pi's environment and its shells': `test:docker` fails); a CLI header the allowlist drops becomes
-  required (the relay log's `dropped` names it; p1170's list is in `docs/steps/spi-1170/p1170.json`).
+  required (the relay log's `dropped` names it; p1170's list is in `steps-evidence-1:docs/steps/spi-1170/p1170.json`).
 - **Detection**: `test/cliProfiles.test.ts` (the relay cases), `test/piEndpoints.test.ts`, `test/piSpawn.test.ts`,
   `test/piDriver.test.ts`,
   `test/piHandleCommand.test.ts` (the launcher and the handle command against `MODEL_HANDLE_ENV`, `PI_HANDLE_HOLDERS`,

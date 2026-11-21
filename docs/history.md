@@ -2,10 +2,22 @@
 
 What t3flare's milestones delivered, and what stays deferred. The decisions are in [`docs/adr/`](adr/).
 
-The working record of how each piece was built is archived at the tag `docs-archive-1`, not on `main`: the step and
-issue reports, the plans and their reviews, the step 0 spike, the early research, the 2026-11-16 scope audit and the
-milestone plan this page replaces (`docs/plan.md`). The raw evidence those reports cite is at `steps-evidence-1`. See
-[`docs/steps/README.md`](steps/README.md) for how to read both.
+## The archive
+
+The working record of how each piece was built is not on `main`. Two tags keep it:
+
+- [`docs-archive-1`](https://github.com/spiritledsoftware/t3flare/tree/docs-archive-1/docs): the step and issue
+  reports (`docs/steps/`), the plans and their reviews, the step 0 spike (`docs/spike/`), the early research, the
+  2026-11-16 scope audit and the milestone plan this page replaces (`docs/plan.md`).
+- [`steps-evidence-1`](https://github.com/spiritledsoftware/t3flare/tree/steps-evidence-1/docs/steps): the raw
+  evidence those reports cite (JSON from the stage scripts, screenshots, logs).
+
+An ADR, a doc or a code comment cites them as `<tag>:<path>`, which `git show` reads as written:
+
+```sh
+git show docs-archive-1:docs/steps/spi-1151.md
+git show steps-evidence-1:docs/steps/step-2a/m3-memory.json
+```
 
 ## Milestones
 

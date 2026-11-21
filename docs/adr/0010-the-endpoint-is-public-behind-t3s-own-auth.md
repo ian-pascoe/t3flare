@@ -59,7 +59,7 @@ Two exact paths on the t3 host are public, outside `/_t3flare` (so outside its A
 - `/t3flare/oauth/callback`, the redirect. It is a GET, but it changes state only by redeeming a single-use 256-bit `state`, with PKCE and an `iss` check.
 - `/t3flare/oauth/client.json`, our Client ID Metadata Document.
 
-Evidence: `docs/steps/tools/m3-panel-safety.json`, `m6-oauth.json` (P13).
+Evidence: `steps-evidence-1:docs/steps/tools/m3-panel-safety.json`, `m6-oauth.json` (P13).
 
 ## Refinement (G11, 2026-11-13): the preview stream route is mounted
 

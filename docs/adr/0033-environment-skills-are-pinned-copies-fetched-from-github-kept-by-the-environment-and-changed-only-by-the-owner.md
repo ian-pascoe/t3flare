@@ -16,7 +16,7 @@ cloudpid and fetched from GitHub), cut to t3flare: one Environment, the owner's 
    - A repo the GitHub App is installed on is read with a token for that repo alone (`contents: read`,
      `metadata: read`). This is the only way to read a private repo.
    - A public repo outside the installation is read with a token for one installed repo. GitHub answers it from the
-     installation's limit (R1, `docs/steps/spi-1001/env-probe.json`: 200 for a public repo outside the token's scope,
+     installation's limit (R1, `steps-evidence-1:docs/steps/spi-1001/env-probe.json`: 200 for a public repo outside the token's scope,
      404 for a private one).
    - With no installed repo at all, reads are unauthenticated, from the 60 an hour GitHub gives the Worker's shared
      address. `/rate_limit` is read first and a request that would run out is refused, naming the reset and the way out;

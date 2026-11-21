@@ -1,5 +1,5 @@
 // CLI profiles (step 4a, plan §4 with the review's F2, F4, F5 and M0's findings): what a Codex or pi process gets,
-// whatever t3 asked. Expected values are the M0 probes' (docs/steps/step-4a/m0-local.json), not recomputed here. Every
+// whatever t3 asked. Expected values are the M0 probes' (steps-evidence-1:docs/steps/step-4a/m0-local.json), not recomputed here. Every
 // CLI runs on its Model endpoints through the model relay, and is refused without one (SPI-1176).
 import { describe, expect, it } from "vitest";
 

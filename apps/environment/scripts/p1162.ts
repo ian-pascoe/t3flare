@@ -3,7 +3,7 @@
 // script), a Durable turn with tools on each, the picker grouped by endpoint, a changed model list reaching the picker
 // and a running thread, and a removed endpoint's model failing the turn with a clear message.
 //
-//   node scripts/stage.ts run p1162 p1162 [--out ../../docs/steps/spi-1162/p1162.json]
+//   node scripts/stage.ts run p1162 p1162 [--out ../../.evidence/spi-1162/p1162.json]
 //
 // The Anthropic Messages endpoint is the stage's Model proxy (Commissary) at MODEL_PROXY_URL with its key; the OpenAI
 // one is Commissary's OpenAI Responses API at `<MODEL_PROXY_URL>/v1` with the same key, unless OPENAI_API_KEY is set (then
