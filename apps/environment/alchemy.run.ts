@@ -137,13 +137,11 @@ export default Alchemy.Stack(
     }
     // A shorter idle delay for test stages (ADR-0003's default is 60 s).
     const idleAfterMs = yield* Config.String("T3FLARE_IDLE_AFTER_MS").pipe(Config.withDefault(""));
-    // Prod's sweep purges only when the owner sets it (the `prod` GitHub environment variable, SPI-974).
-    const sweepPurge = (yield* Config.String("T3FLARE_SWEEP_PURGE").pipe(Config.withDefault(""))) === "1";
     // The first pass of a deploy to a new stage: no Durable Object bindings across the two Workers (scripts/stage.ts).
     const bootstrapPass = (yield* Config.String("T3FLARE_DEPLOY_BOOTSTRAP").pipe(Config.withDefault(""))) === "1";
     // The turn deadline (2 h) shortened on a stage for its check (step 2a M5): unset in normal deploys.
     const turnDeadlineMs = yield* Config.String("T3FLARE_TURN_DEADLINE_MS").pipe(Config.withDefault(""));
-    // The terminal hold (30 min) and the sweep's grace (7 days) shortened on a stage for their checks (step 2b).
+    // The terminal hold (30 min) and the Grace (an Environment setting, ADR-0043) shortened on a stage for their checks.
     const terminalIdleMs = yield* Config.String("T3FLARE_TERMINAL_IDLE_MS").pipe(Config.withDefault(""));
     const terminalPromptIdleMs = yield* Config.String("T3FLARE_TERMINAL_PROMPT_IDLE_MS").pipe(Config.withDefault(""));
     const sweepGraceMs = yield* Config.String("T3FLARE_SWEEP_GRACE_MS").pipe(Config.withDefault(""));
@@ -343,9 +341,6 @@ export default Alchemy.Stack(
         T3FLARE_GITHUB_APP_ID: Config.String("T3FLARE_GITHUB_APP_ID"),
         T3FLARE_GITHUB_APP_PRIVATE_KEY: Config.Redacted("T3FLARE_GITHUB_APP_PRIVATE_KEY"),
         ...(idleAfterMs === "" ? {} : { T3FLARE_IDLE_AFTER_MS: idleAfterMs }),
-        // Step 2b (review F3): the Workspace sweep purges on test stages; prod's reports what it would do until the owner
-        // sets T3FLARE_SWEEP_PURGE=1 for it (the `prod` environment's variable, passed by deploy-prod.yml; on 2026-11-12, SPI-974).
-        ...(stage === "prod" && !sweepPurge ? {} : { T3FLARE_SWEEP_PURGE: "1" }),
         // Step 3+ (ADR-0025): test stages keep the T3 Connect account token and let the service token run the Connect
         // routes; prod discards the token after the link and admits only the owner's own identity there.
         ...(stage === "prod" ? {} : { T3FLARE_CONNECT_KEEP_ACCOUNT_TOKEN: "1", T3FLARE_CONNECT_SERVICE_TOKEN: "1" }),

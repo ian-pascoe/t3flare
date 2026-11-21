@@ -8,29 +8,83 @@ import { toWorkspace } from "@t3flare/workspace-client";
 import { environmentServices } from "./bindings.ts";
 import { byName } from "./rpc.ts";
 import { workspaceRpc } from "./workspaceClient.ts";
+import { DAY_MS, type SweepSettings } from "./deletionSettings.ts";
 import type { WorkspaceRecord } from "./workspaces.ts";
 
-export { GRACE_MS } from "./deletionConstants.ts";
-export const SWEEP_EVERY_MS = 24 * 60 * 60_000;
+export { type SweepSettings, sweepSettingsOf } from "./deletionSettings.ts";
+export const SWEEP_EVERY_MS = DAY_MS;
 /** A `deleting` row is driven again this soon (review F5: t3 may re-create the same worktree path). */
 export const DELETING_RETRY_MS = 5 * 60_000;
 /** A `provisioning` or `failed` row older than this is purged. */
 export const STALE_PROVISIONING_MS = 60 * 60_000;
+/** The Sweep never runs again sooner than this after a run (ADR-0043 §5). */
+export const SWEEP_MIN_GAP_MS = 60_000;
 
-export interface SweepSettings {
+// ---------------------------------------------------------------------------------------------------------------------
+// The purge date (ADR-0043 §2): computed when it is read, never stored
+
+/** What waits out the Grace. A Tombstone is `dated` when its `purge_after` is set (a removal step that ran). */
+export type PurgeSubject =
+  | { readonly kind: "unreferenced"; readonly since: number }
+  | { readonly kind: "tombstone"; readonly deletedAt: number; readonly dated: boolean }
+  /** A deleted thread's Session, by t3's `deleted_at`. */
+  | { readonly kind: "session"; readonly deletedAt: string };
+
+/** The Grace a date is computed with: its length, and when purging was last turned on (ADR-0043 §4), if it is on. */
+export interface GraceClock {
   readonly graceMs: number;
-  /** Purging is on (stages); off, the sweep only reports what it would do (prod's default, review F3). */
-  readonly purge: boolean;
+  readonly purgingSince: number | null;
 }
+
+/**
+ * When the Sweep may purge `subject`: when it started waiting plus the Grace, no sooner than one Grace after purging was
+ * turned on (ADR-0043 §4). Null for what is never purged: a Tombstone whose removal could not run, a date not readable.
+ */
+export const purgeDue = (subject: PurgeSubject, grace: GraceClock): number | null => {
+  const since = subject.kind === "unreferenced" ? subject.since : subject.kind === "tombstone" ? (subject.dated ? subject.deletedAt : null) : Date.parse(subject.deletedAt);
+  if (since === null || !Number.isFinite(since)) return null;
+  return Math.max(since, grace.purgingSince ?? since) + grace.graceMs;
+};
+
+/**
+ * What of a registry row waits out the Grace: a marked `ready` row, or a Tombstone. Nothing for any other row. It waits
+ * from its mark (or removal), or from `released`, the last deletion in t3 of a project or thread that referenced it, when
+ * that is later: a mark no Sweep cleared, while a thread held the Workspace and was deleted, is stale (ADR-0043 §2).
+ */
+export const purgeSubjectOf = (row: WorkspaceRecord, released?: number): PurgeSubject | undefined => {
+  const after = (at: number) => Math.max(at, released ?? at);
+  if (row.state === "ready") return row.unreferencedSince === null ? undefined : { kind: "unreferenced", since: after(row.unreferencedSince) };
+  // A Tombstone from before ADR-0043 has a `deleted_at` (set with its `purge_after`); its old due date is the fallback.
+  if (row.state === "tombstoned") return { kind: "tombstone", deletedAt: after(row.deletedAt ?? row.purgeAfter ?? row.createdAt), dated: row.purgeAfter !== null };
+  return undefined;
+};
 
 // ---------------------------------------------------------------------------------------------------------------------
 // References (plan section 5.2): read from t3's own tables, failing closed (review F3)
 
+/** One thing that references a Workspace (ADR-0044 §1): the page names it with its t3 title. */
+export type Holder =
+  | { readonly kind: "project" | "thread"; readonly id: string; readonly archived: boolean }
+  | { readonly kind: "run"; readonly id: string }
+  | { readonly kind: "terminals"; readonly count: number };
+
+/** A holder as the Sweep's reasons and the admin routes word it (no titles). */
+export const holderText = (holder: Holder): string =>
+  holder.kind === "terminals"
+    ? `${holder.count} open terminals`
+    : holder.kind === "run"
+      ? `open run in thread ${holder.id}`
+      : `${holder.kind} ${holder.id}${holder.archived ? " (archived)" : ""}`;
+
 export interface References {
   /** Why each Workspace id is referenced. */
   readonly byWorkspace: ReadonlyMap<string, ReadonlyArray<string>>;
+  /** The same, as the holders themselves (at most 5 a Workspace). */
+  readonly holders: ReadonlyMap<string, ReadonlyArray<Holder>>;
   /** Deleted threads by the Workspace their worktree or project was in (their Sessions go with a purge). */
   readonly deletedThreads: ReadonlyMap<string, ReadonlyArray<{ readonly threadId: string; readonly deletedAt: string }>>;
+  /** The latest t3 `deleted_at` of a deleted project or thread that referenced each Workspace (`purgeSubjectOf`). */
+  readonly released: ReadonlyMap<string, number>;
 }
 
 const OPEN_RUN_STATUSES = ["preparing", "queued", "starting", "running", "waiting"];
@@ -43,12 +97,12 @@ const idOf = (path: string | null | undefined): string | null => (path ? (toWork
  * projects, and open runs. Any read error throws: the sweep then does nothing (unlike the idle check's empty answer).
  */
 export const referencesFrom = (sql: SqlStorage): References => {
-  const byWorkspace = new Map<string, Array<string>>();
-  const add = (id: string | null, why: string) => {
+  const holders = new Map<string, Array<Holder>>();
+  const add = (id: string | null, holder: Holder) => {
     if (id === null) return;
-    const list = byWorkspace.get(id) ?? [];
-    if (list.length < 5) list.push(why);
-    byWorkspace.set(id, list);
+    const list = holders.get(id) ?? [];
+    if (list.length < 5) list.push(holder);
+    holders.set(id, list);
   };
   const projects = sql
     .exec<{ project_id: string; workspace_root: string; deleted_at: string | null; archived_at: string | null }>(
@@ -56,7 +110,16 @@ export const referencesFrom = (sql: SqlStorage): References => {
     )
     .toArray();
   const rootOf = new Map(projects.map((project) => [project.project_id, project.workspace_root]));
-  for (const project of projects) if (project.deleted_at === null) add(idOf(project.workspace_root), `project ${project.project_id}${project.archived_at === null ? "" : " (archived)"}`);
+  const released = new Map<string, number>();
+  const release = (ids: ReadonlyArray<string>, deletedAt: string) => {
+    const at = Date.parse(deletedAt);
+    if (Number.isFinite(at)) for (const id of ids) released.set(id, Math.max(at, released.get(id) ?? at));
+  };
+  for (const project of projects) {
+    const id = idOf(project.workspace_root);
+    if (project.deleted_at === null) add(id, { kind: "project", id: project.project_id, archived: project.archived_at !== null });
+    else if (id !== null) release([id], project.deleted_at);
+  }
   const threads = sql
     .exec<{ thread_id: string; project_id: string; deleted_at: string | null; archived_at: string | null; worktree: string | null }>(
       "SELECT thread_id, project_id, deleted_at, archived_at, json_extract(payload_json, '$.worktreePath') AS worktree FROM orchestration_v2_projection_threads",
@@ -66,9 +129,10 @@ export const referencesFrom = (sql: SqlStorage): References => {
   for (const thread of threads) {
     const ids = [...new Set([idOf(thread.worktree), idOf(rootOf.get(thread.project_id))].filter((id): id is string => id !== null))];
     if (thread.deleted_at === null) {
-      for (const id of ids) add(id, `thread ${thread.thread_id}${thread.archived_at === null ? "" : " (archived)"}`);
+      for (const id of ids) add(id, { kind: "thread", id: thread.thread_id, archived: thread.archived_at !== null });
     } else {
       for (const id of ids) deletedThreads.set(id, [...(deletedThreads.get(id) ?? []), { threadId: thread.thread_id, deletedAt: thread.deleted_at }]);
+      release(ids, thread.deleted_at);
     }
   }
   const runs = sql
@@ -77,9 +141,31 @@ export const referencesFrom = (sql: SqlStorage): References => {
   const threadById = new Map(threads.map((thread) => [thread.thread_id, thread]));
   for (const run of runs) {
     const thread = threadById.get(run.thread_id);
-    if (thread !== undefined) for (const id of [idOf(thread.worktree), idOf(rootOf.get(thread.project_id))]) add(id, `open run in thread ${run.thread_id}`);
+    if (thread !== undefined) for (const id of [idOf(thread.worktree), idOf(rootOf.get(thread.project_id))]) add(id, { kind: "run", id: run.thread_id });
   }
-  return { byWorkspace, deletedThreads };
+  return { byWorkspace: textsOf(holders), holders, deletedThreads, released };
+};
+
+const textsOf = (holders: ReadonlyMap<string, ReadonlyArray<Holder>>): ReadonlyMap<string, ReadonlyArray<string>> => new Map([...holders].map(([id, list]) => [id, list.map(holderText)]));
+
+/** How many Terminals a `ready` Workspace has open; throws when it cannot answer. */
+export type OpenTerminals = (id: string) => Promise<number>;
+
+export const openTerminals: OpenTerminals = async (id) => (await workspaceRpc(id).terminalState()).keys.length;
+
+/**
+ * Everything that references the Workspaces `rows` (ADR-0044 §1), shared by the Sweep, the page and a Purge: t3's projection
+ * (`referencesFrom`) and each `ready` row's open Terminals. Any read that fails throws: the caller then does nothing
+ * (review F3).
+ */
+export const readReferences = async (sql: SqlStorage, rows: ReadonlyArray<WorkspaceRecord>, terminals: OpenTerminals = openTerminals): Promise<References> => {
+  const read = referencesFrom(sql);
+  const holders = new Map(read.holders);
+  for (const row of rows.filter((ws) => ws.state === "ready")) {
+    const count = await terminals(row.id);
+    if (count > 0) holders.set(row.id, [...(holders.get(row.id) ?? []), { kind: "terminals", count }]);
+  }
+  return { byWorkspace: textsOf(holders), holders, deletedThreads: read.deletedThreads, released: read.released };
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -200,6 +286,7 @@ export const removeWorktree = async (projectCwd: string, path: string, force: bo
     if (!home.ok) return await tombstone(`the worktree's refs could not be carried home: ${(home.error ?? "").slice(0, 300)}`, null);
     carried = home.lines;
   }
+  // `purge_after` only says the Tombstone has a date (ADR-0043 §2): the date itself is its deletion plus the Grace as it is then.
   if (out.dirty) return await tombstone("uncommitted work (--force)", Date.now() + settings.graceMs, { carried });
   const references = referencesFrom(sql);
   const purged = await purgeWorkspace(id, references.deletedThreads.get(id) ?? []);
@@ -213,11 +300,19 @@ export interface SweepAction {
   readonly id: string;
   readonly action: "purge" | "mark-unreferenced" | "clear-unreferenced" | "skip";
   readonly why: string;
+  /** A skipped or newly marked row's purge date (ADR-0043 §2), when purging is on and it has one: the next run is due by it (ADR-0043 §5). */
+  readonly due?: number;
 }
 
 export interface SweepReport {
   readonly at: string;
+  /** Nothing was written (a preview). */
   readonly dry: boolean;
+  /** The Environment setting `sweepPurges`: off, the Sweep marked and purged nothing. */
+  readonly purging: boolean;
+  readonly graceMs: number;
+  /** When purging was last turned on (ADR-0043 §4): nothing is purged before one Grace after it. */
+  readonly purgingSince: string | null;
   readonly ok: boolean;
   readonly error?: string;
   readonly actions: ReadonlyArray<SweepAction>;
@@ -228,31 +323,69 @@ export interface SweepReport {
   readonly nextDue: string;
 }
 
-/** What the sweep would do to each row, given its references; pure (tests). */
+/** The Grace as one Sweep plans with: purging on or off, its length, and when purging was turned on (null when off). */
+export interface SweepGrace extends GraceClock {
+  readonly purging: boolean;
+}
+
+const iso = (at: number) => new Date(at).toISOString();
+
+/**
+ * What the sweep would do to each row, given its references; pure (tests). With purging off it still marks and clears
+ * (ADR-0043 §4) and drives a `deleting` row on (a Purge already under way), and purges nothing else. A `deleting` row and a
+ * stale `provisioning` or `failed` one are not held by `purgingSince` (ADR-0043 §4). `released` is `References.released`.
+ */
 export const planSweep = (
   rows: ReadonlyArray<WorkspaceRecord>,
   references: ReadonlyMap<string, ReadonlyArray<string>>,
   now: number,
-  graceMs: number,
+  grace: SweepGrace,
+  released: ReadonlyMap<string, number>,
 ): ReadonlyArray<SweepAction> =>
   rows.map((row): SweepAction => {
     const why = references.get(row.id);
+    const subject = purgeSubjectOf(row, released.get(row.id));
+    const off = "purging is off";
+    /** A row waiting out the Grace: purged on its date when purging is on, else skipped with the date it waits for. */
+    const waiting = (subject: PurgeSubject, purge: string, wait: string): SweepAction => {
+      if (!grace.purging) return { id: row.id, action: "skip", why: `${wait}; ${off}` };
+      const due = purgeDue(subject, grace);
+      if (due === null) return { id: row.id, action: "skip", why: wait };
+      return due <= now ? { id: row.id, action: "purge", why: purge } : { id: row.id, action: "skip", why: `${wait}, in its Grace until ${iso(due)}`, due };
+    };
     if (row.state === "deleting") return { id: row.id, action: "purge", why: "left in deleting" };
     if (row.state === "tombstoned") {
-      if (row.purgeAfter !== null && row.purgeAfter <= now && why === undefined) return { id: row.id, action: "purge", why: "tombstone past its grace" };
-      return { id: row.id, action: "skip", why: row.purgeAfter === null ? "tombstone kept (a removal step could not run)" : why !== undefined ? `tombstone referenced: ${why[0]}` : "tombstone in its grace" };
+      if (why !== undefined) return { id: row.id, action: "skip", why: `tombstone referenced: ${why[0]}` };
+      if (row.purgeAfter === null) return { id: row.id, action: "skip", why: "tombstone kept (a removal step could not run)" };
+      return waiting(subject!, "tombstone past its Grace", "tombstone");
     }
     if (row.state === "provisioning" || row.state === "failed") {
-      return now - row.createdAt >= STALE_PROVISIONING_MS && why === undefined
-        ? { id: row.id, action: "purge", why: `${row.state} for over an hour` }
-        : { id: row.id, action: "skip", why: row.state };
+      if (now - row.createdAt < STALE_PROVISIONING_MS || why !== undefined) return { id: row.id, action: "skip", why: row.state };
+      return grace.purging ? { id: row.id, action: "purge", why: `${row.state} for over an hour` } : { id: row.id, action: "skip", why: `${row.state} for over an hour; ${off}` };
     }
     if (why !== undefined) return row.unreferencedSince === null ? { id: row.id, action: "skip", why: why[0]! } : { id: row.id, action: "clear-unreferenced", why: why[0]! };
-    if (row.unreferencedSince === null) return { id: row.id, action: "mark-unreferenced", why: "nothing references it" };
-    return now - row.unreferencedSince >= graceMs
-      ? { id: row.id, action: "purge", why: `unreferenced since ${new Date(row.unreferencedSince).toISOString()}` }
-      : { id: row.id, action: "skip", why: `unreferenced, in its grace until ${new Date(row.unreferencedSince + graceMs).toISOString()}` };
+    if (subject?.kind !== "unreferenced") {
+      // Marked now: its date is known now, so a Sweep that only marks comes back on it (ADR-0043 §5), not a day later.
+      const marked = grace.purging ? purgeSubjectOf({ ...row, unreferencedSince: now }, released.get(row.id)) : undefined;
+      const due = marked === undefined ? null : purgeDue(marked, grace);
+      return { id: row.id, action: "mark-unreferenced", why: "nothing references it", ...(due === null ? {} : { due }) };
+    }
+    const since = `unreferenced since ${iso(subject.since)}`;
+    return waiting(subject, since, since);
   });
+
+/**
+ * When the Sweep runs next (ADR-0043 §5): a day ahead, or sooner at the earliest purge date it skipped, or five minutes
+ * ahead when a `deleting` row is left; never sooner than a minute ahead.
+ */
+export const nextSweepAt = (input: { readonly now: number; readonly dues: ReadonlyArray<number>; readonly deletingLeft: boolean }): number =>
+  Math.max(input.now + SWEEP_MIN_GAP_MS, Math.min(input.now + (input.deletingLeft ? DELETING_RETRY_MS : SWEEP_EVERY_MS), ...input.dues));
+
+/** When purging was last turned on (ADR-0043 §4), kept by the Environment DO. */
+export interface PurgingSince {
+  get(): number | null;
+  set(at: number | null): void;
+}
 
 /** Which deleted threads' Sessions the sweep already destroyed (kept by the Environment DO). */
 export interface SweptSessions {
@@ -260,46 +393,75 @@ export interface SweptSessions {
   add(threadId: string): void;
 }
 
+/** Told of each Workspace the Sweep purged (ADR-0044 §4: its `sweep.purge` audit entry). */
+export type OnSweepPurge = (purged: PurgeReport, why: string) => void;
+
 export const sweep = async (
   sql: SqlStorage,
   settings: SweepSettings & { readonly dry: boolean },
   now = Date.now(),
   sweptSessions?: SweptSessions,
+  purgingSinceStore?: PurgingSince,
+  onPurge?: OnSweepPurge,
 ): Promise<SweepReport> => {
   const services = environmentServices();
-  const dry = settings.dry || !settings.purge;
+  const { dry, purging } = settings;
+  // ADR-0043 §4: the first Sweep that finds purging on starts its Grace; one that finds it off clears it. A dry run writes
+  // nothing, and plans as if it were the first.
+  const stored = purgingSinceStore?.get() ?? null;
+  const purgingSince = purging ? (stored ?? now) : null;
+  if (!dry && stored !== purgingSince) purgingSinceStore?.set(purgingSince);
+  const grace: SweepGrace = { purging, graceMs: settings.graceMs, purgingSince };
+  const reported = { at: iso(now), dry, purging, graceMs: settings.graceMs, purgingSince: purgingSince === null ? null : iso(purgingSince) };
   const rows = services.workspaces.list();
   let references: References;
-  const terminals = new Map<string, Array<string>>();
   try {
-    references = referencesFrom(sql);
     // Open terminals reference their Workspace too; a Workspace DO that cannot answer fails the sweep (review F3).
-    for (const row of rows.filter((ws) => ws.state === "ready")) {
-      const state = await workspaceRpc(row.id).terminalState();
-      if (state.keys.length > 0) terminals.set(row.id, [`${state.keys.length} open terminals`]);
-    }
+    references = await readReferences(sql, rows);
   } catch (error) {
-    const report: SweepReport = { at: new Date(now).toISOString(), dry, ok: false, error: `the sweep read failed, nothing done: ${String(error).slice(0, 500)}`, actions: [], purged: [], costGuard: [], nextDue: new Date(now + DELETING_RETRY_MS).toISOString() };
+    const report: SweepReport = { ...reported, ok: false, error: `the sweep read failed, nothing done: ${String(error).slice(0, 500)}`, actions: [], purged: [], costGuard: [], nextDue: new Date(now + DELETING_RETRY_MS).toISOString() };
     console.warn(JSON.stringify({ t3flare: "sweep-aborted", error: report.error }));
     return report;
   }
-  const merged = new Map(references.byWorkspace);
-  for (const [id, why] of terminals) merged.set(id, [...(merged.get(id) ?? []), ...why]);
-  const actions = planSweep(rows, merged, now, settings.graceMs);
+  const actions = planSweep(rows, references.byWorkspace, now, grace, references.released);
   const purged: Array<PurgeReport> = [];
+  // Marks are written with purging off too (ADR-0043 §4); `dry` alone writes nothing. planSweep purges with purging off only
+  // a row already `deleting`.
   if (!dry) {
+    // A deleted worktree thread is under its project too: its Session goes once, with the first of them purged (as a
+    // Purge now's set, workspaceActions.ts), so one `sweep.purge` entry counts it. One an earlier run destroyed (its date
+    // comes a few seconds before its Workspace's) is left, and not counted again.
+    const taken = new Set<string>();
     for (const action of actions) {
       if (action.action === "mark-unreferenced") services.workspaces.setUnreferencedSince(action.id, now);
       if (action.action === "clear-unreferenced") services.workspaces.setUnreferencedSince(action.id, null);
-      if (action.action === "purge") purged.push(await purgeWorkspace(action.id, references.deletedThreads.get(action.id) ?? []));
+      if (action.action !== "purge") continue;
+      const threads = (references.deletedThreads.get(action.id) ?? []).filter((thread) => !taken.has(thread.threadId) && sweptSessions?.has(thread.threadId) !== true);
+      const report = await purgeWorkspace(action.id, threads);
+      // A failed purge's Sessions stay unrecorded: the Session pass below, or its `deleting` row's retry, counts them.
+      if (report.destroyed) {
+        for (const threadId of report.sessionsDestroyed) {
+          taken.add(threadId);
+          sweptSessions?.add(threadId);
+        }
+      }
+      purged.push(report);
+      if (report.destroyed) onPurge?.(report, action.why);
     }
   }
-  // ADR-0008: the Sessions of threads deleted more than the grace ago go too, whether or not their Workspace does.
+  // ADR-0008: the Sessions of threads deleted more than the Grace ago go too, whether or not their Workspace does; with
+  // purging off, none (ADR-0043 §4).
   const sessions: Array<string> = [];
+  const dues = actions.flatMap((action) => (action.due === undefined ? [] : [action.due]));
   const purgedIds = new Set(purged.filter((p) => p.destroyed).flatMap((p) => p.sessionsDestroyed));
-  for (const thread of [...references.deletedThreads.values()].flat()) {
+  for (const thread of purging ? [...references.deletedThreads.values()].flat() : []) {
     if (sessions.length >= 50 || purgedIds.has(thread.threadId) || sweptSessions?.has(thread.threadId) === true) continue;
-    if (now - Date.parse(thread.deletedAt) < settings.graceMs) continue;
+    const due = purgeDue({ kind: "session", deletedAt: thread.deletedAt }, grace);
+    if (due === null) continue;
+    if (due > now) {
+      dues.push(due);
+      continue;
+    }
     if (!dry) {
       try {
         await destroyed(byName(services.agents.SESSIONS, `thread:${thread.threadId}`, "SESSIONS").destroy());
@@ -311,19 +473,19 @@ export const sweep = async (
     }
     sessions.push(thread.threadId);
   }
+  // The cost guard runs with purging off too (ADR-0043 §4): a Container no Workspace holds is stopped, no files go.
   const costGuard = await guardCost(dry);
   const deletingLeft = services.workspaces.list().some((ws) => ws.state === "deleting");
   const report: SweepReport = {
-    at: new Date(now).toISOString(),
-    dry,
+    ...reported,
     ok: true,
     actions,
     purged,
     sessions,
     costGuard,
-    nextDue: new Date(now + (deletingLeft ? DELETING_RETRY_MS : SWEEP_EVERY_MS)).toISOString(),
+    nextDue: iso(nextSweepAt({ now, dues, deletingLeft })),
   };
-  console.log(JSON.stringify({ t3flare: "sweep", dry, actions: actions.filter((a) => a.action !== "skip").length, purged: purged.length, costGuard: costGuard.length }));
+  console.log(JSON.stringify({ t3flare: "sweep", dry, purging, actions: actions.filter((a) => a.action !== "skip").length, purged: purged.length, costGuard: costGuard.length }));
   return report;
 };
 

@@ -51,6 +51,8 @@ export interface FixtureOptions {
   readonly links?: Readonly<Record<string, ThreadLink>>;
   readonly harness?: StoredHarness;
   readonly cardWaitMs?: number;
+  /** The Workspaces `list_workspaces` and `purge_workspace` act on (ADR-0044 §5). */
+  readonly workspaces?: SettingsServerDeps["workspaces"];
 }
 
 export const settingsFixture = (options: FixtureOptions = {}) => {
@@ -109,6 +111,7 @@ export const settingsFixture = (options: FixtureOptions = {}) => {
     running: async () => ({ count: 0, holders: [] }),
     log: (event) => void logs.push(event),
     ...(options.cardWaitMs === undefined ? {} : { cardWaitMs: options.cardWaitMs }),
+    ...(options.workspaces === undefined ? {} : { workspaces: options.workspaces }),
   };
   const durable = (thread = "thread-d", runtimeMode = "approval-required"): OwnCaller => {
     if (!noted.includes(thread)) {

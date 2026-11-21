@@ -40,6 +40,7 @@ import {
   resolveEnvironment,
   resolveHarness,
   SETTINGS_SERVER,
+  SWEEP_SETTING_KEYS,
   t3AsksForDirect,
   type TierVerdict,
   tierOf,
@@ -48,6 +49,9 @@ import {
   withoutQuery,
 } from "@t3flare/harness-registry";
 import type { McpAsker, McpQuestionAnswer, McpQuestionCard } from "@t3flare/session-protocol";
+
+import { planPurge, purgeNow, type WorkspaceActionsDeps } from "../agents/workspaceActions.ts";
+import { workspacesView } from "../agents/workspaceView.ts";
 
 import { containerCostTable } from "../harness/containerCost.ts";
 import { changePagePath, OPEN_CHANGES_PATH } from "../harness/paths.ts";
@@ -110,7 +114,7 @@ import {
 } from "./openChanges.ts";
 import { askedByText, changeText, environmentItems, extensionItems, mcpItems, PAGE_REASON, shownSkill, toolsItems } from "./render.ts";
 import { settingsToolOf } from "./tools.ts";
-import type { ChangeItem, ChangeView, PageReason } from "./types.ts";
+import type { ChangeEntity, ChangeItem, ChangeView, PageReason } from "./types.ts";
 
 export interface SettingsServerDeps {
   readonly ops: OpsDeps & { readonly mcp: Pick<McpHost, "servers" | "inventory" | "tools" | "list"> };
@@ -129,6 +133,11 @@ export interface SettingsServerDeps {
   readonly running?: () => Promise<{ readonly count: number; readonly holders: ReadonlyArray<string> } | null>;
   readonly log?: (event: Record<string, unknown>) => void;
   readonly cardWaitMs?: number;
+  /**
+   * The Workspaces (ADR-0044 §5): `list_workspaces` reads them and `purge_workspace` purges one through
+   * `workspaceActions.ts`, as the Settings page does. Without it both answer that they are not available here.
+   */
+  readonly workspaces?: WorkspaceActionsDeps;
 }
 
 export interface SettingsCallInput {
@@ -142,8 +151,6 @@ export interface SettingsCallInput {
 /** The status every write's result carries (plan D11's `structuredContent`; `waiting` is an Owner client's, M5). */
 export type WriteStatus = "applied" | "unchanged" | "waiting" | "declined" | "withdrawn" | "expired" | "moved" | "refused";
 
-type Entity = "harness" | "environment";
-
 export const LINKED_REFUSAL = "This thread is Linked work; the owner changes settings from his own thread, the Settings page, or an Owner client.";
 export const UNKNOWN_REFUSAL = "t3flare cannot establish where this thread comes from, so it may read settings and change none. The owner changes them from his own thread or the Settings page.";
 export const NO_MODES_REFUSAL = "t3flare has no record of this thread's modes (the Environment restarted during the turn), so it changes no settings now. Try again in the thread's next turn.";
@@ -153,7 +160,11 @@ export const READ_ONLY_REFUSAL = "The owner made the Settings server read-only; 
 export const APPLIES_AT = {
   harness: "Applies at each thread's next turn, this one included. A CLI agent's server list changes at its next process.",
   environment: "Applies when each Workspace's Container next starts. Not in a Container that is running now, this one included; do not retry to see it.",
+  /** The Grace (ADR-0043): read by the Sweep, which a change to it brings forward, never by a Container. */
+  sweep: "Applies at the next Sweep, within minutes: every purge date moves with it.",
   skills: "Files at each thread's next turn; the listing at the next context window; the composer at once.",
+  /** A Purge (ADR-0044 §5). */
+  purge: "Applies at once; it cannot be undone.",
 } as const;
 
 const json = (value: unknown) => JSON.stringify(value, null, 2);
@@ -344,7 +355,7 @@ type Described = { readonly items: ReadonlyArray<ChangeItem>; readonly lines: Re
 
 /** What a write changes, in the words its card and page use, and when it applies (plan D17). */
 interface Target {
-  readonly entity: Entity;
+  readonly entity: ChangeEntity;
   readonly subject: string;
   readonly appliesAt: string;
 }
@@ -533,6 +544,14 @@ const planSignIn = (deps: SettingsServerDeps, args: Readonly<Record<string, unkn
   };
 };
 
+/** When an Environment change applies (ADR-0043 §2): the Grace at the next Sweep, the rest at a Container start; both when it moves both. */
+const environmentAppliesAt = (keys: ReadonlyArray<string>): string => {
+  const sweep = keys.filter((key) => (SWEEP_SETTING_KEYS as ReadonlyArray<string>).includes(key));
+  if (sweep.length === 0) return APPLIES_AT.environment;
+  if (sweep.length === keys.length) return APPLIES_AT.sweep;
+  return `${APPLIES_AT.environment} ${sweep.join(" and ")}: ${APPLIES_AT.sweep}`;
+};
+
 const planEnvironment = (deps: SettingsServerDeps, args: Readonly<Record<string, unknown>>): PlanOrRefusal => {
   const settings = objectArg(args.settings);
   if (settings === undefined) return { refused: "settings is an object of Environment settings" };
@@ -541,6 +560,7 @@ const planEnvironment = (deps: SettingsServerDeps, args: Readonly<Record<string,
   if (!applied.ok) return { refused: applied.error };
   return {
     ...TARGET.environment,
+    appliesAt: environmentAppliesAt(applied.changed.length > 0 ? applied.changed : Object.keys(settings)),
     verdict: tierOf({ entity: "environment", stored, change: { settings } }),
     normalized: { settings },
     describe: async () => ({ items: environmentItems(stored, settings), lines: [] }),
@@ -654,8 +674,59 @@ const planSkills = (deps: SettingsServerDeps, args: Readonly<Record<string, unkn
   }
 };
 
-const planWrite = (deps: SettingsServerDeps, tool: string, args: Readonly<Record<string, unknown>>): PlanOrRefusal => {
+const WORKSPACES_UNAVAILABLE = "The Workspaces are not available here.";
+
+const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
+
+/**
+ * A Purge asked through the Settings server (ADR-0044 §2, §5): an unknown Workspace, or a set something
+ * references, is refused before anything opens; otherwise it is always asked, in every mode, and names no revision (its
+ * entity's is a constant 0). It purges files only, never a t3 project, and never with force. Its hash is the tool and the
+ * Workspace, so a declined Purge of it is not asked again for a while.
+ */
+const planPurgeWorkspace = async (deps: SettingsServerDeps, args: Readonly<Record<string, unknown>>): Promise<PlanOrRefusal> => {
+  const workspaces = deps.workspaces;
+  if (workspaces === undefined) return { refused: WORKSPACES_UNAVAILABLE };
+  const id = stringArg(args, "workspace");
+  if (id === undefined || id === "") return { refused: "workspace is the id of one Workspace, as list_workspaces names it" };
+  let planned: Awaited<ReturnType<typeof planPurge>>;
+  try {
+    planned = await planPurge(workspaces, id, deps.ops.now());
+  } catch (error) {
+    return { refused: `the Workspace's references could not be read, so nothing was asked: ${String(error).slice(0, 300)}` };
+  }
+  if (!planned.ok) return { refused: planned.error };
+  const { plan } = planned;
+  const reason = `${id}: purged, with its files, ${plural(plan.worktrees.length, "Worktree Workspace")} and ${plural(plan.sessions, "Session")}`;
+  return {
+    entity: "workspaces",
+    subject: `the Workspace ${id}`,
+    appliesAt: APPLIES_AT.purge,
+    verdict: { tier: "asked", reasons: [reason] },
+    normalized: { workspace: id },
+    describe: async () => ({
+      items: [{ kind: "purge", id, workspaceKind: plan.kind, title: plan.title, status: plan.status, worktrees: plan.worktrees, sessions: plan.sessions, purgeDue: plan.purgeDue }],
+      lines: [PURGE_LINE],
+    }),
+    run: async (options) => {
+      // The Purge reads the references again (ADR-0044 §5); a read that fails is its own refusal. What throws past it may
+      // have come after some of the set was purged, so it says nothing about what was left.
+      const purged = await purgeNow(workspaces, id, { force: false, actor: options.actor }).catch((error: unknown) => ({
+        ok: false as const,
+        error: `the Purge could not finish: ${String(error).slice(0, 300)}; list_workspaces shows what is left`,
+      }));
+      return purged.ok ? { ok: true } : { ok: false, error: purged.error };
+    },
+  };
+};
+
+/** A Purge's fixed line (ADR-0044 §2): what it removes, and what it leaves to t3. */
+export const PURGE_LINE = "Its files go for good; t3's project and threads are not touched. Its references are read again when it is approved, and a new one refuses it.";
+
+const planWrite = async (deps: SettingsServerDeps, tool: string, args: Readonly<Record<string, unknown>>): Promise<PlanOrRefusal> => {
   switch (tool) {
+    case "purge_workspace":
+      return planPurgeWorkspace(deps, args);
     case "change_extension":
       return planExtension(deps, args);
     case "change_tools":
@@ -673,7 +744,9 @@ const planWrite = (deps: SettingsServerDeps, tool: string, args: Readonly<Record
   }
 };
 
-const revisionOf = (deps: SettingsServerDeps, entity: Entity): number => (entity === "harness" ? deps.ops.store.load().revision : deps.ops.store.loadEnvironment().revision);
+/** An entity's revision; the Workspaces' is a constant 0 (ADR-0044 §5), so a Purge never reads as moved. */
+const revisionOf = (deps: SettingsServerDeps, entity: ChangeEntity): number =>
+  entity === "workspaces" ? 0 : entity === "harness" ? deps.ops.store.load().revision : deps.ops.store.loadEnvironment().revision;
 
 /** The Change page's URL for `id` on the configured host, when known (plan D10). */
 export const changeUrlOf = (deps: Pick<SettingsServerDeps, "origin">, id: string): string | undefined => {
@@ -734,7 +807,7 @@ export const askedCard = (view: ChangeView, input: SettingsCallInput, url: strin
   const prompt =
     needsPage === "oversize"
       ? [
-          `An agent asks to change ${view.subject} (revision ${view.revision}). ${PAGE_REASON.oversize(where)}`,
+          `${view.entity === "workspaces" ? `An agent asks for a Purge of ${view.subject}.` : `An agent asks to change ${view.subject} (revision ${view.revision}).`} ${PAGE_REASON.oversize(where)}`,
           "",
           askedBy(input.caller),
           `"Opened it" keeps the call waiting for the page; Decline and Cancel close it.`,
@@ -820,7 +893,8 @@ export const applyOpenChange = async (deps: SettingsServerDeps, record: ChangeRe
   if (barred !== undefined) return { ok: false, error: barred.text };
   // So may he have hidden its tool (SPI-1195 review): a hidden tool applies nothing, on either door.
   if (hiddenTools(deps)(record.tool)) return { ok: false, error: HIDDEN_SINCE_REFUSAL(record.tool) };
-  const planned = planWrite(deps, record.tool, (record.args ?? {}) as Readonly<Record<string, unknown>>);
+  // A Purge is planned again too: a reference that appeared since the ask refuses it, naming the reference (ADR-0044 §5).
+  const planned = await planWrite(deps, record.tool, (record.args ?? {}) as Readonly<Record<string, unknown>>);
   if ("refused" in planned) return { ok: false, error: planned.refused };
   const ran = await planned.run(
     { actor: actorOfChange(record, input.by), ...(record.expectedRevision === undefined ? {} : { expectedRevision: record.expectedRevision }) },
@@ -834,7 +908,7 @@ export const applyOpenChange = async (deps: SettingsServerDeps, record: ChangeRe
 /** An own agent's close waits this long for an applying answer (`closeOrSettle`). */
 const OWN_WAIT = { waitMs: OWN_APPLYING_WAIT_MS } as const;
 
-const resultOf = (outcome: ChangeOutcome, record: Pick<ChangeRecord, "id" | "entity">, planned: Pick<Planned, "appliesAt">): McpCallAnswer => {
+const resultOf = (outcome: ChangeOutcome, record: Pick<ChangeRecord, "id" | "entity" | "shown">, planned: Pick<Planned, "appliesAt">): McpCallAnswer => {
   const where = outcome.by === "page" ? " on the Change page" : outcome.by === "card" ? " on the card" : outcome.by === "client" ? " in the client's form" : outcome.by === "agent" ? " through resume" : "";
   const name = entityName(record.entity);
   // `native` and `model` prove no person answered (ADR-0035, plan §10): their texts name what answered, not the owner.
@@ -842,6 +916,8 @@ const resultOf = (outcome: ChangeOutcome, record: Pick<ChangeRecord, "id" | "ent
   const declined = outcome.by === "client" || outcome.by === "agent" ? `it was declined${where}` : `the owner declined it${where}`;
   switch (outcome.state) {
     case "applied":
+      // A Purge has no settings revision (ADR-0044 §5): its result says what went.
+      if (record.entity === "workspaces") return written("applied", `Purged: ${approved}. ${(record.shown?.reasons ?? []).join("; ")}. It cannot be undone.`, { changeId: record.id });
       return written("applied", `Applied: ${approved}. The ${name} settings are at revision ${outcome.revision ?? "?"}. ${planned.appliesAt}`, {
         ...(outcome.revision === undefined ? {} : { revision: outcome.revision }),
         appliesAt: planned.appliesAt,
@@ -877,13 +953,15 @@ type Prepared = { readonly kind: "planned"; readonly planned: Planned; readonly 
 type WriteLog = (outcome: string, extra?: Readonly<Record<string, unknown>>) => void;
 
 /** Validation by the registry, the expected revision (D15), and whether the change moves anything. */
-const prepareWrite = (deps: SettingsServerDeps, tool: string, args: Readonly<Record<string, unknown>>, log: WriteLog): Prepared => {
+const prepareWrite = async (deps: SettingsServerDeps, tool: string, args: Readonly<Record<string, unknown>>, log: WriteLog): Promise<Prepared> => {
   const refused = (text: string): Prepared => {
     log("refused", { reason: "invalid" });
     return { kind: "result", answer: written("refused", text) };
   };
-  const planned = planWrite(deps, tool, args);
+  const planned = await planWrite(deps, tool, args);
   if ("refused" in planned) return refused(`Not changed: ${scrubUrls(planned.refused)}`);
+  // A Purge names no revision (ADR-0044 §5): what it is bound to is read again when it applies.
+  if (planned.entity === "workspaces") return { kind: "planned", planned, expected: 0, current: 0 };
   const expected = args.expectedRevision;
   if (typeof expected !== "number" || !Number.isSafeInteger(expected) || expected < 0) return refused("Not changed: expectedRevision is the revision you read, a whole number.");
   const current = revisionOf(deps, planned.entity);
@@ -899,7 +977,7 @@ const prepareWrite = (deps: SettingsServerDeps, tool: string, args: Readonly<Rec
   return { kind: "planned", planned, expected, current };
 };
 
-const entityName = (entity: Entity): string => (entity === "harness" ? "Harness" : "Environment");
+const entityName = (entity: ChangeEntity): string => (entity === "harness" ? "Harness" : entity === "environment" ? "Environment" : "Workspaces");
 
 /** A free change, run (plan D7), and kept as an already-closed row for the applied cap (D16). */
 const applyFree = async (
@@ -1217,7 +1295,7 @@ const write = async (deps: SettingsServerDeps, input: SettingsCallInput): Promis
   const barred = mayNotWrite(deps, caller);
   if (barred !== undefined) return refuse(barred.reason, barred.text);
   const modes = deps.modes(caller)!;
-  const prepared = prepareWrite(deps, tool, args, log);
+  const prepared = await prepareWrite(deps, tool, args, log);
   if (prepared.kind === "result") return prepared.answer;
   const { planned, expected, current } = prepared;
   const key = caller.thread!;
@@ -1264,6 +1342,15 @@ const runRead = async (deps: SettingsServerDeps, name: string, args: Readonly<Re
       return listMcpServers(deps, args);
     case "list_skills":
       return listSkills(deps, args);
+    case "list_workspaces": {
+      // The Settings page's view (ADR-0044 §1, §5), without each Workspace's size and Container state.
+      if (deps.workspaces === undefined) return readError(WORKSPACES_UNAVAILABLE);
+      try {
+        return read({ ...(await workspacesView(deps.workspaces, deps.ops.now())) });
+      } catch (error) {
+        return readError(`The Workspaces could not be read: ${String(error).slice(0, 300)}`);
+      }
+    }
     case "get_status": {
       const access = accessSwitchOf(deps);
       return read({
@@ -1480,7 +1567,7 @@ const ownerWrite = async (deps: SettingsServerDeps, input: OwnerCallInput): Prom
   };
   const barred = accessBar(deps);
   if (barred !== undefined) return refuse(barred.reason, barred.text);
-  const prepared = prepareWrite(deps, tool, args, log);
+  const prepared = await prepareWrite(deps, tool, args, log);
   if (prepared.kind === "result") return result(prepared.answer);
   const { planned, expected } = prepared;
   if (planned.verdict.tier !== "free") return ownerAsk(deps, input, planned, expected);

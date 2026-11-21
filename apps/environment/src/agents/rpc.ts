@@ -75,6 +75,8 @@ export interface WorkspaceRpc {
   killExecs(execIds: ReadonlyArray<string>): Promise<{ readonly running: boolean; readonly signalled: number; readonly survivors: number }>;
   /** G11: the Container's listeners; never starts it, not use. */
   listeners(): Promise<{ readonly running: boolean; readonly scan: PortScan | null }>;
+  /** The Settings page's Files column (ADR-0044 §1): the DO's storage size and whether its Container runs; never starts it. */
+  usage(): Promise<{ readonly bytes: number; readonly containerRunning: boolean }>;
   /** G11: stops one process group in the Container (TERM, then KILL); false when gone or not running. */
   stopProcessGroup(pgid: number, members: ReadonlyArray<number>): Promise<boolean>;
   /** G11: a configured `localhost` preview URL's web probe on the Container's port; never starts it, not use. */

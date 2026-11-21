@@ -55,6 +55,27 @@ export interface AuditEntry extends AuditActor {
   readonly after?: unknown;
 }
 
+/**
+ * An entry under `workspaces` (ADR-0044 §4): the Owner's Purge, Restore and Stop, a run of the Sweep, and each
+ * Workspace the Sweep purges.
+ */
+export const auditWorkspace = (input: {
+  readonly at: number;
+  readonly actor: AuditActor;
+  readonly action: string;
+  readonly target: string;
+  readonly before?: unknown;
+  readonly after: unknown;
+}): AuditEntry => ({
+  at: input.at,
+  entity: "workspaces",
+  ...input.actor,
+  action: input.action,
+  target: input.target,
+  ...(input.before === undefined ? {} : { before: input.before }),
+  after: input.after,
+});
+
 /** A Session or a Workspace DO took the settings: when, and which revision. */
 export interface LastRead {
   readonly revision: number;

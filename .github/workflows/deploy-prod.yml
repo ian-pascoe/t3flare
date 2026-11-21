@@ -81,8 +81,6 @@ jobs:
       T3FLARE_ACCESS_TEAM_DOMAIN: ${{ vars.T3FLARE_ACCESS_TEAM_DOMAIN }}
       T3FLARE_WORKERS_DEV_SUBDOMAIN: ${{ vars.T3FLARE_WORKERS_DEV_SUBDOMAIN }}
       T3FLARE_T3_TRACK: ${{ vars.T3FLARE_T3_TRACK }}
-      # The Workspace sweep's real purge (SPI-974): `1` on prod once the owner turned it on.
-      T3FLARE_SWEEP_PURGE: ${{ vars.T3FLARE_SWEEP_PURGE }}
       NPM_CONFIG_WORKSPACE_DIR: ${{ github.workspace }}
     steps:
       # The submodule is fetched by hand, not by the action (see bump.yml).

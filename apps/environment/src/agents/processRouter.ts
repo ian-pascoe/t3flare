@@ -392,7 +392,7 @@ const worktreeRouteOf = (
       return async () => {
         const { removeWorktree } = await import("./deletion.ts");
         const services = environmentServices();
-        const answer = await removeWorktree(cwd, command.path, command.force, services.sql, services.sweep);
+        const answer = await removeWorktree(cwd, command.path, command.force, services.sql, services.sweep());
         return { exitCode: answer.exitCode, stdout: "", stderr: answer.stderr, route: "worktree", detail: answer.detail };
       };
     case "unsupported":

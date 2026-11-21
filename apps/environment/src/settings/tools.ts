@@ -18,18 +18,21 @@ export interface SettingsTool {
 
 /** What the server covers, said the same to both doors (plan D17). */
 const SETTINGS_SCOPE =
-  "t3flare's own settings: the Harness settings (Pi Durable's extensions and the MCP server set), the Environment settings (Container size, idle time, budget, Variables, Global mise config) and the Environment skills. These are not t3's preferences (t3_environment_preferences_update). Read tools run.";
+  "t3flare's own settings: the Harness settings (Pi Durable's extensions and the MCP server set), the Environment settings (Container size, idle time, budget, Variables, Global mise config, the Grace) and the Environment skills; and the Workspaces, which list_workspaces reads and purge_workspace asks to purge (their files only: a Workspace something in t3 references is refused, and deleting a project or thread stays t3's). These are not t3's preferences (t3_environment_preferences_update). Read tools run.";
+
+/** What both doors say of a Purge (ADR-0044 §5). */
+const PURGE_NOTE = "A Purge (purge_workspace) names no revision and always waits for the owner's answer, in every mode.";
 
 /** What agents are told about the server (plan D17): its instructions and its tools' descriptions, nothing else. */
 export const SETTINGS_INSTRUCTIONS =
-  `${SETTINGS_SCOPE} Every write names the expectedRevision it read, and the thread's mode rules it: plan mode refuses writes; outside full access a write waits for the owner's card; a change that widens what agents have or can do always waits for the owner's answer on a card or its Change page (at most ${durationText(CHANGE_TTL_MS)}, one at a time per thread). Do not repeat a declined change.`;
+  `${SETTINGS_SCOPE} Every settings write names the expectedRevision it read, and the thread's mode rules it: plan mode refuses writes; outside full access a write waits for the owner's card; a change that widens what agents have or can do always waits for the owner's answer on a card or its Change page (at most ${durationText(CHANGE_TTL_MS)}, one at a time per thread). ${PURGE_NOTE} Do not repeat a declined change.`;
 
 /**
  * The same for an Owner client (plan D11, D12): it has no thread mode, and its asked changes wait on the Change page in
  * its Elicitation mode.
  */
 export const SETTINGS_OWNER_INSTRUCTIONS =
-  `${SETTINGS_SCOPE} Every write names the expectedRevision it read. A change that narrows what agents have or can do applies at once; one that widens it waits for the owner's answer on its Change page (at most ${durationText(CHANGE_TTL_MS)}): open the link the result or the question gives, and do not repeat the call; read the settings to see whether it applied. Do not repeat a declined change.`;
+  `${SETTINGS_SCOPE} Every settings write names the expectedRevision it read. ${PURGE_NOTE} A change that narrows what agents have or can do applies at once; one that widens it waits for the owner's answer on its Change page (at most ${durationText(CHANGE_TTL_MS)}): open the link the result or the question gives, and do not repeat the call; read the settings to see whether it applied. Do not repeat a declined change.`;
 
 /**
  * What an Owner client is told besides, by its Elicitation mode (plan D12): the mode the owner set for this client on the
@@ -93,6 +96,13 @@ export const SETTINGS_TOOLS: ReadonlyArray<SettingsTool> = [
     class: "read",
     description: "Lists the Environment skills with the Environment revision. Name a skill to read its SKILL.md and its files.",
     inputSchema: { type: "object", properties: { name: { type: "string" } }, additionalProperties: false },
+  },
+  {
+    name: "list_workspaces",
+    class: "read",
+    description:
+      "Lists every Workspace (a project's, with its Worktree Workspaces under it): its status, what in t3 references it, when the Sweep would purge it and what it would do, and the Grace (purging on or off, its days). Each id is what purge_workspace takes.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "get_status",
@@ -207,7 +217,7 @@ export const SETTINGS_TOOLS: ReadonlyArray<SettingsTool> = [
   {
     name: "change_environment",
     class: "write",
-    description: `Changes some of the Environment settings. Applies when each Workspace's Container next starts, not in one running now. ${ASKED_NOTE}`,
+    description: `Changes some of the Environment settings. The Container settings apply when each Workspace's Container next starts, not in one running now; the Grace (sweepPurges, graceDays) applies at the next Sweep. ${ASKED_NOTE}`,
     inputSchema: {
       type: "object",
       required: ["expectedRevision", "settings"],
@@ -237,6 +247,18 @@ export const SETTINGS_TOOLS: ReadonlyArray<SettingsTool> = [
         folders: { type: "array", items: { type: "string" } },
         name: { type: "string" },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "purge_workspace",
+    class: "write",
+    description:
+      "Asks the owner to purge one Workspace now: its files, its Container, and its deleted threads' Sessions, for good; a project's Workspace takes its Worktree Workspaces with it. Refused when anything in t3 references it or one of its worktrees (a live or archived project or thread, an open run or Terminal): delete the project or thread in t3 first. It never deletes the t3 project. Always asked, in every mode, with no expectedRevision; the references are read again when the owner answers.",
+    inputSchema: {
+      type: "object",
+      required: ["workspace"],
+      properties: { workspace: { type: "string", description: "The Workspace's id, as list_workspaces names it." } },
       additionalProperties: false,
     },
   },

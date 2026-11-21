@@ -31,6 +31,7 @@ import {
   type ResolvedHarness,
   ownEntry,
   resolveEnvironment,
+  SWEEP_SETTING_KEYS,
   visible,
 } from "@t3flare/harness-registry";
 
@@ -46,6 +47,7 @@ import { ICON_SPRITE, icon, type IconName } from "./pageIcons.ts";
 import { changePagePath } from "./paths.ts";
 import { SCRIPT } from "./pageScript.ts";
 import { endpointsSection, type EndpointsView } from "./pageEndpoints.ts";
+import { workspacesSection, type WorkspacesSectionInput } from "./pageWorkspaces.ts";
 import { STYLE } from "./pageStyle.ts";
 
 /** `text` safe in HTML, with every control and format character shown as `\u{…}` (a hostile value is inert). */
@@ -316,7 +318,8 @@ const costTable = (costs: ContainerCostTable, size: string): string => {
  */
 const environmentSection = (environment: ResolvedEnvironment, costs: ContainerCostTable, running: PageInput["running"]): string => {
   const values: Readonly<Record<string, unknown>> = { ...environment };
-  const entries = Object.entries(ENVIRONMENT_SETTINGS as Readonly<Record<string, EnvironmentSettingEntry>>);
+  // The Grace (ADR-0043) applies at the next Sweep, not at a Container start: the Workspaces section shows it (ADR-0044 §1).
+  const entries = Object.entries(ENVIRONMENT_SETTINGS as Readonly<Record<string, EnvironmentSettingEntry>>).filter(([key]) => !(SWEEP_SETTING_KEYS as ReadonlyArray<string>).includes(key));
   // The scalar settings share the Containers row; a list (the Variables) and a file (the Global mise config) each get a
   // row of their own. One form, one Save.
   const ownRow = (setting: EnvironmentSettingEntry) => setting.schema.type === "variables" || setting.schema.type === "file";
@@ -663,7 +666,7 @@ const statusSection = (status: Readonly<Record<string, string | number | null>>)
 };
 
 /** Each entity's name in the audit log; one this page does not know shows as stored. */
-const ENTITY_LABELS: Readonly<Record<string, string>> = { harness: "Harness", environment: "Environment", endpoints: "Model endpoints", "owner-clients": "Owner clients" };
+const ENTITY_LABELS: Readonly<Record<string, string>> = { harness: "Harness", environment: "Environment", endpoints: "Model endpoints", "owner-clients": "Owner clients", workspaces: "Workspaces" };
 
 const auditSection = (audit: ReadonlyArray<AuditEntry>): string => {
   const body =
@@ -736,6 +739,8 @@ export interface PageInput {
   readonly ownerClients?: OwnerClientsView;
   /** t3's tools as a Session last listed them (the t3-code card); not listed yet when absent. */
   readonly t3Tools?: T3ToolListing;
+  /** The Workspaces (ADR-0044 §1), or why they could not be read; the section is left out without them. */
+  readonly workspaces?: WorkspacesSectionInput;
 }
 
 const navItem = (id: string, label: string, name: IconName, after = "") => `<a href="#${id}">${icon(name)}${label}${after}</a>`;
@@ -761,7 +766,7 @@ ${input.openChanges === undefined ? "" : `${navItem("changes", "Open changes", "
 ${navItem("extensions", "Extensions", "extensions", `<span class="count">${SWITCHED.length}</span>`)}
 ${navItem("mcp", "MCP servers", "server", failing > 0 ? `<span class="flag" role="img" aria-label="${plural(failing, "server", "servers")} failing"></span>` : `<span class="count">${rows.length}</span>`)}
 ${input.endpoints === undefined ? "" : `${navItem("endpoints", "Model endpoints", "key", `<span class="count">${input.endpoints.endpoints.length}</span>`)}\n`}${navItem("environment", "Environment", "container")}
-${navItem("skills", "Skills", "skills")}
+${input.workspaces === undefined ? "" : `${navItem("workspaces", "Workspaces", "folder", "error" in input.workspaces ? "" : `<span class="count">${input.workspaces.rows.reduce((sum, row) => sum + 1 + row.worktrees.length, 0)}</span>`)}\n`}${navItem("skills", "Skills", "skills")}
 ${navItem("status", "Status", "status")}
 ${navItem("audit", "Audit log", "audit", `<span class="count">${input.audit.length}</span>`)}
 </nav>
@@ -774,6 +779,7 @@ ${input.openChanges === undefined ? "" : `${openChangesSection(input.openChanges
 ${extensionsSection(input.resolved)}
 ${mcpSection(rows, t3Card(input.resolved, input.t3Tools), input.ownerClients)}
 ${endpointsSection(escapeHtml, input.endpoints)}${environmentSection(environment, input.costs ?? containerCostTable(environment.containerBudget), input.running)}
+${workspacesSection(escapeHtml, time, input.workspaces)}
 ${skillsSection(input.skills)}
 ${statusSection(input.status)}
 ${auditSection(input.audit)}

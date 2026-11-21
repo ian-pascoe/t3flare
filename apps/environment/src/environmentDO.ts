@@ -13,14 +13,17 @@ import type { SkillSet } from "@t3flare/skills";
 import { extensionOf, type McpRelayAnswer, type McpRelayInput, resolveEnvironment, type ResolvedEnvironment, resolveHarness, type ResolvedHarness } from "@t3flare/harness-registry";
 
 import { bindEnvironmentServices, environmentServices } from "./agents/bindings.ts";
+import { graceMoved, ownerSweep, SweepWake } from "./agents/sweepWake.ts";
 import { GitHubTokens } from "./agents/github.ts";
 import { deliverPush } from "./agents/sessionSink.ts";
-import { GRACE_MS } from "./agents/deletionConstants.ts";
+import { sweepSettingsOf } from "./agents/deletionSettings.ts";
 import { ProcessChannel } from "./agents/processChannel.ts";
 import { scratchProjectOf } from "./agents/scratch.ts";
 import { locate, workspaceRpc } from "./agents/workspaceClient.ts";
 import { workspaceRegistry } from "./agents/workspaces.ts";
 import type { AgentsBindings } from "./agents/rpc.ts";
+import type { SweepReport } from "./agents/deletion.ts";
+import type { WorkspacesApi } from "./agents/workspaceActions.ts";
 import * as BootState from "./host/bootState.ts";
 import * as Idle from "./host/idle.ts";
 import * as ModuleState from "./host/moduleState.ts";
@@ -29,7 +32,7 @@ import { isRefusedRelayRoute } from "./host/relayRoutes.ts";
 import { bindStateStorage } from "./platform/stateStore.ts";
 import type { AccessCaller } from "./access.ts";
 import { harnessSecrets } from "./harness/secrets.ts";
-import { harnessStore } from "./harness/store.ts";
+import { auditWorkspace, harnessStore } from "./harness/store.ts";
 import { type CredentialBroker, credentialBroker } from "./credentials/broker.ts";
 import { chatgptSignIn } from "./credentials/chatgpt.ts";
 import { claudeSignIn } from "./credentials/claude.ts";
@@ -75,9 +78,7 @@ export interface EnvironmentEnv extends AgentsBindings {
   readonly T3FLARE_GITHUB_APP_PRIVATE_KEY?: string;
   /** Overrides IDLE_AFTER_MS (tests and the acceptance stage). */
   readonly T3FLARE_IDLE_AFTER_MS?: string;
-  /** Step 2b: the sweep purges only when this is "1" (stages); prod's sweep reports what it would do (review F3). */
-  readonly T3FLARE_SWEEP_PURGE?: string;
-  /** Overrides the sweep's 7-day grace (stages). */
+  /** Overrides the Grace's days, in milliseconds (a Stage's tests, ADR-0043 §3): the Settings page says so. */
   readonly T3FLARE_SWEEP_GRACE_MS?: string;
   /**
    * Step 3+ (ADR-0025): "1" keeps the T3 Connect account token after the link (stages). Unset, as on prod, it is
@@ -147,6 +148,8 @@ const NEXT_SWEEP_KEY = "t3flare:next-sweep";
 const LAST_SWEEP_KEY = "t3flare:last-sweep";
 /** The deleted threads whose Sessions the sweep destroyed. */
 const SWEPT_SESSIONS_KEY = "t3flare:swept-sessions";
+/** When purging was last turned on (ADR-0043 §4): nothing is purged before one Grace after it. */
+const PURGING_SINCE_KEY = "t3flare:purging-since";
 
 /** Step 4a (review F6): this object's boot counter, the process channel's Environment epoch. */
 const BOOT_COUNT_KEY = "t3flare:boot-count";
@@ -215,10 +218,10 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       github: () => this.github,
       workspaces: workspaceRegistry(ctx.storage.sql),
       sql: ctx.storage.sql,
-      sweep: {
-        purge: env.T3FLARE_SWEEP_PURGE === "1",
-        graceMs: Number(env.T3FLARE_SWEEP_GRACE_MS) > 0 ? Number(env.T3FLARE_SWEEP_GRACE_MS) : GRACE_MS,
-      },
+      // Read at each use (ADR-0043 §2–3): a change to the Grace applies at the next Sweep, without a reset.
+      sweep: () => sweepSettingsOf(resolveEnvironment(harnessStore(ctx.storage.kv).loadEnvironment()), env.T3FLARE_SWEEP_GRACE_MS),
+      // The deletion wake's Layer (`t3/deletionWake.ts`, ADR-0043 §5) asks for a Sweep here.
+      wakeSweep: () => this.wakeSweep(),
       marks: { has: (key) => ctx.storage.kv.get(key) !== undefined, set: (key) => ctx.storage.kv.put(key, Date.now()) },
       seededTextModel: { get: () => ctx.storage.kv.get<string>(SEEDED_TEXT_MODEL_KEY), set: (slug) => ctx.storage.kv.put(SEEDED_TEXT_MODEL_KEY, slug) },
       processes: this.#processes,
@@ -393,6 +396,9 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       mcp: this.mcpHost,
       secrets: harnessSecrets(this.ctx.storage.kv),
       oauth: this.harnessOAuth,
+      sweepSettingsChanged: () => this.#sweepSettingsChanged(),
+      // The Workspaces section (ADR-0044): the view, the Owner's acts, each Workspace's usage, and the Sweep.
+      workspaces: await this.workspacesApi(),
       // The Container budget's leases (ADR-0032): the Environment section shows the running count and holders.
       budget: () => this.#budgetState(),
       skills: this.#skillsApi(),
@@ -582,7 +588,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     const store = harnessStore(this.ctx.storage.kv);
     const skills = this.#skillsApi();
     return {
-      ops: { store, mcp: this.mcpHost, secrets: harnessSecrets(this.ctx.storage.kv), oauth: this.harnessOAuth, skills, now: () => Date.now() },
+      ops: { store, mcp: this.mcpHost, secrets: harnessSecrets(this.ctx.storage.kv), oauth: this.harnessOAuth, skills, sweepSettingsChanged: () => this.#sweepSettingsChanged(), now: () => Date.now() },
       oauthStatus: (server) => this.harnessOAuth.status(server),
       link: (thread) => threadLinkIn(this.ctx.storage.sql, thread),
       // A Durable thread's modes are the adapter's record; a CLI thread's are its live session's (plan D3).
@@ -592,6 +598,8 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
       status: () => harnessStatus({ store, skills }),
       running: () => runningContainers({ budget: () => this.#budgetState() }),
       log: (event) => console.log(JSON.stringify(event)),
+      // `list_workspaces` and `purge_workspace` (ADR-0044 §5): the Settings page's reads and acts.
+      workspaces: (await this.workspacesApi()).deps,
     };
   }
 
@@ -979,7 +987,18 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     this.#idleTimer = undefined;
   }
 
-  #sweeping: Promise<unknown> | undefined;
+  /** Every non-dry Sweep runs through this, one at a time (ADR-0043 §5): the scheduled ones and the Owner's. */
+  readonly #sweepWake = new SweepWake<SweepReport>({
+    now: () => Date.now(),
+    nextSweep: () => this.#nextSweep(),
+    setNextSweep: (at) => this.ctx.storage.kv.put(NEXT_SWEEP_KEY, at),
+    arm: () => this.#armSweep(),
+    sweep: () => this.runSweep({ dry: false }),
+    failed: (what, error) =>
+      what === "sweep"
+        ? console.error(JSON.stringify({ t3flare: "sweep-failed", error: String(error).slice(0, 500) }))
+        : console.warn(JSON.stringify({ t3flare: "sweep-arm-failed", error: String(error).slice(0, 300) })),
+  });
 
   /** When the sweep is next due (the first is an hour after the first look). */
   #nextSweep(now = Date.now()): number {
@@ -989,16 +1008,34 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     return now + 60 * 60_000;
   }
 
+  /**
+   * The deleted threads' Sessions already destroyed, kept here so neither the Sweep nor a Purge now destroys or counts one
+   * twice across runs; written at each destroy, so a Purge now during a Sweep loses nothing.
+   */
+  readonly #sweptSessions = {
+    has: (threadId: string): boolean => (this.ctx.storage.kv.get<ReadonlyArray<string>>(SWEPT_SESSIONS_KEY) ?? []).includes(threadId),
+    add: (threadId: string): void => {
+      const swept = this.ctx.storage.kv.get<ReadonlyArray<string>>(SWEPT_SESSIONS_KEY) ?? [];
+      if (!swept.includes(threadId)) this.ctx.storage.kv.put(SWEPT_SESSIONS_KEY, [...swept, threadId].slice(-5000));
+    },
+  };
+
   /** Runs the Workspace sweep (step 2b); `dry` only reports. Never boots t3: it reads t3's tables directly. */
-  async runSweep(options: { readonly dry: boolean }): Promise<unknown> {
+  async runSweep(options: { readonly dry: boolean }): Promise<SweepReport> {
     const { sweep } = await import("./agents/deletion.ts");
     const { environmentServices } = await import("./agents/bindings.ts");
-    const swept = new Set(this.ctx.storage.kv.get<ReadonlyArray<string>>(SWEPT_SESSIONS_KEY) ?? []);
-    const report = await sweep(this.ctx.storage.sql, { ...environmentServices().sweep, dry: options.dry }, Date.now(), {
-      has: (threadId) => swept.has(threadId),
-      add: (threadId) => void swept.add(threadId),
-    });
-    if (!options.dry) this.ctx.storage.kv.put(SWEPT_SESSIONS_KEY, [...swept].slice(-5000));
+    const kv = this.ctx.storage.kv;
+    const store = harnessStore(kv);
+    const report = await sweep(
+      this.ctx.storage.sql,
+      { ...environmentServices().sweep(), dry: options.dry },
+      Date.now(),
+      this.#sweptSessions,
+      { get: () => kv.get<number>(PURGING_SINCE_KEY) ?? null, set: (at) => (at === null ? void kv.delete(PURGING_SINCE_KEY) : kv.put(PURGING_SINCE_KEY, at)) },
+      // ADR-0044 §4: each Workspace the Sweep purges is its own audit entry, beside the Owner's purges.
+      (purged, why) =>
+        store.audit(auditWorkspace({ at: Date.now(), actor: { caller: "sweep" }, action: "sweep.purge", target: purged.id, after: { purged: [purged.id], sessions: purged.sessionsDestroyed.length, why } })),
+    );
     if (!options.dry) {
       this.ctx.storage.kv.put(LAST_SWEEP_KEY, report);
       this.ctx.storage.kv.put(NEXT_SWEEP_KEY, Date.parse(report.nextDue));
@@ -1007,16 +1044,58 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     return report;
   }
 
+  /**
+   * The Workspaces section's reads and acts (ADR-0044 §1, §2–3, §4), for the Settings page, the admin routes and the
+   * Settings server: t3's projection here, the registry, the Grace as stored now, and each Workspace DO.
+   */
+  async workspacesApi(): Promise<WorkspacesApi> {
+    const { openTerminals, purgeWorkspace, restoreWorkspace } = await import("./agents/deletion.ts");
+    const services = environmentServices();
+    const kv = this.ctx.storage.kv;
+    const store = harnessStore(kv);
+    return {
+      deps: {
+        sql: this.ctx.storage.sql,
+        registry: services.workspaces,
+        settings: services.sweep,
+        purgingSince: () => kv.get<number>(PURGING_SINCE_KEY) ?? null,
+        terminals: openTerminals,
+        purge: purgeWorkspace,
+        restore: restoreWorkspace,
+        stop: (id) => workspaceRpc(id).stopContainer(),
+        audit: (entry) => store.audit(entry),
+        now: () => Date.now(),
+        sweptSessions: this.#sweptSessions,
+      },
+      usage: (id) => workspaceRpc(id).usage(),
+      // The preview runs directly (it writes nothing); "Run the Sweep" waits its turn behind a scheduled one.
+      runSweep: this.ownerSweep,
+    };
+  }
+
+  /** The Owner's Sweep (the Settings page, the admin route): `dry` directly, a real one through the wake's queue. */
+  readonly ownerSweep = ownerSweep(this.#sweepWake, () => this.runSweep({ dry: true }));
+
   get lastSweep(): unknown {
     return this.ctx.storage.kv.get(LAST_SWEEP_KEY) ?? null;
   }
 
-  async #sweepIfDue(now = Date.now()): Promise<void> {
-    if (now < this.#nextSweep(now) || this.#sweeping !== undefined) return;
-    this.#sweeping = this.runSweep({ dry: false })
-      .catch((error: unknown) => console.error(JSON.stringify({ t3flare: "sweep-failed", error: String(error).slice(0, 500) })))
-      .finally(() => (this.#sweeping = undefined));
-    await this.#sweeping;
+  async #sweepIfDue(): Promise<void> {
+    await this.#sweepWake.runIfDue();
+  }
+
+  /**
+   * A deletion in t3 or a change to the Grace (ADR-0043 §5) asks for a Sweep: it runs after 5 s
+   * with no other wake, and the next-sweep time and the alarm are written now, so a reset inside the 5 s loses
+   * nothing. A wake while a Sweep runs asks for one more after it (`agents/sweepWake.ts`).
+   */
+  wakeSweep(): void {
+    this.#sweepWake.wake();
+  }
+
+  /** A change moved the Grace (`sweepPurges` or `graceDays`, ADR-0043 §5): every purge date moved; off clears `purgingSince`. */
+  #sweepSettingsChanged(): void {
+    graceMoved({ purging: environmentServices().sweep().purging, clearPurgingSince: () => void this.ctx.storage.kv.delete(PURGING_SINCE_KEY), wake: () => this.wakeSweep() });
   }
 
   /** The one alarm also wakes the sweep (ADR-0003's refinement). */

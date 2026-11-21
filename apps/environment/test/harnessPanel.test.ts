@@ -1,9 +1,14 @@
 // The Settings page's seam (ADR-0026, plan §6.4, review H4): `handleHarness` over a store, as the admin entrypoint calls
 // it after Access. CSRF and Origin (missing, wrong origin, wrong token, the previous hour, a form-encoded body), the
 // script path without CSRF, validation, the audit log, escaping of hostile strings, and the CSP.
+// @effect-diagnostics nodeBuiltinImport:off
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import { csrfToken } from "../src/harness/csrf.ts";
+import { SCRIPT } from "../src/harness/pageScript.ts";
+import { STYLE } from "../src/harness/pageStyle.ts";
+import { WORKSPACES_SCRIPT } from "../src/harness/pageWorkspaces.ts";
 import type { AccessCaller } from "../src/access.ts";
 import { escapeHtml } from "../src/harness/page.ts";
 import { CSRF_HEADER, handleHarness } from "../src/harness/panel.ts";
@@ -150,6 +155,16 @@ describe("Settings page", () => {
     const html = await response.text();
     expect(html).toContain('name="t3flare-csrf"');
     expect(html).toContain("Code mode");
+  });
+
+  it("allows its one script by its hash, the Workspaces section's part of it, and serves that script unchanged", async () => {
+    const { deps } = setup();
+    const response = await handleHarness(new Request(`https://${HOST}/_t3flare/settings`), deps);
+    const csp = response.headers.get("content-security-policy") ?? "";
+    expect(csp).toContain(`script-src 'sha256-${createHash("sha256").update(SCRIPT).digest("base64")}'`);
+    expect(csp).toContain(`style-src 'sha256-${createHash("sha256").update(STYLE).digest("base64")}'`);
+    expect(SCRIPT).toContain(WORKSPACES_SCRIPT);
+    expect(await response.text()).toContain(`<script>${SCRIPT}</script>`);
   });
 
   it("a direct server's header value is stored write-only: no answer, page or audit entry carries it (or its base64)", async () => {

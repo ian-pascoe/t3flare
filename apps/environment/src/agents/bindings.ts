@@ -6,7 +6,7 @@ import type { GitHubTokens } from "./github.ts";
 import type { AgentsBindings } from "./rpc.ts";
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 
-import type { SweepSettings } from "./deletion.ts";
+import type { SweepSettings } from "./deletionSettings.ts";
 import type { SkillStore } from "../skills/store.ts";
 import type { WorkspaceRegistry } from "./workspaces.ts";
 import type { ProcessChannel } from "./processChannel.ts";
@@ -24,7 +24,10 @@ export interface EnvironmentServices {
   readonly workspaces: WorkspaceRegistry;
   /** The Environment DO's SQLite (t3's projection, read by the deletion's reference check). */
   readonly sql: SqlStorage;
-  readonly sweep: SweepSettings;
+  /** The Sweep's settings as stored now (ADR-0043 §2–3): read at each use, so a change to the Grace needs no reset. */
+  readonly sweep: () => SweepSettings;
+  /** Asks for a Sweep after 5 s of quiet (ADR-0043 §5): the deletion wake's Layer calls it. */
+  readonly wakeSweep: () => void;
   /** One-time marks in the Environment DO's storage (step 3: a setting seeded once, L1). */
   readonly marks: { has(key: string): boolean; set(key: string): void };
   /** SPI-1163: the model the text-generation setting was last pointed at as its default (`seedSettings.ts`). */

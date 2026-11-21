@@ -6,7 +6,7 @@
 // It is the only place a header value is typed for an agent's change, and the only place a sign-in's authorization URL
 // goes (in the POST's own answer, to this page's script): ADR-0035, O8.
 import { type ChangeRecord, CLOSED_KEPT_MS, type ClosedBy, durationText } from "../settings/changes.ts";
-import { askedByText, lineDiff, sizeText } from "../settings/render.ts";
+import { askedByText, changeHead, keptOf, keptText, lineDiff, purgeDueText, sizeText } from "../settings/render.ts";
 import type { ChangeItem, ShownSkill } from "../settings/types.ts";
 import { fileUrl } from "../skills/api.ts";
 import { CHANGE_SCRIPT } from "./changePageScript.ts";
@@ -84,6 +84,12 @@ const itemBlock = (item: ChangeItem, needsSecret: boolean): string => {
       return `<div class="change-block"><h3>${item.op === "enable" ? "Enable" : item.op === "disable" ? "Disable" : "Remove"} the Environment skill ${visibleHtml(item.name)}</h3>${
         item.repo === undefined ? "" : `<p class="desc">From <code>${visibleHtml(item.repo)}</code>${item.commit === undefined ? "" : ` at <code>${visibleHtml(item.commit.slice(0, 7))}</code>`}</p>`
       }</div>`;
+    case "purge":
+      return `<div class="change-block"><h3>Purge <code>${visibleHtml(item.id)}</code> now</h3><dl class="kv"><div><dt>Workspace</dt><dd>${item.workspaceKind === "project" ? "a project's" : "a Worktree Workspace"}, ${visibleHtml(item.title)}, ${visibleHtml(item.status)}</dd></div><div><dt>Worktree Workspaces with it</dt><dd>${
+        item.worktrees.length === 0 ? "none" : `<ul>${item.worktrees.map((worktree) => `<li><code>${visibleHtml(worktree.id)}</code> ${visibleHtml(worktree.status)}</li>`).join("")}</ul>`
+      }</dd></div><div><dt>Sessions destroyed</dt><dd>${item.sessions}</dd></div><div><dt>Without this</dt><dd>${visibleHtml(purgeDueText(item.purgeDue))}</dd></div></dl>${keptOf(item)
+        .map((ids) => `<p class="desc"><strong>${visibleHtml(keptText(ids))}</strong></p>`)
+        .join("")}<p class="desc">Its files go for good; it cannot be undone. t3's project and threads are not touched.</p></div>`;
   }
 };
 
@@ -134,12 +140,15 @@ export const renderChangePage = (record: ChangeRecord, input: { readonly csrf: s
   const open = record.state === "open";
   const left = Math.max(0, Math.ceil(((record.expiresAt ?? record.createdAt) - input.now) / 60_000));
   const needsSecret = record.needsPage === "secret";
-  const title = view === undefined ? "A change" : `A change to ${view.subject}`;
+  const title = view === undefined ? "A change" : view.entity === "workspaces" ? changeHead(view) : `A change to ${view.subject}`;
   const facts = [
     ["State", `<strong>${STATE_TEXT[record.state]}</strong>`],
     ["Asked by", visibleHtml(askedByText(record.caller))],
     ["Answered", record.mode === "card" ? "on its card on the thread, or here" : `in the client's ${visibleHtml(record.mode ?? "")} mode, or here`],
-    ["Revision", `${view?.entity === "environment" ? "Environment" : "Harness"} settings at ${record.expectedRevision ?? "?"}`],
+    // A Purge names no revision (ADR-0044 §5): its references are read again when it is approved.
+    view?.entity === "workspaces"
+      ? ["Bound to", "nothing referencing it when it is approved: read again then"]
+      : ["Revision", `${view?.entity === "environment" ? "Environment" : "Harness"} settings at ${record.expectedRevision ?? "?"}`],
     ["Asked at", time(record.createdAt)],
     ...(open ? [["Time left", `${left} ${left === 1 ? "minute" : "minutes"} (until ${time(record.expiresAt ?? record.createdAt)})`]] : []),
     ...(record.closed === undefined
@@ -155,7 +164,7 @@ export const renderChangePage = (record: ChangeRecord, input: { readonly csrf: s
   const items = (view?.items ?? []).map((item) => itemBlock(item, open && needsSecret)).join("");
   const answer = open
     ? `<form class="group change-answer" id="change-answer" data-change="${escapeHtml(record.id)}" autocomplete="off" novalidate><button type="button" class="btn btn-primary" data-action="approve">${
-        record.needsPage === "sign-in" ? "Approve and sign in" : "Approve"
+        record.needsPage === "sign-in" ? "Approve and sign in" : view?.entity === "workspaces" ? "Approve and purge" : "Approve"
       }</button><button type="button" class="btn" data-action="decline">Decline</button><p class="desc">The first answer wins: the card on the thread and this page answer the same change.</p></form>`
     : "";
   return `${head(title, input.csrf)}<body><main class="change-main" id="main">${brandLink}

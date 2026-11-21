@@ -1,6 +1,9 @@
 // The Settings page's structure (SPI-1086): a snapshot of its markup from the fixture state, and checks over the
 // parsed tags (balanced, ids unique, every section in the navigation, every control named), every state it draws, the
 // CSP's limits (no inline style or handler, one script), and escaping of hostile strings in every server-supplied field.
+// @effect-diagnostics nodeBuiltinImport:off globalDate:off
+import { Script } from "node:vm";
+
 import { applyToolsChange, BUILTIN_TOOLS, EMPTY_HARNESS, resolveHarness } from "@t3flare/harness-registry";
 import { describe, expect, it } from "vitest";
 
@@ -24,7 +27,8 @@ const SKILL: SkillsView["skills"][number] = {
   files: 2,
   bytes: 1024,
 };
-import { FIXTURE_MCP, FIXTURE_NOW, fixturePage } from "./fixtures/harnessPage.ts";
+import { FIXTURE_MCP, FIXTURE_NOW, FIXTURE_WORKSPACES, fixturePage } from "./fixtures/harnessPage.ts";
+import { WORKSPACES_SCRIPT } from "../src/harness/pageWorkspaces.ts";
 
 /** One section of a rendered page, by its id. */
 const section = (html: string, id: string): string => {
@@ -95,7 +99,7 @@ describe("harness page", () => {
 
   it("links every section from the navigation, in order, each with its heading", () => {
     const nav = tags.filter((tag) => tag.name === "a" && tag.attrs.href?.startsWith("#") && tag.attrs.href !== "#main" && tag.attrs.href !== "#add-server");
-    expect(nav.map((tag) => tag.attrs.href)).toEqual(["#tools", "#extensions", "#mcp", "#environment", "#skills", "#status", "#audit"]);
+    expect(nav.map((tag) => tag.attrs.href)).toEqual(["#tools", "#extensions", "#mcp", "#environment", "#workspaces", "#skills", "#status", "#audit"]);
     for (const link of nav) {
       const section = tags.find((tag) => tag.name === "section" && tag.attrs.id === link.attrs.href!.slice(1));
       expect(section?.attrs["aria-labelledby"]).toBeDefined();
@@ -330,3 +334,149 @@ describe("the Settings server's row", () => {
     }
   });
 });
+
+// The Workspaces section (ADR-0044 §1, §4 and its Consequences): the Grace as one control, every Workspace with
+// a project's worktrees under it, the lazy Files column, and the Owner's three acts.
+describe("the Workspaces section", () => {
+  const sectionOf = (html: string) => html.slice(html.indexOf('<section id="workspaces"'), html.indexOf("</section>", html.indexOf('<section id="workspaces"')));
+  const html = renderPage(fixturePage());
+  const section = sectionOf(html);
+  const tags = tagsOf(section);
+
+  it("shows the Grace as one radio pair, saved through the Environment settings, and keeps it out of the Environment section (ADR-0044 §1)", () => {
+    const radios = tags.filter((tag) => tag.name === "input" && tag.attrs.type === "radio");
+    expect(radios.map((tag) => [tag.attrs.value, tag.attrs.checked !== undefined])).toEqual([
+      ["days", true],
+      ["never", false],
+    ]);
+    expect(tags.find((tag) => tag.attrs["data-grace-days"] !== undefined)?.attrs).toMatchObject({ type: "number", min: "1", max: "3650", step: "1", value: "7" });
+    expect(textOf(section, tags, tags.findIndex((tag) => tag.name === "label" && tag.attrs.for === "grace-days"))).toBe("Purge after");
+    expect(textOf(section, tags, tags.findIndex((tag) => tag.name === "label" && tag.attrs.for === "grace-never"))).toBe("Never purge");
+    expect(tags.some((tag) => tag.name === "form" && tag.attrs["data-grace"] !== undefined)).toBe(true);
+    const environment = html.slice(html.indexOf('<section id="environment"'), html.indexOf("</section>", html.indexOf('<section id="environment"')));
+    expect(environment).not.toContain('data-setting="sweepPurges"');
+    expect(environment).not.toContain('data-setting="graceDays"');
+    expect(section).not.toContain("T3FLARE_SWEEP_GRACE_MS");
+    const never = sectionOf(renderPage(fixturePage({ workspaces: { ...FIXTURE_WORKSPACES, purging: false, graceDays: 30 } })));
+    expect(tagsOf(never).filter((tag) => tag.attrs.type === "radio").map((tag) => tag.attrs.checked !== undefined)).toEqual([false, true]);
+    expect(never).toContain('value="30"');
+    expect(never).toContain("Never purge: the Sweep marks what nothing references and purges nothing.");
+  });
+
+  it("says when a Stage's T3FLARE_SWEEP_GRACE_MS overrides the days (ADR-0043 §3)", () => {
+    const overridden = sectionOf(renderPage(fixturePage({ workspaces: { ...FIXTURE_WORKSPACES, overridden: true, graceMs: 180_000 } })));
+    expect(overridden).toContain("This Stage overrides the Grace");
+    expect(overridden).toContain("<code>T3FLARE_SWEEP_GRACE_MS</code> sets it to 3 minutes");
+  });
+
+  it("lists every Workspace, a project's worktrees under it, with status, references, purge date and a Files cell loaded later (ADR-0044 §1)", () => {
+    const rows = tags.filter((tag) => tag.name === "tr" && tag.attrs["data-workspace"] !== undefined);
+    expect(rows.map((tag) => [tag.attrs["data-workspace"], tag.attrs.class ?? ""])).toEqual([
+      ["acme", ""],
+      [".wt/acme/feat-a", "wt"],
+      [".wt/acme/feat-b", "wt"],
+      ["live", ""],
+      [".wt/old/kept", ""],
+    ]);
+    expect(tags.filter((tag) => tag.attrs["data-workspace-usage"] !== undefined).map((tag) => tag.attrs["data-workspace-usage"])).toEqual(["acme", ".wt/acme/feat-a", ".wt/acme/feat-b", "live", ".wt/old/kept"]);
+    expect(section).toContain('<th scope="col" class="files">Files</th>');
+    // A path or a branch wraps only after a slash, never mid-name.
+    expect(section).toContain("<code>.wt/<wbr>acme/<wbr>feat-b</code>");
+    expect(section).toContain("<strong>t3/<wbr>feat-b</strong>");
+    expect(section).toContain('<span class="pill pill-ok">in use</span>');
+    expect(section).toContain('<span class="pill pill-warn">unreferenced</span>');
+    expect(section).toContain('<span class="pill pill-warn">tombstone</span>');
+    expect(section).toContain('<span class="pill">tombstone (kept)</span>');
+    expect(section).toContain("project “Live app”; thread “Fix the bug”; 2 open terminals");
+    expect(section).toContain("uncommitted work (--force)");
+    expect(section).toContain(`<time datetime="${new Date(FIXTURE_NOW + 5 * 24 * 60 * 60_000).toISOString()}" data-local>`);
+    expect(section).toContain("never: kept");
+    expect(section).toContain("Purging since");
+  });
+
+  it("offers Purge now beside \"purges its files for good\", Restore for a Tombstone and Stop for a ready Workspace; none for one in use", () => {
+    const purges = tags.filter((tag) => tag.attrs["data-workspace-purge"] !== undefined);
+    expect(purges.map((tag) => JSON.parse(tag.attrs["data-workspace-purge"]!.replaceAll("&quot;", '"')))).toEqual([
+      {
+        id: "acme",
+        name: "acme",
+        title: "Acme",
+        goes: [
+          { id: ".wt/acme/feat-a", status: "unreferenced" },
+          { id: ".wt/acme/feat-b", status: "tombstone" },
+          { id: "acme", status: "unreferenced" },
+        ],
+        sessions: 3,
+      },
+      { id: ".wt/acme/feat-a", name: "feat-a", title: "feat-a", goes: [{ id: ".wt/acme/feat-a", status: "unreferenced" }], sessions: 1 },
+      { id: ".wt/acme/feat-b", name: "feat-b", title: "t3/feat-b", goes: [{ id: ".wt/acme/feat-b", status: "tombstone" }], sessions: 0 },
+      { id: ".wt/old/kept", name: "kept", title: "kept", goes: [{ id: ".wt/old/kept", status: "tombstone (kept)" }], sessions: 0 },
+    ]);
+    // A kept Tombstone in the set is called out: work a removal could not check (the script shows it).
+    const kept = tags.find((tag) => tag.attrs["data-purge-kept"] !== undefined);
+    expect(kept?.attrs.hidden).toBe("");
+    expect(textOf(section, tags, tags.indexOf(kept!))).toContain("work a removal could not check");
+    for (const index of purges.map((tag) => tags.indexOf(tag))) {
+      expect(textOf(section, tags, index)).toBe("Purge now");
+      expect(markupAfter(section, tags[index]!)).toMatch(/^<\/button><span class="hint">purges its files for good<\/span>/);
+    }
+    expect(tags.filter((tag) => tag.attrs["data-workspace-restore"] !== undefined).map((tag) => tag.attrs["data-workspace-restore"])).toEqual([".wt/acme/feat-b", ".wt/old/kept"]);
+    expect(tags.filter((tag) => tag.attrs["data-workspace-stop"] !== undefined).map((tag) => tag.attrs["data-workspace-stop"])).toEqual(["acme", ".wt/acme/feat-a", "live"]);
+    // The typed-name dialog: its field labelled, its Purge disabled until the name matches (the script).
+    expect(tags.find((tag) => tag.name === "dialog")?.attrs["data-purge-dialog"]).toBe("");
+    expect(tags.find((tag) => tag.attrs["data-purge-go"] !== undefined)?.attrs.disabled).toBe("");
+    expect(tags.some((tag) => tag.name === "label" && tag.attrs.for === "purge-confirm")).toBe(true);
+    expect(tags.some((tag) => tag.attrs["data-sweep-preview"] !== undefined)).toBe(true);
+    // GLOSSARY: a Purge purges; delete and remove are t3's own acts.
+    expect(section).toContain("This purges its files for good");
+    expect(section).toContain("Purge now purges a Workspace nothing references at once");
+    expect(section).not.toMatch(/deletes its files|removes a Workspace/);
+    expect(tags.some((tag) => tag.attrs["data-sweep-run"] !== undefined)).toBe(true);
+  });
+
+  it("draws its empty state, and a failed read as its error, never a table that could mislead", () => {
+    expect(sectionOf(renderPage(fixturePage({ workspaces: { ...FIXTURE_WORKSPACES, rows: [] } })))).toContain("No Workspaces");
+    const failed = sectionOf(renderPage(fixturePage({ workspaces: { error: "no such table: projection_projects" } })));
+    expect(failed).toContain("The Workspaces could not be read");
+    expect(failed).toContain("no such table: projection_projects");
+    expect(failed).not.toContain("data-workspace-purge");
+    const { workspaces: _workspaces, ...withoutWorkspaces } = fixturePage();
+    expect(renderPage(withoutWorkspaces)).not.toContain('id="workspaces"');
+  });
+
+  it("escapes hostile strings in every Workspace field", () => {
+    const hostile = `"><img src=x onerror=alert(1)>'&<script>`;
+    const [acme] = FIXTURE_WORKSPACES.rows;
+    const page = renderPage(
+      fixturePage({
+        workspaces: {
+          ...FIXTURE_WORKSPACES,
+          rows: [{ ...acme!, id: hostile, title: hostile, repo: hostile, branch: hostile, confirmName: hostile, references: [hostile], lastError: hostile, planned: { action: "skip", why: hostile }, worktrees: [] }],
+        },
+      }),
+    );
+    expect(page).not.toContain("<img");
+    expect(page.match(/<script/g)).toHaveLength(1);
+    const parsed = tagsOf(page);
+    expect(balance(parsed)).toBe("balanced");
+    expect(parsed.some((tag) => Object.keys(tag.attrs).some((name) => /^on/i.test(name)))).toBe(false);
+  });
+
+  it("its script posts the typed name, says what Restore does (ADR-0044's Consequences), previews the dry Sweep, and writes answers as text", () => {
+    expect(SCRIPT.endsWith(WORKSPACES_SCRIPT)).toBe(true);
+    // The page's one script parses whole: a name declared twice across its parts would stop all of it.
+    expect(() => new Script(SCRIPT)).not.toThrow();
+    expect(WORKSPACES_SCRIPT).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML|document\.write/);
+    expect(WORKSPACES_SCRIPT).toContain('post("/_t3flare/settings/api/workspaces/purge", { id: current.id, confirm: typed.value }, go)');
+    expect(WORKSPACES_SCRIPT).toContain("its Grace starts over now, unless a thread in t3 takes the worktree again");
+    expect(WORKSPACES_SCRIPT).toContain('getJson("/_t3flare/settings/api/workspaces/sweep")');
+    expect(WORKSPACES_SCRIPT).toContain('getJson("/_t3flare/settings/api/workspaces/usage?id=" + encodeURIComponent(');
+    expect(WORKSPACES_SCRIPT).toContain('post("/_t3flare/settings/api/environment", { settings }, save)');
+  });
+});
+
+/** The markup right after `tag` closes its element's text (for what sits beside a button). */
+const markupAfter = (html: string, tag: Tag): string => {
+  const rest = markup(html).slice(tag.index);
+  return rest.slice(rest.indexOf("</button>"));
+};

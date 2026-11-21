@@ -19,6 +19,9 @@
 // - The Owner clients' Elicitation modes (ADR-0035's 2026-11-15 refinement): `GET …/api/mcp/clients` lists them and
 //   `POST …/api/mcp/clients` `{ key, clientName, mode }` or `{ key, clientName, remove: true }`, behind the same write
 //   guard, changes one, audited. This is the only place a client's mode is set: the endpoint only reads it.
+// - The Workspaces (ADR-0044 §4): `GET …/api/workspaces` (the view), `…/usage?id=` (one row's Files, ADR-0044 §1)
+//   and `…/sweep` (the dry Sweep); `POST …/api/workspaces/purge` `{ id, confirm }`, `/restore` `{ id }`, `/stop` `{ id }`
+//   and `/sweep`, behind the same write guard: the Owner's own acts (workspaceActions.ts), audited, never Open changes.
 import { BUILTIN_TOOLS, describeGlobalMise, ENVIRONMENT_SETTINGS, EXTENSIONS, ignoredServersOf, resolveEnvironment, resolveHarness, type ToolsChange } from "@t3flare/harness-registry";
 
 import type { AccessCaller } from "../access.ts";
@@ -47,6 +50,8 @@ import {
   setMcpHeader,
   testMcpServer,
 } from "./ops.ts";
+import { purgeNow, restore, stop, type ActionOutcome, type WorkspacesApi } from "../agents/workspaceActions.ts";
+import { confirmNameOf, sweepPreview, workspacesView } from "../agents/workspaceView.ts";
 import { isChangeId } from "../settings/changes.ts";
 import { clientNameOf, isOwnerMode, type OwnerClients } from "../settings/clients.ts";
 import { type Answerer, type ChangesApi, openChangeSummary } from "../settings/openChanges.ts";
@@ -54,7 +59,7 @@ import { renderChangePage, renderGonePage } from "./changePage.ts";
 import { CHANGE_SCRIPT } from "./changePageScript.ts";
 import { CHANGES_API_PATH, CHANGES_PATH, changePagePath, SETTINGS_PAGE_PATH } from "./paths.ts";
 import { pageCsp, renderPage } from "./page.ts";
-import type { AuditActor, HarnessStore } from "./store.ts";
+import { type AuditActor, auditWorkspace, type HarnessStore } from "./store.ts";
 
 export const CSRF_HEADER = "x-t3flare-csrf";
 
@@ -83,7 +88,14 @@ export interface HarnessDeps {
   readonly clients?: OwnerClients;
   /** The Owner-client endpoint's URL, when it is deployed (ADR-0036): what the owner adds to his clients. */
   readonly ownerEndpoint?: string;
+  /** A change moved the Grace (ADR-0043 §5): the Environment DO brings the Sweep forward. */
+  readonly sweepSettingsChanged?: () => void;
+  /** The Workspaces section (ADR-0044 §4): the view, the Owner's acts, each Workspace's usage, and the Sweep. */
+  readonly workspaces?: WorkspacesApi;
 }
+
+export const WORKSPACES_API_PATH = `${SETTINGS_PAGE_PATH}/api/workspaces`;
+const WORKSPACES_ACTIONS = ["/purge", "/restore", "/stop", "/sweep"] as const;
 
 export const CLIENTS_API_PATH = `${SETTINGS_PAGE_PATH}/api/mcp/clients`;
 
@@ -210,6 +222,10 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
         ...(deps.skills === undefined ? {} : { skills: skillsOverview(deps.skills) }),
         ...(deps.endpoints === undefined ? {} : { endpoints: await endpointsOverview(deps.endpoints) }),
         ...(deps.changes === undefined ? {} : { openChanges: deps.changes.list().map((record) => openChangeSummary(record, undefined)) }),
+        // A failed read is the section's error, not the page's (ADR-0044 §1): the rest of the page still serves.
+        ...(deps.workspaces === undefined
+          ? {}
+          : { workspaces: await workspacesView(deps.workspaces.deps, deps.now?.() ?? Date.now()).catch((error: unknown) => ({ error: String(error).slice(0, 300) })) }),
         ...(deps.clients === undefined && deps.ownerEndpoint === undefined
           ? {}
           : { ownerClients: { ...(deps.ownerEndpoint === undefined ? {} : { endpoint: deps.ownerEndpoint }), clients: deps.clients?.list() ?? [], viewer: subject } }),
@@ -243,6 +259,22 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
     if (path === `${SETTINGS_PAGE_PATH}/api/mcp`) return json({ servers: await mcpOverview(deps) });
     if (path === `${SETTINGS_PAGE_PATH}/api/audit`) return json({ entries: deps.store.auditLog(50) });
     if (path === CLIENTS_API_PATH && deps.clients !== undefined) return json({ clients: deps.clients.list() });
+    if (path.startsWith(WORKSPACES_API_PATH) && deps.workspaces !== undefined) {
+      const workspaces = deps.workspaces;
+      try {
+        if (path === WORKSPACES_API_PATH) return json(await workspacesView(workspaces.deps, deps.now?.() ?? Date.now()));
+        if (path === `${WORKSPACES_API_PATH}/usage`) {
+          // ADR-0044 §1: one row's size and Container state, loaded after the table renders; never starts a Container.
+          const id = url.searchParams.get("id") ?? "";
+          if (workspaces.deps.registry.get(id) === undefined) return refused(404, `no Workspace ${id}`);
+          return json(await workspaces.usage(id));
+        }
+        // ADR-0044 §1: the dry Sweep, which writes nothing.
+        if (path === `${WORKSPACES_API_PATH}/sweep`) return json(sweepPreview(await workspaces.runSweep(true)));
+      } catch (error) {
+        return refused(503, `the Workspaces could not be read: ${String(error).slice(0, 300)}`);
+      }
+    }
     if (path === `${SETTINGS_PAGE_PATH}/api/skills` && deps.skills !== undefined) return json(skillsOverview(deps.skills));
     if (path === `${SETTINGS_PAGE_PATH}/api/skills/view` && deps.skills !== undefined) return skillsResponse(viewSkill(deps.skills, url.searchParams.get("name") ?? ""));
     if (path === `${SETTINGS_PAGE_PATH}${ENDPOINTS_PATHS.list}` && deps.endpoints !== undefined) return json(await endpointsOverview(deps.endpoints));
@@ -254,7 +286,10 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
   const endpointsRoute = deps.endpoints === undefined ? undefined : Object.values(ENDPOINTS_PATHS).find((route) => path === `${SETTINGS_PAGE_PATH}${route}`);
   const changeRoute = path.startsWith(`${CHANGES_API_PATH}/`) && deps.changes !== undefined ? path.slice(`${CHANGES_API_PATH}/`.length) : undefined;
   const clientsRoute = path === CLIENTS_API_PATH && deps.clients !== undefined;
-  if (!routes.includes(path) && (skillsRoute === undefined || deps.skills === undefined) && endpointsRoute === undefined && changeRoute === undefined && !clientsRoute) return refused(404, "Not found");
+  const workspacesRoute = deps.workspaces === undefined ? undefined : WORKSPACES_ACTIONS.find((route) => path === `${WORKSPACES_API_PATH}${route}`);
+  if (!routes.includes(path) && (skillsRoute === undefined || deps.skills === undefined) && endpointsRoute === undefined && changeRoute === undefined && !clientsRoute && workspacesRoute === undefined) {
+    return refused(404, "Not found");
+  }
   const why = await unsafeWrite(request, deps);
   if (why !== undefined) {
     console.log(JSON.stringify({ t3flare: "harness-refused", reason: why, caller: deps.caller.kind }));
@@ -262,6 +297,16 @@ export const handleHarness = async (request: Request, deps: HarnessDeps): Promis
   }
   if (changeRoute !== undefined && deps.changes !== undefined) return answerChange(deps.changes, changeRoute, await bodyOf(request), deps.caller);
   if (clientsRoute && deps.clients !== undefined) return changeClient(deps, deps.clients, await bodyOf(request));
+  if (workspacesRoute !== undefined && deps.workspaces !== undefined) {
+    const body = await bodyOf(request);
+    try {
+      return await workspacesAction(deps, deps.workspaces, workspacesRoute, body);
+    } catch (error) {
+      // A Purge's failed reference read is its own refusal (purgeNow); what throws here may have come after some of the
+      // act was done (an audit write), so the answer says nothing about what was left.
+      return refused(503, `the act could not finish: ${String(error).slice(0, 300)}; the Workspaces section shows what is left`);
+    }
+  }
   const ops = opsOf(deps);
   if (skillsRoute !== undefined && deps.skills !== undefined) {
     const body = await bodyOf(request);
@@ -384,6 +429,34 @@ const changeClient = (deps: HarnessDeps, clients: OwnerClients, body: Record<str
   return json({ key, clientName, mode });
 };
 
+/**
+ * One of the Owner's acts on the Workspaces (ADR-0044 §4), after the write guard: never an Open change, each
+ * its own audit entry (workspaceActions.ts). A Purge needs the Workspace's own name typed, compared here (ADR-0044 §4); the
+ * page has no force.
+ */
+const workspacesAction = async (deps: HarnessDeps, workspaces: WorkspacesApi, route: (typeof WORKSPACES_ACTIONS)[number], body: Record<string, unknown> | undefined): Promise<Response> => {
+  const actor = actorOf(deps);
+  if (route === "/sweep") {
+    const report = await workspaces.runSweep(false);
+    const preview = sweepPreview(report);
+    const purged = report.purged.filter((entry) => entry.destroyed).map((entry) => entry.id);
+    workspaces.deps.audit(
+      auditWorkspace({ at: deps.now?.() ?? Date.now(), actor, action: "sweep.run", target: "sweep", after: { ok: report.ok, purged, sessions: preview.sessions.length, containers: preview.containers.length } }),
+    );
+    return json(preview);
+  }
+  const id = body?.id;
+  if (typeof id !== "string" || id === "") return refused(400, route === "/purge" ? "the body is { id, confirm }" : "the body is { id }");
+  if (route === "/purge") {
+    const name = confirmNameOf(id);
+    if (body?.confirm !== name) return refused(400, `type ${name}, the Workspace's own name, to purge it`);
+    return actionResponse(await purgeNow(workspaces.deps, id, { force: false, actor }));
+  }
+  return actionResponse(route === "/restore" ? await restore(workspaces.deps, id, { actor }) : await stop(workspaces.deps, id, { actor }));
+};
+
+const actionResponse = <T extends object>(outcome: ActionOutcome<T>): Response => (outcome.ok ? json(outcome) : refused(outcome.status, outcome.error));
+
 const skillsResponse = (answer: SkillsAnswer): Response => ("json" in answer ? json(answer.json, answer.status) : refused(answer.status, answer.text));
 
 /** An op's outcome as the panel answers it: the outcome as JSON, or the refusal's words with its status. */
@@ -427,4 +500,5 @@ const opsOf = (deps: HarnessDeps): OpsDeps => ({
   ...(deps.secrets === undefined ? {} : { secrets: deps.secrets }),
   ...(deps.oauth === undefined ? {} : { oauth: deps.oauth }),
   ...(deps.skills === undefined ? {} : { skills: deps.skills }),
+  ...(deps.sweepSettingsChanged === undefined ? {} : { sweepSettingsChanged: deps.sweepSettingsChanged }),
 });

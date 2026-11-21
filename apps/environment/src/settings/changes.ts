@@ -14,7 +14,7 @@ import { sha256Hex } from "@t3flare/skills";
 
 import { base64Url } from "../harness/keys.ts";
 import { canonicalJson } from "../mcp/canonical.ts";
-import type { ChangeView, PageReason } from "./types.ts";
+import type { ChangeEntity, ChangeView, PageReason } from "./types.ts";
 
 export const CHANGES_TABLE = "t3flare_settings_changes";
 
@@ -98,8 +98,8 @@ export interface ChangeCaller {
 /** A change as the table keeps it: an Open change (tier `asked`), or a free change already applied. */
 export interface ChangeRecord {
   readonly id: string;
-  /** Whose revision. */
-  readonly entity: "harness" | "environment";
+  /** Whose revision: a settings entity's, or the Workspaces' (a Purge, always 0, ADR-0044 §5). */
+  readonly entity: ChangeEntity;
   readonly expectedRevision?: number;
   /** The write tool's name. */
   readonly tool: string;

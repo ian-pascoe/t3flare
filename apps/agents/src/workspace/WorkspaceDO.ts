@@ -1839,6 +1839,15 @@ export class WorkspaceDO extends ContainerHost {
     return { running: scan !== undefined, scan: scan ?? null };
   }
 
+  /**
+   * The Settings page's Files column (ADR-0044 §1): this object's own storage and whether its Container runs. Never
+   * starts the Container and is not use; a destroyed Workspace answers zeros. A running Container's disk is not counted.
+   */
+  async usage(): Promise<{ readonly bytes: number; readonly containerRunning: boolean }> {
+    if (this.#isDestroyed()) return { bytes: 0, containerRunning: false };
+    return { bytes: this.ctx.storage.sql.databaseSize, containerRunning: this.containerRunning() };
+  }
+
   /** G11: stops process group `pgid` (stock's TERM, then KILL after 3 s); false when it was gone or nothing runs. */
   async stopProcessGroup(pgid: number, members: ReadonlyArray<number>): Promise<boolean> {
     if (this.#isDestroyed()) return false;
