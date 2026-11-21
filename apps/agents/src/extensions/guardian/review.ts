@@ -3,7 +3,7 @@
 // or uncategorized reply, and the Escalation Pass for a would-be Rejection. Changed: the model is reached through the
 // Session's own models (its Model endpoints', `api.models`) with `completeSimple`; there is no classifier First Pass, no cache
 // breakpoint helper and no token calibration (evidence is bounded in characters, `evidence.ts`).
-// @effect-diagnostics asyncFunction:off globalDate:off globalTimers:off newPromise:off
+// @effect-diagnostics globalDate:off globalTimers:off
 import { type Api, type AssistantMessage, clampThinkingLevel, type Context, type Model, type Models } from "@earendil-works/pi-ai";
 
 import { type Assessment, decide, decidedRisk, type Outcome, parseAssessment, parseFinalAssessment, type RiskCategory, uncategorized } from "./assessment.ts";

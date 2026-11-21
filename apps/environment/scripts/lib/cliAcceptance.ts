@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off
+// @effect-diagnostics globalDate:off
 // Step 4a's acceptance (`acceptance.ts --codex` / `--pi`): on a fresh clone of the fixture, the retired key route giving nothing with no
 // CLI alive; a CLI turn at approval-required that edits a file and runs `bash test.sh`, each asked and approved; the
 // Container stopped; a second turn that resumes the same native thread (the protocol trace, no handoff); the leak check

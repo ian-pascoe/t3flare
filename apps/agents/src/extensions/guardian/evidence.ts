@@ -7,7 +7,6 @@
 // work (another agent's message, as pi-guardian treats a Child Agent's), the Advisor's and the Terminals' notes are
 // untrusted, and the untrusted window is the newest that fits a character budget, not pi-guardian's anchored window
 // (no token calibration here). There are no Skills, delegations or User Overrides to carry.
-// @effect-diagnostics asyncFunction:off
 import type { Context as ChordContext } from "@earendil-works/chord";
 import type { EntryRecord, HookApi } from "@earendil-works/pi-durable";
 

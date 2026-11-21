@@ -1,4 +1,4 @@
-// @effect-diagnostics globalFetch:off globalFetchInEffect:off globalJsonInEffect:off effectFnOpportunity:off
+// @effect-diagnostics effectFnOpportunity:off
 // The Durable agent provider's text generation (thread titles, commit messages, PR content; step 2a plan, section 1):
 // one request from the Environment DO, with no Session and no tools.
 //

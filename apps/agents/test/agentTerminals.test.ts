@@ -1,6 +1,6 @@
 // The Workspace DO's half of the agent's Terminals (SPI-1057): entries over a fake PTY host that echoes like a REPL,
 // rendered by the headless xterm, with termctrl's settle reasons, scrolled-off lines, exits, stops, waits and the cap.
-// @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off globalDate:off nodeBuiltinImport:off
+// @effect-diagnostics globalTimers:off globalDate:off nodeBuiltinImport:off
 import { spawnSync } from "node:child_process";
 
 import { terminalCommand } from "@t3flare/sandbox-image/terminal";

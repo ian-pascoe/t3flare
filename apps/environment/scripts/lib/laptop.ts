@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off globalTimers:off nodeBuiltinImport:off
+// @effect-diagnostics globalDate:off globalFetch:off nodeBuiltinImport:off
 // Step 3: the "laptop" of a Peer link, headless on this machine: a stock t3 server from npm at an exact version, in a
 // temporary base directory and loopback port (plan section 2.1, M0 R2). Driven through its own CLI (`t3 auth pairing
 // create`, `t3 environment link`) and its own WebSocket protocol, as the owner's desktop drives its bundled server.

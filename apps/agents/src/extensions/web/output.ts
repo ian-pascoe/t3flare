@@ -1,5 +1,4 @@
 // Copied from cloudpid@93ba45a3:packages/extensions/src/web/output.ts, unchanged but for its header (SPI-1054; see ./NOTICE.md).
-// @effect-diagnostics missingPipeableSignature:off preferEffectArray:off
 // What the model sees of a tool's text: the head of it within the output limits, and a note saying what was left.
 //
 // Ported from pi-web-tools' `src/web-tool-output.ts` (see ./NOTICE.md). The original saved a truncated result in

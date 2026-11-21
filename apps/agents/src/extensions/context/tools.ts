@@ -7,7 +7,7 @@
 // are Sessions of their own), so refs are the conversation's own; History is read in pages of stored entries, each in
 // its own read, `windows`/`list` keep only a short line per entry and `search` stops once its page is full, so a long
 // thread never holds its whole transcript in memory at once; the Notes' total size is bounded.
-// @effect-diagnostics asyncFunction:off preferEffectArray:off globalDate:off extendsNativeError:off
+// @effect-diagnostics globalDate:off extendsNativeError:off
 import type { Context } from "@earendil-works/chord";
 import { type ConversationId, defineTool, type EntryRecord, type ToolExecutionApi, type ToolRegistration } from "@earendil-works/pi-durable";
 import { int, obj, oneOf, opt, str } from "@earendil-works/pi-schema";
@@ -58,7 +58,7 @@ const SCAN_PAGE = 200;
 export async function* storedEntries(api: ToolExecutionApi, conversationId: ConversationId, context: Context): AsyncGenerator<EntryRecord> {
   let cursor: unknown;
   do {
-    // oxlint-disable-next-line no-await-in-loop -- one page at a time keeps memory bounded
+    // One page at a time keeps memory bounded.
     const page = await api.commit((tx) => tx.scanEntries({ conversationId, order: "ascending" }, SCAN_PAGE, cursor as never), context);
     yield* page.items;
     cursor = page.next;

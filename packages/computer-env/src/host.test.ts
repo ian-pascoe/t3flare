@@ -1,7 +1,6 @@
 // Copied from cloudpid@ae5a7b73:packages/computer-env/src/host.test.ts.
 // `WorkspaceEnvHost.readEnv`: the environment code inside the Workspace DO reads files through. Paths resolve against
 // its `cwd` as `ComputerExecutionEnv`'s do, so the same paths reach the same files.
-// @effect-diagnostics asyncFunction:off
 import type { Workspace } from "@cloudflare/computer";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { getOrThrow } from "@earendil-works/pi-durable/env";
@@ -14,7 +13,7 @@ import type { EnvRequest } from "./wire.ts";
 const hostOf = (files: Readonly<Record<string, string>>) => {
   const read: string[] = [];
 
-  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: `readEnv`'s `readTextFile` uses only `fs.readFile`, which the fake answers.
+  // SAFETY: `readEnv`'s `readTextFile` uses only `fs.readFile`, which the fake answers.
   const workspace = {
     fs: {
       readFile: async (path: string) => {
@@ -39,7 +38,7 @@ const hostOf = (files: Readonly<Record<string, string>>) => {
 const routedHost = (options: { readonly running: boolean; readonly stdout: string }) => {
   const scripts: string[] = [];
 
-  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: the operations these tests call use only `fs.stat`, `fs.lstat` and `fs.readdir`, which the fake answers.
+  // SAFETY: the operations these tests call use only `fs.stat`, `fs.lstat` and `fs.readdir`, which the fake answers.
   const workspace = {
     fs: {
       stat: async (path: string) => {

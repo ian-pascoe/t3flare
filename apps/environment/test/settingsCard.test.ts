@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off
 // T-card (plan §5; ADR-0035, plan D6, D9), M4 (SPI-1199): an own agent's asked change on its owner-only card. An
 // `approval` card with no field (its shape and the owner-only refusal are in settingsHostile.test.ts); the prompt's
 // server-written parts and fixed lines; no Approve on a change that needs the page; the page answering first withdraws the card; a Stop

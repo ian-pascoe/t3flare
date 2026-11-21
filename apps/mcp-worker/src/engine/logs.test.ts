@@ -1,4 +1,3 @@
-// @effect-diagnostics preferEffectArray:off
 import { MCP_LOG_DATA_MAX, MCP_LOG_RING } from "@cloudpid/mcp/types";
 import { describe, expect, it } from "vitest";
 import { callLogs, secretsOf } from "./logs.ts";

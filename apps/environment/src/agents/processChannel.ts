@@ -1,4 +1,4 @@
-// @effect-diagnostics globalTimers:off globalConsole:off globalDate:off extendsNativeError:off
+// @effect-diagnostics globalTimers:off globalConsole:off extendsNativeError:off
 // The Environment's half of the process channel (step 4a, ADR-0015's refinement): a CLI process t3 spawns runs in a
 // Workspace's Container (the Workspace DO's `ProcessHost`); here it is a handle t3's code reads and writes.
 //

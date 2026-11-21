@@ -1,7 +1,7 @@
 // Code mode's nested calls are judged exactly like direct ones (plan §2.3, one test per row): a script on pi-codemode's
 // real QuickJS VM (the Node sandbox; the Session uses the remote one, same host side) calls the guarded tools through
 // pi-durable's nested calls, on a real Harness on pi-ai's faux provider, restarted as an evicted Durable Object is.
-// @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off
+// @effect-diagnostics globalTimers:off
 import { CodemodeSandbox } from "@earendil-works/pi-codemode";
 import { type AssistantMessage, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { defineExtension, defineTool } from "@earendil-works/pi-durable";

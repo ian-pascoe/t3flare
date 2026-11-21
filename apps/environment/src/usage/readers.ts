@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off
 // t3's usage readers for t3flare's agents (`shadows/builtInDrivers.ts`). t3's own readers scan each CLI's transcripts on
 // the host; here the agents run in Durable Objects and Containers, so each reader reads t3flare's own usage records
 // (`records.ts`, SPI-1173), one source per agent: every Model endpoint's requests.

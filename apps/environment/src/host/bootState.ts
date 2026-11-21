@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off
 // The Environment DO's boot record and safe mode (ADR-0010's admin routes), in DO key-value storage.
 //
 // Every boot of t3 is counted before it starts, so a boot that takes the isolate down with it still

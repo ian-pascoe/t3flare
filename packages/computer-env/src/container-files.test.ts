@@ -1,7 +1,7 @@
 // Copied from cloudpid@ae5a7b73:packages/computer-env/src/container-files.test.ts.
 // The Container's file operations run their real scripts here, in bash on this machine, which stands in for the
 // Container; the "Workspace DO" side of the stage is the same disk.
-// @effect-diagnostics nodeBuiltinImport:off asyncFunction:off preferEffectArray:off processEnv:off
+// @effect-diagnostics nodeBuiltinImport:off
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,

@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
+// @effect-diagnostics globalConsole:off globalFetch:off nodeBuiltinImport:off
 // SPI-1086's stage evidence: seeds a little harness state on a throwaway stage and screenshots the panel through Access
 // with agent-browser, at desktop and phone widths, in light and dark. Run through the stage's `run`, which sets the
 // stage's service token and admin token (never printed):

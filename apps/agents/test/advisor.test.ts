@@ -3,7 +3,6 @@
 // running agent with an attributed Concern; under `request`, the final Review's findings become notes in the same run and
 // a Blocker continues it once; findings that cite no evidence are dropped; a failed Review pauses the Advisor without
 // stopping the agent, and nothing it does starts a run of its own.
-// @effect-diagnostics asyncFunction:off newPromise:off
 import { type AssistantMessage, createModels, fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
 import { createRegistry, defineExtension, defineTool, type EntryRecord, Harness, MemoryStorage } from "@earendil-works/pi-durable";
 import { obj, str } from "@earendil-works/pi-schema";

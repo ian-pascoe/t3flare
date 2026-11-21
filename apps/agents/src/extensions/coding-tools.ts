@@ -4,7 +4,6 @@
 // from cloudpid's: the Images binding (`read` keeps pi-durable's own image checks), the Call diff of `write` and of
 // codemode's nested calls (`edit` records its patch itself; a script's edits show as its children, ADR-0027). Added: `bash`'s exit code in its result's
 // `details`, which the Environment's differ shows on the command item, and (SPI-1057) pi-termctrl's `background`.
-// @effect-diagnostics asyncFunction:off preferEffectArray:off
 import type { Context } from "@earendil-works/chord";
 import { defineExtension, defineTool, type Extension, section, type ToolExecutionApi, type ToolExecutionResult, type ToolRegistration } from "@earendil-works/pi-durable";
 import type { ExecutionEnv, FileError, Result, ShellOutputInfo } from "@earendil-works/pi-durable/env";

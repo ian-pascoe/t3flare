@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off
 // A GitHub Copilot plan through GitHub's device flow (SPI-1166), as pi-ai 1.5.0 signs in to Copilot
 // (`dist/auth/oauth/github-copilot.js`; its facts in `@t3flare/models/copilotOAuth`, pinned against pi-ai's own flow):
 // the panel shows the code GitHub gives, the owner enters it at github.com/login/device and approves, and the

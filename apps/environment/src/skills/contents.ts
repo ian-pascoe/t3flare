@@ -1,4 +1,4 @@
-// @effect-diagnostics globalFetch:off globalDate:off
+// @effect-diagnostics globalDate:off
 // A repo's commit, tree and blobs, read from GitHub's REST API by the Environment DO alone (SPI-1148, ADR-0033): the
 // `RepoReader` the fetch reads through. Ported from cloudpid@47941c7c (`apps/server/src/github/contents.ts`,
 // `request.ts`), with t3flare's credential (plan §3.2):

@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off globalDate:off
+// @effect-diagnostics nodeBuiltinImport:off
 // A picked Skill in a CLI agent's message (SPI-1151 §3): Claude Code gets stock's rewrite (`planClaudeSkillDispatch`)
 // in the wrapper's `startTurn`, a mention that opens the message becoming the native `/name rest` and any other an inline
 // `/name` with a note in stock's wording naming its `SKILL.md`; OpenCode gets the Skill embedded as its own skill tool returns it.

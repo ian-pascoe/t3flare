@@ -2,7 +2,6 @@
 // `listFiles`' walk over an in-memory file tree: what it skips is never walked, and a repository below the listed
 // directory applies its own ignore rules. The conformance cases (`apps/server/src/workspace/env.workerd.test.ts`) check
 // the rest against a real Workspace.
-// @effect-diagnostics asyncFunction:off preferEffectArray:off preferEffectRecord:off
 import type { Workspace } from "@cloudflare/computer";
 import { describe, expect, it } from "vitest";
 import { listFiles } from "./list-files.ts";
@@ -60,7 +59,7 @@ const treeOf = (files: Readonly<Record<string, string>>) => {
     },
   };
 
-  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: `listFiles` uses only `stat`, `lstat`, `readFile` and `find`, which the fake answers.
+  // SAFETY: `listFiles` uses only `stat`, `lstat`, `readFile` and `find`, which the fake answers.
   return { fs: fs as unknown as Workspace["fs"], walked };
 };
 

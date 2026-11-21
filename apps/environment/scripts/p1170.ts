@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off nodeBuiltinImport:off
 // SPI-1170's evidence on its stage: the pi CLI through the model relay.
 //
 //   node scripts/stage.ts deploy p1170

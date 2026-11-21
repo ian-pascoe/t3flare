@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off globalConsole:off
 // T-clients (ADR-0035's 2026-11-15 refinement, plan D12): an Owner client's Elicitation mode is the owner's setting on the
 // Settings page, by caller key and `clientInfo.name`, since Claude Code's OAuth discovery does not survive a query on the
 // endpoint's URL. The kept mode decides when the URL names none; `?elicitation_mode=` still overrides; an unknown client

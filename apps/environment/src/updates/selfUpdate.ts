@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalDateInEffect:off effectFnOpportunity:off
+// @effect-diagnostics globalDateInEffect:off effectFnOpportunity:off
 // The stock client's server Update in the Cloud Environment (ADR-0037; in-app updates plan D2–D7): t3flare's own
 // `ServerSelfUpdate` and `ServiceLauncherClient`, which replace t3's in `t3/composition.ts` (ADR-0001: Layer).
 //

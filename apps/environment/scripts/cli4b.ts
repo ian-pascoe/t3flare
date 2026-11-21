@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
 // Step 4b's stage evidence (plan §8 M1–M5), through the admin routes and t3's own client protocol.
 //
 //   node scripts/stage.ts run step4b cli4b acp --cli claude|opencode [--model <id>] [--workspace <id>]

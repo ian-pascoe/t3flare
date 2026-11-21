@@ -21,7 +21,7 @@
 // tool, which pi-durable would also offer the agent. Not ported: Consultations (`advisor_ask`), Superseded Findings'
 // re-validation, token calibration, Advisor Session compaction (a Session past its size starts from a new seed), Child
 // Agents.
-// @effect-diagnostics asyncFunction:off globalDate:off globalTimers:off newPromise:off globalConsole:off
+// @effect-diagnostics globalDate:off globalTimers:off globalConsole:off
 import type { Context as ChordContext } from "@earendil-works/chord";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { type Conversation, defineExtension, type EntryId, type Extension, GenerationTask, type Harness, hook, type HookApi, type JsonObject } from "@earendil-works/pi-durable";

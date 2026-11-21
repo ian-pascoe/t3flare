@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalDateInEffect:off effectFnOpportunity:off globalConsole:off cryptoRandomUUID:off
+// @effect-diagnostics globalDate:off globalDateInEffect:off effectFnOpportunity:off globalConsole:off
 // The Environment's process spawner (step 2a plan, section 2): the Environment DO runs no processes, so every command
 // t3 spawns is answered here. `git` in a Workspace (`/w/<id>/…`) runs in that Workspace's Container; t3's clone into
 // `/w` makes a Workspace; `gh auth token` is the Environment's own GitHub token (t3's PR features); everything else is

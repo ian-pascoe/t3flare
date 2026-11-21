@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off
 // The Change page (ADR-0035, plan D10), M4 (SPI-1199): one Open change, server-rendered from its `shown` (render.ts), at
 // `/_t3flare/settings/changes/<id>` under the Settings page's Access check, hash-only CSP and security headers. Every string that
 // is not a literal here is made visible (control and bidi characters shown as `\u{…}`) and then HTML-escaped, so a

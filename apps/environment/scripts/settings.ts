@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
 // The Settings server's stage harness (SPI-1195, docs-archive-1:docs/steps/settings-mcp.md "Evidence"): the parts of the M1-M6 stage
 // runs that need no person at the keyboard. Own agents' turns are driven through t3's own protocol (as tools.ts and
 // spi1079.ts do), their cards answered by this script as the owner's paired session (`runtime-request.respond`); the

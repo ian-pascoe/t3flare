@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
 // Step 2b's worktree Workspace evidence against a stage, through t3's own RPCs (a headless stock-protocol client):
 //
 //   node scripts/stage.ts run <stage> worktree local-commit --workspace <project id>   a branch with a local-only commit

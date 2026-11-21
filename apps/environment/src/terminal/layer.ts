@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off
 // t3's TerminalManager in the Cloud Environment (step 2b, ADR-0021): a Layer of ours that restates `Manager.make` and
 // calls t3's exported `makeWithOptions`, so all of t3's terminal behaviour (sessions, viewers, scrollback, history
 // files, resume, setup scripts) stays stock above the PTY seam. `TerminalManager.layer` is not used.

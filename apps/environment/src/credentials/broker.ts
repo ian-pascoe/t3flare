@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off cryptoRandomUUID:off
+// @effect-diagnostics globalConsole:off cryptoRandomUUID:off
 // The Credential broker (SPI-1164; ADR-0018 revived and refined): the Environment DO holds every Subscription's tokens
 // (a Model endpoint's sign-in) and is their only refresher.
 //

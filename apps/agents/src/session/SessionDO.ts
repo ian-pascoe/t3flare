@@ -1,4 +1,4 @@
-// @effect-diagnostics asyncFunction:off globalDate:off globalConsole:off globalTimers:off cryptoRandomUUID:off globalFetch:off
+// @effect-diagnostics globalDate:off globalConsole:off globalTimers:off cryptoRandomUUID:off globalFetch:off
 // The Session DO (ADR-0005, step 2a plan): one Durable agent's conversation, a pi-durable Harness, per t3 thread. The
 // host follows pi-durable's test worker and cloudpid's Session host rules (docs/architecture/overview.md → Session host):
 // the Harness opens in the constructor after a fallback alarm is armed, `resume()` runs from the constructor and the

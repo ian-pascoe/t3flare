@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
 // SPI-1148's stage evidence (stage `penvsk`): Environment skills installed on the Settings page's API, delivered to a
 // Workspace and its Container, and used by a Durable agent, through t3's own calls as the web client makes them. Run
 // through the stage's `run`, which sets the stage's service token and admin token (never printed):

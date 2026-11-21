@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics nodeBuiltinImport:off
 // Workers Logs of a stage, tailed with `wrangler tail` while some work runs, kept in memory and never printed (the leak
 // scans compare them by name). From the tools step's `tools.ts`. wrangler authenticates with $CLOUDFLARE_API_TOKEN, or
 // the alchemy profile's token, read by this script and passed in wrangler's environment only.

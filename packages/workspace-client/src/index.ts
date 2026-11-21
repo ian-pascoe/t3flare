@@ -22,7 +22,7 @@ export const isWorktreeDir = (value: string): boolean =>
   value.length > 0 &&
   value !== "." &&
   value !== ".." &&
-  // oxlint-disable-next-line no-control-regex
+  // oxlint-disable-next-line no-control-regex -- control characters are what this refuses
   !/[/\x00-\x1f\x7f]/.test(value) &&
   new TextEncoder().encode(value).byteLength <= 100;
 

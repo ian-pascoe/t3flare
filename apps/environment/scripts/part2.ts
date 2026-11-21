@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
 // Step 2a part 2's checks on a deployed stage (docs-archive-1:docs/steps/step-2a-part2-plan.md):
 //
 //   node scripts/stage.ts run step2a2 part2 setup            clone the fixture into a Workspace and open a project on it
@@ -194,12 +194,10 @@ switch (scenario) {
     check("cloned", cloned.cwd === destination, cloned);
     finish();
   }
-  // eslint-disable-next-line no-fallthrough
   case "ps": {
     report.ps = await ps(fixture().workspaceId);
     finish();
   }
-  // eslint-disable-next-line no-fallthrough
   case "abort": {
     const threadId = await threadOn(`abort ${stamp}`);
     const started = await startSleeper(threadId);
@@ -214,7 +212,6 @@ switch (scenario) {
     check("no process of the call within 3 s of Stop", gone.seconds !== null && gone.seconds <= 3, report.after);
     finish();
   }
-  // eslint-disable-next-line no-fallthrough
   case "restart": {
     const session = flag("session");
     const threadId = await threadOn(`restart ${session ? "session" : "environment"} ${stamp}`);
@@ -264,7 +261,6 @@ switch (scenario) {
     }
     finish();
   }
-  // eslint-disable-next-line no-fallthrough
   case "survivor": {
     const threadId = await threadOn(`survivor ${stamp}`);
     await sendMessage(
@@ -287,7 +283,6 @@ switch (scenario) {
     await exec(fixture().workspaceId, `kill ${background.map((b) => b.pid).join(" ")} 2>/dev/null; true`);
     finish();
   }
-  // eslint-disable-next-line no-fallthrough
   case "stopped": {
     // With the Container stopped, a kill does not start it.
     const id = fixture().workspaceId;
@@ -303,7 +298,6 @@ switch (scenario) {
     check("and it is still stopped", entry === undefined || entry.container?.running !== true, entry);
     finish();
   }
-  // eslint-disable-next-line no-fallthrough
   case "limit":
   case "key":
   case "overload": {
@@ -362,7 +356,6 @@ switch (scenario) {
     check("the thread resumed by itself and completed", runs.at(-1)?.status === "completed", runs);
     finish();
   }
-  // eslint-disable-next-line no-fallthrough
   default:
     console.error(`unknown scenario ${scenario}`);
     process.exit(2);

@@ -3,7 +3,7 @@
 // faux provider calls `bash`, which waits for the owner's answer. The Harness is restarted as an evicted Durable Object
 // is, more times than `restartLimit`, while the call waits: the request survives, the call is not ended, and the answer
 // given after the restarts runs the tool once. Also: a decline, the modes, and an unsafe tool cut off after it started.
-// @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off
+// @effect-diagnostics globalTimers:off
 import { type AssistantMessage, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { defineExtension, defineTool } from "@earendil-works/pi-durable";
 import { obj, str } from "@earendil-works/pi-schema";

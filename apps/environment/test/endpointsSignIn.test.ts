@@ -1,4 +1,3 @@
-// @effect-diagnostics globalConsole:off
 // ChatGPT plan usage on the Settings page (SPI-1164): the owner starts the sign-in, opens the authorize link, pastes the
 // address the browser lands on, and sees the account or why it failed; a ChatGPT endpoint is saved with the models its
 // token lists; sign-out revokes and stops the endpoint's Sessions. The panel's answers, page and audit log never hold a

@@ -14,7 +14,7 @@
 //
 // Also here: the path translation of t3's `/w/<id>` (the Workspace as t3 names it) to `/workspace/repo` (as the tools
 // see it) in the arguments of the file tools and in `bash`'s command (step 2a plan, R13).
-// @effect-diagnostics asyncFunction:off preferEffectArray:off globalDate:off globalConsole:off
+// @effect-diagnostics globalDate:off globalConsole:off
 import type { Context } from "@earendil-works/chord";
 import { defineExtension, type Extension, section, type ToolExecutionApi, type ToolRegistration, type Wrap } from "@earendil-works/pi-durable";
 import type { ApprovalDecision, InteractionMode, PendingApproval, RuntimeMode } from "@t3flare/session-protocol";

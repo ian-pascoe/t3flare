@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off
 // A fake of OpenAI's "Sign in with ChatGPT" authorization server (SPI-1164), as its docs describe it
 // (developers.openai.com/siwc/token-sharing-open-source): discovery, the JWKS, the authorize step (as a browser approval
 // that answers with the loopback callback URL), the token endpoint (authorization code with PKCE, and rotating refresh

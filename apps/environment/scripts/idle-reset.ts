@@ -1,4 +1,4 @@
-// @effect-diagnostics globalJsonInEffect:off globalDateInEffect:off globalDate:off globalConsole:off nodeBuiltinImport:off globalFetch:off cryptoRandomUUID:off cryptoRandomUUIDInEffect:off globalTimers:off
+// @effect-diagnostics globalDateInEffect:off globalDate:off globalConsole:off nodeBuiltinImport:off globalFetch:off cryptoRandomUUIDInEffect:off globalTimers:off
 // Evidence for ADR-0003 on a deployed stage (or local workerd): with no client, the Environment resets
 // itself and later wakes on its alarm.
 //

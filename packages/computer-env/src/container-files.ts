@@ -5,7 +5,7 @@
 // pulls into the Workspace DO after the command, and a write stages its bytes there first, which computer pushes to the
 // Container before the command. Metadata, listings and matches come back on standard output.
 // pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
-// @effect-diagnostics asyncFunction:off cryptoRandomUUID:off preferEffectArray:off
+// @effect-diagnostics cryptoRandomUUID:off
 import type { FileErrorCode, FileInfo, FileKind } from "@earendil-works/pi-durable/env";
 import { failureMessage } from "@t3flare/workspace-client";
 import { HARNESS_ROOT, isContainerOnly } from "./container-paths.ts";

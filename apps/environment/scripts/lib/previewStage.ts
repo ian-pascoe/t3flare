@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off anyUnknownInErrorContext:off
+// @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off globalTimers:off anyUnknownInErrorContext:off
 // G11's stage flow (scripts/previews.ts): a Vite dev server in a thread's terminal in the fixture Workspace, listed by
 // port discovery, opened in t3's server browser, watched over t3's stream route, edited for HMR, and a hostile page run
 // in it. What a tab's page sees is read through the stage-only `tab-eval` spike op (a second CDP connection).

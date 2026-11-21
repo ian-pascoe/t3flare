@@ -6,7 +6,7 @@
 // computerd's own kill leaves them running (docs-archive-1:docs/steps/step-2a-part2.md, M0). An id is forgotten only when its command
 // ended by itself or a kill found none of its processes left; otherwise the kill is tried again from the Session's
 // alarm, and given up after `MAX_ATTEMPTS`. A background process of a command that completed is left alone.
-// @effect-diagnostics globalTimers:off globalConsole:off newPromise:off
+// @effect-diagnostics globalTimers:off globalConsole:off
 
 const KEY = "t3flare:running-execs";
 /** Kills of one id before it is given up (each about 5 s apart, from the alarm). */

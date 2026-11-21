@@ -1,7 +1,7 @@
 // t3's PTY seam in the Cloud Environment (step 2b, ADR-0021) at the adapter: what t3's TerminalManager sees of a shell
 // whose Workspace DO is a fake. The env allowlist (review F0), write order, pushed frames, the foreground's state (F1),
 // one close instead of SIGTERM/SIGKILL (F2), and the Workspace DO's epoch (F11).
-// @effect-diagnostics globalTimers:off newPromise:off
+// @effect-diagnostics globalTimers:off
 import type { TerminalAnswer, TerminalOpenInput } from "@t3flare/workspace-client";
 import { describe, expect, it } from "vitest";
 

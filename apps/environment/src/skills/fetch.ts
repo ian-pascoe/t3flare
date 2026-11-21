@@ -72,7 +72,7 @@ export type SkillMdInfo =
 /** A frontmatter value as one line of printable text, as the CLI's `sanitizeMetadata` makes it. */
 const oneLine = (value: string): string =>
   value
-    // oxlint-disable-next-line no-control-regex
+    // oxlint-disable-next-line no-control-regex -- control characters are what this strips
     .replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, "")
     .replace(/[\r\n]+/g, " ")
     .trim();

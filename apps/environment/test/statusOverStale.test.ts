@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off globalDate:off
+// @effect-diagnostics nodeBuiltinImport:off
 // t3's own status reading over the cloud's passive git answers (the prod bugs of 2026-11-11): t3's real `GitVcsDriver`
 // spawns git through the process router, whose Workspace answers like a Workspace DO: real git while its Container
 // runs, and `staleRead` (the DO's rule for a passive read) once it stops. The repo is a clone of a repo with a

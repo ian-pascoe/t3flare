@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off
 // T-endpoint, T-guards, T-state (plan §5; ADR-0035, plan D11, D12's `browser`), M5a (SPI-1200): the Owner-client
 // endpoint over one Environment's Settings server (settingsFixture). Version negotiation for each version and an unknown
 // method; capabilities from 2026's `_meta` on each request and from 2025's signed session; every guard of D11; the signed

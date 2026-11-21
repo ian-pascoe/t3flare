@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalConsoleInEffect:off globalJsonInEffect:off globalDate:off effectFnOpportunity:off anyUnknownInErrorContext:off
+// @effect-diagnostics globalConsoleInEffect:off globalJsonInEffect:off effectFnOpportunity:off
 // What the Cloud Environment's ACP flavors share (step 4b, plan §3.2 and §5 with the review's F1, F7, F9; back to stock,
 // owner 2026-11-12): the agent is pinned to its asking mode and t3 decides each request it asks, as stock t3's adapters
 // decide (plan §5.1); this module is that decision, the effort picker, a failed prompt's failure, and the plan capture

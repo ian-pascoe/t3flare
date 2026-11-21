@@ -1,4 +1,4 @@
-// @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off globalDate:off nodeBuiltinImport:off preferEffectArray:off
+// @effect-diagnostics globalTimers:off globalDate:off nodeBuiltinImport:off
 // G11's M0 spike and the stage's browser checks (test stages only; `POST /_t3flare/previews/spike`, `scripts/previews.ts`):
 // Browser Run under the Playwright calls t3's `ServerBrowser` makes, the Container preview routes and their props across
 // invocations, `localhost` and `t3-page.localhost` under Browser Run's policy, and what a page there can reach. Every

@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalTimers:off globalConsoleInEffect:off globalDateInEffect:off effectFnOpportunity:off globalJsonInEffect:off nodeBuiltinImport:off
+// @effect-diagnostics globalDate:off globalTimers:off globalJsonInEffect:off
 // Step 4b M1's demo (stages only): Claude Code or OpenCode started through t3's own `ChildProcessSpawner` (the process
 // router, the CLI profile, the process channel) in a Workspace's Container, without t3's drivers, and driven over ACP:
 // `initialize`, `session/new`, the model chosen, one prompt. Every permission request is refused. Admin

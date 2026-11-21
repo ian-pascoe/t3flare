@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
+// @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off
 // Step 2a M3's deployed checks (tools, approvals, diffs) on the fixture Workspace, through t3's own commands, as the
 // web client sends them:
 //

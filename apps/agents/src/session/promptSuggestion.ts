@@ -5,7 +5,7 @@
 // endpoints' small model, text generation's default rule), with
 // the turn's request and answer only (bounded), never the whole thread: one cheap request per completed turn, only while
 // the owner has the labs flag on.
-// @effect-diagnostics asyncFunction:off globalTimers:off
+// @effect-diagnostics globalTimers:off
 import type { Api, Context, Model, Models } from "@earendil-works/pi-ai";
 import { defaultSmallModel, type ModelEndpoints, parseEndpointSlug } from "@t3flare/models/endpoints";
 

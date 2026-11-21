@@ -1,4 +1,4 @@
-// @effect-diagnostics globalJsonInEffect:off globalDateInEffect:off globalDate:off globalConsole:off globalFetch:off cryptoRandomUUID:off globalTimers:off anyUnknownInErrorContext:off
+// @effect-diagnostics globalDate:off globalFetch:off cryptoRandomUUID:off globalTimers:off anyUnknownInErrorContext:off
 // A headless stock-protocol t3 client for the stage scripts (step 2a): pairs with the armed bootstrap token, sends
 // commands over /ws (t3's own WsRpcGroup), and reads threads through the bounded HTTP snapshot.
 import { ORCHESTRATION_V2_WS_METHODS, WS_METHODS, WsRpcGroup } from "@t3tools/contracts";

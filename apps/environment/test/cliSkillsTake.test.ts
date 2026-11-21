@@ -1,4 +1,3 @@
-// @effect-diagnostics globalTimers:off
 // SPI-1153 (hand-off A1): a CLI agent's Workspace takes the Environment skill set before the CLI's process starts and
 // before each of its turns, on the Environment's side, bounded and never failing either. The take itself
 // (`takeEnvironmentSkillsAt`), the spawner's take before the process channel starts (`spawnCli`), and the wrapper's

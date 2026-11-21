@@ -1,4 +1,4 @@
-// @effect-diagnostics globalFetch:off globalDate:off extendsNativeError:off
+// @effect-diagnostics globalDate:off extendsNativeError:off
 // GitHub Actions as an in-app Update uses it (ADR-0037; in-app updates plan D4, D5, D9): dispatch one of t3flare's own
 // workflows on `main`, find the run that dispatch made by its `run-name`, read the run, and name its failed step. Every
 // request takes a fresh token from `token()` (the DO's minter, with `UPDATE_DISPATCH_GITHUB_PERMISSIONS` on the update

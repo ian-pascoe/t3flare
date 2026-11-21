@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off globalTimers:off anyUnknownInErrorContext:off
+// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
 // Parity batch 2's stage harness (docs-archive-1:docs/steps/parity-batch-2.md), through t3's own client protocol as the web client sends
 // it, against a stage deployed with `T3FLARE_PROBE=1` (its probe Worker: an OTLP receiver).
 // Evidence goes to .evidence/parity-batch-2/<part>.json, tokens and keys redacted.

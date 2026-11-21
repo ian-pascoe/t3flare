@@ -1,4 +1,3 @@
-// @effect-diagnostics asyncFunction:off
 // The agents Worker's entrypoint for Container previews (G11's M3, ADR-0031): the Environment Worker's `ContainerPreviews`
 // (Browser Run's `outboundByHost` target, made for one Workspace) hands each request here over a service binding. It
 // reaches one method of one Workspace DO, `containerPreview`, for the Workspace id it is given, and nothing else; the id

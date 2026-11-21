@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off
+// @effect-diagnostics globalDate:off nodeBuiltinImport:off
 // The acceptance test's real turn (step 2a plan, Tests → Deployed; `scripts/acceptance.ts --real-turn [--push]`):
 // clone the fixture into a new Workspace through t3's own clone, open a project and an approval-required thread on
 // it, run one turn with a small model that edits a file and runs `bash test.sh`, approve each call, and check the turn

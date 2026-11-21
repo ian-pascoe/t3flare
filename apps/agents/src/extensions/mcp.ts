@@ -7,7 +7,6 @@
 // writes follow the thread's mode (plan refuses; full access runs; otherwise the owner is asked, and may accept the tool
 // for the session), linked threads included (owner, 2026-11-12, back to stock). A write is memoed before it is sent: a restart
 // after that answers "cut off", never sends it twice (ADR-0022's rule; Commissary keeps no idempotency key).
-// @effect-diagnostics asyncFunction:off preferEffectArray:off globalConsole:off
 import type { Context } from "@earendil-works/chord";
 import { defineExtension, type Extension, section, type ToolExecutionApi, type ToolRegistration } from "@earendil-works/pi-durable";
 import type { CodemodeNamespace } from "@earendil-works/pi-durable/codemode";

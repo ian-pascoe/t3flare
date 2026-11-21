@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off
 // The publish recorder (step 3+, plan section 4.4): t3's AgentAwarenessRelay calls T3 Connect through its own HTTP
 // client, so nothing of ours sees the relay's answer, but it logs each outcome. A Logger of ours keeps the last 100 of
 // those events (thread, phase, the relay's delivery counts, a failure's status), mirrored to DO storage so they survive

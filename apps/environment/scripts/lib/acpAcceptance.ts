@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off
 // The acceptance test's Claude Code and OpenCode checks (step 4b, plan §9; `scripts/acceptance.ts --claude --opencode`):
 // on a fresh clone of the fixture, an approval-required turn whose edit and `bash test.sh` are each asked and
 // approved, the diff, then a plan turn on the same thread that edits nothing (Claude's with a proposed plan), and 4a's

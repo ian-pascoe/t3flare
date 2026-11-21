@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off
 // `pnpm run test:docker`, SPI-1151's probe (its M0): which skill and command roots each pinned CLI loads, launched as
 // the Workspace DO launches it (`profileLaunch` → `processCommand`) in test:docker's image. A marker Skill with its own
 // name sits in every candidate root, repo-level and user-level, with one same-named Skill (`dup`) in every repo root;

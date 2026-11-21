@@ -1,4 +1,4 @@
-// @effect-diagnostics asyncFunction:off globalTimers:off globalDate:off globalConsole:off effectFnOpportunity:off
+// @effect-diagnostics globalTimers:off globalDate:off effectFnOpportunity:off
 // t3's HTML renders' browser (G11's M1, ADR-0031): stock `htmlRender/headlessChrome.ts`, unchanged, spawns Chrome with
 // `--remote-debugging-pipe` (CDP on fd 3 in and fd 4 out, NUL-delimited) at the path `PreviewBrowser` gives it. Here
 // that path is `HTML_BROWSER_EXECUTABLE` (our `PreviewBrowser` Layer), and our process router answers it with this

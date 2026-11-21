@@ -1,7 +1,7 @@
 // Copied from cloudpid@93ba45a3:packages/extensions/src/web/content.test.ts, imports repointed (SPI-1054).
 // The page fixtures and main-content expectations come from pi-web-tools' `test/web-fetch.test.ts` (MIT; see
 // ../../NOTICE.md); the Markdown expectations are for the Worker-side converter that replaces Turndown.
-// @effect-diagnostics preferEffectArray:off globalDate:off
+// @effect-diagnostics globalDate:off
 import { describe, expect, it } from "vitest";
 import { convertContent, type WebFetchFormat } from "../../src/extensions/web/content.ts";
 import { htmlToMarkdown, MAX_FRAMES, MAX_SPANS } from "../../src/extensions/web/html-markdown.ts";

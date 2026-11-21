@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off
+// @effect-diagnostics globalDate:off
 // Step 3: an owner's thread on the stage's fixture project with the Durable agent, driven as the stock client drives it,
 // and its projection read until a condition holds (the M2–M4 scripts).
 import { dispatch, projectionOf, runsOf, SETTLED, sendMessage, sleep, threadWindow, uuid } from "./client.ts";

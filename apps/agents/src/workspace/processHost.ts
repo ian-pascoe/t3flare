@@ -1,4 +1,4 @@
-// @effect-diagnostics asyncFunction:off globalDate:off globalTimers:off globalConsole:off
+// @effect-diagnostics globalTimers:off globalConsole:off
 // The Workspace DO's CLI processes (step 4a, the process channel): `codex app-server` and `pi --mode rpc` under the
 // platform's non-PTY exec in the Workspace's Container, their stdout and stderr kept as bytes until the Environment's
 // spawner reads them (`read`, a long poll that is also the heartbeat), their stdin, signals and turns from the

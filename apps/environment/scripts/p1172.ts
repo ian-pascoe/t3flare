@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
 // SPI-1172's evidence on its stage: a Durable turn on the stage's Model endpoint (`commissary`, Anthropic Messages, an API
 // key) whose model answers come from the Session's fault route in the vendors' shapes, classified by the endpoint's API
 // and auth.
@@ -154,7 +154,6 @@ switch (step) {
     check("cloned", cloned.cwd === destination, cloned);
     finish();
   }
-  // eslint-disable-next-line no-fallthrough
   case "limit": {
     await updateSettings(cookie, { autoResumeLimitedThreads: true });
     const { threadId, resetAt, failure, turn } = await failedTurn(`limit ${stamp}`, "anthropicUsageLimit", Number(option("reset-s", "120")));
@@ -182,7 +181,6 @@ switch (step) {
     check("the resumed run started after the reset", (report.resumed as any).secondRunStartedAfterResetMs >= 0, report.resumed);
     finish();
   }
-  // eslint-disable-next-line no-fallthrough
   case "key": {
     const stop = flag("tail") ? tail() : undefined;
     if (stop !== undefined) await sleep(8000);
@@ -209,7 +207,6 @@ switch (step) {
     }
     finish();
   }
-  // eslint-disable-next-line no-fallthrough
   case "overload": {
     const { failure, turn } = await failedTurn(`overload ${stamp}`, "overloaded", 120);
     // pi-durable retries an overload (3 retries): four answers, then a provider error.
@@ -217,7 +214,6 @@ switch (step) {
     check("a provider error, not a usage limit", failure.class === "provider_error" && failure.code === "overloaded", failure);
     finish();
   }
-  // eslint-disable-next-line no-fallthrough
   case "cli": {
     const proxyUrl = (process.env.MODEL_PROXY_URL ?? "").replace(/\/+$/, "");
     if (!check("the stage's script has MODEL_PROXY_URL (dev.env)", proxyUrl !== "")) finish();
@@ -258,7 +254,6 @@ switch (step) {
     await api("POST", "endpoints", { op: "remove", id: "badkey" });
     finish();
   }
-  // eslint-disable-next-line no-fallthrough
   default:
     console.error(`unknown step ${step}`);
     process.exit(2);

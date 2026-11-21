@@ -8,7 +8,6 @@
 // mount root, `/…` anchored at it, `**/…` at any depth, `*` within one segment, `**` a whole segment, a leading `!`
 // taking a path back; the last pattern that matches decides. A pattern that matches a directory covers everything below
 // it, so the last pattern that matches the path or one of its ancestors decides.
-// @effect-diagnostics missingPipeableSignature:off preferEffectArray:off
 
 /** Where the Workspace is mounted, on the Container and in the Workspace DO's files. */
 export const WORKSPACE_ROOT = "/workspace";

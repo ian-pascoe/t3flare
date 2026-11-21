@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off globalTimers:off globalDate:off globalConsole:off asyncFunction:off newPromise:off globalFetch:off
+// @effect-diagnostics globalTimers:off globalDate:off globalConsole:off globalFetch:off
 // Shadow of t3code `apps/server/src/preview/ServerBrowserContexts.ts` (G11's M3, ADR-0031; ADR-0001). Stock launches
 // Chrome on its host; here every browser is Cloudflare Browser Run, driven by `@cloudflare/playwright` (a port of
 // Playwright 1.62.1; t3 types against `playwright-core` 1.64.1, cast at this boundary). Exports what stock does:
@@ -470,7 +470,7 @@ export class ServerBrowserContexts {
     }
   }
 
-  // oxlint-disable-next-line require-await -- stock's signature; there is no desktop app on this host.
+  // Stock's signature; there is no desktop app on this host.
   async connectDesktopPage(_endpoint: string): Promise<{ browser: Browser; page: Page }> {
     throw new Error("The Cloud Environment has no desktop app to attach to.");
   }

@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalDateInEffect:off anyUnknownInErrorContext:off
+// @effect-diagnostics globalDateInEffect:off anyUnknownInErrorContext:off
 // SQL checks through t3's own SQL client (ADR-0006), run by the admin route `/_t3flare/check/sql`:
 // withTransaction rollback (and a nested savepoint rolled back alone), more than 100 bound parameters through
 // the adapter's inlining, and how reads behave behind an open transaction.

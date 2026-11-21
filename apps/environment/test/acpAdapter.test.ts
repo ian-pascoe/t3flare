@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off globalDate:off
+// @effect-diagnostics nodeBuiltinImport:off
 // t3's own ACP adapter (`makeAcpAdapterV2`) through our flavors (step 4b, plan §9's "Node with t3's adapter", review
 // F1; back to stock, owner 2026-11-12): a scripted agent (fixtures/fake-acp-agent.mjs) answers as claude-agent-acp 0.106.0 and opencode 2.2.7
 // did in M0's probes. Each test asserts what the agent was answered and what t3 saw.

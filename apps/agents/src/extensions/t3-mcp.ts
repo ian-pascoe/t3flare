@@ -14,7 +14,7 @@
 //   so a rerun under a credential t3 issued again (an Environment restart) is refused rather than repeated (review C9).
 //   Any other tool that changes state is not run again once started.
 // - A wait (`timeoutMs`) goes to t3 in pieces of at most 50 s from its start (review C9), each marked as progress.
-// @effect-diagnostics asyncFunction:off preferEffectArray:off globalDate:off globalConsole:off
+// @effect-diagnostics globalDate:off
 import type { Context } from "@earendil-works/chord";
 import { defineExtension, type Extension, section, type ToolExecutionApi, type ToolRegistration } from "@earendil-works/pi-durable";
 import type { InteractionMode, RuntimeMode } from "@t3flare/session-protocol";

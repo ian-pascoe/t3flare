@@ -2,7 +2,6 @@
 // Session's storage while they run, so an aborted call's processes are killed, and a Session that died mid-call kills
 // them when it opens again. An id is forgotten only when its command ended by itself or a kill found none of its
 // processes left; otherwise the kill is tried again (the Session's alarm).
-// @effect-diagnostics globalTimers:off newPromise:off
 import { describe, expect, it } from "vitest";
 
 import { type KillAnswer, RunningExecs, type RunningExecsStorage } from "../src/session/runningExecs.ts";

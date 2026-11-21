@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
 // Step 2b's terminal evidence against a stage, through t3's own terminal RPCs (a headless stock-protocol client).
 //
 //   node scripts/stage.ts run <stage> terminal basic [--workspace <id>] [--out file.json]

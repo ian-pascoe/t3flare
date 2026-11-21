@@ -2,7 +2,6 @@
 // answer shaping (its Exa-style result list shares the `contextMaxCharacters` budget so each result keeps its Title and
 // URL) and the sanitizer for text a provider controls, unchanged but for this header and the exports. `search.ts`
 // writes its results in the same `Title:`/`URL:` shape so the same budget applies.
-// @effect-diagnostics missingPipeableSignature:off preferEffectArray:off missedPipeableOpportunity:off
 import * as Arr from "effect/Array";
 import * as Order from "effect/Order";
 

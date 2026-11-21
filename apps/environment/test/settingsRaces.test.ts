@@ -1,4 +1,3 @@
-// @effect-diagnostics globalDate:off globalTimers:off
 // Races around an Open change (ADR-0035, plan D8, D9, D12), SPI-1200 spec review:
 // - a decline, Stop, cancel or timeout landing while another answer is applying the change waits for that outcome, never
 //   reporting a failure it did not have (`closeOrSettle`), for an own agent's card, an Owner client's retry and `resume`;

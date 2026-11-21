@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalConsole:off globalDate:off nodeBuiltinImport:off
 // `pnpm run test:docker`, SPI-1153's probe (its M0): each pinned CLI, launched as the Workspace DO launches it
 // (`profileLaunch` → `processCommand`, with SPI-1153's links and pi's flag), with an Environment skill set mounted
 // read-only at `/workspace/.agents/skills` (as SPI-1148's lock leaves it): an Environment-only Skill (`e-env`) and a

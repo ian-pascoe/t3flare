@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
 // SPI-993's stage check: an image attached in t3 reaches the Durable agent. Through t3's own client protocol it persists
 // a small solid green PNG (`assets.persistChatAttachments`, as the web client does), sends it on claude-haiku-5-5 and
 // asks for the colour; then sends an image past the Session's inline budget and checks the turn still completes, with

@@ -1,4 +1,4 @@
-// @effect-diagnostics globalTimers:off globalDate:off
+// @effect-diagnostics globalTimers:off
 // The Global mise config's lay-down, once per Container (SPI-1150, ADR-0032's Global mise config refinement): the Workspace DO runs the script
 // (`@t3flare/sandbox-image/globalMise`) on each new Container before its first command, holding the Container while it
 // runs, and reports how it ended.

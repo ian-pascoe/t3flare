@@ -1,7 +1,7 @@
 // Copied from cloudpid@ae5a7b73:apps/server/src/github/app.ts (ADR-0013 here). The GitHub App: GitHub tokens minted on demand from the app's private
 // key, one per installation (an account the app is installed on). A Worker or a Workspace DO holds one `GitHubApp`,
 // which keeps the installations it found and the tokens it minted.
-// @effect-diagnostics asyncFunction:off globalFetch:off preferEffectArray:off missingPipeableSignature:off extendsNativeError:off -- WebCrypto and `fetch` are Promise APIs, over native arrays. `GitHubNotInstalled` and `GitHubRefused` are thrown from that Promise code, kept by `#once` and thrown again to every caller in its wait, and read with `instanceof` by the callers that act on them (the hooks client's codes): plain `Error`s, as every failure `#once` keeps is.
+// @effect-diagnostics extendsNativeError:off -- WebCrypto and `fetch` are Promise APIs, over native arrays. `GitHubNotInstalled` and `GitHubRefused` are thrown from that Promise code, kept by `#once` and thrown again to every caller in its wait, and read with `instanceof` by the callers that act on them (the hooks client's codes): plain `Error`s, as every failure `#once` keeps is.
 
 import type { GitHubPermissions } from "./permissions.ts";
 import * as Option from "effect/Option";

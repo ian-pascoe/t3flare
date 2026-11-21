@@ -4,7 +4,6 @@
 // one queue answers both the agent and the Guardian: a destructive command is reviewed, escalated and blocked with
 // pi-guardian's rejection, and a `t3flare.guardian` entry carries the reason for t3; a Safe Command runs without a
 // review; a `deny` Command Rule blocks without one; a code mode script's nested call is reviewed with its issuer.
-// @effect-diagnostics asyncFunction:off
 import { type AssistantMessage, createModels, fauxAssistantMessage, fauxProvider, fauxToolCall, type ToolResultMessage } from "@earendil-works/pi-ai";
 import { createRegistry, defineExtension, defineTool, type Extension, Harness, MemoryStorage } from "@earendil-works/pi-durable";
 import { obj, str } from "@earendil-works/pi-schema";

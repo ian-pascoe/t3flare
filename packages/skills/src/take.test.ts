@@ -1,4 +1,3 @@
-// @effect-diagnostics globalTimers:off
 // A turn takes the Environment skill set (SPI-1148, plan §4.2): only with a hash and a Workspace, bounded, and never
 // failing the turn: a Workspace that predates the call, refuses the set or does not answer in time leaves it as it was.
 import { describe, expect, it, vi } from "vitest";

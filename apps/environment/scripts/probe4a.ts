@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
 // Step 4a M0's stage probes (plan §8 M0, with the review's P12 and P8 gate), through the admin routes.
 //
 //   node scripts/stage.ts run step4a probe4a workspace            clone the fixture project (once); prints its Workspace id

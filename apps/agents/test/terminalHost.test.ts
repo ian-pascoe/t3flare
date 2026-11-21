@@ -1,7 +1,7 @@
 // The Workspace DO's terminals (step 2b, ADR-0021) at their seam, `TerminalHost`, over a fake PTY process: what the
 // Environment's adapter sees pushed, and what reaches the shell and the kill script. Review F1 (markers), F2 (no
 // `ExecProcess.kill`), F10 (only input is use), F11 (the epoch) and D1 (a lapsed heartbeat kills).
-// @effect-diagnostics globalTimers:off newPromise:off globalDate:off
+// @effect-diagnostics globalTimers:off
 import { MARK_BUSY, MARK_PROMPT, scanMarkers } from "@t3flare/sandbox-image/terminal";
 import type { TerminalFrame, TerminalPushAnswer } from "@t3flare/workspace-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

@@ -1,4 +1,4 @@
-// @effect-diagnostics asyncFunction:off globalDate:off globalConsole:off globalTimers:off cryptoRandomUUID:off globalFetch:off
+// @effect-diagnostics globalDate:off globalConsole:off globalTimers:off cryptoRandomUUID:off
 // The Workspace DO (ADR-0008, ADR-0009; step 2a plan): one `@cloudflare/computer` Workspace, its files in this object's
 // SQLite, its commands on the Worker Shell or, for real binaries, in the Container this object starts itself
 // (`schedulingPolicy: "durable_object"`). Adapted from cloudpid@ae5a7b73:apps/server/src/workspace/Workspace.ts, which

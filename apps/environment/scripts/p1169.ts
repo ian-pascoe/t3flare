@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off nodeBuiltinImport:off
 // SPI-1169's evidence on its stage: OpenCode through the model relay.
 //
 //   node scripts/stage.ts deploy p1169

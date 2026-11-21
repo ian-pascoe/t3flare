@@ -56,7 +56,7 @@ export const skillSetOf = async (files: Readonly<Record<string, string>>): Promi
  */
 export const skillFilePathProblem = (path: string): string | undefined => {
   if (path.includes("\\") || path.includes("\0")) return "has a backslash or a NUL";
-  // oxlint-disable-next-line no-control-regex
+  // oxlint-disable-next-line no-control-regex -- control characters are what this refuses
   if (/[\u0001-\u001f\u007f]/.test(path)) return "has a control character";
   const segments = path.split("/");
   if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) return "has an empty, `.` or `..` segment";

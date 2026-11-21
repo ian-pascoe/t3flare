@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off asyncFunction:off
+// @effect-diagnostics globalDate:off globalConsole:off
 // OAuth sign-ins for direct MCP servers (review M4, ADR-0010's and ADR-0012's refinements; cloudpid ADR-0034's model):
 // the owner starts one on the Settings page, the server's authorization server sends the browser back to a public exact
 // path on the t3 host, outside `/_t3flare` (with the client metadata document; owner, 2026-11-12, back to stock), and the

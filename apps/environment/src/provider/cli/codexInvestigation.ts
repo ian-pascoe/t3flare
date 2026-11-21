@@ -1,4 +1,4 @@
-// @effect-diagnostics globalJsonInEffect:off effectFnOpportunity:off
+// @effect-diagnostics globalJsonInEffect:off
 // The Codex driver's investigating text generation (parity G7, SPI-998): t3's PR review guide asks a coding agent to
 // read a checkout read-only (`TextGenerationOperations.Request.investigate`), and stock t3 runs `codex exec -s
 // read-only` with the checkout as its cwd (`CodexTextGeneration.runCodexJson`). Here the same run happens in the

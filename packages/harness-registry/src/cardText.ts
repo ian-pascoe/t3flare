@@ -3,7 +3,6 @@
 // an explicit TRUNCATED line, so nothing is approved unseen without the card saying so. Control characters (but newline
 // and tab) and invisible format characters (bidi overrides, zero-width marks) are shown as `\u{…}`, so text cannot hide
 // or reorder what the owner reads (SPI-992 review M6's rule for refs, kept to what is not printable).
-// @effect-diagnostics nodeBuiltinImport:off
 import { createHash } from "node:crypto";
 
 /** Most characters of a card's text shown. */

@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off effectFnOpportunity:off
+// @effect-diagnostics globalDate:off effectFnOpportunity:off
 // t3's `PortDiscovery` for the Cloud Environment (G11's M2, ADR-0031): a Layer replacing stock `PortScanner.layer`, whose
 // single-host model (one `/proc`, one pid space) does not fit up to three Containers.
 //

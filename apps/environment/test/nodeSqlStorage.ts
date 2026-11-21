@@ -1,4 +1,3 @@
-// @effect-diagnostics nodeBuiltinImport:off
 // A `SqlStorage`-shaped view of Node's own SQLite, so the adapter and the idle queries are tested on Node
 // against a real SQLite (DO SQLite's own limits are tested in workerd: test/*.workerd.test.ts).
 import { DatabaseSync } from "node:sqlite";

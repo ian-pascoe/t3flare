@@ -6,7 +6,6 @@
 // debounced on the process's output. t3 captures as soon as the turn ends, before that pull ran, so the capture first
 // pulls the Container's writes (nothing when it is stopped: a stop pulls before it ends), and only then reads the
 // change log's revision and the files.
-// @effect-diagnostics asyncFunction:off
 import type { CheckpointAnswer } from "@t3flare/workspace-client";
 import * as git from "isomorphic-git";
 

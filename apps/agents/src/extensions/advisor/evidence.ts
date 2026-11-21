@@ -4,7 +4,6 @@
 // Reference; tool results capped at `maxToolResultChars` (4,000) around a marker. Changed: projected from the Session's
 // stored entries (pi-durable's History), not Pi's session messages; images are left out; the Context Seed keeps the
 // original request and the newest turns within a character budget (no token calibration), never splitting a turn.
-// @effect-diagnostics asyncFunction:off
 import type { EntryRecord } from "@earendil-works/pi-durable";
 
 /** pi-advisor's `maxToolResultChars` default. */

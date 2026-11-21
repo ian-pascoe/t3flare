@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalDateInEffect:off globalFetch:off globalFetchInEffect:off effectFnOpportunity:off
+// @effect-diagnostics globalDate:off globalDateInEffect:off globalFetchInEffect:off effectFnOpportunity:off
 // The Connect service (step 3+, ADR-0025): a publish-only T3 Connect link, so the owner's phone hears when a cloud run
 // ends or waits. Everything is t3's own: the device-flow sign-in (`CliTokenManager.deviceAuthorizationLogin`), the
 // link step (`CloudLink.reconcileDesiredLinkIfStillDesired`), the token store, and the publisher, which then publishes

@@ -1,4 +1,4 @@
-// @effect-diagnostics globalFetch:off globalDate:off globalTimers:off
+// @effect-diagnostics globalFetch:off globalTimers:off
 // SPI-1175: sets up a stage's Model endpoint (modelEndpointSpec.ts) through the Settings page's own API, the way a script
 // reaches it (the stage's Access service token plus its admin token, so no CSRF token and no new route):
 //

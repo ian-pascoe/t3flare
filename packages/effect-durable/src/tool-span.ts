@@ -8,7 +8,6 @@
 // its tools as `ToolSpans`, so a call is found by its Session and its ID together. A Fork reuses its source's call IDs, and
 // one isolate may host several Sessions; a list shared by the isolate would let one Session's call annotate another's span.
 // A call whose tools are not traced (a test's) has no span listed, and its attributes go nowhere.
-// @effect-diagnostics missingPipeableSignature:off -- a registry of plain functions.
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";

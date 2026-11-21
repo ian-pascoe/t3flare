@@ -1,5 +1,4 @@
 // Copied from cloudpid@93ba45a3:packages/extensions/src/todo/list.ts, unchanged but for its header (SPI-1055).
-// @effect-diagnostics missingPipeableSignature:off preferEffectArray:off -- plain functions over the Todo List's JSON, kept as pi-todo's (`todo-list.ts`).
 // The Todo List's rules (`docs/architecture/agent-capabilities.md` → Todo): what each action of the `todo` tool does to a list, without storage or
 // the model's context. Every action is a pure function from the list to the next one or to a failure, so a batch that
 // has one bad entry changes nothing.

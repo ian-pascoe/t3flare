@@ -2,7 +2,6 @@
 // repository's `AGENTS.md` (or `CLAUDE.md`) files, from the repo root down to the conversation's working directory,
 // read through the call's environment before each request. cloudpid also wraps `read`/`edit`/`write` to show nested
 // files' instructions as the agent reaches them; part 1 keeps only the section.
-// @effect-diagnostics asyncFunction:off preferEffectArray:off
 import { defineExtension, type Extension, section } from "@earendil-works/pi-durable";
 
 const NAMES = ["AGENTS.md", "CLAUDE.md"] as const;

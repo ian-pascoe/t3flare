@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalFetch:off
+// @effect-diagnostics globalDate:off
 // The Worker's routing for the Owner-client endpoint (worker.ts; ADR-0036, plan D13), SPI-1200 review: the endpoint's
 // branch comes before the panel's and the generic `/_t3flare` branch; it verifies against the endpoint's own audience,
 // so the panel's assertion is refused there and the endpoint's at the panel; a path below the endpoint answers 404; and

@@ -1,4 +1,4 @@
-// @effect-diagnostics anyUnknownInErrorContext:off layerMergeAllWithDependencies:off nodeBuiltinImport:off
+// @effect-diagnostics nodeBuiltinImport:off
 /**
  * CI credentials as code (ADR-0017): the GitHub Actions environment `bump`, a scoped Cloudflare API token for it, and
  * the secret and variable that hand them to .github/workflows/bump.yml; and the environment `prod` (deployable from

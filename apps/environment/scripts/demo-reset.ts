@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off nodeBuiltinImport:off
+// @effect-diagnostics globalConsole:off
 // The launch video's beat 6 (tools/demo-video): a Remote task runs in the Cloud Environment's own checkout of the
 // fixture, so each take first puts that checkout back on its remote's default branch, through t3's terminal RPC.
 //

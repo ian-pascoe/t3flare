@@ -2,7 +2,7 @@
 // The Workspace DO side of `ComputerExecutionEnv`: file operations on the object's own `@cloudflare/computer`
 // Workspace, where a failure still carries its POSIX code, answered as plain data (see `wire.ts`).
 // pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
-// @effect-diagnostics asyncFunction:off cryptoRandomUUID:off globalDate:off preferEffectArray:off
+// @effect-diagnostics cryptoRandomUUID:off globalDate:off
 import type { Workspace } from "@cloudflare/computer";
 import {
   err,

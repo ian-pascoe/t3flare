@@ -1,6 +1,6 @@
 // SPI-996: plan mode's `propose_plan` on a real pi-durable Harness. In plan mode the call hands the plan over and ends the
 // run (no model request after it); outside plan mode it refuses and the run goes on.
-// @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off
+// @effect-diagnostics globalTimers:off
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { type InteractionMode, PROPOSE_PLAN_TOOL } from "@t3flare/session-protocol";
 import { describe, expect, it } from "vitest";

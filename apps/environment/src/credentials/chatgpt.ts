@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalTimers:off
+// @effect-diagnostics globalTimers:off
 // ChatGPT plan usage through "Sign in with ChatGPT" (SPI-1164), as OpenAI documents it for open-source clients
 // (developers.openai.com/siwc/token-sharing-open-source: "Registration and sign-in", "Accounts and sessions", "Token
 // reference", "Errors and recovery"). A public client, with no secret: the first sign-in registers a client through

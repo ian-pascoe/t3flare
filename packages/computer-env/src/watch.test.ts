@@ -1,5 +1,5 @@
 // Copied from cloudpid@ae5a7b73:packages/computer-env/src/watch.test.ts.
-// @effect-diagnostics asyncFunction:off newPromise:off globalTimers:off
+// @effect-diagnostics globalTimers:off
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { getOrThrow, type FileChange } from "@earendil-works/pi-durable/env";
 import { describe, expect, it } from "vitest";

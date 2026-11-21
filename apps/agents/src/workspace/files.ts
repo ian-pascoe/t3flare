@@ -1,4 +1,3 @@
-// @effect-diagnostics asyncFunction:off
 // The Workspace DO's file operations for the Environment (step 2a plan, section 2): its own files only (computer's
 // SQLite VFS), never the Container. Paths are inside the Workspace (`/workspace/…`); the Environment translates.
 import type { Workspace as ComputerWorkspace } from "@cloudflare/computer";

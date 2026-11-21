@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off globalJsonInEffect:off anyUnknownInErrorContext:off
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off anyUnknownInErrorContext:off
 // SPI-1174's evidence on its stage: t3's limit meters for subscription endpoints, from the limit headers of their answers.
 //
 //   T3FLARE_PROBE=1 node scripts/stage.ts deploy p1174

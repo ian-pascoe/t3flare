@@ -2,7 +2,7 @@
 // options, t3's real `ProjectSetupScriptRunner`, our PTY adapter, and our Workspace DO terminal host, wired in process,
 // whose shells are a real bash under a real PTY (`script`) with our rc file (its markers). Covers open, write, the
 // foreground's state through `closeIdle` (review F1), and the setup script's sentinel with exit codes 0 and 3.
-// @effect-diagnostics nodeBuiltinImport:off globalTimers:off globalDate:off newPromise:off
+// @effect-diagnostics nodeBuiltinImport:off globalTimers:off globalDate:off
 import { spawn, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";

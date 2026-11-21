@@ -1,4 +1,4 @@
-// @effect-diagnostics globalJsonInEffect:off globalDateInEffect:off globalDate:off globalConsole:off nodeBuiltinImport:off globalFetch:off cryptoRandomUUID:off
+// @effect-diagnostics globalJsonInEffect:off globalDate:off globalConsole:off nodeBuiltinImport:off globalFetch:off cryptoRandomUUID:off
 // The acceptance test (ADR-0017): a headless t3 client against a deployed stage (or local workerd).
 //
 //   T3_URL=https://… T3_BOOTSTRAP_TOKEN=… T3FLARE_ADMIN_TOKEN=… \

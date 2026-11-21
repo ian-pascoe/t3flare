@@ -23,10 +23,8 @@
  *   call waiting on the budget, which checks again at least every `STREAM_HOLD_MS` while it waits.
  */
 // @effect-diagnostics asyncFunction:off -- the meter is a `fetch` and a byte stream, Promise-based at their seams.
-// @effect-diagnostics globalFetch:off -- it wraps the `fetch` it is given, and builds the `Response` the core reads.
 // @effect-diagnostics missingPipeableSignature:off -- plain functions over values, not combinators.
 // @effect-diagnostics globalTimers:off -- a waiting call's own timer, in its own invocation, takes back expired leases.
-// @effect-diagnostics globalDate:off -- a lease's expiry is wall-clock time, across invocations.
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
 import { MCP_STREAM_HOLD_MS } from "@cloudpid/mcp/types";

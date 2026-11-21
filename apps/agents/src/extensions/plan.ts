@@ -4,7 +4,6 @@
 // and the owner implements it from t3 as with any provider. The call ends the run (`control.terminate`) so the turn
 // settles on the plan, as Claude's adapter tells the model to stop there. Outside plan mode it refuses and changes
 // nothing, so the tool list stays the same in both modes (one prompt cache).
-// @effect-diagnostics asyncFunction:off
 import { defineExtension, defineTool, type Extension, section } from "@earendil-works/pi-durable";
 import { obj, str } from "@earendil-works/pi-schema";
 import { type InteractionMode, PROPOSE_PLAN_TOOL } from "@t3flare/session-protocol";

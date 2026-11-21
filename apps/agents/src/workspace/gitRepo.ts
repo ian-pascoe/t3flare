@@ -2,7 +2,6 @@
 // (capture as a commit of the working tree under a ref, with HEAD as its parent, as t3's `captureCheckpoint` makes),
 // the trees a checkpoint diff compares, and the facts the stale git reads are patched with (`./staleReads.ts`). Written
 // against an isomorphic-git file system, so the Node tests run it on a real repo next to real git.
-// @effect-diagnostics asyncFunction:off preferEffectArray:off
 import * as git from "isomorphic-git";
 
 import type { RepoFacts } from "./staleReads.ts";

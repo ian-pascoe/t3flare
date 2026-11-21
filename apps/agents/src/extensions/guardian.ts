@@ -15,7 +15,7 @@
 // Not ported: the interactive Allow once (t3's approvals are the owner's interactive gate), the classifier First Pass,
 // pre-reviews of a response's parallel calls, the Rejection Streak, User Overrides and delegations (there are no Child
 // Agents in a Durable Session).
-// @effect-diagnostics asyncFunction:off globalConsole:off
+// @effect-diagnostics globalConsole:off
 import type { Context as ChordContext } from "@earendil-works/chord";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { defineExtension, type Extension, type Harness, hook, type HookApi, type JsonObject, type ToolHookCall, ToolTask } from "@earendil-works/pi-durable";

@@ -1,4 +1,4 @@
-// @effect-diagnostics globalDate:off globalConsole:off globalFetch:off nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off
 // Step 2b M3: setup scripts in worktree threads, through t3's own RPCs (a headless stock-protocol client):
 //
 //   node scripts/stage.ts run <stage> setup scripts --project <project id> --command '<setup command>' [--blocking]

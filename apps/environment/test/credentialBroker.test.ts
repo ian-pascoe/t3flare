@@ -1,4 +1,3 @@
-// @effect-diagnostics globalConsole:off
 // The Credential broker (SPI-1164; ADR-0018 revived): the Environment DO holds each sign-in's tokens sealed, is their
 // only refresher (one refresh in flight per endpoint), saves a rotated refresh token before any caller gets the new access
 // token, and signs the endpoint out when OpenAI refuses a renewal. Tested against a fake of OpenAI's authorization server;

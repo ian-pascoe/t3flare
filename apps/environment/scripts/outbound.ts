@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off globalTimers:off nodeBuiltinImport:off
+// @effect-diagnostics globalConsole:off globalDate:off globalFetch:off nodeBuiltinImport:off
 // SPI-1061: the Outbound link on a stage, against the stand-in (plan §6, §8): a stock t3 in Docker on this machine,
 // reachable over the stage's named Cloudflare Tunnel (`T3FLARE_STANDIN=1` on deploy). Gates G1–G4 and checks C1–C7,
 // one phase per run; evidence in .evidence/spi-1061/<phase>.json. Nothing secret is printed or written: bearers,

@@ -1,4 +1,4 @@
-// @effect-diagnostics globalConsole:off globalConsoleInEffect:off globalJsonInEffect:off globalDate:off globalDateInEffect:off effectFnOpportunity:off cryptoRandomUUID:off
+// @effect-diagnostics globalConsoleInEffect:off globalJsonInEffect:off effectFnOpportunity:off cryptoRandomUUID:off
 // The CLI adapters' wrapper (step 4a, plan §3 with review F1, F7, F10): t3's own Codex and Pi adapters, with what the
 // Cloud Environment changes around them.
 //
