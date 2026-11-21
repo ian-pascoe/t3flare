@@ -109,14 +109,7 @@ describe("spawnCli for pi", () => {
     expect(out).toBe('{"type":"response","command":"set_model","success":true,"data":{"provider":"comm","id":"claude-haiku-5-5"}}\n{"type":"agent_end"}\n');
   });
 
-  it("names the default model in a thread's set_model of an old thread's `anthropic` (SPI-1176)", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => undefined);
-    bind({ endpoints: { revision: 1, endpoints: [endpoint("comm", "anthropic-messages", ["claude-haiku-5-5"])] } });
-    await exchange(['{"id":"c2","type":"set_model","provider":"anthropic","modelId":"claude-sonnet-5-5"}\n']);
-    expect(written.join("")).toBe('{"id":"c2","type":"set_model","provider":"t3flare-endpoint-comm","modelId":"claude-haiku-5-5"}\n');
-  });
-
-  it("names the default model even where another endpoint lists the old model's id (ADR-0034 §3)", async () => {
+  it("names the default model in a thread's set_model of an old thread's `anthropic`, even where another endpoint lists the old model's id (SPI-1176, ADR-0034 §3)", async () => {
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     bind({ endpoints: { revision: 1, endpoints: [endpoint("comm", "anthropic-messages", ["claude-haiku-5-5"]), endpoint("other", "anthropic-messages", ["claude-sonnet-5-5"])] } });
     await exchange(['{"id":"c3","type":"set_model","provider":"anthropic","modelId":"claude-sonnet-5-5"}\n']);

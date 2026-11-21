@@ -134,9 +134,6 @@ describe("Claude Code on the Model endpoints through the model relay (SPI-1168)"
     expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe("comm2/claude-sonnet-5-5");
     expect(answer.env).toMatchObject({ ANTHROPIC_DEFAULT_SONNET_MODEL: "comm2/claude-sonnet-5-5", ANTHROPIC_DEFAULT_OPUS_MODEL: "comm2/claude-sonnet-5-5" });
     for (const name of ["HTTPS_PROXY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_CUSTOM_HEADERS"]) expect(env[name], name).toBe("");
-    // No MODEL_PROXY_* setting and no key helper of the old design reach the process.
-    expect(answer.files?.map((file) => file.text).join("")).not.toContain("proxy.example");
-    expect(JSON.stringify(answer.env)).not.toContain("proxy.example");
   });
 
   it("leaves Claude Code's own background model when there is none to give", () => {
@@ -202,6 +199,7 @@ describe("OpenCode's profile", () => {
       OPENCODE_DISABLE_LSP_DOWNLOAD: "1",
     });
     expect(Object.keys(answer.env).filter((name) => /API_KEY|CONFIG_CONTENT|NONCE/.test(name))).toEqual([]);
+    // The synced snapshot's path, which the image's own launcher (apps/sandbox-image/image/t3flare-opencode) spells out too.
     expect(OPENCODE_SNAPSHOT_DIR).toBe("/workspace/.t3flare/opencode");
     // SPI-1153: the Environment skill set as OpenCode's user-level Skill root, linked, never copied.
     expect(answer.links).toEqual([{ path: "/var/lib/t3flare/cli/proc-7/config/opencode/skills", target: "/workspace/.agents/skills" }]);
@@ -311,7 +309,7 @@ describe("OpenCode on the Model endpoints through the model relay (SPI-1169)", (
     expect(Object.keys(providers["t3flare-endpoint-or"]!.models)).toEqual(["anthropic/claude-opus-5-5"]);
     expect(json).toMatchObject({ model: "t3flare-endpoint-comm/claude-haiku-5-5", small_model: "t3flare-endpoint-oai/gpt-5-mini" });
     // No key in the file: the plugin gives the handle; no MODEL_PROXY_* setting.
-    expect(JSON.stringify(json)).not.toMatch(/apiKey|x-api-key|proxy\.example|"t3flare"/i);
+    expect(JSON.stringify(json)).not.toMatch(/apiKey|x-api-key|"t3flare"/i);
     expect(json.plugins).toEqual(["/opt/t3flare/share/opencode-key-plugin"]);
   });
 

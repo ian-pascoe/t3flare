@@ -1,5 +1,5 @@
-// Versioned schemas for t3flare's own tables in the Environment DO's SQLite (after cloudpid's
-// `@cloudpid/effect-durable/sqlite`). t3's tables are t3's: its migrations run from our composition.
+// Versioned schemas for t3flare's own tables in the Environment DO's SQLite (modelled on
+// cloudpid's `effect-durable` SQLite migrations). t3's tables are t3's: its migrations run from our composition.
 import type { SqlStorage } from "@cloudflare/workers-types/index.ts";
 
 /** One schema step. Steps are numbered by position: never edit, reorder or drop a released one. */

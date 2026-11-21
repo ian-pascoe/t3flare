@@ -4,13 +4,13 @@
 import { describe, expect, it } from "vitest";
 
 import { csrfToken } from "../src/harness/csrf.ts";
-import { escapeHtml, renderPage } from "../src/harness/page.ts";
 import type { AccessCaller } from "../src/access.ts";
+import { escapeHtml } from "../src/harness/page.ts";
 import { CSRF_HEADER, handleHarness } from "../src/harness/panel.ts";
 import { harnessSecrets } from "../src/harness/secrets.ts";
 import { harnessStore } from "../src/harness/store.ts";
 import { McpHost } from "../src/mcp/host.ts";
-import { defaultSettingsServer, resolveHarness, EMPTY_HARNESS } from "@t3flare/harness-registry";
+import { defaultSettingsServer, resolveHarness } from "@t3flare/harness-registry";
 
 const HOST = "t3-admin.example.dev";
 const NOW = Date.UTC(2026, 10, 12, 10, 30);
@@ -119,19 +119,6 @@ describe("Settings page", () => {
     const html = await response.text();
     expect(html).toContain('name="t3flare-csrf"');
     expect(html).toContain("Code mode");
-  });
-
-  it("escapes hostile strings everywhere the page shows them", () => {
-    const hostile = `<img src=x onerror="alert(1)">'&`;
-    const html = renderPage({
-      resolved: resolveHarness(EMPTY_HARNESS),
-      csrf: hostile,
-      audit: [{ at: NOW, caller: hostile, action: hostile, target: hostile, after: { note: hostile } }],
-      status: { [hostile]: hostile },
-    });
-    expect(html).not.toContain("<img");
-    expect(html).toContain(escapeHtml(hostile));
-    expect(escapeHtml(hostile)).toBe("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;&#39;&amp;");
   });
 
   it("a direct server's header value is stored write-only: no answer, page or audit entry carries it (or its base64)", async () => {

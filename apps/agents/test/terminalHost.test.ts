@@ -4,7 +4,7 @@
 // @effect-diagnostics globalTimers:off newPromise:off globalDate:off
 import { MARK_BUSY, MARK_PROMPT, scanMarkers } from "@t3flare/sandbox-image/terminal";
 import type { TerminalFrame, TerminalPushAnswer } from "@t3flare/workspace-client";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HEARTBEAT_LAPSE_MS, MAX_TERMINALS, type ShellProcess, TerminalHost, type TerminalHostDeps } from "../src/workspace/terminalHost.ts";
 
@@ -252,15 +252,23 @@ describe("TerminalHost", () => {
   });
 
   describe("output batching (cost audit F4): immediate while typing, 100 ms batches otherwise", () => {
-    it("batches output nobody typed for into one push", async () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => vi.useRealTimers());
+    const advance = (ms: number) => vi.advanceTimersByTimeAsync(ms);
+
+    it("batches output nobody typed for into one push, 100 ms after the first line", async () => {
       const h = harness();
       await h.host.open(open("term-a1"));
       await h.host.settled();
       const before = h.host.pushes;
       h.shells[0]!.print("line 1\r\n");
-      await tick(30);
+      await advance(30);
       h.shells[0]!.print("line 2\r\n");
-      await tick(150);
+      await advance(60);
+      expect(h.host.pushes - before).toBe(0);
+      await advance(20);
       expect(h.host.pushes - before).toBe(1);
       expect(h.text("term-a1")).toBe("line 1\r\nline 2\r\n");
     });
@@ -272,11 +280,11 @@ describe("TerminalHost", () => {
       const before = h.host.pushes;
       for (let i = 0; i < 50; i++) {
         h.shells[0]!.print(`line ${i}\r\n`);
-        await tick(10);
+        await advance(10);
       }
-      await h.host.settled();
-      // About 500 ms of output: at most one push per 100 ms (and the last), where one per round trip made about 20.
-      expect(h.host.pushes - before).toBeLessThanOrEqual(8);
+      await advance(200);
+      // 500 ms of output: one push per 100 ms batch (and the last), where one per round trip made about 20.
+      expect(h.host.pushes - before).toBeLessThanOrEqual(6);
       expect(h.text("term-a1")).toContain("line 49");
     });
 
@@ -284,13 +292,14 @@ describe("TerminalHost", () => {
       const h = harness();
       await h.host.open(open("term-a1"));
       h.shells[0]!.print(`${MARK_PROMPT}$ `);
-      await tick();
+      await advance(40);
       await h.host.settled();
       h.shells[0]!.print("background noise\r\n");
-      await tick(5);
+      await advance(5);
       await h.host.input("term-a1", "x");
       h.shells[0]!.print("x");
-      await tick(40);
+      // Within the typing batch (16 ms), long before the 100 ms one the noise was waiting for.
+      await advance(20);
       expect(h.text("term-a1")).toBe("$ background noise\r\nx");
     });
   });

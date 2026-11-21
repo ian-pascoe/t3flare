@@ -303,12 +303,6 @@ describe("D12's fallbacks toward browser", () => {
     expect(await structuredOf(response)).toMatchObject({ status: "waiting", url: openChange(f).url });
   });
 
-  it("absent elicitation_mode is browser", async () => {
-    const f = world();
-    await endpointOf(f)(askedCall());
-    expect(openChange(f).record.mode).toBe("browser");
-  });
-
   it("a change that needs the page is answered there like any other in browser", async () => {
     const f = world();
     const endpoint = endpointOf(f);

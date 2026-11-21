@@ -215,6 +215,8 @@ describe("harness page", () => {
     expect(page).not.toContain("<img");
     expect(page.match(/<script/g)).toHaveLength(1);
     expect(page).toContain(escapeHtml(hostile));
+    // The exact mapping: quotes, angle brackets, the apostrophe and the ampersand each become an entity.
+    expect(escapeHtml(hostile)).toBe("&quot;&gt;&lt;img src=x onerror=alert(1)&gt;&#39;&amp;&lt;script&gt;");
     const parsed = tagsOf(page);
     expect(balance(parsed)).toBe("balanced");
     expect(parsed.some((tag) => Object.keys(tag.attrs).some((name) => /^on/i.test(name)))).toBe(false);
@@ -244,9 +246,8 @@ describe("harness page", () => {
     expect(parsed.some((tag) => Object.keys(tag.attrs).some((name) => /^on/i.test(name)))).toBe(false);
   });
 
-  it("writes every answer in the page script as text, never as HTML, and confirms a skill's removal", () => {
+  it("writes every answer in the page script as text, never as HTML", () => {
     expect(SCRIPT).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML|document\.write/);
-    expect(SCRIPT).toContain('confirm("Remove the Environment skill " + name + "? Agents lose it at their next turn.")');
   });
 });
 

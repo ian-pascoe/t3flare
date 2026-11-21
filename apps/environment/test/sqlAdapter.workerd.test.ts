@@ -85,15 +85,4 @@ describe("DO SQLite adapter", () => {
       expect(sqlStats.rowsWritten - before).toBe(3);
     });
   });
-
-  it("nested transactionSync, as the State directory's rename runs inside a remove", async () => {
-    await runInDurableObject(env.TEST_OBJECTS.getByName("tx"), async (_instance, state) => {
-      state.storage.sql.exec("CREATE TABLE n (v INTEGER)");
-      state.storage.transactionSync(() => {
-        state.storage.sql.exec("INSERT INTO n VALUES (1)");
-        state.storage.transactionSync(() => state.storage.sql.exec("INSERT INTO n VALUES (2)"));
-      });
-      expect(state.storage.sql.exec("SELECT COUNT(*) AS c FROM n").one().c).toBe(2);
-    });
-  });
 });

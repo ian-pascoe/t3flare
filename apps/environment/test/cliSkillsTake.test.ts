@@ -83,10 +83,17 @@ describe("takeEnvironmentSkillsAt", () => {
     expect(Date.now() - started).toBeLessThan(2000);
   });
 
-  it("reads the Environment's own hash and registry by default, and asks nothing when the services are not bound", async () => {
+  it("reads the Environment's own hash and registry by default", async () => {
     bind();
     await Effect.runPromise(takeEnvironmentSkillsAt("/w/demo"));
     expect(log).toEqual(["take demo h1"]);
+  });
+
+  it("does not fail when the Environment's services are not bound", async () => {
+    // The binding outlives each test: unbind it, so the default access finds no services.
+    bindEnvironmentServices(undefined as unknown as EnvironmentServices);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await expect(Effect.runPromise(takeEnvironmentSkillsAt("/w/demo"))).resolves.toBeUndefined();
   });
 });
 

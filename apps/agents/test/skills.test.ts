@@ -1,6 +1,6 @@
 // The `skills` extension (SPI-1147 §2): the section's text from the Workspace's discovery, empty frozen as empty, and
-// the extension installs in a registry as SessionDO's does (M0: `frozenSection` in the Session's registry).
-import { createRegistry } from "@earendil-works/pi-durable";
+// a failed discovery leaves the section out rather than failing the request.
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { WireSkillDiscovery } from "@t3flare/computer-env";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -25,9 +25,13 @@ describe("the skills section", () => {
     expect(await skillsSectionText({ cwd: "/" } as never)).toBeUndefined();
   });
 
-  it("installs in a registry", () => {
-    const registry = createRegistry();
-    expect(() => registry.install(skillsExtension())).not.toThrow();
+  it("leaves itself out, logging why, when the Workspace's discovery fails, rather than failing the request", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const section = skillsExtension().sections?.[0];
+    const failing = { cwd: "/workspace/repo", discoverSkills: () => Promise.reject(new Error("the Workspace DO is gone")) };
+    expect(await section?.render({ env: failing, shown: {} } as never, BACKGROUND_CONTEXT)).toBeUndefined();
+    expect(warn.mock.calls.map((call) => JSON.parse(String(call[0])))).toEqual([{ t3flare: "skills-section-failed", error: "Error: the Workspace DO is gone" }]);
+    warn.mockRestore();
   });
 });
 

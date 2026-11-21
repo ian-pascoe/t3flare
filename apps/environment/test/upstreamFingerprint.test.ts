@@ -196,9 +196,13 @@ describe("updateFingerprint", () => {
 describe("the pinned t3code against the checked-in fingerprint", () => {
   const fingerprint = JSON.parse(fs.readFileSync(FIXTURE, "utf8")) as Fingerprint;
 
-  it("covers the register entries T2 names", () => {
+  // The register is the list of what is fingerprinted: T2's "Covers" cell names every entry the fixture watches.
+  it("watches the register entries T2 names in docs/upstream-fragility.md, and no others", () => {
+    const register = fs.readFileSync(new URL("docs/upstream-fragility.md", ROOT), "utf8");
+    const covers = /^\| T2 \|.*\| ((?:U\d+, )*U\d+) \| [^|]* \|$/m.exec(register)?.[1];
+    expect(covers, "docs/upstream-fragility.md's T2 row no longer ends with its Covers and Ticket cells").toBeDefined();
     const entries = new Set([...fingerprint.regions, ...fingerprint.literals].map((watched) => watched.entry));
-    expect([...entries].toSorted()).toEqual(["U1", "U12", "U13", "U15", "U4", "U45", "U93"]);
+    expect([...entries].toSorted(), "the fixture's entries and T2's Covers cell differ: update the one that is wrong").toEqual(covers!.split(", ").toSorted());
   });
 
   it("records each watched file's blob id, for the land check", () => {
@@ -210,14 +214,8 @@ describe("the pinned t3code against the checked-in fingerprint", () => {
   const reportOnly = process.env[REPORT_ONLY_ENV] === REPORT_ONLY;
 
   // Under a full `pnpm run check` this parses t3's largest files on a loaded machine: well past vitest's 5 s default.
-  it.skipIf(reportOnly)("matches: every watched region and literal is as last reviewed", () => {
+  // It is also the land check's byte-for-byte comparison: a watched file whose blob id moved is a `moved` finding.
+  it.skipIf(reportOnly)("matches: every watched region, literal and file is as last reviewed", () => {
     expect(checkFingerprint(fingerprint, readT3, gitBlobOf(fileURLToPath(T3)))).toEqual([]);
-  }, 30_000);
-
-  // The land check refuses a pin whose watched files are not byte for byte these: the check fails on the same change.
-  it.skipIf(reportOnly)("matches byte for byte: every watched file's blob id is the one the land check compares", () => {
-    const blobOf = gitBlobOf(fileURLToPath(T3));
-    const moved = watchedFiles(fingerprint).filter((file) => blobOf(file) !== fingerprint.files[file]);
-    expect(moved, `watched t3 files changed since the last review: run ${UPDATE_COMMAND}`).toEqual([]);
   }, 30_000);
 });

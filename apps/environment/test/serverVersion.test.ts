@@ -51,6 +51,6 @@ describe("the version agreement acceptance check", () => {
   it("names each disagreement", () => {
     const result = versionAgreement({ tag: `v${version}`, serverVersion: "0.1.10", scripts: ['const a="0.1.10";'] });
     expect(result.ok).toBe(false);
-    expect(result.failures).toHaveLength(2);
+    expect(result.failures).toEqual([`t3's descriptor reports serverVersion 0.1.10, the pin is v${version}`, `no web client script carries APP_VERSION ${version}`]);
   });
 });

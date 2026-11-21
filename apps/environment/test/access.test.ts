@@ -161,8 +161,13 @@ describe("teamKeys", () => {
       reads++;
       return JSON.stringify({ keys: [{ ...jwk, kid: "k1" }, { kty: "EC", kid: "skipped" }] });
     }, () => 1000);
-    expect(await lookup("k1")).toBeDefined();
-    expect(await lookup("k1")).toBeDefined();
+    // The key served is the team's own: it verifies a signature made with the matching private key.
+    const signed = new TextEncoder().encode("header.payload");
+    const signature = await crypto.subtle.sign(algorithm, keyPair.privateKey, signed);
+    for (const _ of [1, 2]) {
+      const key = await lookup("k1");
+      expect(await crypto.subtle.verify(algorithm, key!, signature, signed)).toBe(true);
+    }
     expect(reads).toBe(1);
     // An unknown kid is looked up again only after the cooldown.
     expect(await lookup("k9")).toBeUndefined();

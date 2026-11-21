@@ -14,6 +14,10 @@
 // - m0-token.json: with gh's hosts.yml present and the image's own git credential helper answering, no request carries
 //   a token; the variables that turn those sources off, and that they beat the owner's and a repo's file.
 //
+// Container runs that only fill those files (the config hierarchy, the owner's `[env]`, each remover without and with the
+// guards, the versions-host-off requests, two more token controls) happen only when T3FLARE_MISE_M0_OUT is set; every
+// run an assertion reads happens always.
+//
 //   pnpm --filter @t3flare/environment exec vitest run --config vitest.docker.config.ts test/docker/mise.docker.test.ts
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -32,6 +36,8 @@ const IMAGE = "t3flare-mise-test";
 const NET = "t3flare-mise-test-net";
 const PROXY = "t3flare-mise-test-proxy";
 const out = process.env.T3FLARE_MISE_M0_OUT;
+/** A container run that only fills the report files, asserted by nothing: it runs when a report directory is named. */
+const forReport = <T>(measure: () => T): T | undefined => (out === undefined ? undefined : measure());
 /** The logging proxy, pinned (this test gates the t3 bump). */
 const MITMPROXY = "mitmproxy/mitmproxy:12.3.1@sha256:2711066c855659b5af8b1dbb84494ed3eff69b42ece439c60b4fe09a2db829d4";
 
@@ -194,7 +200,7 @@ print(json.dumps({k:{"version":v[0]["version"],"source":v[0].get("source",{}).ge
     const versionRun = run(DESIGN_ENV, "mise --version 2>/dev/null | head -1");
     const version = versionRun.stdout.trim().split(" ")[0];
     check("version: the image runs the pinned mise", version === pinned, { pinned, ran: versionRun.stdout });
-    const hierarchy = run(DESIGN_ENV, `${writeGlobal('[tools]\nnode = "24.11.1"\n')}\n${writeRepo('[tools]\npython = "3.13.1"\n')}\nmise config ls --no-header 2>&1`);
+    const hierarchy = forReport(() => run(DESIGN_ENV, `${writeGlobal('[tools]\nnode = "24.11.1"\n')}\n${writeRepo('[tools]\npython = "3.13.1"\n')}\nmise config ls --no-header 2>&1`));
 
     // --- m0-layering ----------------------------------------------------------------------------------------------
     const TYPICAL = '[settings]\nexperimental = true\njobs = 8\n\n[tools]\nnode = "24.11.1"\npython = "3.13.1"\ngo = "1.25.4"\n"github:junegunn/fzf" = "0.56.3"\n\n[env]\nOWNER_VAR = "from the global config"\n';
@@ -214,7 +220,7 @@ print(json.dumps({k:{"version":v[0]["version"],"source":v[0].get("source",{}).ge
     check("layering: git and gh under a typical owner file", typical.gitOk === true && typical.ghOk === true && typical.tools?.["conda:git"]?.source === BASE && typical.tools?.gh?.source === BASE, typical);
     check("layering: the owner's node beats the base's", typical.tools?.node?.version === "24.11.1" && typical.tools?.node?.source === GLOBAL, typical.tools?.node);
     check("layering: a repo's node beats the owner's, the owner's other tools stay", override.tools?.node?.source === "/workspace/repo/mise.toml" && override.tools?.python?.source === GLOBAL && override.tools?.["github:junegunn/fzf"]?.source === GLOBAL, override.tools);
-    const envVar = lastJson(run(DESIGN_ENV, `${writeGlobal(TYPICAL)}\nprintf '{"OWNER_VAR":"%s"}\\n' "$(mise env --json 2>/dev/null | $PY -c 'import json,sys; print(json.load(sys.stdin).get("OWNER_VAR",""))')"`).stdout);
+    const envVar = forReport(() => lastJson(run(DESIGN_ENV, `${writeGlobal(TYPICAL)}\nprintf '{"OWNER_VAR":"%s"}\\n' "$(mise env --json 2>/dev/null | $PY -c 'import json,sys; print(json.load(sys.stdin).get("OWNER_VAR",""))')"`).stdout));
 
     // What an owner's file could do to git and gh: each case without guards, with the design's variables, and through
     // the design's lay-down (which keeps the file only when git and gh still run under it).
@@ -228,12 +234,12 @@ print(json.dumps({k:{"version":v[0]["version"],"source":v[0].get("source",{}).ge
       { name: "[env] PATH replaced", text: '[env]\nPATH = "/nowhere"\n' },
     ];
     const removerResults = removers.map(({ name, text }) => {
-      const bare = probeWith(LAYERED_ENV, text);
-      const guarded = probeWith(DESIGN_ENV, text);
+      const bare = forReport(() => probeWith(LAYERED_ENV, text));
+      const guarded = forReport(() => probeWith(DESIGN_ENV, text));
       const lines = run(DESIGN_ENV, `${PROBE}\n${layDown(text)}\nprobe`).stdout.split("\n").filter((line) => line.startsWith("{"));
       const laid = lastJson(lines[0] ?? "");
       const after = lastJson(lines[1] ?? "");
-      return { name, text, withoutGuards: { git: bare.gitOk, gh: bare.ghOk }, withGuardVariables: { git: guarded.gitOk, gh: guarded.ghOk }, layDown: { laid: laid.laid, install: laid.install, gitAfter: after.gitOk, ghAfter: after.ghOk } };
+      return { name, text, withoutGuards: bare && { git: bare.gitOk, gh: bare.ghOk }, withGuardVariables: guarded && { git: guarded.gitOk, gh: guarded.ghOk }, layDown: { laid: laid.laid, install: laid.install, gitAfter: after.gitOk, ghAfter: after.ghOk } };
     });
     for (const result of removerResults) check(`layering: git and gh survive "${result.name}" through the design`, result.layDown.gitAfter === true && result.layDown.ghAfter === true, result);
 
@@ -246,7 +252,7 @@ print(json.dumps({k:{"version":v[0]["version"],"source":v[0].get("source",{}).ge
     check("requests: the install laid the file down and installed", installAnswer.laid === true && installAnswer.install === 0 && install.stdout.includes("v24.11.1") && install.stdout.includes("0.56.3"), { installAnswer, stdout: install.stdout.slice(-400), stderr: install.stderr.slice(-400) });
     check("requests: no api.github.com request", api(install.requests) === 0, byHost(install.requests));
     check("requests: no request carries a token", install.requests.every((request) => request.authorization === ""), install.requests);
-    const direct = proxiedRun({ ...DESIGN_ENV, MISE_USE_VERSIONS_HOST: "false" }, `${layDown(INSTALL)}`);
+    const direct = forReport(() => proxiedRun({ ...DESIGN_ENV, MISE_USE_VERSIONS_HOST: "false" }, `${layDown(INSTALL)}`));
 
     // --- m0-token -------------------------------------------------------------------------------------------------
     const FZF = '[tools]\n"github:junegunn/fzf" = "0.56.3"\n';
@@ -270,20 +276,20 @@ print(json.dumps({k:{"version":v[0]["version"],"source":v[0].get("source",{}).ge
       };
     };
     const all = { hostsYml: true, gitHelper: true, plainGit: true };
-    const tokenCases = [
-      tokenCase("control: hosts.yml, no guard", LAYERED_ENV, FZF, undefined, { hostsYml: true, gitHelper: true }),
-      tokenCase("control: the image's git helper (git outside the shims), owner turns git credentials on, no guard", LAYERED_ENV, `[settings]\ngithub.use_git_credentials = true\n${FZF}`, undefined, { gitHelper: true, plainGit: true }),
-      tokenCase("control: the image's git helper, owner turns git credentials on, no guard, the image's PATH", LAYERED_ENV, `[settings]\ngithub.use_git_credentials = true\n${FZF}`, undefined, { gitHelper: true }),
-      tokenCase("control: the image's git helper (git outside the shims), a repo's file turns git credentials on, no guard", LAYERED_ENV, FZF, `[settings]\ngithub.use_git_credentials = true\n`, { gitHelper: true, plainGit: true }),
-      tokenCase("control: owner's credential_command, no guard", LAYERED_ENV, `[settings]\ngithub.credential_command = "echo ghp_m0credentialcommand000000000000000000"\n${FZF}`, undefined, {}),
+    const hostsControl = tokenCase("control: hosts.yml, no guard", LAYERED_ENV, FZF, undefined, { hostsYml: true, gitHelper: true });
+    const helperControl = tokenCase("control: the image's git helper (git outside the shims), owner turns git credentials on, no guard", LAYERED_ENV, `[settings]\ngithub.use_git_credentials = true\n${FZF}`, undefined, { gitHelper: true, plainGit: true });
+    const helperImagePath = forReport(() => tokenCase("control: the image's git helper, owner turns git credentials on, no guard, the image's PATH", LAYERED_ENV, `[settings]\ngithub.use_git_credentials = true\n${FZF}`, undefined, { gitHelper: true }));
+    const repoHelperControl = forReport(() => tokenCase("control: the image's git helper (git outside the shims), a repo's file turns git credentials on, no guard", LAYERED_ENV, FZF, `[settings]\ngithub.use_git_credentials = true\n`, { gitHelper: true, plainGit: true }));
+    const commandControl = tokenCase("control: owner's credential_command, no guard", LAYERED_ENV, `[settings]\ngithub.credential_command = "echo ghp_m0credentialcommand000000000000000000"\n${FZF}`, undefined, {});
+    const designCases = [
       tokenCase("design: every source present", DESIGN_ENV, FZF, undefined, all),
       tokenCase("design: every source present, the owner's file turns each on", DESIGN_ENV, `${SOURCES_ON}${FZF}`, undefined, all),
       tokenCase("design: every source present, a repo's file turns each on", DESIGN_ENV, FZF, SOURCES_ON, all),
     ];
-    const [hostsControl, helperControl, helperImagePath, repoHelperControl, commandControl, ...designCases] = tokenCases;
-    check("token: the hosts.yml control sends its token (the proxy sees one)", hostsControl!.withAuthorization > 0, hostsControl);
-    check("token: the git helper control sends its token", helperControl!.withAuthorization > 0, helperControl);
-    check("token: the credential_command control sends its token", commandControl!.withAuthorization > 0, commandControl);
+    const tokenCases = [hostsControl, helperControl, helperImagePath, repoHelperControl, commandControl, ...designCases];
+    check("token: the hosts.yml control sends its token (the proxy sees one)", hostsControl.withAuthorization > 0, hostsControl);
+    check("token: the git helper control sends its token", helperControl.withAuthorization > 0, helperControl);
+    check("token: the credential_command control sends its token", commandControl.withAuthorization > 0, commandControl);
     for (const design of designCases) check(`token: ${design.name}: none sent`, design.withAuthorization === 0 && design.apiGithubRequests > 0 && String(design.miseToken).includes("(none)"), design);
 
     const at = new Date().toISOString();
@@ -291,12 +297,13 @@ print(json.dumps({k:{"version":v[0]["version"],"source":v[0].get("source",{}).ge
     const git = (args: ReadonlyArray<string>) => spawnSync("git", args, { cwd: here, encoding: "utf8" }).stdout.trim();
     const commit = `${git(["rev-parse", "--short", "HEAD"])}${git(["status", "--porcelain", "--", imageContext, here]) === "" ? "" : " (with uncommitted changes)"}`;
     const image = docker(["image", "inspect", "-f", "{{.Id}}", IMAGE]).stdout.trim();
-    const files: Record<string, unknown> = {
+    // The report's files, with the research-only runs above: built only when a directory is named for them.
+    const files: Record<string, unknown> = out === undefined ? {} : {
       "m0-version.json": {
         at,
         pinned: `v${pinned}`,
         ran: versionRun.stdout.trim(),
-        layeringOnIt: { configFiles: redact(hierarchy.stdout.trim()).split("\n"), note: "mise config ls in /workspace/repo with the design's variables, an owner's global and a repo's mise.toml: system, then global, then the repo (lowest first)" },
+        layeringOnIt: { configFiles: redact(hierarchy!.stdout.trim()).split("\n"), note: "mise config ls in /workspace/repo with the design's variables, an owner's global and a repo's mise.toml: system, then global, then the repo (lowest first)" },
         researchedOn: "2026.11.7 (local) and 2026.11.8 (source); the image pins 2026.11.2: every finding below is from the image's own binary",
       },
       "m0-layering.json": {
@@ -313,13 +320,13 @@ print(json.dumps({k:{"version":v[0]["version"],"source":v[0].get("source",{}).ge
         at,
         config: INSTALL,
         default: { layDown: installAnswer, byHost: byHost(install.requests), apiGithub: api(install.requests), withAuthorization: install.requests.filter((request) => request.authorization !== "").length, requests: install.requests },
-        versionsHostOff: { note: "MISE_USE_VERSIONS_HOST=false, for comparison", byHost: byHost(direct.requests), apiGithub: api(direct.requests), requests: direct.requests },
+        versionsHostOff: { note: "MISE_USE_VERSIONS_HOST=false, for comparison", byHost: byHost(direct!.requests), apiGithub: api(direct!.requests), requests: direct!.requests },
       },
       "m0-token.json": {
         at,
         variables: TOKEN_GUARDS,
         precedence: "MISE_GITHUB_TOKEN > GITHUB_API_TOKEN > GITHUB_TOKEN > github.credential_command > OAuth > github_tokens.toml > gh hosts.yml (github.gh_cli_tokens) > git credential fill (github.use_git_credentials)",
-        cases: tokenCases,
+        cases: tokenCases.filter((entry) => entry !== undefined),
         imagePath: helperImagePath,
         repoTurnsGitCredentialsOn: repoHelperControl,
       },

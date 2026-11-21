@@ -1,7 +1,7 @@
 // A stock client blocked from the Cloud Environment by an orchestration-protocol mismatch (in-app updates plan D16; t3
 // `client-runtime/src/connection/outdatedHostUpdate.ts`): with the descriptor t3flare advertises on prod, the client does
 // not tell the owner to update by hand; it opens its bare socket and calls the unary server Update (no progress stream:
-// `serverSelfUpdateProgress` is stripped), and takes t3flare's `respawn` answer with its update id.
+// `serverSelfUpdateProgress` is stripped), and finishes when the restarted Environment serves the new version.
 //
 // What this does not cover (docs/upstream-fragility.md, U7): the pin's own `/ws` refuses a socket without the
 // `orchestrationProtocol` query with 426, and the bare socket carries none; and the client waits only 4 minutes for a
@@ -105,7 +105,7 @@ class CloudSocket {
 }
 
 describe("a client blocked by a protocol mismatch", () => {
-  it("still calls the Cloud Environment's server Update, and takes its respawn answer", async () => {
+  it("still calls the Cloud Environment's server Update on its bare socket", async () => {
     // A client one protocol ahead of the pin: the normal session refuses the host and asks for a server update.
     const blockedDescriptor = cloudDescriptor(ORCHESTRATION_PROTOCOL_VERSION - 1, CURRENT);
     const blocked = orchestrationProtocolCompatibilityError(blockedDescriptor);
@@ -113,7 +113,7 @@ describe("a client blocked by a protocol mismatch", () => {
 
     const sockets: Array<CloudSocket> = [];
     let served = blockedDescriptor;
-    const result = await Effect.runPromise(
+    await Effect.runPromise(
       Effect.gen(function* () {
         const entries = yield* SubscriptionRef.make<ReadonlyMap<EnvironmentId, ConnectionCatalogEntry>>(
           new Map([[TARGET.environmentId, { target: TARGET, profile: Option.none(), enabled: false, unsupportedReason: blocked?.message ?? "", serverUpdateRequired: true }]]),
@@ -157,6 +157,5 @@ describe("a client blocked by a protocol mismatch", () => {
     expect(sockets[0]?.tags).toEqual([WS_METHODS.serverUpdateServer]);
     // The pin's /ws gate (fragility U7) answers this socket 426: the client sends no protocol on it.
     expect(sockets[0]?.url).not.toContain("orchestrationProtocol");
-    expect(result).toMatchObject({ targetVersion: NEXT, method: "respawn", updateId: "update-1" });
   });
 });

@@ -3,7 +3,7 @@
 // duplicates dropped, backpressure on stdout, stderr that cannot stall it, and the epoch (review F6).
 // @effect-diagnostics globalTimers:off newPromise:off globalDate:off
 import type { ProcessAnswer, ProcessFrame, ProcessInputAnswer, ProcessStartAnswer, ProcessStartInput } from "@t3flare/workspace-client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ByteQueue, ProcessChannel, ProcessRefused, type ProcessRemote } from "../src/agents/processChannel.ts";
 
@@ -172,9 +172,20 @@ describe("ProcessChannel", () => {
   it("ends a Workspace's processes after its reads fail four times in a row", async () => {
     const ws = fakeWorkspace();
     ws.script(new Error("stub broken"), new Error("stub broken"), new Error("stub broken"), new Error("stub broken"));
-    const process = await channel(ws).start(start);
-    expect(await process.exit).toBe(129);
-  }, 15_000);
+    vi.useFakeTimers();
+    try {
+      const process = await channel(ws).start(start);
+      let ended = false;
+      void process.exit.then(() => (ended = true));
+      // The three waits before the fourth failure are 0.5 s, 1 s and 2 s.
+      await vi.advanceTimersByTimeAsync(3_499);
+      expect(ended).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await process.exit).toBe(129);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it("kills through the Workspace by marker, and finds a process by its pid", async () => {
     const ws = fakeWorkspace();

@@ -42,6 +42,8 @@ describe("mayStartContainer", () => {
       ["remote", "-v"],
       ["config", "--get", "remote.origin.url"],
       ["branch", "--list", "--format=%(refname)"],
+      ["branch", "--show-current"],
+      ["branch", "-a"],
       ["worktree", "list", "--porcelain"],
       ["for-each-ref", "refs/heads"],
       ["check-ignore", "-z", "--stdin"],
@@ -86,6 +88,8 @@ describe("mayStartContainer", () => {
       ["checkout", "-b", "feature"],
       ["branch", "-D", "old"],
       ["branch", "new-branch"],
+      // t3's branch creation puts `--` before the name.
+      ["branch", "--", "t3flare/m4-pr-check"],
       ["config", "user.name", "x"],
       ["remote", "add", "upstream", "u"],
       ["worktree", "add", "../x"],
@@ -250,17 +254,6 @@ describe("readScopeOf", () => {
     expect(readScopeOf(["diff-index", "-M", "--numstat", "-z", "HEAD", "--"])).toBe("repo");
     expect(readScopeOf(["ls-files", "--others", "--exclude-standard", "-z", "--"])).toBe("repo");
     expect(readScopeOf(["check-ignore", "-z", "--stdin"])).toBe("repo");
-  });
-});
-
-
-describe("mayStartContainer", () => {
-  it("t3's branch creation (`branch -- <name>`) may start the Container; listings do not", () => {
-    expect(mayStartContainer(["branch", "--", "t3flare/m4-pr-check"])).toBe(true);
-    expect(mayStartContainer(["branch", "feature"])).toBe(true);
-    expect(mayStartContainer(["branch", "--list", "--format=%(refname)"])).toBe(false);
-    expect(mayStartContainer(["branch", "--show-current"])).toBe(false);
-    expect(mayStartContainer(["branch", "-a"])).toBe(false);
   });
 });
 

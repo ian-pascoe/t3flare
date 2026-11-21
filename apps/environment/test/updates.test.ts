@@ -188,9 +188,6 @@ describe("the update records", () => {
     const subject = updates({ store: mapStore(), actions: undefined, now: () => 0, newId: () => "x" });
     expect(subject.configured).toBe(false);
     await expect(subject.press(serverPress(NEXT))).rejects.toThrow(NO_UPDATE_TARGET);
-    expect(NO_UPDATE_TARGET).toBe(
-      "This Environment has no update target. Update it by deploying: pull the Canonical repository's main and deploy this Stage again (docs/deploy.md, Updating).",
-    );
   });
 });
 

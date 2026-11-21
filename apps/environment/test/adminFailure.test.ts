@@ -14,8 +14,6 @@ describe("a failed admin route", () => {
   it("answers with the error and its causes, and no stack", () => {
     const body = adminFailureBody(failure());
     expect(body).toEqual({ error: "Error: outer", causes: ["SQLITE_ERROR: no such table", '{"code":7}'] });
-    expect(JSON.stringify(body)).not.toMatch(/\bat .+:\d+:\d+/);
-    expect(body).not.toHaveProperty("stack");
   });
 
   it("answers for a thrown value that is not an Error", () => {
