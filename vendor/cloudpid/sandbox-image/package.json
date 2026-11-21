@@ -1,8 +1,0 @@
-{
-  "name": "@cloudpid/sandbox-image",
-  "version": "0.0.0",
-  "private": true,
-  "license": "MIT",
-  "type": "module",
-  "exports": { "./mcp-bridge": "./src/mcp-bridge.ts" }
-}
