@@ -30,6 +30,7 @@ const servicesWith = (rows: Array<WorkspaceRecord>, destroyedSessions: Array<str
     setUnreferencedSince: () => undefined,
     remove: (id: string) => void rows.splice(rows.findIndex((row) => row.id === id), 1),
   };
+  // A stand-in for the few registry and namespace methods the Sweep calls, not the whole EnvironmentServices.
   bindEnvironmentServices({
     workspaces: registry,
     agents: {
@@ -39,6 +40,7 @@ const servicesWith = (rows: Array<WorkspaceRecord>, destroyedSessions: Array<str
   } as unknown as EnvironmentServices);
 };
 
+// The binding outlives each test: unbind it, so the default access finds no services.
 afterEach(() => bindEnvironmentServices(undefined as unknown as EnvironmentServices));
 
 describe("the Sweep's Purge of a deleted project with a worktree thread", () => {
@@ -60,7 +62,7 @@ describe("the Sweep's Purge of a deleted project with a worktree thread", () => 
     servicesWith(rows, destroyedSessions);
     const entries: Array<PurgeReport> = [];
     const report = await sweep(
-      sql as never,
+      sql,
       { purging: true, graceMs: GRACE_MS, graceDays: 7, overridden: true, dry: false },
       NOW,
       undefined,
@@ -99,7 +101,7 @@ describe("the Sweep's Purge of a deleted project with a worktree thread", () => 
     const swept = new Set(["t1"]);
     const entries: Array<PurgeReport> = [];
     await sweep(
-      sql as never,
+      sql,
       { purging: true, graceMs: GRACE_MS, graceDays: 7, overridden: true, dry: false },
       NOW,
       { has: (thread) => swept.has(thread), add: (thread) => void swept.add(thread) },
@@ -125,7 +127,7 @@ describe("the Sweep's Purge of a deleted project with a worktree thread", () => 
     servicesWith(rows, [], async () => Promise.reject(new Error("Workspace DO unreachable")));
     const swept = new Set<string>();
     const report = await sweep(
-      sql as never,
+      sql,
       { purging: true, graceMs: GRACE_MS, graceDays: 7, overridden: true, dry: false },
       NOW,
       { has: (thread) => swept.has(thread), add: (thread) => void swept.add(thread) },

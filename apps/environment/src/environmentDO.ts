@@ -22,7 +22,7 @@ import { scratchProjectOf } from "./agents/scratch.ts";
 import { locate, workspaceRpc } from "./agents/workspaceClient.ts";
 import { workspaceRegistry } from "./agents/workspaces.ts";
 import type { AgentsBindings } from "./agents/rpc.ts";
-import type { SweepReport } from "./agents/deletion.ts";
+import type { PurgingSince, SweepReport } from "./agents/deletion.ts";
 import type { WorkspacesApi } from "./agents/workspaceActions.ts";
 import * as BootState from "./host/bootState.ts";
 import * as Idle from "./host/idle.ts";
@@ -1020,18 +1020,23 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
     },
   };
 
+  /** When purging was last turned on (ADR-0043 §4), for the Sweep, the Workspaces section and a change to the Grace. */
+  readonly #purgingSince: PurgingSince = {
+    get: () => this.ctx.storage.kv.get<number>(PURGING_SINCE_KEY) ?? null,
+    set: (at) => (at === null ? void this.ctx.storage.kv.delete(PURGING_SINCE_KEY) : this.ctx.storage.kv.put(PURGING_SINCE_KEY, at)),
+  };
+
   /** Runs the Workspace sweep (step 2b); `dry` only reports. Never boots t3: it reads t3's tables directly. */
   async runSweep(options: { readonly dry: boolean }): Promise<SweepReport> {
     const { sweep } = await import("./agents/deletion.ts");
     const { environmentServices } = await import("./agents/bindings.ts");
-    const kv = this.ctx.storage.kv;
-    const store = harnessStore(kv);
+    const store = harnessStore(this.ctx.storage.kv);
     const report = await sweep(
       this.ctx.storage.sql,
       { ...environmentServices().sweep(), dry: options.dry },
       Date.now(),
       this.#sweptSessions,
-      { get: () => kv.get<number>(PURGING_SINCE_KEY) ?? null, set: (at) => (at === null ? void kv.delete(PURGING_SINCE_KEY) : kv.put(PURGING_SINCE_KEY, at)) },
+      this.#purgingSince,
       // ADR-0044 §4: each Workspace the Sweep purges is its own audit entry, beside the Owner's purges.
       (purged, why) =>
         store.audit(auditWorkspace({ at: Date.now(), actor: { caller: "sweep" }, action: "sweep.purge", target: purged.id, after: { purged: [purged.id], sessions: purged.sessionsDestroyed.length, why } })),
@@ -1051,14 +1056,13 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
   async workspacesApi(): Promise<WorkspacesApi> {
     const { openTerminals, purgeWorkspace, restoreWorkspace } = await import("./agents/deletion.ts");
     const services = environmentServices();
-    const kv = this.ctx.storage.kv;
-    const store = harnessStore(kv);
+    const store = harnessStore(this.ctx.storage.kv);
     return {
       deps: {
         sql: this.ctx.storage.sql,
         registry: services.workspaces,
         settings: services.sweep,
-        purgingSince: () => kv.get<number>(PURGING_SINCE_KEY) ?? null,
+        purgingSince: () => this.#purgingSince.get(),
         terminals: openTerminals,
         purge: purgeWorkspace,
         restore: restoreWorkspace,
@@ -1095,7 +1099,7 @@ export class EnvironmentDO extends DurableObject<EnvironmentEnv> {
 
   /** A change moved the Grace (`sweepPurges` or `graceDays`, ADR-0043 §5): every purge date moved; off clears `purgingSince`. */
   #sweepSettingsChanged(): void {
-    graceMoved({ purging: environmentServices().sweep().purging, clearPurgingSince: () => void this.ctx.storage.kv.delete(PURGING_SINCE_KEY), wake: () => this.wakeSweep() });
+    graceMoved({ purging: environmentServices().sweep().purging, clearPurgingSince: () => this.#purgingSince.set(null), wake: () => this.wakeSweep() });
   }
 
   /** The one alarm also wakes the sweep (ADR-0003's refinement). */

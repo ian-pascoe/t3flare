@@ -1,5 +1,5 @@
 // @effect-diagnostics globalDate:off
-// What an asked Settings change shows (plan D9, D10): the Open change's `shown`, built by the server from the stored
+// What an asked Settings change shows (ADR-0035 §7): the Open change's `shown`, built by the server from the stored
 // settings before the change and the change as the registry will apply it, never from the agent's words. The card's text
 // and the Change page are both rendered from it: this file renders the text (the card's prompt, and an Owner client's
 // message `M`); `harness/changePage.ts` renders the page. No secret is ever in it: a header value is typed on the page and
