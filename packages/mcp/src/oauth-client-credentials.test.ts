@@ -1,4 +1,4 @@
-// The Client Credentials grant and `private_key_jwt` (`docs/architecture/mcp-sign-in.md` → Client Credentials): the
+// The Client Credentials grant and `private_key_jwt`: the
 // assertion's claims and header, golden; the signature, checked against the public key; the key problems; how a secret or
 // an assertion is sent; and that no secret, key or assertion comes back out of an outcome.
 // @effect-diagnostics asyncFunction:off globalFetch:off preferEffectArray:off schemaSync:off

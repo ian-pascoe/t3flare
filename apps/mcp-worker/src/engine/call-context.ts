@@ -1,6 +1,6 @@
 /**
- * One engine call's connection deps, over the host's `prior` rows and the call's hooks
- * (`docs/architecture/mcp-connections.md` → The engine; #382 D1, D13.2): the rows live in memory for the call and the
+ * One engine call's connection deps, over the host's `prior` rows and the call's hooks:
+ * the rows live in memory for the call and the
  * ones it changed go back as `state`; `fetch` is the Worker's own, metered against the call's lease on the byte budget;
  * `auth` asks the host, and every token it gives is remembered so the result can be scrubbed of it.
  */
@@ -138,7 +138,7 @@ const decodeAnswer = Schema.decodeUnknownEffect(McpInputAnswer);
 const encodeInput = Schema.encodeEffect(McpInputRequestSchema);
 
 /**
- * The host's `onInput` hook as the core's (`docs/architecture/mcp-server-requests.md` → Questions): a caller that cannot
+ * The host's `onInput` hook as the core's: a caller that cannot
  * answer (its RPC broke, its Session gone) cancels the question, and an answer this build does not know (a newer
  * Session's) is a refusal, since the gain-only edge never gives an older engine a member it must act on. Nothing of a
  * question or its answer is kept or logged here.
@@ -221,11 +221,10 @@ export const openCall = Effect.fn("mcp.engine.openCall")(function* (
     // Roots are offered on a bridge connection only (`routeVia`). A Legacy connection declares an elicitation's form and
     // URL modes connection-wide, at `initialize`, whatever call opens it (`ctx` is undefined there): a question on a call
     // that cannot take it is cancelled, and a server that sees `url` may answer a `tools/call` `-32042`, which a call
-    // that cannot wait for a page gets as the server's error (`docs/architecture/mcp-server-requests.md` → Questions,
-    // Elicitation requests). A Modern request declares per request: the form of an elicitation only on a call whose caller
-    // offers it (`ctx.answers`) and has an `onInput` to answer with; its `url` mode also only where the caller keeps the
-    // page for later (`defer`) and resumes it (`pages`), or waits at it live (`livePages`: a prompt send's get), since a
-    // Modern page is answered once the owner is done there.
+    // that cannot wait for a page gets as the server's error. A Modern request declares per request: the form of an
+    // elicitation only on a call whose caller offers it (`ctx.answers`) and has an `onInput` to answer with; its `url`
+    // mode also only where the caller keeps the page for later (`defer`) and resumes it (`pages`), or waits at it live
+    // (`livePages`: a prompt send's get), since a Modern page is answered once the owner is done there.
     capabilities: (ctx?: McpCallContext) =>
       ctx === undefined
         ? { elicitation: { form: {}, url: {} } }

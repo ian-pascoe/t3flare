@@ -1,7 +1,7 @@
 // @effect-diagnostics globalTimers:off
 // A Session's usage records (SPI-1173): every assistant message a model call on a Model endpoint answers (a turn's,
-// compaction's, an extension's: they all go through the Session's models) is recorded with pi-ai's usage and cost, under
-// the Durable agent, the endpoint, the model and the Session; text generation records its own the same way.
+// compaction's, an extension's: they all go through the Session's models) is recorded with pi-ai's usage and cost,
+// under the Durable agent, the endpoint, the model and the Session; text generation records its own the same way.
 import { createModels } from "@earendil-works/pi-ai";
 import type { ModelEndpoint } from "@t3flare/models/endpoints";
 import type { UsageEntry } from "@t3flare/models/usage";

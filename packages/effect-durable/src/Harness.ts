@@ -1,4 +1,4 @@
-// The pi-durable Harness as an Effect service (ADR-0003): a thin facade whose calls are `Effect.tryPromise` over the
+// The pi-durable Harness as an Effect service: a thin facade whose calls are `Effect.tryPromise` over the
 // native Promise API. Each call gets the fiber's `ChordContext`, cancelled when the fiber is interrupted.
 import * as Chord from "@earendil-works/chord/context";
 import {

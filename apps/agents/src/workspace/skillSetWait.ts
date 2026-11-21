@@ -85,7 +85,7 @@ export interface PriorSkillsOptions {
 /**
  * What is at the mount before the Workspace first indexes it is the Workspace's own (written there before the mount
  * existed). computer clears a mount's root when it indexes it, so those files are moved aside first, unless there are
- * none Returns where they went.
+ * none. Returns where they went.
  */
 export const keepPriorSkills = async (options: PriorSkillsOptions): Promise<string | undefined> => {
   const { fs, mount } = options;

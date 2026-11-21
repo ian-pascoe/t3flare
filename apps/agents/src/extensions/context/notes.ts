@@ -1,8 +1,7 @@
-// A conversation's Notes (SPI-1056) and its last
-// saved Handoff, as one pi-durable conversation document in the Session DO's storage. Documents are not part of the
-// transcript, so a Handoff or a compaction leaves them as they are. Bounded, as the document is one stored value:
-// at most 64 Notes of 32,000 characters and 256,000 characters in
-// all, and a Handoff of at most 32,000.
+// A conversation's Notes (SPI-1056) and its last saved Handoff, as one pi-durable conversation document in the Session
+// DO's storage. Documents are not part of the transcript, so a Handoff or a compaction leaves them as they are.
+// Bounded, as the document is one stored value: at most 64 Notes of 32,000 characters and 256,000 characters in all,
+// and a Handoff of at most 32,000.
 import { type ConversationId, defineDoc } from "@earendil-works/pi-durable";
 
 /** At most this many Notes per conversation. */

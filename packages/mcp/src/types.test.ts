@@ -1,5 +1,5 @@
 /**
- * The engine edge's failure Schema (`docs/architecture/mcp.md` → Deploys): `McpErrorWire` reads every known tag as
+ * The engine edge's failure Schema: `McpErrorWire` reads every known tag as
  * its `McpError` and anything else as an `OtherMcpError` that may have run, so a newer engine's new tag never fails a
  * decode on an older host. The fixtures are JSON text, as the edge carries them.
  */

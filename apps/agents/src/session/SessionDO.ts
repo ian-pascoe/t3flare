@@ -1,8 +1,8 @@
 // @effect-diagnostics globalDate:off globalConsole:off globalTimers:off cryptoRandomUUID:off globalFetch:off
 // The Session DO (ADR-0005, step 2a plan): one Durable agent's conversation, a pi-durable Harness, per t3 thread. The
-// host follows pi-durable's test worker and the Session host rules (docs/architecture/overview.md → Session host):
-// the Harness opens in the constructor after a fallback alarm is armed, `resume()` runs from the constructor and the
-// alarm, the alarm is armed before work is admitted, and a 60 s heartbeat runs while a turn is live.
+// host follows pi-durable's test worker and the Session host rules: the Harness opens in the constructor after a
+// fallback alarm is armed, `resume()` runs from the constructor and the alarm, the alarm is armed before work is
+// admitted, and a 60 s heartbeat runs while a turn is live.
 //
 // The Session pushes its committed state to the Environment DO over DO RPC (`sessionPush`), coalesced to about 300 ms
 // while streaming and at least every 60 s while a turn is live; the Environment's adapter diffs it into t3's events.

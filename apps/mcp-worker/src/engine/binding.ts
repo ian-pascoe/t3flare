@@ -1,13 +1,13 @@
 import type { McpBridgeOptions } from "@t3flare/sandbox-image/mcp-bridge";
 import type { RpcTarget } from "cloudflare:workers";
 
-/** The name `Server` binds `McpWorker`'s `McpEngine` entrypoint under, for `McpHost` (ADR-0038). */
+/** The name `Server` binds `McpWorker`'s `McpEngine` entrypoint under, for `McpHost`. */
 export const MCP_ENGINE_BINDING = "MCP_ENGINE";
 
 /** The `McpWorker` entrypoint `Server` binds as `MCP_ENGINE`. */
 export const MCP_ENGINE_ENTRYPOINT = "McpEngine";
 
-/** The name `Server` binds `McpWorker`'s `McpServer` entrypoint under, for `/mcp` (`docs/architecture/mcp-endpoint.md` → The handler). */
+/** The name `Server` binds `McpWorker`'s `McpServer` entrypoint under, for `/mcp`. */
 export const MCP_SERVER_BINDING = "MCP_SERVER";
 
 /** The `McpWorker` entrypoint `Server` binds as `MCP_SERVER`. */
@@ -21,7 +21,7 @@ export interface McpServerBinding {
   serve(request: Request, api: RpcTarget): Promise<Response>;
 }
 
-/** The name `McpWorker` binds the Workspaces Worker's `WorkspaceMcpBridge` entrypoint under (`docs/architecture/mcp-connections.md` → The engine). */
+/** The name `McpWorker` binds the Workspaces Worker's `WorkspaceMcpBridge` entrypoint under. */
 export const MCP_BRIDGE_BINDING = "MCP_BRIDGE";
 
 /** The Workspaces Worker's entrypoint `McpWorker` binds as `MCP_BRIDGE`. */

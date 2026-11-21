@@ -1,6 +1,5 @@
-// docs/architecture/operations.md → Telemetry. A Session's list of its running calls' spans: a tool's counts reach the span
-// its call is listed under in that Session's list, never another Session's with the same call ID, and nothing once the call
-// is over.
+// A Session's list of its running calls' spans: a tool's counts reach the span its call is listed under in that
+// Session's list, never another Session's with the same call ID, and nothing once the call is over.
 import * as Effect from "effect/Effect";
 import { describe, expect, it } from "vitest";
 import {

@@ -1,6 +1,5 @@
 /**
- * The `prior` rows (`docs/architecture/mcp.md` → Protocol eras, Deploys; `docs/architecture/mcp-connections.md` →
- * Storage, Requests and Legacy sessions): a Modern server reconnects with no round trip, a Legacy session goes on with
+ * The `prior` rows: a Modern server reconnects with no round trip, a Legacy session goes on with
  * no `initialize`, a row of an unknown format `v` reads as absent, and a Legacy era row is probed again once 24 h old.
  */
 // @effect-diagnostics asyncFunction:off preferEffectArray:off

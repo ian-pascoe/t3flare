@@ -1,5 +1,5 @@
 /**
- * Roots (`docs/architecture/mcp-in-a-session.md` → Roots): a connection given `roots` declares the capability and answers
+ * Roots: a connection given `roots` declares the capability and answers
  * `roots/list` in both eras, on the call's stream in a Legacy exchange and in the `input_required` round on Modern; one
  * given none declares no `roots`, so a remote server is never offered any. `roots.listChanged` is never declared.
  */

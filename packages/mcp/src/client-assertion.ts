@@ -1,5 +1,5 @@
 /**
- * The client assertion of RFC 7523 §2.2 (`private_key_jwt`; `docs/architecture/mcp-sign-in.md` → Client Credentials): the
+ * The client assertion of RFC 7523 §2.2 (`private_key_jwt`): the
  * claims, the PKCS#8 key import (RSA of at least 2048 bits signs RS256, P-256 signs ES256) and the compact JWS. Re-exported
  * by `./oauth`; no SDK import. Nothing here returns, logs or throws a key: a problem says what to fix and never quotes it.
  */

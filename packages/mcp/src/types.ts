@@ -2,12 +2,10 @@
  * `@t3flare/mcp/types`: Effect Schemas for `McpHost`'s and `McpEngine`'s RPC (`McpEngineMethods` included). It never
  * loads the SDK, so Sessions, the `mcp` extension, `McpHost`, the web app and the bridge can import it; its test
  * (`sdk-isolation.test.ts`) fails if it comes to.
- *
- * `docs/architecture/mcp.md` → Packages and objects (the core's seam), Deploys (`prior` rows carry a format `v`).
  * What is here so far: the core's tagged `McpError`, `McpErrorWire` (with its fallback `OtherMcpError`, and
- * `mayHaveRun`) for the engine edge, the call context, the `prior` rows the host keeps for the engine
- * (`docs/architecture/mcp-connections.md` → Storage), `McpEngine`'s RPC, `McpEngineMethods`
- * (`docs/architecture/mcp-connections.md` → The engine) with the Schemas of its sign-in read (`./public-fetch.ts`), and the
+ * `mayHaveRun`) for the engine edge, the call context, the `prior` rows the host keeps for the engine,
+ * `McpEngine`'s RPC, `McpEngineMethods`
+ * with the Schemas of its sign-in read (`./public-fetch.ts`), and the
  * host's own RPC (`./host.ts`).
  */
 import * as Arr from "effect/Array";
@@ -48,21 +46,21 @@ export { isJsonObject, JsonObject, jsonListOf, present } from "./json.ts";
 
 export { xMcpHeaderProblems } from "./tool-headers.ts";
 
-/** Where a call comes from (The MCP core #394 D7, `McpCallContext`). */
+/** Where a call comes from (`McpCallContext`). */
 export const McpCallOrigin = Schema.Literals(["agent", "owner", "app", "host"]);
 
 export type McpCallOrigin = typeof McpCallOrigin.Type;
 
 /**
- * What a caller can answer (`docs/architecture/mcp-server-requests.md` → Questions): the kinds of question the call's
+ * What a caller can answer: the kinds of question the call's
  * `onInput` takes (elicitation and, on a Legacy server, Sampling), and how long a Legacy question may wait for the owner (`inputWaitMs`, the largest of the kinds
  * offered). The core declares to the server only what is offered here, and a callback's presence is the other half of
- * the version-skew gate (`docs/architecture/mcp.md` → Deploys: `ctx.answers`).
+ * the version-skew gate.
  */
 export const McpAnswers = Schema.Struct({
   elicitation: Schema.optionalKey(Schema.Boolean),
   /**
-   * The caller answers a server's Sampling request (`docs/architecture/mcp-server-requests.md` → Sampling requests): a
+   * The caller answers a server's Sampling request: a
    * Legacy server's, on the call's stream, and a Modern server's, in a round of questions, which `onInput` runs, or keeps
    * for later when the caller also sets `defer`. A Modern request declares `sampling` only with it.
    */
@@ -71,15 +69,14 @@ export const McpAnswers = Schema.Struct({
   /**
    * The caller keeps a Modern server's questions for later (`onInput` may answer `defer`), so the request may be
    * answered `input_required` with a `ResumeState`, and `resume` sends it again with the answers. Without it no request
-   * is ever answered `input_required`, and a `defer` reads as `cancel` (`docs/architecture/mcp-server-requests.md` →
-   * Questions).
+   * is ever answered `input_required`, and a `defer` reads as `cancel`.
    */
   defer: Schema.optionalKey(Schema.Boolean),
   /**
    * The caller keeps a Legacy server's `-32042` (URL elicitation required) for later, as it does a Modern round with
    * `defer` (which it sets too): the request may be answered `pages_required` with a `ResendState`, and `resend` sends
    * it again once the owner has opened the pages. Without it a `-32042` is the server's error, as before. A new success
-   * shape, so asked for apart from `defer` (`docs/architecture/mcp.md` → Deploys). With `defer` it is also what makes a
+   * shape, so asked for apart from `defer`. With `defer` it is also what makes a
    * Modern request declare the elicitation's `url` mode: the caller keeps a page for later and sends the call again once
    * the owner is done there, as `resume` does for any Modern round (a read, which has no `resume`, declares none).
    */
@@ -88,9 +85,8 @@ export const McpAnswers = Schema.Struct({
    * The caller waits for the owner at a page, live, with no resume (a prompt send's `prompts/get`, which keeps nothing for
    * later): a Modern request declares the elicitation's `url` mode, and its page reaches `onInput` as a `deferrable`
    * question the caller answers once the owner is done there; a Legacy server's `-32042` reaches it the same way, once per
-   * resend of the request, at most `MCP_INPUT_ROUNDS` times. Without it a get has neither (`docs/architecture/
-   * mcp-server-requests.md` → Questions, Elicitation requests). A new key, so a core from before it ignores it and the
-   * request is as it was.
+   * resend of the request, at most `MCP_INPUT_ROUNDS` times. Without it a get has neither. A new key, so a core from
+   * before it ignores it and the request is as it was.
    */
   livePages: Schema.optionalKey(Schema.Boolean),
 });
@@ -112,13 +108,13 @@ export const McpCallContext = Schema.Struct({
 export type McpCallContext = typeof McpCallContext.Type;
 
 /**
- * The MCP tasks extension's id (`docs/architecture/mcp.md` → Extensions): a Modern server advertises it in its
+ * The MCP tasks extension's id: a Modern server advertises it in its
  * `capabilities.extensions`, and a client declares it in a request's `_meta` client capabilities, only on a
  * `tools/call` it can wait for (`ctx.allowTask`) and on the `tasks/*` requests of a task it started.
  */
 export const MCP_TASKS_EXTENSION = "io.modelcontextprotocol/tasks";
 
-/** The statuses of an MCP task (`docs/architecture/mcp-server-requests.md` → MCP tasks). */
+/** The statuses of an MCP task. */
 export const McpTaskStatus = Schema.Literals([
   "working",
   "input_required",
@@ -179,24 +175,24 @@ export const McpTaskInputResponses = Schema.Record(Schema.String, JsonObject);
 
 export type McpTaskInputResponses = typeof McpTaskInputResponses.Type;
 
-/** The most a `ResumeState` may weigh, as JSON (ADR-0037). */
+/** The most a `ResumeState` may weigh, as JSON. */
 export const MCP_RESUME_STATE_MAX_BYTES = 1024 * 1024;
 
-/** The most rounds of questions one request may take before it fails (ADR-0037). */
+/** The most rounds of questions one request may take before it fails. */
 export const MCP_INPUT_ROUNDS = 10;
 
 /**
  * What a resume whose `ResumeState` this build cannot read says: a format `v` past its 30 days, or a state that is not
- * one (`docs/architecture/mcp-server-requests.md` → Questions; `docs/architecture/mcp.md` → Deploys).
+ * one.
  */
 export const MCP_RESUME_STATE_EXPIRED =
   "The question was asked by an older version of t3flare and can't be resumed; call the tool again";
 
 /**
- * A `ResumeState`, format 1 (`docs/architecture/mcp-server-requests.md` → Questions; ADR-0037): what the core needs to
+ * A `ResumeState`, format 1: what the core needs to
  * send a Modern request again once its deferred questions are answered. JSON, at most `MCP_RESUME_STATE_MAX_BYTES`,
  * opaque to everyone but the core: the Session keeps it in the question's record and hands it back to `resume`. A later
- * format is a new `v`, and this one stays readable for 30 days after it (`docs/architecture/mcp.md` → Deploys).
+ * format is a new `v`, and this one stays readable for 30 days after it.
  */
 export const ResumeStateV1 = Schema.Struct({
   v: Schema.Literal(1),
@@ -216,7 +212,7 @@ export const ResumeStateV1 = Schema.Struct({
 export type ResumeStateV1 = typeof ResumeStateV1.Type;
 
 /**
- * A `ResendState`, format 1 (`docs/architecture/mcp-server-requests.md` → Elicitation requests, URL mode): what the
+ * A `ResendState`, format 1: what the
  * core needs to send a Legacy request again once the owner has opened the pages its `-32042` listed. The call ran
  * nothing, so it goes again as it was, with nothing added. `deferred` are the keys (`elicitationId`s) of the pages, which
  * `resend` takes an `accept` for each of; any other answer fails the call with the server's own error, `message`. JSON,
@@ -237,8 +233,7 @@ export type ResendStateV1 = typeof ResendStateV1.Type;
 
 /**
  * The era row (`mcp_eras`), format 1: the Protocol era a server was found to speak, its negotiated version and, for a
- * Modern server, its `server/discover` result, so it reconnects with no round trip
- * (`docs/architecture/mcp.md` → Protocol eras).
+ * Modern server, its `server/discover` result, so it reconnects with no round trip.
  */
 export const EraRowV1 = Schema.Union([
   Schema.Struct({
@@ -260,7 +255,7 @@ export type EraRow = typeof EraRowV1.Type;
 
 /**
  * The Legacy session row (`mcp_sessions`), format 1: what the core needs to go on with a Legacy server's session
- * without a new `initialize` (The MCP core #394 D5). The resumed SDK client knows none of it, so the core serves the
+ * without a new `initialize`. The resumed SDK client knows none of it, so the core serves the
  * server's capabilities and instructions from here. `declared` only gains: an older row has none.
  */
 export const SessionRowV1 = Schema.Struct({
@@ -272,7 +267,7 @@ export const SessionRowV1 = Schema.Struct({
   instructions: Schema.optionalKey(Schema.String),
   initializedAt: Schema.Finite,
   /**
-   * What the client declared at `initialize` (`mcp-server-requests.md` → Questions): a session whose declaration is not
+   * What the client declared at `initialize`: a session whose declaration is not
    * today's (or has none, as rows from before questions did not) is initialized again at its next use, since a server
    * keeps what it was told for the life of the session.
    */
@@ -321,8 +316,8 @@ export class Unreachable extends Schema.TaggedError<
   stopped: Schema.optionalKey(Schema.Boolean),
   /**
    * Set when the server is unreachable because its sign-in could not be used for now (the Registry could not refresh it or
-   * be asked), so a Session says so ("try again shortly") and `details.sign_in` is `unavailable`
-   * (`docs/architecture/mcp-sign-in.md` → Sign-in requests). Optional, so an edge that does not know it reads the failure as any.
+   * be asked), so a Session says so ("try again shortly") and `details.sign_in` is `unavailable`.
+   * Optional, so an edge that does not know it reads the failure as any.
    */
   signIn: Schema.optionalKey(Schema.Boolean),
 }) {}
@@ -333,7 +328,7 @@ export const MCP_CONTAINER_STOPPED_CUT = "Container stopped";
 /**
  * The request's stream ended before its answer arrived; a `tools/call` may or may not have run. `lost` says where it
  * was lost when that was not the server's stream: `"engine"`, the host's RPC to the engine broke, which a Session shows
- * as `details.cut: "engine_lost"` (`docs/architecture/mcp-in-a-session.md` → Calls and results). Optional and read as
+ * as `details.cut: "engine_lost"`. Optional and read as
  * any string, so an edge that does not know it, or a value it does not know, still reads the cut.
  */
 export class Cut extends Schema.TaggedError<Cut, { readonly brand: unique symbol }>()("Cut", {
@@ -400,7 +395,7 @@ export class ProtocolViolation extends Schema.TaggedError<
   message: Schema.String,
 }) {}
 
-/** Every way a core request fails (`docs/architecture/mcp.md` → Packages and objects). */
+/** Every way a core request fails. */
 export const McpError = Schema.Union([
   SignInRequired,
   StepUpRequired,
@@ -453,7 +448,7 @@ const OtherMcpErrorFromWire = AnyMcpErrorFields.pipe(
 );
 
 /**
- * The engine edge's failure Schema (`docs/architecture/mcp.md` → Deploys): every known tag reads as its `McpError`,
+ * The engine edge's failure Schema: every known tag reads as its `McpError`,
  * anything else as an `OtherMcpError`, so a newer engine's new tag never fails a decode on an older host.
  */
 export const McpErrorWire = Schema.Union([...McpError.members, OtherMcpErrorFromWire]);
@@ -461,7 +456,7 @@ export const McpErrorWire = Schema.Union([...McpError.members, OtherMcpErrorFrom
 export type McpErrorWire = typeof McpErrorWire.Type;
 
 /**
- * Whether a failed request may have run (`docs/architecture/mcp-connections.md` → Failures and cuts), so whether it
+ * Whether a failed request may have run, so whether it
  * may be sent again. Only a `tools/call` runs anything; for any other method this is what a `Cut` or an
  * `OtherMcpError` says, else false. For a `tools/call`:
  *
@@ -494,12 +489,11 @@ export const mayHaveRun = (error: McpErrorWire, method: string): boolean => {
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
-// `McpEngine`'s RPC (`McpEngineMethods`): what `McpHost` sends the engine and what comes back
-// (`docs/architecture/mcp-connections.md` → The engine; The Environment's MCP host object #382 D1).
+// `McpEngine`'s RPC (`McpEngineMethods`): what `McpHost` sends the engine and what comes back.
 //
 // The engine is a `WorkerEntrypoint`, so a call's values cross by structured clone: the engine sends each result
 // encoded with these Schemas and the host decodes it with them, a failure through `McpErrorWire` (an unknown tag reads
-// as `OtherMcpError`). The edge only gains (`docs/architecture/mcp.md` → Deploys): a new operation is a new `op`, which
+// as `OtherMcpError`). The edge only gains: a new operation is a new `op`, which
 // an older engine fails as `Unsupported`, and a new success shape is returned only when the request asked for it.
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -512,8 +506,8 @@ const TargetFields = {
   name: Schema.String,
   /**
    * The Secret values the host substituted for `${NAME}` into `headers` or `env` (`${…}` is refused in the URL): what
-   * the engine scrubs, as far as four characters, from the logs, errors, results and inventory it hands back
-   * (`docs/architecture/mcp-connections.md` → Telemetry). Empty for an entry that references no Secret, and absent from
+   * the engine scrubs, as far as four characters, from the logs, errors, results and inventory it hands back.
+   * Empty for an entry that references no Secret, and absent from
    * a host older than this field.
    */
   redact: Schema.Array(Schema.String).pipe(Schema.optionalKey),
@@ -521,7 +515,7 @@ const TargetFields = {
   timeoutMs: Schema.optionalKey(Schema.Int),
   /**
    * Whether a Legacy connection to this server declares `sampling` at `initialize` (the definition's `sampling` key lets
-   * it: `docs/architecture/mcp-server-requests.md` → Sampling requests). Absent from a host older than this field, and
+   * it). Absent from a host older than this field, and
    * for a server that is declared none: a stdio server's questions are not answered yet, and a Modern connection
    * declares no sampling.
    */
@@ -535,8 +529,8 @@ export const McpEngineHttpTarget = Schema.Struct({
   url: Schema.String,
   headers: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
   /**
-   * The MCP extensions this connection declares besides MCP Apps, in both eras (`docs/architecture/mcp.md` →
-   * Extensions): today only OAuth Client Credentials, and only on a connection that signs in with that grant. The engine
+   * The MCP extensions this connection declares besides MCP Apps, in both eras: today only OAuth Client Credentials,
+   * and only on a connection that signs in with that grant. The engine
    * declares the ones it knows and no other. Absent from a host older than this field, and from any other connection.
    */
   extensions: Schema.Record(Schema.String, JsonObject).pipe(Schema.optionalKey),
@@ -547,7 +541,7 @@ export type McpEngineHttpTarget = typeof McpEngineHttpTarget.Type;
 export type McpEngineHttpTargetEncoded = typeof McpEngineHttpTarget.Encoded;
 
 /**
- * A Root as a stdio server is offered it (`docs/architecture/mcp-in-a-session.md` → Roots): `file:///workspace/<repo-dir>`,
+ * A Root as a stdio server is offered it: `file:///workspace/<repo-dir>`,
  * named `owner/name`.
  */
 export const McpRoot = Schema.Struct({
@@ -561,7 +555,7 @@ export type McpRoot = typeof McpRoot.Type;
  * A stdio server, run by the bridge of the Container of Workspace object `workspace` (`ws:<id>`): what the bridge spawns,
  * with the entry's `env` resolved, and whether the call may start a stopped Container (`start`: a live caller's request
  * only, never background work). `roots` are what the server is offered, the Repos of that Workspace; a target without
- * them declares no `roots` (`docs/architecture/mcp-connections.md` → The stdio bridge).
+ * them declares no `roots`.
  */
 export const McpEngineStdioTarget = Schema.Struct({
   kind: Schema.Literal("stdio"),
@@ -579,7 +573,7 @@ export type McpEngineStdioTarget = typeof McpEngineStdioTarget.Type;
 
 /**
  * The server a call goes to. A `kind` an engine does not know fails as `Unsupported`, sending nothing, so the edge only
- * gains (`docs/architecture/mcp.md` → Deploys).
+ * gains.
  */
 export const McpEngineTarget = Schema.Union([McpEngineHttpTarget, McpEngineStdioTarget]);
 
@@ -587,7 +581,7 @@ export type McpEngineTarget = typeof McpEngineTarget.Type;
 
 /**
  * The rows the host keeps for a connection (`mcp_eras`, `mcp_sessions`), as JSON of any format: the engine reads a row
- * it does not know as absent (`docs/architecture/mcp-connections.md` → Storage).
+ * it does not know as absent.
  */
 export const McpEnginePrior = Schema.Struct({
   era: Schema.optionalKey(Schema.Json),
@@ -609,15 +603,15 @@ const EngineLogs = { logs: McpLogEntry.pipe(Schema.Array, Schema.optionalKey) };
 
 /**
  * The spawn id of the stdio server's process the call last heard from (the bridge's `x-t3flare-spawn`): it changes when
- * the process is spawned again, so the host learns of a restart (`docs/architecture/mcp-connections.md` → The stdio
- * bridge). Gain-only: absent for an HTTP server and from an engine that does not know it.
+ * the process is spawned again, so the host learns of a restart. Gain-only: absent for an HTTP server and from an
+ * engine that does not know it.
  */
 const EngineSpawn = { spawn: Schema.optionalKey(Schema.String) };
 
 /**
  * A tool's definition, as the server listed it and the host keeps it in its catalog: a `tools/call` carries it, since
  * its `inputSchema` gives the `Mcp-Param` headers and its `outputSchema` is what the engine checks `structuredContent`
- * against (The MCP core #394 D14, D17).
+ * against.
  */
 export const McpToolDefinition = Schema.StructWithRest(
   Schema.Struct({
@@ -639,8 +633,8 @@ export const McpToolProblem = Schema.Struct({
 export type McpToolProblem = typeof McpToolProblem.Type;
 
 /**
- * The server's tools, listed again by a `request` because the server refused a `tools/call`'s headers (`-32020`; The
- * MCP core #394 D14), with their schema problems compiled as discovery compiles them, for the host to update its
+ * The server's tools, listed again by a `request` because the server refused a `tools/call`'s headers (`-32020`), with
+ * their schema problems compiled as discovery compiles them, for the host to update its
  * catalog. Present on the call's result whether its second send completed or failed.
  */
 const RefreshedTools = {
@@ -651,7 +645,7 @@ const RefreshedTools = {
 /**
  * What was found wrong with a prompt: one left out for a name or a key that holds a value the call keeps secret, said by
  * its place in the list (`prompt #3`) and never the value. A prompt's problems are kept apart from a tool's, so a
- * prompts-only change never changes the tools' version (`docs/architecture/mcp-connections.md` → Versions).
+ * prompts-only change never changes the tools' version.
  */
 export const McpPromptProblem = Schema.Struct({
   prompt: Schema.String,
@@ -675,7 +669,7 @@ export const McpEngineFailed = Schema.Struct({
 
 export type McpEngineFailed = typeof McpEngineFailed.Type;
 
-/** A server's protocol era as the engine reports it (`docs/architecture/mcp.md` → Protocol eras). */
+/** A server's protocol era as the engine reports it. */
 export const MCP_ENGINE_ERAS = ["modern", "legacy"] as const;
 
 export const McpEngineEra = Schema.Literals(MCP_ENGINE_ERAS);
@@ -685,32 +679,32 @@ export type McpEngineEra = typeof McpEngineEra.Type;
 /** A mebibyte, the unit of the core's byte limits. */
 export const MiB = 1024 * 1024;
 
-/** The most a `tools/call` result or a large read may weigh (#394 D16); a larger answer is `TooLarge`. */
+/** The most a `tools/call` result or a large read may weigh; a larger answer is `TooLarge`. */
 export const MCP_LARGE_RESULT_BYTES = 16 * MiB;
 
 /**
  * How long the engine lets a result's stream go unread before it errors the stream and lets its bytes go (each pull
- * renews it): the Session's waits for a stream stay under it (`docs/architecture/mcp-connections.md` → Memory).
+ * renews it): the Session's waits for a stream stay under it.
  */
 export const MCP_STREAM_HOLD_MS = 60_000;
 
-/** The core's bound on a probe or an `initialize` (#394 D15). */
+/** The core's bound on a probe or an `initialize`. */
 export const MCP_CONNECT_TIMEOUT_MS = 15_000;
 
-/** The core's bound on walking every page of a list (#394 D15). */
+/** The core's bound on walking every page of a list. */
 export const MCP_LIST_WALK_TIMEOUT_MS = 120_000;
 
-/** What a `tasks/*` request may take, in the core and at the host: 30 s each (`docs/architecture/mcp-connections.md` → Requests and Legacy sessions). */
+/** What a `tasks/*` request may take, in the core and at the host: 30 s each. */
 export const MCP_TASK_TIMEOUT_MS = 30_000;
 
 /** What a `completion/complete` waits at most (or the entry's lower `timeout`): 5 s, as the form shows it ("Suggestions unavailable" after). */
 export const MCP_COMPLETION_TIMEOUT_MS = 5_000;
 
-/** What a `prompts/get` waits at most (or the entry's lower `timeout`): `docs/architecture/mcp-connections.md` → Requests and Legacy sessions. */
+/** What a `prompts/get` waits at most (or the entry's lower `timeout`). */
 export const MCP_PROMPT_GET_TIMEOUT_MS = 30_000;
 
 /**
- * A discovery (`docs/architecture/mcp-connections.md` → Discovery and the MCP inventory): what the server is, every
+ * A discovery: what the server is, every
  * page of its tools and prompts, and the tools whose output schema could not be compiled. The inventory's bounds,
  * versions and storage are the host's.
  */
@@ -749,7 +743,7 @@ export const McpEngineListOp = Schema.Literals([
 
 /**
  * What a `completion/complete` completes an argument of: a prompt by `name`, or a resource template by its
- * `uriTemplate` (`docs/architecture/mcp-in-a-session.md` → Arguments and completions).
+ * `uriTemplate`.
  */
 export const McpCompletionRef = Schema.Union([
   Schema.Struct({ type: Schema.Literal("ref/prompt"), name: Schema.String }),
@@ -770,7 +764,7 @@ export const McpCompletionContext = Schema.Struct({
 
 export type McpCompletionContext = typeof McpCompletionContext.Type;
 
-/** What `request` is asked to do. A new operation is a new `op` (`docs/architecture/mcp.md` → Deploys). */
+/** What `request` is asked to do. A new operation is a new `op`. */
 export const McpEngineRequest = Schema.Union([
   Schema.Struct({
     op: Schema.Literal("tools/call"),
@@ -883,7 +877,7 @@ const ByteStream = Schema.declare(
 
 /**
  * A result's value: inline up to 1 MiB of JSON, else the JSON's bytes as a native `ReadableStream` the engine produces
- * on pull (`docs/architecture/mcp-connections.md` → The engine, large results; #409 answer 3).
+ * on pull.
  */
 export const McpEngineValue = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("inline"), value: Schema.Json }),
@@ -893,8 +887,8 @@ export const McpEngineValue = Schema.Union([
 export type McpEngineValue = typeof McpEngineValue.Type;
 
 /**
- * How a `tools/call` result's `structuredContent` fits the tool's `outputSchema`, checked in the engine (The MCP core
- * #394 D17, refined by #382 D9.3): absent when the tool declares none, `valid: false` with the first errors otherwise.
+ * How a `tools/call` result's `structuredContent` fits the tool's `outputSchema`, checked in the engine: absent when
+ * the tool declares none, `valid: false` with the first errors otherwise.
  */
 export const McpStructuredOutput = Schema.Union([
   Schema.Struct({ valid: Schema.Literal(true) }),
@@ -903,7 +897,7 @@ export const McpStructuredOutput = Schema.Union([
 
 export type McpStructuredOutput = typeof McpStructuredOutput.Type;
 
-/** A request that completed: its value, its cache metadata (The MCP core #394 D13) and the rows it changed. */
+/** A request that completed: its value, its cache metadata and the rows it changed. */
 export const McpEngineCompleted = Schema.Struct({
   kind: Schema.Literal("complete"),
   result: McpEngineValue,
@@ -932,7 +926,7 @@ export type McpEngineCompleted = typeof McpEngineCompleted.Type;
 /**
  * A `tools/call` the server answered with an MCP task (`resultType: "task"`): returned only to a call that asked for
  * one (`ctx.allowTask`), and only when the server is Modern and advertises the tasks extension, so a caller without
- * `allowTask` never gets one (`docs/architecture/mcp-server-requests.md` → MCP tasks). `tools` and `problems` are as
+ * `allowTask` never gets one. `tools` and `problems` are as
  * `McpEngineCompleted`'s after a `-32020`.
  */
 export const McpEngineTaskStarted = Schema.Struct({
@@ -967,7 +961,7 @@ export type McpEngineTaskState = typeof McpEngineTaskState.Type;
 /**
  * A Modern `tools/call` (or its `resume`) whose server asked questions the caller deferred, returned only to a call
  * whose `ctx.answers.defer` is set: the deferred `requests`, scrubbed of the call's tokens, and the `ResumeState` a
- * `resume` goes on from, as the core made it (`docs/architecture/mcp-server-requests.md` → Questions).
+ * `resume` goes on from, as the core made it.
  */
 export const McpEngineInputRequired = Schema.Struct({
   kind: Schema.Literal("input_required"),
@@ -1014,7 +1008,7 @@ export type McpEngineTaskAck = typeof McpEngineTaskAck.Type;
 /**
  * A request's result. Neither result union has a fallback member, by design: a new success shape is returned only
  * when the request asked for it (a request flag such as `ctx.allowTask`, or an `op` of its own such as `tasks/get`),
- * so an older host never receives one it cannot read (`docs/architecture/mcp.md` → Deploys); failures fall back
+ * so an older host never receives one it cannot read; failures fall back
  * through `McpErrorWire`.
  */
 export const McpEngineRequestResult = Schema.Union([
@@ -1029,11 +1023,11 @@ export const McpEngineRequestResult = Schema.Union([
 
 export type McpEngineRequestResult = typeof McpEngineRequestResult.Type;
 
-/** How long a listen waits for the server's acknowledgement (`docs/architecture/mcp-connections.md` → Requests and Legacy sessions). */
+/** How long a listen waits for the server's acknowledgement. */
 export const MCP_LISTEN_ACK_MS = 10_000;
 
 /**
- * What a listen carries (`docs/architecture/mcp-in-a-session.md` → Resource watches; The MCP core #394 D12): the resource
+ * What a listen carries: the resource
  * URIs to be told of (`resourceSubscriptions`, the wire's own name) and the list changes. A `2026-07-28` server
  * acknowledges the part it honors; a `2025-11-25` server's shim subscribes each URI and reads list changes from its GET
  * stream, so what it honors is the URIs it accepted.
@@ -1087,8 +1081,8 @@ export const McpEngineListenResult = Schema.Union([McpEngineListening, McpEngine
 export type McpEngineListenResult = typeof McpEngineListenResult.Type;
 
 /**
- * A server's `notifications/progress` on a call, as it reaches the caller (`docs/architecture/mcp-in-a-session.md` →
- * Calls and results): how far the call is, of `total` if the server knows it, and a message.
+ * A server's `notifications/progress` on a call, as it reaches the caller: how far the call is, of `total` if the
+ * server knows it, and a message.
  */
 export const McpProgress = Schema.Struct({
   progress: Schema.Finite,
@@ -1098,20 +1092,19 @@ export const McpProgress = Schema.Struct({
 
 export type McpProgress = typeof McpProgress.Type;
 
-/** The most progress notices a call passes on in a second (`docs/architecture/mcp-connections.md` → RPC). */
+/** The most progress notices a call passes on in a second. */
 export const MCP_PROGRESS_PER_SECOND = 10;
 
 /**
- * The callbacks a call carries, passed as RPC stubs that live as long as the caller's invocation (`docs/architecture/
- * mcp.md` → RPC edges). There is no `onLog`: a server's logs come back in
- * the result (`logs`), so a discovery, which passes no hooks, brings them too (`docs/architecture/mcp-connections.md` →
- * Telemetry).
+ * The callbacks a call carries, passed as RPC stubs that live as long as the caller's invocation. There is no `onLog`:
+ * a server's logs come back in
+ * the result (`logs`), so a discovery, which passes no hooks, brings them too.
  */
 export interface McpEngineHooks {
   /**
    * Pending until the caller aborts the call (it resolves) or dies (it rejects); either way the engine aborts the server
    * request, since RPC carries no `AbortSignal`. Absent for a call that no caller's invocation holds (the host's
-   * background discovery, which a function stub would not outlive, #409 answer 2): the engine then runs it to its own
+   * background discovery, which a function stub would not outlive): the engine then runs it to its own
    * bounds.
    */
   readonly untilAborted?: () => Promise<void>;
@@ -1136,8 +1129,8 @@ export interface McpEngineHooks {
   readonly onInputEnded?: (key: string) => void | Promise<void>;
   /**
    * The server used a feature the MCP spec deprecated (`"sampling"`: it sent a Sampling request), however the request
-   * ended: tied to a call or not, answered or refused (`docs/architecture/mcp-server-requests.md` → Sampling requests,
-   * Deprecation). A hook that fails or is slow fails nothing. An engine from before never calls it.
+   * ended: tied to a call or not, answered or refused. A hook that fails or is slow fails nothing. An engine from
+   * before never calls it.
    */
   readonly onDeprecated?: (feature: string) => void | Promise<void>;
   /**
@@ -1168,7 +1161,7 @@ export interface McpEngineMethods {
     hooks: McpEngineHooks,
   ) => Promise<typeof McpEngineRequestResult.Encoded>;
   /**
-   * Opens a listen on the server (`docs/architecture/mcp-connections.md` → Requests and Legacy sessions → Listens): a
+   * Opens a listen on the server: a
    * `subscriptions/listen` on a Modern server, `resources/subscribe` for each URI and the GET stream on a Legacy one. It
    * answers once the server acknowledged, or fails in 10 s. The connection lives as long as the event stream does, and
    * ends when `stop`, a stream the caller keeps, ends or breaks: closing it is how the caller ends the listen at once
@@ -1184,7 +1177,7 @@ export interface McpEngineMethods {
   ) => Promise<typeof McpEngineListenResult.Encoded>;
   /**
    * A public read for the Registry's MCP sign-in on one of t3flare's own hosts, from this Worker, which has
-   * `global_fetch_strictly_public` (`./public-fetch.ts`; `docs/architecture/mcp-sign-in.md` → Code). Not part of a
+   * `global_fetch_strictly_public` (`./public-fetch.ts`). Not part of a
    * connection. Optional: an engine from before it has no such method, and its stub's call fails as one it does not
    * implement, which the caller reads as "read it yourself".
    */
@@ -1194,7 +1187,7 @@ export interface McpEngineMethods {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// `McpHost.request`: a Session's call through the host (`docs/architecture/mcp-connections.md` → RPC). Here because it
+// `McpHost.request`: a Session's call through the host. Here because it
 // carries the engine's values and failures; the rest of the host's RPC is in `./host.ts`. The edge only gains: an `op`
 // this host does not know is `HostUnsupported`, and a failure under a tag the caller does not know reads as
 // `HostFailed` (`readMcpHostRequestResult`).
@@ -1210,13 +1203,12 @@ export const McpHostRequestContext = Schema.Struct({
   workspace: Schema.optionalKey(Schema.String),
   /**
    * The caller can wait for an MCP task: a `tools/call` made with it may be answered with `Task`, and one made without
-   * it never is. The host passes it on only for an agent's or an App View's call to an HTTP server
-   * (`docs/architecture/mcp-server-requests.md` → MCP tasks, Declaration).
+   * it never is. The host passes it on only for an agent's or an App View's call to an HTTP server.
    */
   allowTask: Schema.optionalKey(Schema.Boolean),
   /**
    * For a `tasks/get`: the status the caller last saw. The host spans the request only when the answer is another status
-   * or an error, and counts the rest (`docs/architecture/mcp-connections.md` → Observability); without it every one is
+   * or an error, and counts the rest; without it every one is
    * spanned. Additive and optional: an older host ignores it.
    */
   lastStatus: Schema.optionalKey(Schema.String),
@@ -1224,15 +1216,15 @@ export const McpHostRequestContext = Schema.Struct({
   answers: Schema.optionalKey(McpAnswers),
   /**
    * For an `app` request: the `viewHash` its App record pinned, the origin hash of the server whose View makes it. A
-   * server of that name whose own is another (shadowed since) is `ServerChanged`, nothing sent
-   * (`docs/architecture/mcp-apps.md` → An App View's calls). Optional, so a host that does not know it checks nothing more.
+   * server of that name whose own is another (shadowed since) is `ServerChanged`, nothing sent.
+   * Optional, so a host that does not know it checks nothing more.
    */
   viewHash: Schema.optionalKey(Schema.String),
   /**
    * `false`: the request never starts a Container. A stdio server whose Workspace's Container is not running is refused as
    * `Unreachable` with `stopped`, and a running one is read as usual. Set by the owner's own requests that must not wake
-   * one: the pages of the `@` menu's list (`docs/architecture/mcp-in-a-session.md` → Attached resources) and a preview of a
-   * resource link (→ Resource links and embedded resources). The read of an Attached resource at send leaves it out: the
+   * one: the pages of the `@` menu's list and a preview of a
+   * resource link. The read of an Attached resource at send leaves it out: the
    * owner sending a message may start the Container. A host that lacks the `no_start` feature drops the key and would
    * start the Container, so a Session sends it only to one that lists it.
    */
@@ -1297,7 +1289,7 @@ export type McpHostTaskCancel = typeof McpHostTaskCancel.Type;
 
 /**
  * `request({ op: "resume" })`: a `tools/call` answered `InputRequired`, sent again with the answers to the questions it
- * deferred, by key (`docs/architecture/mcp-server-requests.md` → Questions). `tool` is the server's own name for the
+ * deferred, by key. `tool` is the server's own name for the
  * tool, `conn` the server's connection key when it asked (another one now is `ServerChanged`, nothing sent), and
  * `resume` the `ResumeState` the `InputRequired` carried, as it came. Answered as a `tools/call` is, with the same
  * `ctx`.
@@ -1318,7 +1310,7 @@ export type McpHostResume = typeof McpHostResume.Type;
 
 /**
  * `request({ op: "resend" })`: a `tools/call` answered `PagesRequired`, sent again with an answer for each page it
- * listed (`docs/architecture/mcp-server-requests.md` → Elicitation requests, URL mode). Like `McpHostResume`, with the
+ * listed. Like `McpHostResume`, with the
  * `ResendState` the `PagesRequired` carried as `resend`.
  */
 export const McpHostResend = Schema.Struct({
@@ -1345,9 +1337,8 @@ export const MCP_APP_PROFILE = "profile=mcp-app";
 const MCP_APP_URI_MAX_LENGTH = 2048;
 
 /**
- * The `ui://` resource a tool declares as its App in its `_meta.ui.resourceUri` (`docs/architecture/mcp-apps.md` →
- * Declaring and reading Apps); undefined for any other tool, or a URI over 2048 characters. `meta` is the tool's whole
- * `_meta`, as the inventory keeps it.
+ * The `ui://` resource a tool declares as its App in its `_meta.ui.resourceUri`; undefined for any other tool, or a URI
+ * over 2048 characters. `meta` is the tool's whole `_meta`, as the inventory keeps it.
  */
 export const appUriOfMeta = (meta: Schema.Json | undefined): string | undefined => {
   const ui = isJsonObject(meta) ? meta["ui"] : undefined;
@@ -1360,7 +1351,7 @@ export const appUriOfMeta = (meta: Schema.Json | undefined): string | undefined 
 
 /**
  * Who a tool is for (`_meta.ui.visibility`, MCP Apps): `model`, `app`, or both, the default when `meta` has none or it
- * cannot be read (`docs/architecture/mcp-apps.md` → Declaring and reading Apps). `meta` is the tool's whole `_meta`.
+ * cannot be read. `meta` is the tool's whole `_meta`.
  */
 export const visibilityOfMeta = (meta: Schema.Json | undefined): ReadonlyArray<string> => {
   const ui = isJsonObject(meta) ? meta["ui"] : undefined;
@@ -1382,7 +1373,7 @@ export const MCP_APP_READ_BYTES = 12 * MiB;
 
 /**
  * What the View is mounted with besides its HTML: the `_meta.ui` of the content item, or of the resource's listing
- * entry, of which only these keys are kept (`docs/architecture/mcp-apps.md` → Declaring and reading Apps).
+ * entry, of which only these keys are kept.
  */
 export const McpAppUiMeta = Schema.Struct({
   csp: Schema.optionalKey(JsonObject),
@@ -1412,7 +1403,7 @@ export type McpHostAppHtmlRequest = typeof McpHostAppHtmlRequest.Type;
 
 /**
  * `request({ op: "prompts/get" })`: get prompt `params.name` of server `server` with `params.arguments`, the owner's
- * pick at send (`docs/architecture/mcp-in-a-session.md` → Getting a prompt at send). The prompt must be in the server's
+ * pick at send. The prompt must be in the server's
  * inventory. Answered `Completed` with the server's `GetPromptResult` as its result.
  */
 export const McpHostPromptGet = Schema.Struct({
@@ -1429,7 +1420,7 @@ export type McpHostPromptGet = typeof McpHostPromptGet.Type;
 
 /**
  * `request({ op: "completion/complete" })`: suggestions for `params.argument` of the prompt or resource template
- * `params.ref` of server `server`, the owner's (`docs/architecture/mcp-in-a-session.md` → Arguments and completions).
+ * `params.ref` of server `server`, the owner's.
  * Answered `Completed` with the server's `CompleteResult` as its result. It never starts a Container, whatever `ctx.start`
  * says, and is bounded at `MCP_COMPLETION_TIMEOUT_MS`; a server that does not declare `completions` is not asked
  * (`CallFailed` with `Unsupported`).
@@ -1450,8 +1441,7 @@ export type McpHostCompletion = typeof McpHostCompletion.Type;
 /**
  * `request({ op: "resources/read" })`: read the resource `params.uri` of server `server`, whether or not any list names it.
  * With `params.watch: true` the host starts a Resource watch on it (subscribing first, then reading) and answers
- * `Completed.watch` with whether it started; with `false` it ends the conversation's watch and still reads
- * (`docs/architecture/mcp-in-a-session.md` → Resource watches).
+ * `Completed.watch` with whether it started; with `false` it ends the conversation's watch and still reads.
  */
 export const McpHostResourceRead = Schema.Struct({
   op: Schema.Literal("resources/read"),
@@ -1470,8 +1460,7 @@ const ResourceListFields = {
 
 /**
  * `request({ op: "resources/list" })`: one page of the server's resources, from `params.cursor`. The answer is
- * `Completed` whose value is `{ resources, nextCursor? }`; a Modern server's page is kept by the host for its `ttlMs`
- * (`docs/architecture/mcp-in-a-session.md` → Resource tools).
+ * `Completed` whose value is `{ resources, nextCursor? }`; a Modern server's page is kept by the host for its `ttlMs`.
  */
 export const McpHostResourcesList = Schema.Struct({
   op: Schema.Literal("resources/list"),
@@ -1543,7 +1532,7 @@ export const MCP_UNASKED_TASK_MESSAGE = "The server started an MCP task that was
 
 /**
  * The callbacks a Session's request carries, passed as RPC stubs that live as long as its invocation, so the Session
- * awaits the request for its whole length (`docs/architecture/mcp-connections.md` → RPC).
+ * awaits the request for its whole length.
  */
 export interface McpHostRequestHooks {
   /** Pending until the caller aborts the request (it resolves) or dies (it rejects); either way the host cancels it. */
@@ -1553,7 +1542,7 @@ export interface McpHostRequestHooks {
   /**
    * A question the server asks while the request waits (`ctx.answers` says which kinds): resolves with the answer the
    * server gets, or rejects when the caller cannot answer. The host passes it on to the engine, never keeping a
-   * question or an answer (`docs/architecture/mcp-server-requests.md` → Questions).
+   * question or an answer.
    */
   readonly onInput?: (
     request: typeof McpInputRequest.Encoded,
@@ -1561,7 +1550,7 @@ export interface McpHostRequestHooks {
   /**
    * The server stopped waiting for question `key` (its own cancellation): the caller withdraws its card. The host also
    * calls it, with `reason`, for a question whose server a set change left changed, switched off or removed while the
-   * call waited (`docs/architecture/mcp-server-requests.md` → The waiting-question record, #569): a caller from before
+   * call waited: a caller from before
    * `reason` ignores it and says its own.
    */
   readonly onInputEnded?: (key: string, reason?: string) => void | Promise<void>;
@@ -1605,10 +1594,10 @@ export const McpHostCompleted = Schema.TaggedStruct("Completed", {
 export type McpHostCompleted = typeof McpHostCompleted.Type;
 
 /**
- * What a result of a task says of where it was made (`docs/architecture/mcp-sign-in.md` → The sign-in id): `signIn`,
+ * What a result of a task says of where it was made: `signIn`,
  * the MCP sign-in id of the token the server was called with (absent for a server with no sign-in), so a follower can
  * tell "not reachable under the current sign-in" from "expired"; and `spawn`, the stdio process's id (present for a stdio
- * server's task, #494: another one is a process that ended, which the Session reads as the task `unknown`).
+ * server's task: another one is a process that ended, which the Session reads as the task `unknown`).
  */
 const McpHostTaskOrigin = {
   signIn: Schema.optionalKey(Schema.String),
@@ -1625,7 +1614,7 @@ export const McpHostTaskStarted = Schema.TaggedStruct("Task", {
   identity: Schema.optionalKey(Schema.String),
   /**
    * An App tool's call: the `viewHash` of the origin the server's Views are served on, as `Completed.app.viewHash`, so the
-   * App record the task makes when it completes pins it (`docs/architecture/mcp-apps.md` → Results). Absent when the host
+   * App record the task makes when it completes pins it. Absent when the host
    * does not know the Environment and source, or from a host from before it.
    */
   viewHash: Schema.optionalKey(Schema.String),
@@ -1648,7 +1637,7 @@ export type McpHostTaskState = typeof McpHostTaskState.Type;
  * A `tools/call` (or its `resume`) whose server asked questions the caller deferred, returned only to a call whose
  * `ctx.answers.defer` is set: the questions, and the `ResumeState` a `resume` sends with their answers, opaque to the
  * caller, who keeps it. `conn` and `identity` are the server's as it asked, for the caller's record; `signIn` and
- * `spawn` as a task's (`docs/architecture/mcp-server-requests.md` → The waiting-question record).
+ * `spawn` as a task's.
  */
 export const McpHostInputRequired = Schema.TaggedStruct("InputRequired", {
   requests: Schema.Array(McpInputRequest),
@@ -1686,8 +1675,7 @@ export type McpHostTaskAck = typeof McpHostTaskAck.Type;
 
 /**
  * The name's server is not the one the task was started on: its `conn` changed. It carries the current `conn` and
- * `mcpServerIdentity`, so the caller can tell a re-pin (the same identity) from a new server (`docs/architecture/
- * mcp-server-requests.md` → MCP tasks, Failures). Nothing was sent.
+ * `mcpServerIdentity`, so the caller can tell a re-pin (the same identity) from a new server. Nothing was sent.
  */
 export const ServerChanged = Schema.TaggedStruct("ServerChanged", {
   message: Schema.String,
@@ -1708,7 +1696,7 @@ export type McpHostCallFailed = typeof McpHostCallFailed.Type;
 
 /**
  * `request({ op: "ui/html" })` completed: the HTML under `hash` and what its View is mounted with. `viewHash` names the
- * server's App sandbox origin (`docs/architecture/mcp-apps.md` → The App sandbox, Origins): set by a host that knows its
+ * server's App sandbox origin: set by a host that knows its
  * Environment and the server's source, left out by an older one and for a source it does not know.
  */
 export const McpHostAppHtml = Schema.TaggedStruct("AppHtml", {

@@ -1,6 +1,5 @@
 /**
- * `xMcpHeaderProblems` (SEP-2243): the rules the SDK's `listTools` applies, which discovery applies to the core's list
- * (`docs/architecture/mcp-connections.md` → Discovery and the MCP inventory).
+ * `xMcpHeaderProblems` (SEP-2243): the rules the SDK's `listTools` applies, which discovery applies to the core's list.
  */
 import type * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";

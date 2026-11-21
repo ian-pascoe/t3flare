@@ -1,9 +1,7 @@
 /**
- * The MCP core: the official TypeScript SDK v2 inside one Effect interface for both protocol eras (ADR-0036). This
+ * The MCP core: the official TypeScript SDK v2 inside one Effect interface for both protocol eras. This
  * entry loads `@modelcontextprotocol/client`, so only `McpEngine` and `McpServer` (the `McpWorker`) import it: the
  * SDK adds about 9-10 MiB of cold heap to every isolate that loads it.
- *
- * `docs/architecture/mcp.md` → Packages and objects (the SDK pin, the import rule, the core's seam).
  */
 export {
   type CallToolParams,

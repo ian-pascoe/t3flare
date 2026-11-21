@@ -1,7 +1,6 @@
 /**
- * The pages t3flare declines unseen, and the ones it shows (`docs/architecture/mcp-server-requests.md` → Elicitation
- * requests → URL mode; #388 D9.1, D9.2): golden lists, since a miss in either is a server sending the owner somewhere
- * it should not, or a page the owner is never shown.
+ * The pages t3flare declines unseen, and the ones it shows: golden lists, since a miss in either is a server sending
+ * the owner somewhere it should not, or a page the owner is never shown.
  */
 import * as Result from "effect/Result";
 import { describe, expect, it } from "vitest";

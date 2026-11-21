@@ -5,7 +5,7 @@
 // On the Worker Shell (just-bash in a Dynamic Worker) a command's output arrives once, when it exits: `onOutput` then
 // gets all of stdout and then all of stderr, attributed but not interleaved in arrival order. Backends that stream
 // (the Container) deliver chunks as they come.
-// pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
+// pi-durable's `ExecutionEnv` is Promise-native and stays so; this adapter follows it.
 // @effect-diagnostics cryptoRandomUUID:off globalDate:off globalTimers:off
 import {
   getWorkspace,

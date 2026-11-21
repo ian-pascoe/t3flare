@@ -1,27 +1,26 @@
 #!/bin/bash
-# The Container's entrypoint (docs/architecture/container.md → Exit reports). It runs computerd, passing its
-# output through to the Container's own log as before, and keeps the last lines of it. When computerd exits without
-# having been asked to (no SIGTERM or SIGINT reached this script), its status, how long it ran and those lines are
-# posted to the Workspace DO's report host, which writes them to the Workers logs: the platform keeps a Container's
-# output where no API reads it, and computer records only that the Container exited. The lines are kept in memory (a
-# tmpfs where there is one), never on the Container's disk, which a snapshot captures. A report that cannot be sent is
-# dropped; the exit status is computerd's either way.
+# The Container's entrypoint. It runs computerd, passing its output through to the Container's own log as before, and
+# keeps the last lines of it. When computerd exits without having been asked to (no SIGTERM or SIGINT reached this
+# script), its status, how long it ran and those lines are posted to the report host (t3flare.internal/container-exit):
+# the platform keeps a Container's output where no API reads it. Nothing in t3flare answers that host yet, so the report
+# is dropped until something does. The lines are kept in memory (a tmpfs where there is one), never on the Container's
+# disk, which a snapshot captures. A report that cannot be sent is dropped; the exit status is computerd's either way.
 #
 # computerd's log lines can carry file contents as `data:<mime>;base64,<payload>` runs, hundreds of KB each, which would
 # fill the report and push out the lines that matter (a crash and its stack). The kept copy, not the passthrough, has
 # each payload of at least `base64_min` characters replaced by a marker before the last lines are chosen, by a
 # line-buffered sed that reads a line of any length as it comes (a payload cut off by the end of its line collapses too).
 #
-# It also runs the memory guard beside computerd (`t3flare-memory-guard`; docs/architecture/container.md →
-# Memory guard), which stops the largest process when the Container is nearly out of memory. Without it the kernel,
-# with no swap to use, evicts computerd's own pages long before its OOM killer acts, and every command stalls, `echo`
-# included. Its lines go where computerd's do, so an exit report carries them too.
+# It also runs the memory guard beside computerd (`t3flare-memory-guard`), which stops the largest process when the
+# Container is nearly out of memory. Without it the kernel, with no swap to use, evicts computerd's own pages long
+# before its OOM killer acts, and every command stalls, `echo` included. Its lines go where computerd's do, so an exit
+# report carries them too.
 #
-# Before anything else runs, it makes the Container's start marker anew (docs/architecture/container.md → Snapshots): the
-# scan before a snapshot searches only the files whose status changed after it, unless the Workspace DO asks for all.
+# Before anything else runs, it makes the Container's start marker anew: the scan before a snapshot searches only the
+# files whose status changed after it, unless the Workspace DO asks for all.
 #
-# T3FLARE_COMPUTERD, T3FLARE_MEMORY_GUARD, T3FLARE_MEMORY_NOTES, T3FLARE_START_MARKER and T3FLARE_REPORT_* let a test
-# point this script elsewhere; the image sets none of them.
+# T3FLARE_COMPUTERD, T3FLARE_MEMORY_GUARD, T3FLARE_MEMORY_NOTES, T3FLARE_START_MARKER and T3FLARE_REPORT_* override
+# their defaults; the image sets none of them.
 set -u
 
 computerd=${T3FLARE_COMPUTERD:-/usr/local/bin/computerd}
@@ -64,7 +63,7 @@ exec 3>"$scratch/out"
 
 # A Container started from its Environment's Build (T3FLARE_RESET_STORE=1 in the launch's environment) has the Build's
 # computerd store on its disk, with the sync positions of the Build's own Durable Object: computerd starts with an
-# empty one instead, so this Workspace's Durable Object pushes it every file (docs/architecture/container.md → Builds).
+# empty one instead, so this Workspace's Durable Object pushes it every file.
 if [ "${T3FLARE_RESET_STORE:-}" = 1 ] && [ -n "${COMPUTERD_DB:-}" ]; then
   rm -f -- "$COMPUTERD_DB" "$COMPUTERD_DB-wal" "$COMPUTERD_DB-shm"
 fi

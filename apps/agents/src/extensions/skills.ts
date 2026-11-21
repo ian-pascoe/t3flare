@@ -1,14 +1,14 @@
 // @effect-diagnostics globalConsole:off
-// The `skills` extension (SPI-1147 §2): a `skills`
-// system prompt section listing the Skills the agent can read, as pi does (`<available_skills>`: name, description and
-// the `SKILL.md` path, which the agent loads with `read` when a task matches). The Workspace DO finds them next to its
-// files (`WorkspaceDO.skills`), one RPC that never starts the Container.
+// The `skills` extension (SPI-1147 §2): a `skills` system prompt section listing the Skills the agent can read, as pi
+// does (`<available_skills>`: name, description and the `SKILL.md` path, which the agent loads with `read` when a task
+// matches). The Workspace DO finds them next to its files (`WorkspaceDO.skills`), one RPC that never starts the
+// Container.
 //
-// The section is read once per context window and then shown as it was (`frozenSection`): a Skill
-// can change during a Session, and a changed section would rewrite the system prompt, the head of the provider's cache
-// prefix. A first read that finds none freezes as empty, so a Skill written later is not added as a patch; a read that
-// fails, or a request without a Workspace, freezes nothing and the next request tries again. The owner's `$name` and
-// `/skill:name` expand in the Environment (`provider/attachments.ts`), from a fresh discovery, not from this list.
+// The section is read once per context window and then shown as it was (`frozenSection`): a Skill can change during a
+// Session, and a changed section would rewrite the system prompt, the head of the provider's cache prefix. A first read
+// that finds none freezes as empty, so a Skill written later is not added as a patch; a read that fails, or a request
+// without a Workspace, freezes nothing and the next request tries again. The owner's `$name` and `/skill:name` expand
+// in the Environment (`provider/attachments.ts`), from a fresh discovery, not from this list.
 import type { WireSkillDiscovery } from "@t3flare/computer-env";
 import { frozenSection } from "@t3flare/effect-durable";
 import { formatSkills } from "@t3flare/skills";

@@ -1,11 +1,10 @@
 // t3flare reads `changedBetween` for the write journal of the stale git reads (`./staleReads.ts`).
 // What computer's sync has sent the Container, read from its change log in the Workspace DO's SQLite (dofs, inside
-// `@cloudflare/computer`), for the file-change signal (docs/architecture/container.md → File-change signals;
-// `notify.ts`). Every write to the Workspace's files takes the next revision (`vfs_meta.rev`) and stamps it on the
-// node it changed (`vfs_nodes.rev`; a new directory gets its own); a removal leaves a tombstone with its path
-// (`vfs_changes`); and a push to a backend moves that backend's cursor (`_vfs_push_cursor`, `_vfs_watermark.pushRev`)
-// to the revision it sent through. So the paths a push sent are those of the nodes and tombstones whose revision lies
-// between the cursor before it and the cursor after.
+// `@cloudflare/computer`), for the file-change signal (`notify.ts`). Every write to the Workspace's files takes the
+// next revision (`vfs_meta.rev`) and stamps it on the node it changed (`vfs_nodes.rev`; a new directory gets its own);
+// a removal leaves a tombstone with its path (`vfs_changes`); and a push to a backend moves that backend's cursor
+// (`_vfs_push_cursor`, `_vfs_watermark.pushRev`) to the revision it sent through. So the paths a push sent are those of
+// the nodes and tombstones whose revision lies between the cursor before it and the cursor after.
 //
 // The model's file tools reach the files directly (`WorkspaceEnvHost` over `Workspace.fs`), not through the Workspace
 // stub, so computer reports no `workspace.fs.*` span for them: this log is the one record of every change, whoever made

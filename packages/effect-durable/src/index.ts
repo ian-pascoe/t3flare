@@ -1,4 +1,4 @@
-// Effect ↔ pi-durable adapters and service facades (`docs/architecture/overview.md` → Effect boundary, ADR-0003).
+// Effect ↔ pi-durable adapters and service facades.
 export { ChordContext } from "./chord.ts";
 
 export { CallerFrame, captureFrame, type Frame } from "./frame.ts";

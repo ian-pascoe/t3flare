@@ -1,8 +1,8 @@
 /**
- * A Legacy server's Sampling request during a call (`docs/architecture/mcp-server-requests.md` → Questions, Sampling
- * requests; ADR-0039): the core ties it to the `tools/call` whose POST stream carried it, passes it to `onInput` while
- * the call's timeout stops, and answers the server with the reply `onInput` gives; a request that belongs to no such
- * call is refused `-1` "no conversation to sample in". A Modern connection declares no sampling.
+ * A Legacy server's Sampling request during a call: the core ties it to the `tools/call` whose POST stream carried it,
+ * passes it to `onInput` while the call's timeout stops, and answers the server with the reply `onInput` gives; a
+ * request that belongs to no such call is refused `-1` "no conversation to sample in". A Modern connection declares no
+ * sampling.
  */
 // @effect-diagnostics asyncFunction:off preferEffectArray:off
 import * as Effect from "effect/Effect";

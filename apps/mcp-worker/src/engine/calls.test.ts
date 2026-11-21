@@ -1,5 +1,5 @@
 /**
- * What an engine call records in its span (`docs/architecture/mcp-connections.md` → Telemetry): the wire's counts and
+ * What an engine call records in its span: the wire's counts and
  * status, the server's name and origin, and no value (header, token, URL path or query, argument, result, log).
  */
 // @effect-diagnostics asyncFunction:off preferEffectArray:off strictEffectProvide:off schemaSync:off

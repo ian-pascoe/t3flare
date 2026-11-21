@@ -1,11 +1,11 @@
 // `web_search` (SPI-1054; see ./NOTICE.md). Exa and Parallel need keys the deploy holds;
 // t3flare holds neither and adds no owner secret (ADR-0016), so it asks a search-capable model on one of the
-// owner's Model endpoints with the endpoint's own key, which the Session
-// asks the Environment for at use time and never stores (ADR-0034 §4). The request is an Anthropic Messages call with
-// the server-side `web_search` tool, so the endpoint is an Anthropic Messages one with an API key or no auth whose
-// server takes that tool (Anthropic's API; Commissary passes it to a Claude upstream or translates it to a Codex
-// upstream's `web_search`), and it answers with `web_search_tool_result` blocks. The results are written in Exa's
-// `Title:`/`URL:` shape so the budget applies (`shaping.ts`), followed by the model's cited summary.
+// owner's Model endpoints with the endpoint's own key, which the Session asks the Environment for at use time and never
+// stores (ADR-0034 §4). The request is an Anthropic Messages call with the server-side `web_search` tool, so the
+// endpoint is an Anthropic Messages one with an API key or no auth whose server takes that tool (Anthropic's API;
+// Commissary passes it to a Claude upstream or translates it to a Codex upstream's `web_search`), and it answers with
+// `web_search_tool_result` blocks. The results are written in Exa's `Title:`/`URL:` shape so the budget applies
+// (`shaping.ts`), followed by the model's cited summary.
 //
 // A search spends a model request on the endpoint, so the harness setting keeps `web_search` off until the owner turns
 // it on (the registry's `web.search`).

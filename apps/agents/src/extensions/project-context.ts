@@ -1,7 +1,7 @@
-// The `project_context` section (step 2a plan, section 4): the
-// repository's `AGENTS.md` (or `CLAUDE.md`) files, from the repo root down to the conversation's working directory,
-// read through the call's environment before each request. Part 1 keeps only the section: `read`/`edit`/`write` do not
-// show nested files' instructions as the agent reaches them.
+// The `project_context` section (step 2a plan, section 4): the repository's `AGENTS.md` (or `CLAUDE.md`) files, from
+// the repo root down to the conversation's working directory, read through the call's environment before each request.
+// Part 1 keeps only the section: `read`/`edit`/`write` do not show nested files' instructions as the agent reaches
+// them.
 import { defineExtension, type Extension, section } from "@earendil-works/pi-durable";
 
 const NAMES = ["AGENTS.md", "CLAUDE.md"] as const;

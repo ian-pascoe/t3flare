@@ -1,9 +1,8 @@
 /**
- * `McpHost`'s RPC types, re-exported by `@t3flare/mcp/types` (`docs/architecture/mcp-connections.md` → RPC, Storage;
- * `docs/architecture/mcp-configuration.md` → From the Registry to the host). Like everything in `./types`, this never
+ * `McpHost`'s RPC types, re-exported by `@t3flare/mcp/types`. Like everything in `./types`, this never
  * loads the SDK.
  *
- * Every edge only gains (`docs/architecture/mcp.md` → Deploys): a Schema drops the keys it does not know, a union the
+ * Every edge only gains: a Schema drops the keys it does not know, a union the
  * other end may extend has a fallback member, and an operation this build does not know fails as `HostUnsupported`,
  * never as a decode error. Failures cross the edge as plain data (`_tag` and fields), since a Durable Object's RPC
  * does not carry error classes.
@@ -92,8 +91,7 @@ export type McpApplyDestroy = typeof McpApplyDestroy.Type;
 
 /**
  * `apply({ kind: "reload" })`: `settings_mcp_reload` or `mcpReconnect`. The host drops the eras and Legacy sessions of
- * `servers` (every server when absent), and rediscovers its HTTP servers at once, a `failed` one included
- * (`docs/architecture/mcp-connections.md` → Discovery and the MCP inventory).
+ * `servers` (every server when absent), and rediscovers its HTTP servers at once, a `failed` one included.
  */
 export const McpApplyReload = Schema.Struct({
   kind: Schema.Literal("reload"),
@@ -116,22 +114,20 @@ export const REDISCOVERING_CHANGES: ReadonlyArray<(typeof MCP_SIGN_IN_CHANGES)[n
 
 /**
  * A change this build does not know is a string, read as an unknown one: the host drops its tokens for the servers and
- * rediscovers nothing, which is what a newer sender's change that this build cannot act on would need at least
- * (`docs/architecture/mcp.md` → Deploys).
+ * rediscovers nothing, which is what a newer sender's change that this build cannot act on would need at least.
  */
 export const McpSignInChange = Schema.Union([Schema.Literals(MCP_SIGN_IN_CHANGES), Schema.String]);
 
 export type McpSignInChange = typeof McpSignInChange.Type;
 
 /**
- * `apply({ kind: "sign_ins" })` (`docs/architecture/mcp-sign-in.md` → Tokens reach the host object → Reports and
- * pushes): an MCP sign-in changed, which the main Worker carries from the Registry's answer to each host whose
- * Environment uses it. `servers` are the names the sign-in's servers go by in that Environment's set (compared as the
- * sign-in key does, normalized), and `revision` the sign-ins revision the change raised it to, which the host keeps
- * only when it is the very next one after the revision the host holds, so a lost push is never hidden by a later one:
- * the host's next pull finds the gap and heals it. `signed_in`, `replaced` and `rebound` (`REDISCOVERING_CHANGES`) make
- * the host drop the servers' cached tokens and rediscover those of them that are not working at once; `signed_out`
- * drops the tokens and the servers' sessions and rediscovers nothing.
+ * `apply({ kind: "sign_ins" })`: an MCP sign-in changed, which the main Worker carries from the Registry's answer to
+ * each host whose Environment uses it. `servers` are the names the sign-in's servers go by in that Environment's set
+ * (compared as the sign-in key does, normalized), and `revision` the sign-ins revision the change raised it to, which
+ * the host keeps only when it is the very next one after the revision the host holds, so a lost push is never hidden by
+ * a later one: the host's next pull finds the gap and heals it. `signed_in`, `replaced` and `rebound`
+ * (`REDISCOVERING_CHANGES`) make the host drop the servers' cached tokens and rediscover those of them that are not
+ * working at once; `signed_out` drops the tokens and the servers' sessions and rediscovers nothing.
  */
 export const McpApplySignIns = Schema.Struct({
   kind: Schema.Literal("sign_ins"),
@@ -143,7 +139,7 @@ export const McpApplySignIns = Schema.Struct({
 export type McpApplySignIns = typeof McpApplySignIns.Type;
 
 /**
- * `apply({ kind: "end_watches" })` (`docs/architecture/mcp-in-a-session.md` → Resource watches → Ends): end the Resource
+ * `apply({ kind: "end_watches" })`: end the Resource
  * watches of Session `session`: one conversation's (`conversation`), one server's (`server`) or one resource's (`uri`),
  * each narrowing the one before, else all of the Session's. Unless `silent`, each is noted for the conversation's next
  * `requestStart` as ended with `reason` ("ended" when none is given): the owner's ✕ is, a deleted subagent, a deleted or
@@ -273,7 +269,7 @@ const OtherHostFailureFromWire = Schema.Struct({
 
 /**
  * `McpApplyResult` as it crosses the edge: a tag this build does not know reads as `HostFailed`, never as a decode
- * error (`docs/architecture/mcp.md` → Deploys). A known tag whose fields do not fit reads as `HostFailed` as well.
+ * error. A known tag whose fields do not fit reads as `HostFailed` as well.
  */
 export const McpApplyResultWire = Schema.Union([
   ...McpApplyResult.members,
@@ -285,7 +281,7 @@ export type McpApplyResultWire = typeof McpApplyResultWire.Type;
 /**
  * The reader of one host method's answers as they cross the edge, into a result this build knows: a failure under a tag
  * it does not know is `HostFailed` (`OtherHostFailureFromWire`), and so is anything that is no result at all, never a
- * decode error (`docs/architecture/mcp.md` → Deploys). `what` names the method in the message.
+ * decode error. `what` names the method in the message.
  */
 // @effect-diagnostics-next-line missingPipeableSignature:off -- a reader built from a schema, not a combinator.
 export const hostAnswerReader = <
@@ -315,25 +311,24 @@ export const readMcpApplyResult: (answer: Schema.Json) => McpApplyResult = hostA
 );
 
 /**
- * The features the host lists at `requestStart`: a Session uses one only once it is listed (`mcp.md` → Deploys).
+ * The features the host lists at `requestStart`: a Session uses one only once it is listed.
  *
  * - `inventory`: `requestStart` answers the MCP inventory's versions and servers and takes `known`, `waitFor` and
  *   `waitMs`, and the host answers `servers` and `apply({ kind: "reload" })`.
  * - `call`: the host answers `request({ op: "tools/call" })`, with its `untilAborted` and `onProgress` hooks.
  * - `tasks`: the host answers `request({ op: "tasks/get" | "tasks/update" | "tasks/cancel" })` and takes `ctx.allowTask`
- *   on a `tools/call` (`mcp-server-requests.md` → MCP tasks).
+ *   on a `tools/call`.
  * - `app_html`: a `tools/call` of an App tool answers the `htmlHash` of its App, and the host answers
- *   `request({ op: "ui/html" })` (`docs/architecture/mcp-apps.md` → Declaring and reading Apps).
- * - `resources`: the host answers `request({ op: "resources/list" | "resources/templates/list" | "resources/read" })`
- *   (`docs/architecture/mcp-in-a-session.md` → Resource tools).
+ *   `request({ op: "ui/html" })`.
+ * - `resources`: the host answers `request({ op: "resources/list" | "resources/templates/list" | "resources/read" })`.
  * - `resume`: a `tools/call` with `ctx.answers.defer` may be answered `InputRequired`, and the host answers
- *   `request({ op: "resume" })` (`mcp-server-requests.md` → Questions).
+ *   `request({ op: "resume" })`.
  * - `resend`: a `tools/call` with `ctx.answers.pages` may be answered `PagesRequired` (a Legacy `-32042`), and the host
- *   answers `request({ op: "resend" })` (`mcp-server-requests.md` → Elicitation requests, URL mode).
+ *   answers `request({ op: "resend" })`.
  * - `no_start`: a `resources/list`, `resources/templates/list` or `resources/read` with `ctx.start: false` never starts a
- *   stdio server's Container (`mcp-in-a-session.md` → Attached resources, Resource links and embedded resources).
+ *   stdio server's Container.
  * - `completions`: the host answers `request({ op: "completion/complete" })`, which never starts a Container, and says in
- *   each server's inventory whether it declares the capability (`mcp-in-a-session.md` → Arguments and completions).
+ *   each server's inventory whether it declares the capability.
  *
  * The Session side names those of these its MCP tools use: `MCP_TOOL_FEATURES` the ones
  * they cannot be built without, `MCP_OPTIONAL_TOOL_FEATURES` the ones it does without when the host lacks them (`resources`).
@@ -362,10 +357,10 @@ export const McpCaller = Schema.Struct({
 
 export type McpCaller = typeof McpCaller.Type;
 
-/** The longest `requestStart` and `servers` wait for a discovery: 10 s (`docs/architecture/mcp-connections.md` → Discovery). */
+/** The longest `requestStart` and `servers` wait for a discovery: 10 s. */
 export const MCP_MAX_WAIT_MS = 10_000;
 
-/** `requestStart`'s arguments (`docs/architecture/mcp-connections.md` → RPC). */
+/** `requestStart`'s arguments. */
 export const McpRequestStart = Schema.Struct({
   caller: McpCaller,
   /** Set on a Context Window's first request: the host asks the Registry for the set, so a lost push heals. */
@@ -388,7 +383,7 @@ export const McpRequestStart = Schema.Struct({
 export type McpRequestStart = typeof McpRequestStart.Type;
 
 /**
- * A server's state in the MCP inventory (`docs/architecture/mcp-connections.md` → Discovery and the MCP inventory):
+ * A server's state in the MCP inventory:
  *
  * - `not_discovered`: in the set, never asked yet (an HTTP server waits for its first demand once the host is idle);
  * - `connecting`: being discovered;
@@ -453,7 +448,7 @@ export const McpWatchEnd = Schema.Struct({
 
 export type McpWatchEnd = typeof McpWatchEnd.Type;
 
-/** `requestStart`'s answer (`docs/architecture/mcp-in-a-session.md` → The `mcp` extension). */
+/** `requestStart`'s answer. */
 export const McpRequestStartAnswer = Schema.Struct({
   version: Schema.String,
   promptsVersion: Schema.String,
@@ -490,7 +485,7 @@ export const readMcpRequestStartResult: (
 ) => McpRequestStartResult = hostAnswerReader(McpRequestStartResult, "requestStart");
 
 /**
- * `servers`' arguments (`docs/architecture/mcp-connections.md` → RPC): the servers by name (every one when absent),
+ * `servers`' arguments: the servers by name (every one when absent),
  * the parts to add (a part this build does not know is left out), how long to wait for one being discovered, and the
  * caller's Workspace. It never starts a Container. `demand: false` is a read of what the host holds: no discovery
  * starts (the `settings_mcp_*` reads, which connect to nothing). A host from before the field ignores it and treats the
@@ -581,7 +576,7 @@ export const readMcpServersResult: (answer: typeof McpServersResult.Encoded) => 
   hostAnswerReader(McpServersResult, "servers");
 
 /**
- * `serverLog`'s arguments (`docs/architecture/mcp-connections.md` → Telemetry): the server by name, and the Workspace
+ * `serverLog`'s arguments: the server by name, and the Workspace
  * whose stdio server's stderr tail is wanted. It reads what the host holds and never starts a Container.
  */
 export const McpServerLogRequest = Schema.Struct({
@@ -613,12 +608,12 @@ export const McpServerLogResult = Schema.Union([McpServerLog, McpNoServer, HostF
 export type McpServerLogResult = typeof McpServerLogResult.Type;
 
 /**
- * The Registry's answer to the host's `mcpServerSet({ environment, heldHash })` (`docs/architecture/mcp-configuration.md`
- * → From the Registry to the host): the current set's hash, and the set itself unless it is the one held.
+ * The Registry's answer to the host's `mcpServerSet({ environment, heldHash })`: the current set's hash, and the set
+ * itself unless it is the one held.
  */
 export const McpServerSetAnswer = Schema.Struct({
   hash: Schema.String,
-  /** Bumped by an MCP sign-in, sign-out or rebind (`docs/architecture/mcp-sign-in.md`); 0 until sign-ins exist. */
+  /** Bumped by an MCP sign-in, sign-out or rebind; 0 until sign-ins exist. */
   signInsRevision: Schema.Int,
   set: McpSetEntry.pipe(Schema.Array, Schema.optionalKey),
   /**

@@ -1,6 +1,5 @@
 /**
- * The core's listen, in both eras (`docs/architecture/mcp-in-a-session.md` → Resource watches; `docs/architecture/
- * mcp-connections.md` → Requests and Legacy sessions → Listens): a Modern server's `subscriptions/listen` and a Legacy
+ * The core's listen, in both eras: a Modern server's `subscriptions/listen` and a Legacy
  * server's `resources/subscribe` with its GET stream, the events each carries, how each ends, and the Legacy server that
  * cannot send updates.
  */
@@ -26,7 +25,7 @@ const OTHER = "file:///other.md";
 
 /**
  * How long a wait for the events lasts: a deadline well under the tests' timeout, not a count of polls, which a loaded
- * runner's slow timers stretch or cut short (#632).
+ * runner's slow timers stretch or cut short.
  */
 const WAIT = { timeout: 10_000, interval: 10 };
 

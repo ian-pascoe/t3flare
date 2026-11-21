@@ -1,6 +1,5 @@
 /**
- * A hostile server (`docs/architecture/mcp.md` → Testing and tracing; `docs/architecture/mcp-connections.md` →
- * Failures and cuts, Requests and Legacy sessions): cut streams, oversize bodies, bad headers and odd error bodies,
+ * A hostile server: cut streams, oversize bodies, bad headers and odd error bodies,
  * against `list` and `callTool` in both eras.
  */
 // @effect-diagnostics asyncFunction:off preferEffectArray:off

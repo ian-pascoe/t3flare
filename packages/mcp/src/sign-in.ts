@@ -1,9 +1,8 @@
 /**
- * The Registry's MCP sign-in edge, as `McpHost` calls it (`docs/architecture/mcp-sign-in.md` → Tokens reach the host
- * object): `mcpAccessToken`, `reportMcpAuth` and the revision of the sign-ins. Plain data over Durable Object RPC, and
- * never the SDK. Re-exported by `./types`.
+ * The Registry's MCP sign-in edge, as `McpHost` calls it: `mcpAccessToken`, `reportMcpAuth` and the revision of the
+ * sign-ins. Plain data over Durable Object RPC, and never the SDK. Re-exported by `./types`.
  *
- * Every edge only gains (`docs/architecture/mcp.md` → Deploys): a Schema drops the keys it does not know, and a union
+ * Every edge only gains: a Schema drops the keys it does not know, and a union
  * the other end may extend has a fallback member, which the reader takes as a generic failure. A token is in the
  * `ok` answer only: no other answer, report or error carries one.
  */
@@ -11,8 +10,7 @@ import * as Arr from "effect/Array";
 import * as Schema from "effect/Schema";
 
 /**
- * The extension a connection that signs in with OAuth Client Credentials declares, in both eras
- * (`docs/architecture/mcp.md` → Extensions; `docs/architecture/mcp-sign-in.md` → Client Credentials), and what it declares.
+ * The extension a connection that signs in with OAuth Client Credentials declares, in both eras, and what it declares.
  */
 export const MCP_CLIENT_CREDENTIALS_EXTENSION = "io.modelcontextprotocol/oauth-client-credentials";
 
@@ -86,7 +84,7 @@ export const MCP_AUTH_EVENTS = ["needs_sign_in", "step_up", "rejected", "working
 
 /**
  * A newer host's event is a string this build does not know, read as unknown (the last member): the Registry ignores it
- * with why, rather than failing the report at decode (`docs/architecture/mcp.md` → Deploys).
+ * with why, rather than failing the report at decode.
  */
 export const McpAuthEvent = Schema.Union([Schema.Literals(MCP_AUTH_EVENTS), Schema.String]);
 
@@ -136,7 +134,7 @@ export const McpAuthReportAnswer = Schema.Union([
 
 export type McpAuthReportAnswer = typeof McpAuthReportAnswer.Type;
 
-// Starting and completing a sign-in (`docs/architecture/mcp-sign-in.md` → Starting and completing a sign-in) ---------------
+// Starting and completing a sign-in ---------------
 
 /** The Environment a start names when the entry is Global's own: `environment=all` of the start link. */
 export const MCP_SIGN_IN_GLOBAL = "all";
@@ -291,7 +289,7 @@ export const McpSignInEnvironment = Schema.Struct({ id: Schema.String, name: Sch
 
 export type McpSignInEnvironment = typeof McpSignInEnvironment.Type;
 
-/** The outcomes of a callback that saved nothing (`mcp-sign-in.md` → Page outcomes). */
+/** The outcomes of a callback that saved nothing. */
 export const MCP_SIGN_IN_FAILURES = [
   "expired",
   "declined",
@@ -362,7 +360,7 @@ export const readMcpSignInCompleteAnswer = (
 export const scopesOf = (list: string | undefined): ReadonlyArray<string> =>
   Arr.filter((list ?? "").split(/\s+/), (scope) => scope !== "");
 
-// Sign-in requests (`docs/architecture/mcp-sign-in.md` → Sign-in requests) --------------------------------------------------
+// Sign-in requests --------------------------------------------------
 
 /**
  * `mcpSignInAsk`: a Session's Sign-in request for `server` in `environment`'s set, under its own `request` id. Asking

@@ -1,12 +1,11 @@
 /**
- * A public read for t3flare's MCP sign-in, sent from `McpWorker` (`docs/architecture/mcp-sign-in.md` → Code;
- * `docs/architecture/mcp-endpoint.md` → Self-use). The Registry reads an authorization server's metadata from the
- * Server Worker, whose `fetch` to one of t3flare's own hosts never reaches Access there (Cloudflare refuses it, 1042, or
- * sends it to the origin past Access); `McpWorker` has `global_fetch_strictly_public`, so its `fetch` goes through the
- * front door as a client's would. `McpEngine.fetchPublic` makes the read, guarded here: an `https` GET with no credential
- * (no userinfo, no header but content negotiation), no redirect followed (the caller sees the 3xx and decides, as
- * `guardedFetch` does), the OAuth fetch's 15 s timeout and a body of at most 64 KiB. No SDK import: `./types` re-exports
- * the Schemas, and the root entry the function.
+ * A public read for t3flare's MCP sign-in, sent from `McpWorker`. The Registry reads an authorization server's metadata
+ * from the Server Worker, whose `fetch` to one of t3flare's own hosts never reaches Access there (Cloudflare refuses
+ * it, 1042, or sends it to the origin past Access); `McpWorker` has `global_fetch_strictly_public`, so its `fetch` goes
+ * through the front door as a client's would. `McpEngine.fetchPublic` makes the read, guarded here: an `https` GET with
+ * no credential (no userinfo, no header but content negotiation), no redirect followed (the caller sees the 3xx and
+ * decides, as `guardedFetch` does), the OAuth fetch's 15 s timeout and a body of at most 64 KiB. No SDK import:
+ * `./types` re-exports the Schemas, and the root entry the function.
  */
 // @effect-diagnostics asyncFunction:off globalFetch:off missingPipeableSignature:off preferEffectArray:off -- the read is a Promise over `fetch`, its Schemas plain values.
 import * as Record from "effect/Record";
@@ -39,7 +38,7 @@ export const McpPublicRefused = Schema.Struct({
 });
 
 /**
- * The answer of `McpEngine.fetchPublic`. The edge only gains (`docs/architecture/mcp.md` → Deploys): its last member is
+ * The answer of `McpEngine.fetchPublic`. The edge only gains: its last member is
  * the fallback, any other `status` a later `McpWorker` may answer, which the caller reads as a failure of the hop.
  */
 export const McpPublicFetchResult = Schema.Union([

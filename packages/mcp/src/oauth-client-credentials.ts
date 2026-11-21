@@ -1,7 +1,6 @@
 /**
- * The OAuth Client Credentials grant, and `private_key_jwt`: t3flare's own additions to pi-mcp's `oauth`
- * (`docs/architecture/mcp-sign-in.md` → Client Credentials; The MCP core #394 D6, Signing in #390 D8). Re-exported by
- * `./oauth`, so the Registry reaches it without the SDK.
+ * The OAuth Client Credentials grant, and `private_key_jwt`: t3flare's own additions to pi-mcp's `oauth`. Re-exported
+ * by `./oauth`, so the Registry reaches it without the SDK.
  *
  * - **Client authentication.** With a secret: `client_secret_post` if the authorization server lists it, else
  *   `client_secret_basic` if listed or if the list is absent, else a problem. With a key (RFC 7523 §2.2): the request
@@ -32,7 +31,7 @@ import {
   scrubbed,
 } from "./oauth-http.ts";
 
-/** What a token response is held to (→ Bounds). */
+/** What a token response is held to. */
 const MAX_TOKEN_RESPONSE_BYTES = 64 * 1024;
 
 /** How the client proves itself at the token endpoint. */

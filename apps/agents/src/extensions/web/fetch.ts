@@ -1,8 +1,6 @@
-// `web_fetch` (SPI-1054; see ./NOTICE.md), one
-// HTTP(S) URL as text, Markdown or HTML, with line paging, every request through the SSRF guard (`net.ts`). A plain
-// pi-durable tool; the honest user agent names
-// t3flare, and `details` carry what t3's web item shows. A fetch is a read: no mode asks for it, plan mode included,
-// and linked threads may use it.
+// `web_fetch` (SPI-1054; see ./NOTICE.md), one HTTP(S) URL as text, Markdown or HTML, with line paging, every request
+// through the SSRF guard (`net.ts`). A plain pi-durable tool; the honest user agent names t3flare, and `details` carry
+// what t3's web item shows. A fetch is a read: no mode asks for it, plan mode included, and linked threads may use it.
 import { defineTool, type ToolRegistration } from "@earendil-works/pi-durable";
 import { int, num, obj, oneOf, opt, str } from "@earendil-works/pi-schema";
 

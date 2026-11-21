@@ -1,4 +1,4 @@
-// Effect-defined pi-durable system prompt sections (ADR-0003).
+// Effect-defined pi-durable system prompt sections.
 import { type PromptInput, type PromptSection, section } from "@earendil-works/pi-durable";
 import * as Effect from "effect/Effect";
 import { invoker, settle } from "./chord.ts";

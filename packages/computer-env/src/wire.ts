@@ -188,7 +188,7 @@ export type HostOperation = keyof HostOperations;
 /**
  * One call of a host operation, as `ComputerEnvHost.fileOperation` receives it. With `reachContainer`, an operation on a
  * Container-only path runs on the Container (the model's own tools ask for it; nothing else does, so nothing else
- * starts the Container: ADR-0018).
+ * starts the Container).
  */
 export type EnvRequest = {
   readonly [Operation in HostOperation]: {

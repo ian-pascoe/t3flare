@@ -1,7 +1,6 @@
 # t3flare's Container image (step 2a; ADR-0015: one image for Durable agents and, later, CLI agents).
 #
-# The Workspace Container's image (docs/architecture/container.md, ADR-0004): Ubuntu 26.04 LTS with fuse3, the
-# everyday command-line tools, a C toolchain, computerd under its supervisor with a memory guard, and mise with its
+# The Workspace Container's image: Ubuntu 26.04 LTS with fuse3, the everyday command-line tools, a C toolchain, computerd under its supervisor with a memory guard, and mise with its
 # installs of the base mise.toml's Toolchains. Every program a project uses is a mise Toolchain; the image's installs are only found by mise for a
 # Workspace that asks for those versions. The image is glibc-based because computerd is a glibc Node SEA, and
 # linux/amd64 because that is what Cloudflare Containers run.
@@ -63,7 +62,7 @@ RUN apt-get update \
 
 FROM --platform=linux/amd64 ubuntu:26.04@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c
 
-# The everyday tools agents and scripts expect (#169; some from exe.dev's exeuntu list), build-essential and the
+# The everyday tools agents and scripts expect (some from exe.dev's exeuntu list), build-essential and the
 # headers native npm and pip packages build against, and earlyoom, the memory guard
 # the supervisor runs. Versioned Toolchains
 # (Node, pnpm, Bun, Python, git, gh) are mise's, never apt's: mise's shims come first on PATH anyway, so a git an apt
@@ -142,8 +141,7 @@ COPY opencode-key-plugin /opt/t3flare/share/opencode-key-plugin
 COPY --chmod=755 supervise /usr/local/bin/t3flare-supervise
 
 # The memory guard, which the supervisor runs: earlyoom (an apt package above), and a note for the commands that run
-# when it stops a process, which the file every command's bash reads first (BASH_ENV) prints when the command ends
-# (docs/architecture/container.md → Memory guard).
+# when it stops a process, which the file every command's bash reads first (BASH_ENV) prints when the command ends.
 COPY --chmod=755 t3flare-memory-guard /usr/local/bin/t3flare-memory-guard
 COPY command.bash /usr/local/share/t3flare/command.bash
 
@@ -160,8 +158,7 @@ RUN cp -a /usr/local/share/t3flare /usr/local/share/cloudpid
 # computerd passes on to a command, so it is the one set here: mise's other settings reach a command in its exec
 # environment (apps/sandbox-image/src/toolchains.ts).
 # computerd keeps its copy of the Workspace in COMPUTERD_DB, on the Container's disk, so a snapshot holds it with its
-# sync positions: a Container restored from one is sent only what changed since, not every file (docs/architecture/container.md →
-# Snapshots). In memory, the default, it is rebuilt from the Workspace DO at each start.
+# sync positions: a Container restored from one is sent only what changed since, not every file. In memory, the default, it is rebuilt from the Workspace DO at each start.
 ENV PORT=8080 \
     MOUNT_POINT=/workspace \
     FUSE_MOUNT=auto \
@@ -170,6 +167,6 @@ ENV PORT=8080 \
 RUN mkdir -p /var/lib/computerd
 EXPOSE 8080
 
-# computerd runs under a supervisor that reports why it stopped, when it stops on its own, to the Workspace DO
-# (`supervise`; docs/architecture/container.md → Exit reports).
+# computerd runs under a supervisor (`supervise`) that runs the memory guard beside it and reports why it stopped,
+# when it stops on its own.
 ENTRYPOINT ["/usr/local/bin/t3flare-supervise"]

@@ -1,7 +1,6 @@
 /**
- * What `McpEngine`'s methods do, over `@t3flare/mcp` (`docs/architecture/mcp-connections.md` → The engine; #382 D1,
- * D9, D13.2). Each call connects from the host's `prior` rows and its hooks, does its work, and returns its result
- * with the rows it changed, encoded for RPC; it keeps nothing once it ends.
+ * What `McpEngine`'s methods do, over `@t3flare/mcp`. Each call connects from the host's `prior` rows and its hooks,
+ * does its work, and returns its result with the rows it changed, encoded for RPC; it keeps nothing once it ends.
  *
  * - **Aborts:** the call races `untilAborted()`, which resolves when the caller aborts and rejects when it dies; either
  *   way the work is interrupted, which aborts the server request (a Legacy server gets `notifications/cancelled`), and
@@ -9,9 +8,9 @@
  * - **Bytes:** the call's `fetch` is metered against a lease on the isolate's byte budget, given back when the call
  *   ends however it ends, or for a large result once its stream is read (`budget.ts`, `results.ts`).
  * - **Tokens:** every token the host's `auth` hook gave the call is scrubbed from its result and from its error.
- * - **`structuredContent`** is checked against the tool's `outputSchema` (The MCP core #394 D17, refined by D9.3).
+ * - **`structuredContent`** is checked against the tool's `outputSchema`.
  * - **`-32020`:** a `tools/call` whose headers the server rejects lists the server's tools again and is sent once more
- *   with the fresh definition (The MCP core #394 D14). The server refused the first before running it, so the call
+ *   with the fresh definition. The server refused the first before running it, so the call
  *   runs at most once. The fresh tools and their schema problems, compiled as discovery compiles them, go back to the
  *   host for its catalog, whether the second send completed or failed; so do a `tools/list` request's problems.
  */
@@ -80,7 +79,7 @@ import { type Answer, malformed, scrubError, toEngineValue } from "./results.ts"
 import { promptsLeftOut, scrubRaw, scrubValues, toolsLeftOut, vetListed } from "./scrub.ts";
 import { Validators, type ValidatorsApi } from "./validators.ts";
 
-/** Discovery, and the tools listed again after a `-32020`, are the host's own work (The MCP core #394 D7). */
+/** Discovery, and the tools listed again after a `-32020`, are the host's own work. */
 const HOST_WORK: McpCallContext = { origin: "host" };
 
 /** Each list `request` walks, by the core's kind. */
@@ -105,7 +104,7 @@ interface CallInput {
 
 /**
  * `deps` declaring the extensions the host named for the call's connection, the ones this engine knows (OAuth Client
- * Credentials, `docs/architecture/mcp.md` → Extensions) and no other: a third party's extension is never declared, and a
+ * Credentials) and no other: a third party's extension is never declared, and a
  * connection the host named none for declares none.
  */
 const withExtensions = (deps: McpDeps, named: McpEngineHttpTarget["extensions"]): McpDeps => {
@@ -120,8 +119,9 @@ const withExtensions = (deps: McpDeps, named: McpEngineHttpTarget["extensions"])
 };
 
 /**
- * `deps` that also declare `sampling: { tools: {} }`, only when the host's target says the definition lets it, for an HTTP server or a stdio one
- * (`docs/architecture/mcp-server-requests.md` → Questions). A Legacy server is told once,
+ * `deps` that also declare `sampling: { tools: {} }`, only when the host's target says the definition lets it, for an
+ * HTTP server or a stdio one.
+ * A Legacy server is told once,
  * connection-wide, at `initialize`; a Legacy session that was initialized with another declaration is initialized again,
  * once. A Modern request declares it per request, in its `_meta`, only for a call whose caller offers to answer a Sampling
  * request (`ctx.answers.sampling`) and has an `onInput` to answer with; the round's request is answered by `onInput` (run,
@@ -159,7 +159,7 @@ const cutOnceAborted = (untilAborted: () => Promise<void>, mayHaveRun: boolean) 
   );
 
 /**
- * Fails as a cut once the caller aborts the call or dies, whichever comes first (#409 answer 2). A call with no
+ * Fails as a cut once the caller aborts the call or dies, whichever comes first. A call with no
  * `untilAborted` (the host's background discovery) is never cut by its caller: it runs to its own bounds.
  */
 const abortedBy = (hooks: McpEngineHooks, mayHaveRun: boolean) => {
@@ -324,7 +324,7 @@ const runCall = Effect.fnUntraced(function* <A, R>(
 });
 
 /**
- * The call's span, with what the call did on the wire (`docs/architecture/mcp-connections.md` → Telemetry): counts and
+ * The call's span, with what the call did on the wire: counts and
  * one status, the server's name and its origin (scheme and host), never a path, header, argument, result or token.
  */
 type WireAttributes = {
@@ -607,7 +607,7 @@ const runToolCall = Effect.fnUntraced(function* (
 
 /**
  * Sends a `tools/call` that answered `input_required` again from its `ResumeState`, with the answers: answered as a
- * `tools/call` is (`docs/architecture/mcp-server-requests.md` → Questions).
+ * `tools/call` is.
  */
 const runResume = Effect.fnUntraced(function* (
   connection: McpConnection,
@@ -856,7 +856,7 @@ const runResourcePage = Effect.fnUntraced(function* (
 
 /**
  * Runs a `prompts/get`: the server's result as it is, its strings scrubbed of the call's tokens on the way out. The
- * core answers the server's questions during it through `req.ctx` (#492), as a read's.
+ * core answers the server's questions during it through `req.ctx`, as a read's.
  */
 const runPrompt = Effect.fnUntraced(function* (
   connection: McpConnection,
@@ -1029,7 +1029,7 @@ const LISTEN_BACKLOG = 1_000;
 const encoder = new TextEncoder();
 
 /**
- * Opens one listen (`docs/architecture/mcp-connections.md` → Requests and Legacy sessions → Listens): connects, opens the
+ * Opens one listen: connects, opens the
  * core's listen, and answers once the server acknowledged, with what it honors and the events as newline-delimited JSON on
  * a native stream. The connection is kept, under `ctx.waitUntil`, for as long as the stream lives: it ends when the host
  * cancels the stream (or its RPC dies), or when the server ends the listen, which is the stream's last line (`closed`).

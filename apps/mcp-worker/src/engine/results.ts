@@ -1,8 +1,8 @@
 /**
- * A request's value as the engine returns it (`docs/architecture/mcp-connections.md` → The engine, Large results;
- * #382 D9.2): serialized once, with every access token the call sent replaced by `[REDACTED]`
- * (`docs/architecture/mcp-sign-in.md` → Tokens reach the host object), then inline up to 1 MiB, else as a native byte
- * stream produced on pull, which RPC neither clones nor counts and the host returns unread (#409 answer 3). A failed
+ * A request's value as the engine returns it: serialized once, with every access token the call sent replaced by
+ * `[REDACTED]`,
+ * then inline up to 1 MiB, else as a native byte
+ * stream produced on pull, which RPC neither clones nor counts and the host returns unread. A failed
  * call's error is scrubbed of the same tokens.
  */
 // @effect-diagnostics globalJsonInEffect:off -- a server's answer, already decoded by the SDK, serialized to bytes once.

@@ -1,7 +1,6 @@
 /**
- * The Registry's sign-in edge as the host reads and writes it (`docs/architecture/mcp-sign-in.md` → Tokens reach the host
- * object, Version skew): a union the other end may extend has a fallback member, so a newer build's value never fails a
- * decode on an older one.
+ * The Registry's sign-in edge as the host reads and writes it: a union the other end may extend has a fallback member,
+ * so a newer build's value never fails a decode on an older one.
  */
 // @effect-diagnostics asyncFunction:off
 import * as Effect from "effect/Effect";

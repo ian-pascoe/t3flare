@@ -3,8 +3,8 @@
 // (ian-pascoe/pi-extensions@a5e15d1:packages/pi-termctrl, `termctrl-registry.ts` and the termctrl driver's screen) as
 // PTYs in the Workspace's Container. They run under a second `TerminalHost` (ADR-0021's host: the platform's PTY exec,
 // markers, the kill script, the Container's hold measured from input), whose output feeds a headless xterm per entry
-// here instead of t3's terminal adapter: the Workspace DO renders the screen, as termctrl's driver does, and answers the
-// Session's tools with it.
+// here instead of t3's terminal adapter: the Workspace DO renders the screen, as termctrl's driver does, and answers
+// the Session's tools with it.
 //
 // Adapted, not redesigned:
 // - termctrl's driver process is the xterm here; its `status`/`screen.capture`/`logs` are `view()`;

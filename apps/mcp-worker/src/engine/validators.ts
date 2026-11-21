@@ -1,7 +1,6 @@
 /**
  * The validator cache, one per isolate: tools' `outputSchema`s compiled with TypeBox, by schema hash, so a
- * `tools/call` result's `structuredContent` is checked in the engine (`docs/architecture/mcp-connections.md` → The
- * engine, Validation and compiling; The MCP core #394 D17, refined by #382 D8, D9.3).
+ * `tools/call` result's `structuredContent` is checked in the engine.
  *
  * TypeBox runs through its interpreted fallback: acceleration (`new Function`) is switched off, since a Worker may
  * not evaluate code once it has started, whatever `allow_eval_during_startup` allows at startup, and nothing compiles

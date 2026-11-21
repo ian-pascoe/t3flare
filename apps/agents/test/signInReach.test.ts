@@ -1,7 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off
 // No sign-in's token can reach a Container (SPI-1164; ADR-0016): from the Workspace side, the only way to a Model
-// endpoint's credential is the model relay's `modelRelayTarget`, which since SPI-1171 gives a sign-in's access token for
-// one request to the Workspace DO, which hands it to the relay's route in `WorkspaceProxy` (a Worker, outside the
+// endpoint's credential is the model relay's `modelRelayTarget`, which since SPI-1171 gives a sign-in's access token
+// for one request to the Workspace DO, which hands it to the relay's route in `WorkspaceProxy` (a Worker, outside the
 // Container) and keeps it only by hash for the sync guard. No Workspace code calls `endpointCredential`, the Session's
 // RPC; only a Session and text generation call it.
 import * as fs from "node:fs";

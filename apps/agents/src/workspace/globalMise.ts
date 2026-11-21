@@ -1,7 +1,7 @@
 // @effect-diagnostics globalTimers:off
-// The Global mise config's lay-down, once per Container (SPI-1150, ADR-0032's Global mise config refinement): the Workspace DO runs the script
-// (`@t3flare/sandbox-image/globalMise`) on each new Container before its first command, holding the Container while it
-// runs, and reports how it ended.
+// The Global mise config's lay-down, once per Container (SPI-1150, ADR-0032's Global mise config refinement): the
+// Workspace DO runs the script (`@t3flare/sandbox-image/globalMise`) on each new Container before its first command,
+// holding the Container while it runs, and reports how it ended.
 //
 // - Keyed by the Container's runtime id (computer's connect answers it): a Container that replaced one that died on its
 //   own has a new one, so it gets its own run. The outcome is kept in storage, so a new instance of the Workspace DO (a

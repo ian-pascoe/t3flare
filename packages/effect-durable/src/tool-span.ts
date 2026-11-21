@@ -1,7 +1,6 @@
-// docs/architecture/operations.md → Telemetry; docs/architecture/visuals.md → Telemetry. A tool's own counts on its call's
-// `pi.tool.<name>` span. The span is made by the tracing wrap around the tool, which
-// a tool never sees, so the wrap lists its span by the call's ID while the call runs, and a tool adds fixed values and counts
-// to it by that ID (never content: a span carries no arguments, results, text or hosts).
+// A tool's own counts on its call's `pi.tool.<name>` span. The span is made by the tracing wrap around the tool, which
+// a tool never sees, so the wrap lists its span by the call's ID while the call runs, and a tool adds fixed values and
+// counts to it by that ID (never content: a span carries no arguments, results, text or hosts).
 //
 // The list is a Session's own (`makeToolSpans`): each Session object makes one, hands it to its tracing wrap and gives it to
 // its tools as `ToolSpans`, so a call is found by its Session and its ID together. A Fork reuses its source's call IDs, and

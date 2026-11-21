@@ -1,7 +1,6 @@
 /**
- * The SHA-256 of what a `resources/read` answered (`docs/architecture/mcp-in-a-session.md` → Resource watches: the
- * baseline a watch's re-read is compared with). It covers each content item's `uri`, `mimeType` and body, in order, and
- * nothing else: a `_meta`, or a key a later server version adds, never makes a resource look changed.
+ * The SHA-256 of what a `resources/read` answered. It covers each content item's `uri`, `mimeType` and body, in order,
+ * and nothing else: a `_meta`, or a key a later server version adds, never makes a resource look changed.
  *
  * Each body is hashed on its own and the digests are hashed together, so no copy of a 16 MiB read is made beyond the
  * one body being hashed: a text's UTF-8 bytes, or a blob's base64 text as the server sent it.

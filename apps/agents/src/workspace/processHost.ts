@@ -1,8 +1,8 @@
 // @effect-diagnostics globalTimers:off globalConsole:off
 // The Workspace DO's CLI processes (step 4a, the process channel): `codex app-server` and `pi --mode rpc` under the
 // platform's non-PTY exec in the Workspace's Container, their stdout and stderr kept as bytes until the Environment's
-// spawner reads them (`read`, a long poll that is also the heartbeat), their stdin, signals and turns from the
-// spawner. A sibling of `TerminalHost`, but pulled rather than pushed (see `read`).
+// spawner reads them (`read`, a long poll that is also the heartbeat), their stdin, signals and turns from the spawner.
+// A sibling of `TerminalHost`, but pulled rather than pushed (see `read`).
 //
 // - Input is ordered by `seq`, one write at a time: a duplicate (a retried RPC) is acknowledged, a gap or a failed write
 //   kills the process; nothing is ever skipped (review F6).

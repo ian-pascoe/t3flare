@@ -1,6 +1,6 @@
-// The Todo List's rules (`docs/architecture/agent-capabilities.md` → Todo): what each action of the `todo` tool does to a list, without storage or
-// the model's context. Every action is a pure function from the list to the next one or to a failure, so a batch that
-// has one bad entry changes nothing.
+// The Todo List's rules: what each action of the `todo` tool does to a list, without storage or the model's context.
+// Every action is a pure function from the list to the next one or to a failure, so a batch that has one bad entry
+// changes nothing.
 import { type TodoStatus, type TodoTask } from "./doc.ts";
 
 /** The actions of the `todo` tool. */

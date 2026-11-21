@@ -1,5 +1,5 @@
 /**
- * Whether an RPC failed because its callee has no such method, a deploy behind (`docs/architecture/mcp.md` → Deploys).
+ * Whether an RPC failed because its callee has no such method, a deploy behind.
  * The runtime gives no typed marker for it: workerd throws a plain `TypeError` whose only distinguishing mark is its text
  * (`The RPC receiver does not implement the method "x"`, or `... is not a function` on a plain object, as in the
  * conformance run). So the text is matched here, in the one place every caller that reads it past (the endpoint's

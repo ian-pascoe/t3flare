@@ -1,5 +1,6 @@
 // @effect-diagnostics globalDate:off
-// A pi-durable Harness on pi-ai's faux provider, restarted as an evicted Durable Object is, shared by the extension tests.
+// A pi-durable Harness on pi-ai's faux provider, restarted as an evicted Durable Object is, shared by the extension
+// tests.
 // @effect-diagnostics globalTimers:off
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { type AssistantMessage, createModels, fauxProvider } from "@earendil-works/pi-ai";

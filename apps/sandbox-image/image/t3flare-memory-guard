@@ -1,7 +1,6 @@
 #!/bin/bash
-# The Container's memory guard (docs/architecture/container.md → Memory guard), which the supervisor runs
-# beside computerd. It runs earlyoom, which stops the largest process when the Container is nearly out of memory, and
-# passes earlyoom's lines through to its stdout.
+# The Container's memory guard, which the supervisor runs beside computerd. It runs earlyoom, which stops the largest
+# process when the Container is nearly out of memory, and passes earlyoom's lines through to its stdout.
 #
 # For each process earlyoom announces it is stopping, it leaves a note for the commands that run meanwhile: a file
 # named by the time in microseconds, which `command.bash` prints on stderr when each of those commands ends. earlyoom
@@ -12,7 +11,7 @@
 # so a command never reads half of one. The supervisor removes the notes of an earlier start (a snapshot keeps them)
 # before it starts this script and computerd.
 #
-# T3FLARE_EARLYOOM and T3FLARE_MEMORY_NOTES let a test point this script elsewhere; the image sets neither.
+# T3FLARE_EARLYOOM and T3FLARE_MEMORY_NOTES override their defaults; the image sets neither.
 set -u
 export TZ=UTC
 

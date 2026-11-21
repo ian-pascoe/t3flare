@@ -1,11 +1,11 @@
 // @effect-diagnostics globalConsole:off globalTimers:off
-// A Session's Model endpoints (SPI-1162): the endpoints it last took, kept secret-free in its storage so a restart has the
-// same providers; their providers installed in the Session's models in place; and their keys, asked of the Environment at
-// use time (ADR-0018) and kept in memory only, never in storage. A sign-in endpoint's access token (SPI-1164) comes the
-// same way, from the Credential broker, and is kept no later than shortly before its expiry, and dropped on a 401 or the
-// endpoint's sign-out. Each request for a key names the target the Session will send it to (API, base URL, headers), and
-// the Environment gives it only for the endpoint's target now: a Session still holding an endpoint the owner moved gets no
-// key for the old target.
+// A Session's Model endpoints (SPI-1162): the endpoints it last took, kept secret-free in its storage so a restart has
+// the same providers; their providers installed in the Session's models in place; and their keys, asked of the
+// Environment at use time (ADR-0018) and kept in memory only, never in storage. A sign-in endpoint's access token
+// (SPI-1164) comes the same way, from the Credential broker, and is kept no later than shortly before its expiry, and
+// dropped on a 401 or the endpoint's sign-out. Each request for a key names the target the Session will send it to
+// (API, base URL, headers), and the Environment gives it only for the endpoint's target now: a Session still holding an
+// endpoint the owner moved gets no key for the old target.
 import { type AssistantMessage, createModels, type FetchFunction, type MutableModels } from "@earendil-works/pi-ai";
 import {
   EMPTY_ENDPOINTS,

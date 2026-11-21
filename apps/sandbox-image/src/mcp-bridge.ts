@@ -1,4 +1,4 @@
-// The contract of a Container MCP bridge for stdio servers, with the Workspaces Worker and the MCP engine: no Node
+// The contract of a Container MCP bridge for stdio servers, with the agents Worker and the MCP engine: no Node
 // built-ins and no MCP SDK here, since it runs in a Worker. t3flare's image runs no bridge and the MCP Worker has no
 // `MCP_BRIDGE` binding (stdio servers are refused, OD-T12), so the engine's stdio path, which imports this, always fails.
 // @effect-diagnostics asyncFunction:off preferEffectRecord:off preferEffectArray:off
@@ -83,8 +83,8 @@ export type McpBridgeOptions = {
  * `no_workspace` (404), `stopped` (503, with `MCP_BRIDGE_CONTAINER_HEADER`), and 502 for `start_failed` (the Container
  * did not start), `bridge_unreachable` (nothing answers on the bridge's port, or it refuses the launch's token: its
  * message says `container_restart` starts a new one) and `bridge_failed`. `bridge_failed` is the fallback member: a
- * caller reads a code it does not know (a later change adds one: every RPC edge only gains, docs/architecture/mcp.md →
- * Deploys) as it, a generic failure (`mcpBridgeRefusalCode`). Any other status is the bridge's own.
+ * caller reads a code it does not know (a later change adds one: every RPC edge only gains) as it, a generic failure
+ * (`mcpBridgeRefusalCode`). Any other status is the bridge's own.
  */
 export type McpBridgeRefusal = (typeof MCP_BRIDGE_REFUSALS)[number];
 

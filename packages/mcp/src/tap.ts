@@ -1,7 +1,6 @@
 /**
  * The core's `fetch` tap: what the core does at the `fetch` seam, around the injected `fetch`, before the SDK sees a
- * response (`docs/architecture/mcp.md` → Protocol eras; `docs/architecture/mcp-connections.md` → Failures and cuts,
- * Requests and Legacy sessions; The MCP core #394 D2, D15, D16).
+ * response.
  *
  * - **Retries:** a 408 or 429 on the `server/discover` probe is retried once after `Retry-After` (at most 10 s, else
  *   1 s), then reads as unavailable, never as Legacy; read-only requests retry once on a 408, 429 or 5xx.
@@ -10,7 +9,7 @@
  *   before reading.
  * - **Resumes:** a Legacy request stream that ends without its answer, having carried an event id, is resumed by the
  *   tap itself with `GET` and `Last-Event-ID`, after the server's `retry` (0.5–10 s); the SDK is handed one stream, and
- *   only the request's own events from the resumed one. Two resumes failing in a row is a cut (D15; #542).
+ *   only the request's own events from the resumed one. Two resumes failing in a row is a cut.
  * - **Cuts:** an SSE stream that ends without its answer, and cannot be resumed, fails its request at once, since the
  *   SDK neither reconnects nor fails it (it drops `onRequestStreamEnd` for requests).
  * - **Not MCP:** a 2xx answer to a request that is neither JSON-RPC JSON nor an SSE stream.
@@ -141,8 +140,7 @@ export const CALL_HEADER = "x-t3flare-call";
 export const APP_READ_HEADER = "x-t3flare-app-read";
 
 /**
- * Which call each server request on a POST response stream belongs to (`mcp-server-requests.md` → Questions, Legacy:
- * "the core's `fetch` tap ties a question to the call whose POST stream carried it"). A question on any other stream,
+ * Which call each server request on a POST response stream belongs to. A question on any other stream,
  * the GET stream above all, has no tie, and nowhere to go.
  */
 export class Ties {

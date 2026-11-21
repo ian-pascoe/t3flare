@@ -1,6 +1,5 @@
 /**
- * A server's question during a prompt send's `prompts/get` (`docs/architecture/mcp-server-requests.md` → Questions;
- * `docs/architecture/mcp-in-a-session.md` → Getting a prompt at send), in both eras: a Legacy server asks on the get's own
+ * A server's question during a prompt send's `prompts/get`, in both eras: a Legacy server asks on the get's own
  * stream, with the get's timeout stopped while the owner decides; a Modern one answers `input_required`, and the core
  * answers the round at once through `onInput` and sends the get again, as a read's rounds are.
  */

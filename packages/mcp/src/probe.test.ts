@@ -1,5 +1,5 @@
 /**
- * Golden tests of the era probe's outcomes (`docs/architecture/mcp.md` → Protocol eras; The MCP core #394 D2): what
+ * Golden tests of the era probe's outcomes: what
  * `connect` fails with when the server answers `server/discover` with each row of the outcome table, through the SDK's
  * own classifier and the core's `fetch` tap.
  */

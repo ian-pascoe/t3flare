@@ -1,12 +1,12 @@
 // @effect-diagnostics globalDate:off
-// Text generation on a Model endpoint's model (SPI-1163): thread titles, commit messages and PR text, as one pi-ai request
-// with no tools. The Environment DO calls it over the `EndpointTextGeneration` entrypoint (`worker.ts`) with ids only,
-// so the Environment's bundle never holds pi-ai and no caller-supplied endpoint exists here: the endpoint is read from the
-// Environment (`modelEndpoints`) and its provider is a Session's own (`endpointProviders`), whose key is asked of the
-// Environment at use time for the endpoint's target and kept nowhere. A failure names the endpoint and says what happened,
-// classified by the endpoint's API and auth from the answer's status, headers and error body (SPI-1172,
-// `@t3flare/models/failures`), else by its status: a vendor's body (which can echo request details) and the key never
-// reach the message.
+// Text generation on a Model endpoint's model (SPI-1163): thread titles, commit messages and PR text, as one pi-ai
+// request with no tools. The Environment DO calls it over the `EndpointTextGeneration` entrypoint (`worker.ts`) with
+// ids only, so the Environment's bundle never holds pi-ai and no caller-supplied endpoint exists here: the endpoint is
+// read from the Environment (`modelEndpoints`) and its provider is a Session's own (`endpointProviders`), whose key is
+// asked of the Environment at use time for the endpoint's target and kept nowhere. A failure names the endpoint and
+// says what happened, classified by the endpoint's API and auth from the answer's status, headers and error body
+// (SPI-1172, `@t3flare/models/failures`), else by its status: a vendor's body (which can echo request details) and the
+// key never reach the message.
 import { createModels, type FetchFunction } from "@earendil-works/pi-ai";
 import { describeFailure, errorBodyOf, failureHeaders, resetSentence } from "@t3flare/models/failures";
 import {

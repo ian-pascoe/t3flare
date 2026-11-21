@@ -1,6 +1,5 @@
-// The additions `./oauth` makes to pi-mcp's `oauth` (`docs/architecture/mcp-sign-in.md` → Tokens reach the host object (Code),
-// Client registration, Sign-out): RFC 7009 revocation, `client_secret_expires_at`, the issuer pin and the size bounds.
-// The fakes answer `fetch(url, init)` only.
+// The additions `./oauth` makes to pi-mcp's `oauth`: RFC 7009 revocation, `client_secret_expires_at`, the issuer pin
+// and the size bounds. The fakes answer `fetch(url, init)` only.
 // @effect-diagnostics asyncFunction:off globalFetch:off preferEffectArray:off
 import { describe, expect, it } from "vitest";
 import {

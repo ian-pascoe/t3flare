@@ -1,7 +1,7 @@
 // `ls`, `find` and `grep` over the Workspace's files (step 2a plan, section 4):
-// three tools over the Workspace DO's searches
-// (`ComputerFiles`, which reaches the Container only for a Container-only path), as plain Promise tools with text
-// output. Each runs where the call's environment works (`api.env.cwd`), with relative paths resolved against it.
+// three tools over the Workspace DO's searches (`ComputerFiles`, which reaches the Container only for a Container-only
+// path), as plain Promise tools with text output. Each runs where the call's environment works (`api.env.cwd`), with
+// relative paths resolved against it.
 import type { ComputerFiles } from "@t3flare/computer-env";
 import { defineExtension, defineTool, type Extension } from "@earendil-works/pi-durable";
 import { bool, num, obj, opt, str } from "@earendil-works/pi-schema";

@@ -1,8 +1,8 @@
 // @effect-diagnostics globalTimers:off
 // What a Workspace's Container starts with (SPI-1149, ADR-0032): the Environment settings, read from the Environment DO
 // before a start with a bounded wait, as a Session reads the Harness settings at a turn's start; on no answer the copy
-// the Workspace DO last kept, else the defaults. A start never waits on the Environment longer than the bound, and never
-// omits `instance` (an omitted one starts `lite`).
+// the Workspace DO last kept, else the defaults. A start never waits on the Environment longer than the bound, and
+// never omits `instance` (an omitted one starts `lite`).
 import {
   type ContainerInstance,
   containerInstance,

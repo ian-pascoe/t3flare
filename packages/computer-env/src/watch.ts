@@ -1,7 +1,7 @@
 // A polling `FileWatcher`: the Workspace has no change notifications for its files, so the watcher asks the Workspace
 // DO for a snapshot of what it covers at an interval and reports the differences, the way pi-durable's
 // `NodeFileWatcher` does in polling mode.
-// pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
+// pi-durable's `ExecutionEnv` is Promise-native and stays so; this adapter follows it.
 // @effect-diagnostics globalTimers:off
 import type { Context } from "@earendil-works/chord";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";

@@ -1,4 +1,4 @@
-// Chord `Context` ↔ Effect fibers (ADR-0003). pi-durable passes every invocation a Chord `Context` whose abort signal
+// Chord `Context` ↔ Effect fibers. pi-durable passes every invocation a Chord `Context` whose abort signal
 // cancels it; the fiber that runs an invocation's Effect is interrupted by that signal and sees the Context as
 // `ChordContext`, so pi-durable calls it makes inherit both the Context's values and its cancellation.
 import * as Chord from "@earendil-works/chord/context";
@@ -59,7 +59,7 @@ export const settleTyped = <A, E>(
   if (Exit.isSuccess(exit)) return Result.succeed(exit.value);
 
   // Defects win over failures, as in Effect's own error reporting. Since effect 4.0.6 the runtime itself turns every
-  // failure of a cause that holds a defect into a defect (a dying finalizer or concurrent sibling, #9433), in the
+  // failure of a cause that holds a defect into a defect (a dying finalizer or concurrent sibling), in the
   // cause's order, so the first defect may be a failure that was demoted. Nothing marks which ones were, so several are
   // thrown together, and the crash is never hidden behind a failure.
   const defects = Arr.map(

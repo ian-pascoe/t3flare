@@ -1,5 +1,5 @@
 /**
- * The core's resource requests, in both eras (`docs/architecture/mcp-in-a-session.md` → Resource tools): a page of
+ * The core's resource requests, in both eras: a page of
  * `resources/list` and `resources/templates/list` at a time with the server's cache hints, and `resources/read` with the
  * SHA-256 of what it answered, a Legacy server's question during it included.
  */

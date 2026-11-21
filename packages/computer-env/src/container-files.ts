@@ -1,9 +1,9 @@
-// The model tools' file operations on Container-only paths (GLOSSARY.md), run on the Container (ADR-0018).
+// The model tools' file operations on Container-only paths (GLOSSARY.md), run on the Container.
 // `@cloudflare/computer` reaches a Container only through commands, so each operation is a bash script there. Bytes cross
 // through the Workspace's own files: a script copies a file to a stage under `/workspace/.t3flare/tmp`, which computer
 // pulls into the Workspace DO after the command, and a write stages its bytes there first, which computer pushes to the
 // Container before the command. Metadata, listings and matches come back on standard output.
-// pi-durable's `ExecutionEnv` is Promise-native and stays so (ADR-0003); this adapter follows it.
+// pi-durable's `ExecutionEnv` is Promise-native and stays so; this adapter follows it.
 // @effect-diagnostics cryptoRandomUUID:off
 import type { FileErrorCode, FileInfo, FileKind } from "@earendil-works/pi-durable/env";
 import { failureMessage } from "@t3flare/workspace-client";

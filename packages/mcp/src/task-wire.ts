@@ -1,6 +1,6 @@
 /**
  * The core's task transport: JSON-RPC to a Modern server on a `StreamableHTTPClientTransport` of its own, beside the
- * SDK client's (`docs/architecture/mcp-server-requests.md` → MCP tasks, The wire; The MCP core #394 D8).
+ * SDK client's.
  *
  * The SDK's Modern codec answers a `tools/call` only as `resultType: "complete"` or `"input_required"` and refuses
  * `"task"`, and has no `tasks/*` methods, so a task-capable `tools/call` and `tasks/get`, `tasks/update` and

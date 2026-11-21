@@ -1,5 +1,5 @@
 /**
- * The engine's byte budget, one per isolate (`docs/architecture/mcp-connections.md` → The engine, Memory; #382 D9.1):
+ * The engine's byte budget, one per isolate:
  * an 8 MiB pool shared by calls of up to 4 MiB and one large slot for a call whose bytes pass 4 MiB (up to 16 MiB,
  * past which the core's byte limits fail the request).
  *
@@ -15,7 +15,7 @@
  *   none will: so it is let in over budget, and every later charge of its own is too, until it ends or moves to the
  *   large slot; one call at a time, so the pool overshoots by at most 4 MiB. While the holders still running hold
  *   enough for it, nobody overshoots; a running call holding a few bytes (a slow tool's open response) holds nobody
- *   up (#613). The large slot needs no such rule: its holder is charged nothing more, so it never waits.
+ *   up. The large slot needs no such rule: its holder is charged nothing more, so it never waits.
  * - **Release is immediate:** it gives back what the call holds and drops its waiter, whatever the call's charges are
  *   doing, so an abort or a timeout frees the budget at once.
  * - **A returned stream** holds its call's lease until it is read or cancelled, but expires once it has gone unread

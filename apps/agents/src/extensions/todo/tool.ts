@@ -1,8 +1,7 @@
-// The `todo` tool (SPI-1055): pi-todo's parameters,
-// atomic batches and structured output, over the conversation's Todo document, as a plain pi-durable tool.
-// A call reads and changes the list in one commit, so it sees the list as the last call left it and
-// a failure changes nothing. Every result's text ends with the whole list, so the model's context shows the current
-// list wherever the last call is, and the projection only has to fill in when no call is.
+// The `todo` tool (SPI-1055): pi-todo's parameters, atomic batches and structured output, over the conversation's Todo
+// document, as a plain pi-durable tool. A call reads and changes the list in one commit, so it sees the list as the
+// last call left it and a failure changes nothing. Every result's text ends with the whole list, so the model's context
+// shows the current list wherever the last call is, and the projection only has to fill in when no call is.
 import { defineTool, type ToolRegistration, type ToolTaskInput } from "@earendil-works/pi-durable";
 import { arr, int, nullable, obj, oneOf, opt, str } from "@earendil-works/pi-schema";
 

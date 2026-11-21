@@ -1,8 +1,7 @@
 /**
- * A Legacy server's URL-mode elicitation (`docs/architecture/mcp-server-requests.md` → Questions, Elicitation
- * requests): a page the server asks the owner to open during a call, whose clock stays stopped until the owner has
- * finished there; and `-32042` (URL elicitation required), which refuses the call before it runs, so it is kept for
- * the owner and sent again, at most ten times.
+ * A Legacy server's URL-mode elicitation: a page the server asks the owner to open during a call, whose clock stays
+ * stopped until the owner has finished there; and `-32042` (URL elicitation required), which refuses the call before it
+ * runs, so it is kept for the owner and sent again, at most ten times.
  */
 // @effect-diagnostics asyncFunction:off preferEffectArray:off
 import * as Effect from "effect/Effect";

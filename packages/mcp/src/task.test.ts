@@ -1,5 +1,5 @@
 /**
- * The core's task wire (`docs/architecture/mcp-server-requests.md` → MCP tasks, The wire), against a fake Modern task
+ * The core's task wire, against a fake Modern task
  * server: a `tools/call` answered with an MCP task only for a caller that can wait for one, `tasks/get`, `tasks/update`
  * and `tasks/cancel` with their headers, the 16 MiB result limit, and the `-32021` message.
  */

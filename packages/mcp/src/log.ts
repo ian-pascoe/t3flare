@@ -1,6 +1,5 @@
 /**
- * Server logs (`docs/architecture/mcp-in-a-session.md` → Server logging; `docs/architecture/mcp-connections.md` →
- * Telemetry): the entry an engine call hands the host, and the levels. Like everything in `./types`, this never loads
+ * Server logs: the entry an engine call hands the host, and the levels. Like everything in `./types`, this never loads
  * the SDK.
  */
 import * as Arr from "effect/Array";
@@ -19,10 +18,10 @@ export const MCP_LOG_LEVELS = [
   "emergency",
 ] as const;
 
-/** The level the core asks every server that declares `logging` for, in both eras (`docs/architecture/mcp-in-a-session.md` → Server logging). */
+/** The level the core asks every server that declares `logging` for, in both eras. */
 export const MCP_LOG_LEVEL = "warning";
 
-/** How many log entries the host keeps per server, and a call hands back at most (`docs/architecture/mcp-connections.md` → Telemetry). */
+/** How many log entries the host keeps per server, and a call hands back at most. */
 export const MCP_LOG_RING = 50;
 
 /** The most characters of a log entry's `data`: 2 KiB. */

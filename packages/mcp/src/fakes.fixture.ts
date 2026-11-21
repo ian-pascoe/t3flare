@@ -1,5 +1,5 @@
 /**
- * Fake MCP servers behind the injected `fetch`, on the SDK server (`docs/architecture/mcp.md` → Testing and tracing):
+ * Fake MCP servers behind the injected `fetch`, on the SDK server:
  * Modern, Legacy stateless, Legacy stateful with a GET stream, and a hostile wrapper that answers chosen requests
  * itself. Each records what reached it, so tests can see what the core sent.
  */
@@ -253,7 +253,7 @@ export const GATED_TOOL = {
   inputSchema: { type: "object" as const },
 };
 
-/** The MIME type of an MCP App's HTML (`docs/architecture/mcp-apps.md` → Declaring and reading Apps). */
+/** The MIME type of an MCP App's HTML. */
 export const APP_MIME_TYPE = "text/html;profile=mcp-app";
 
 /** A tool of an App server whose App is the `ui://` resource `uri`: it answers as `echo` does. */
@@ -1268,7 +1268,7 @@ export const sse = (events: ReadonlyArray<Json>) =>
   );
 
 // ---------------------------------------------------------------------------------------------------------------------
-// A fake Modern task server (`docs/architecture/mcp-server-requests.md` → Testing): a Modern server that advertises
+// A fake Modern task server: a Modern server that advertises
 // `io.modelcontextprotocol/tasks` and answers a `tools/call` of `report` with an MCP task when the request declares the
 // extension, and `tasks/get`, `tasks/update` and `tasks/cancel` for the tasks it made. `@modelcontextprotocol/ext-tasks`
 // (0.2.x, a devDependency only) has the requester's side of the wire and no server's, so the fake speaks the wire

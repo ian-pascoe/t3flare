@@ -1,6 +1,5 @@
 /**
- * What a failed SDK call means, as an `McpError` (`docs/architecture/mcp.md` → Packages and objects; the probe's
- * outcome table: The MCP core #394 D2; `docs/architecture/mcp-connections.md` → Failures and cuts).
+ * What a failed SDK call means, as an `McpError`.
  *
  * | What failed                                 | `McpError`                                          |
  * | ------------------------------------------- | --------------------------------------------------- |
@@ -211,8 +210,7 @@ type RequiredCapabilities = typeof RequiredCapabilities.Type;
 /**
  * What a server that needs the request run as an MCP task says to one that did not declare the extension: `-32021` naming
  * `io.modelcontextprotocol/tasks`. t3flare declares it only where it can wait for a task (`ctx.allowTask`, under the
- * caps), so this is the message for the call that could not be offered it (`docs/architecture/mcp-server-requests.md` →
- * MCP tasks, Declaration).
+ * caps), so this is the message for the call that could not be offered it.
  */
 const taskNeeded = (
   message: string,

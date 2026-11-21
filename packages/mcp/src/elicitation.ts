@@ -1,6 +1,5 @@
 /**
- * An MCP server's question to t3flare, and the form of an elicitation (`docs/architecture/mcp-server-requests.md` →
- * Questions, Elicitation requests → The form; ADR-0037, ADR-0041). Pure and SDK-free, so the Session, the `mcp`
+ * An MCP server's question to t3flare, and the form of an elicitation. Pure and SDK-free, so the Session, the `mcp`
  * extension, the engine's edge and the web app all import it (`./types`).
  *
  * - **The question's shape:** `McpInputRequest` is what the core hands the call's `onInput`, `McpInputAnswer` what it
@@ -25,7 +24,7 @@ export const MCP_ELICITATION_WAIT_MS = 10 * 60 * 1000;
 
 /**
  * How long a question waits for the owner during a prompt send's `prompts/get`, or an App View's `tools/call`, from the ask:
- * 5 minutes, in either era and both kinds (`docs/architecture/mcp-server-requests.md` → Questions). The get's or the call's
+ * 5 minutes, in either era and both kinds. The get's or the call's
  * own bound pauses meanwhile.
  */
 export const MCP_PROMPT_QUESTION_WAIT_MS = 5 * 60 * 1000;
@@ -35,7 +34,7 @@ export const MCP_ELICITATIONS_PER_CALL = 10;
 
 /**
  * How long a Legacy Sampling request may wait, from the ask (`ctx.answers.inputWaitMs`): the owner's 10 minutes and the
- * 2 minutes a sample may take (`docs/architecture/mcp-server-requests.md` → Sampling requests, Waiting).
+ * 2 minutes a sample may take.
  */
 export const MCP_SAMPLING_WAIT_MS = 12 * 60 * 1000;
 
@@ -57,7 +56,7 @@ export const McpEra = Schema.Literals(["legacy", "modern"]);
 export type McpEra = typeof McpEra.Type;
 
 /**
- * A server's question, as the core surfaces it to a call's `onInput` (`mcp-server-requests.md` → Questions). `key` names
+ * A server's question, as the core surfaces it to a call's `onInput`. `key` names
  * it within its call; `kind` says which it is, and `params` are the server's own: an elicitation's `message` and
  * `requestedSchema`, or the `sampling/createMessage` parameters of a Sampling request. `live` means it can be answered
  * only while its call waits (a Legacy server's), `deferrable` that it may be answered later (a Modern server's, or a
@@ -143,7 +142,7 @@ export type McpElicitParams = typeof McpElicitParams.Type;
 
 export const decodeElicitParams = Schema.decodeUnknownOption(McpElicitParams);
 
-/** The form's bounds (`mcp-server-requests.md` → The form → Bounds). */
+/** The form's bounds. */
 export const ELICITATION_BOUNDS = {
   fields: 32,
   options: 100,
@@ -636,7 +635,7 @@ export type NormalizedForm = {
   readonly form: ElicitationForm;
   /** What the Session ignored or changed, one line each: for the record and the card. */
   readonly notes: ReadonlyArray<string>;
-  /** The shown name of the first field that asks for a credential: the form is declined unseen (ADR-0041). */
+  /** The shown name of the first field that asks for a credential: the form is declined unseen. */
   readonly credential: string | undefined;
 };
 

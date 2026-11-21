@@ -1,5 +1,5 @@
 /**
- * Server logging (`docs/architecture/mcp-in-a-session.md` → Server logging): `warning` in both eras, asked only of a
+ * Server logging: `warning` in both eras, asked only of a
  * server that declares `logging`, and every `notifications/message` handed to `onLog`.
  */
 // @effect-diagnostics asyncFunction:off preferEffectArray:off

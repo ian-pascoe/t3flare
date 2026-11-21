@@ -1,5 +1,5 @@
 /**
- * `completion/complete` in the core (`docs/architecture/mcp-in-a-session.md` → Arguments and completions): the values a
+ * `completion/complete` in the core: the values a
  * server suggests for a prompt's or a resource template's argument, never asked of a server that does not declare the
  * capability, and cancelled with the request that is interrupted, in both eras.
  */

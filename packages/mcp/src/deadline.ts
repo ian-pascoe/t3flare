@@ -1,5 +1,5 @@
 // @effect-diagnostics missingPipeableSignature:off -- a constructor over a plain value.
-// A deadline a question's wait can stop (`docs/architecture/mcp-server-requests.md` → Questions): a `tools/call`'s
+// A deadline a question's wait can stop: a `tools/call`'s
 // timeout, which stands still while a question waits for the owner and starts again from the whole on a progress
 // notice. The one helper for both ends of a call: the core's (which ends the server request) and the Session's (which
 // gives up on the host). Its timer is a fiber on Effect's clock, so a test clock moves it; no SDK is loaded here, so

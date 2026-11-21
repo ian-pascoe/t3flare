@@ -1,6 +1,6 @@
 // @effect-diagnostics globalTimers:off
-// "mise install runs before the first command of each Container start" (SPI-1150, ADR-0032): every command sent to
-// the Container that is not a passive read waits for the lay-down, at the point it is sent (`GlobalMiseBackend`), whoever
+// "mise install runs before the first command of each Container start" (SPI-1150, ADR-0032): every command sent to the
+// Container that is not a passive read waits for the lay-down, at the point it is sent (`GlobalMiseBackend`), whoever
 // sends it: a Durable agent's command comes through computer, never `WorkspaceDO.exec`. Passive reads never run it.
 // Terminals and CLI processes wait before their spawn (`readyForSpawn`).
 import type { BackendHandle, WorkspaceBackend } from "@cloudflare/computer";

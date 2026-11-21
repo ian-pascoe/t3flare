@@ -1,7 +1,7 @@
 /**
  * The tap's SSE splitter against the parser the SDK reads a request stream with (`eventsource-parser`, a devDependency
  * at the version the SDK resolves): for the same chunks it finds the same events, so what the tap counts as an answer
- * is what the SDK dispatches (`docs/architecture/mcp-connections.md` → Failures and cuts).
+ * is what the SDK dispatches.
  */
 // @effect-diagnostics preferEffectArray:off
 import { createParser } from "eventsource-parser";

@@ -1,6 +1,6 @@
 // @effect-diagnostics schemaSync:off
 /**
- * The host's RPC types (`docs/architecture/mcp.md` → Deploys): an `apply` answer with a tag this build does not know
+ * The host's RPC types: an `apply` answer with a tag this build does not know
  * reads as `HostFailed` and never fails a decode, an entry decodes without the keys a later build adds, and a source
  * of a kind this build does not know keeps its kind.
  */

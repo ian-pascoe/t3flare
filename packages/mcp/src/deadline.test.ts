@@ -1,4 +1,4 @@
-// The deadline a question's wait stops (`docs/architecture/mcp-server-requests.md` → Questions), on a test clock.
+// The deadline a question's wait stops, on a test clock.
 // @effect-diagnostics strictEffectProvide:off preferEffectArray:off
 import * as Effect from "effect/Effect";
 import * as TestClock from "effect/testing/TestClock";

@@ -3,9 +3,8 @@
  * HTTP, "Schema Extension"), re-exported by `@t3flare/mcp/types`, so it never loads the SDK.
  *
  * A Modern client MUST leave out a tool whose declarations break the spec's rules, so `McpHost`'s discovery does not
- * register one, and lists why as the tool's problem (`docs/architecture/mcp-connections.md` → Discovery and the MCP
- * inventory; `mcp-in-a-session.md` → Exposure). The rules are the SDK's own (`scanXMcpHeaderDeclarations`, which its
- * `listTools` applies but the core's `list` does not, since it lists through `client.request`): a declaration is a
+ * register one, and lists why as the tool's problem. The rules are the SDK's own (`scanXMcpHeaderDeclarations`, which
+ * its `listTools` applies but the core's `list` does not, since it lists through `client.request`): a declaration is a
  * non-empty RFC 9110 token, case-insensitively unique, on a `string`, `integer` or `boolean` property reached from the
  * root through `properties` alone; one anywhere else (under `items`, `oneOf`, `$defs`…) makes the tool invalid.
  */
@@ -240,8 +239,7 @@ const valueAt = (root: Schema.Json, path: ReadonlyArray<string>): Schema.Json | 
  * The `Mcp-Param-<Name>` headers a Modern `tools/call` carries (SEP-2243): for each property of the tool's
  * `inputSchema` that declares `x-mcp-header`, its value in `args`, as it is or base64-wrapped when it is not plain
  * ASCII. A property that is absent, `null` or not a string, boolean or safe integer has no header. The core sends a
- * task-capable call on a transport of its own, which has to build them as the SDK's client does for any other
- * (`docs/architecture/mcp-server-requests.md` → MCP tasks, The wire).
+ * task-capable call on a transport of its own, which has to build them as the SDK's client does for any other.
  */
 export const xMcpHeaders = (
   inputSchema: Schema.Json,

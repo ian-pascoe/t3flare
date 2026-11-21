@@ -1,11 +1,11 @@
 /**
- * The small HTTP helpers the OAuth additions share (`docs/architecture/mcp-sign-in.md` → Code): the fetch type, a body
+ * The small HTTP helpers the OAuth additions share: the fetch type, a body
  * read to a limit, and HTTP Basic client authentication. Re-exported by `./oauth`; no SDK import.
  */
 // @effect-diagnostics missingPipeableSignature:off asyncFunction:off preferEffectArray:off
 const encoder = new TextEncoder();
 
-/** Each OAuth fetch gets this long (`docs/architecture/mcp-sign-in.md` → Code). */
+/** Each OAuth fetch gets this long. */
 export const OAUTH_FETCH_TIMEOUT_MS = 15_000;
 
 /** The authorization server metadata and discovery a sign-in records, each at most this many bytes. */
@@ -32,8 +32,8 @@ export type OAuthFetch = (input: string | URL, init?: RequestInit) => Promise<Re
 
 /**
  * `response`'s body as text, read until `limit` bytes and no further; undefined when it is longer (the rest is not
- * read). The 64 KiB bound on a token response (→ Bounds) is the limit its readers pass, in the slices that take token
- * responses in (#450 completing a sign-in, #454 refreshing).
+ * read). The 64 KiB bound on a token response is the limit its readers pass, in the slices that take token
+ * responses in.
  */
 export const boundedText = async (
   response: Response,

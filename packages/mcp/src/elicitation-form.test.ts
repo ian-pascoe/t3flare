@@ -1,7 +1,6 @@
 /**
- * The form normalizer, its credential rule and the validator (`docs/architecture/mcp-server-requests.md` → Elicitation
- * requests → The form; ADR-0041): golden lists for what passes and what is declined unseen, the spec's subset and
- * bounds, and the owner's values checked against the form.
+ * The form normalizer, its credential rule and the validator: golden lists for what passes and what is declined unseen,
+ * the spec's subset and bounds, and the owner's values checked against the form.
  */
 // @effect-diagnostics preferEffectArray:off preferEffectRecord:off
 import type { ElicitationForm } from "./elicitation-form.ts";

@@ -1,7 +1,6 @@
 /**
- * The core's seam (`docs/architecture/mcp.md` → Packages and objects): `connect(target, deps)` and the connection's
- * `list` and `callTool`, against the fake servers of both eras behind the injected `fetch`
- * (`docs/architecture/mcp.md` → Testing and tracing).
+ * The core's seam: `connect(target, deps)` and the connection's
+ * `list` and `callTool`, against the fake servers of both eras behind the injected `fetch`.
  */
 // @effect-diagnostics asyncFunction:off preferEffectArray:off
 import * as Duration from "effect/Duration";

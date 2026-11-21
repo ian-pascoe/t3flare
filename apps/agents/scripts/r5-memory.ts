@@ -1,8 +1,8 @@
 // @effect-diagnostics nodeBuiltinImport:off globalConsole:off globalTimers:off
-// R5 (step 2a plan, section 8; moved to M3): the heap the Workspace DO's isomorphic-git work takes on a 2,000-file repo,
-// measured in Node (V8, as workerd) with forced GCs around each step: a checkpoint capture (status of every file, a
-// blob per changed file, the trees, a commit), the checkpoint diff, and a stale status patch. workerd has no heap API,
-// so the deployed run (`m3-memory.json`) reports timings and the absence of memory errors; this reports the heap.
+// R5 (step 2a plan, section 8; moved to M3): the heap the Workspace DO's isomorphic-git work takes on a 2,000-file
+// repo, measured in Node (V8, as workerd) with forced GCs around each step: a checkpoint capture (status of every file,
+// a blob per changed file, the trees, a commit), the checkpoint diff, and a stale status patch. workerd has no heap
+// API, so the deployed run (`m3-memory.json`) reports timings and the absence of memory errors; this reports the heap.
 //
 //   node --expose-gc --experimental-strip-types apps/agents/scripts/r5-memory.ts
 import { execFileSync } from "node:child_process";

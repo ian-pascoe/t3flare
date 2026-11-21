@@ -1,6 +1,6 @@
-// An MCP server's form as the owner sees it (`docs/architecture/mcp-server-requests.md` → Elicitation requests, The
-// form): the `ElicitationForm` made of the server's `requestedSchema`, so no reader takes raw JSON Schema. The
-// normalizer that makes one and the validator that checks an answer against it are in `elicitation.ts`.
+// An MCP server's form as the owner sees it: the `ElicitationForm` made of the server's `requestedSchema`, so no reader
+// takes raw JSON Schema. The normalizer that makes one and the validator that checks an answer against it are in
+// `elicitation.ts`.
 import * as Schema from "effect/Schema";
 
 /** The kinds of field a form has: a string by its format, a number or an integer, a boolean, one choice or several. */

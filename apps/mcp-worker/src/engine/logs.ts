@@ -1,5 +1,5 @@
 /**
- * The server logs of one engine call (`docs/architecture/mcp-connections.md` → Telemetry; #382 D12.2): each
+ * The server logs of one engine call: each
  * `notifications/message` the core hears is kept as an entry, the last 50, and goes back to the host in the call's
  * result, since a discovery passes no hooks and a function stub would not outlive its invocation anyway. Entries are
  * scrubbed of the call's access tokens and of the secrets of its target (`secretsOf`; a server may echo what it
@@ -64,8 +64,7 @@ const pairValues = (value: string): Array<string> =>
 
 /**
  * The headers that carry credentials by name, besides `authorization`, `proxy-authorization` and `cookie`. A looser
- * match than the names an entry may not hold as a literal (`docs/architecture/mcp-configuration.md` → Approval: `TOKEN`,
- * `SECRET`, `PASSWORD`, `PASSWD`, `API_KEY`, `APIKEY`, `ACCESS_KEY`, `PRIVATE_KEY`), which every `key` here covers: a
+ * match than the names an entry may not hold as a literal, which every `key` here covers: a
  * header that is wrongly taken for one only has its value scrubbed from the text it is echoed in.
  */
 const CREDENTIAL_HEADER = /key|token|secret|auth|session|passw(?:or)?d|credential|signature/i;

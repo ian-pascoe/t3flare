@@ -1,7 +1,6 @@
 /**
  * `connect(target, deps) → McpConnection`: one connection to one MCP server, in either Protocol era, over the SDK
- * client (`docs/architecture/mcp.md` → Protocol eras, Packages and objects (the core's seam); The MCP core #394
- * D1–D7, D23).
+ * client.
  *
  * Everything outside the core is injected: `fetch`, `auth`, the era and Legacy session stores, `capabilities(ctx)`,
  * `extensions` and `clientInfo`; the clock is Effect's. The connection opens from the stored rows when it can (a
@@ -136,8 +135,7 @@ export interface McpTarget {
   readonly timeoutMs?: number;
   /**
    * How long a probe or an `initialize` may take (default `MCP_CONNECT_TIMEOUT_MS`, 15 s). Through the Container bridge
-   * it is 60 s, since the first request may start the Container and spawn the server
-   * (`docs/architecture/mcp-connections.md` → Requests and Legacy sessions, Timeouts).
+   * it is 60 s, since the first request may start the Container and spawn the server.
    */
   readonly connectTimeoutMs?: number;
 }
@@ -149,7 +147,7 @@ export interface RowStore {
   readonly drop: Effect.Effect<void>;
 }
 
-/** Everything outside the core, injected and never created (The MCP core #394 D7). */
+/** Everything outside the core, injected and never created. */
 export interface McpDeps {
   /** Guarded and queued, or the Container port. */
   readonly fetch: FetchLike;
@@ -176,17 +174,17 @@ export interface McpDeps {
    */
   readonly onProgress?: (progress: McpProgress) => void;
   /**
-   * The Roots the client offers (`docs/architecture/mcp-in-a-session.md` → Roots), given only on a bridge connection. With
+   * The Roots the client offers, given only on a bridge connection. With
    * it the client declares `roots` and answers `roots/list` from it, on the call's stream in a Legacy exchange and in the
    * `input_required` round it arrives in on Modern; without it a server is declared no `roots`, so a remote server is
    * never asked for any.
    */
   readonly roots?: ReadonlyArray<McpRoot>;
   /**
-   * A Legacy server's question during a call whose `ctx.answers` offers its kind (`docs/architecture/
-   * mcp-server-requests.md` → Questions): answered with what the server gets, the call's timeout paused while it pends
-   * and its wait bounded by `ctx.answers.inputWaitMs` (10 minutes for an elicitation, 12 for a Sampling request). When
-   * the wait runs out an elicitation reads as `cancel` and a Sampling request as a refusal.
+   * A Legacy server's question during a call whose `ctx.answers` offers its kind: answered with what the server gets,
+   * the call's timeout paused while it pends and its wait bounded by `ctx.answers.inputWaitMs` (10 minutes for an
+   * elicitation, 12 for a Sampling request). When the wait runs out an elicitation reads as `cancel` and a Sampling
+   * request as a refusal.
    *
    * A question that no call can take is not asked: one on another stream, with no `onInput`, or of a kind the call did
    * not offer is cancelled (an elicitation) or refused (a Sampling request). A Legacy connection declares `elicitation`
@@ -212,8 +210,7 @@ export interface McpLog {
 }
 
 /**
- * What a connection did on the wire, for the engine's span: counts and one status, never a URL, header or value
- * (`docs/architecture/mcp-connections.md` → Telemetry).
+ * What a connection did on the wire, for the engine's span: counts and one status, never a URL, header or value.
  */
 export interface McpConnectionStats {
   /** HTTP responses received, retries included. */
@@ -273,7 +270,7 @@ export interface TaskStarted {
 }
 
 /**
- * A Modern `tools/call` whose server asked questions the caller deferred (`input_required`; ADR-0037): only a call
+ * A Modern `tools/call` whose server asked questions the caller deferred (`input_required`): only a call
  * whose `ctx.answers.defer` is set is ever answered so. `requests` are the deferred questions, as `onInput` was handed
  * them; `resume` is the `ResumeState` that `resume` sends the call again from, with their answers. The core keeps
  * nothing.
@@ -286,10 +283,9 @@ export interface InputRequired {
 }
 
 /**
- * A Legacy `tools/call` whose server answered `-32042` (URL elicitation required; `docs/architecture/
- * mcp-server-requests.md` → Elicitation requests): only a call whose `ctx.answers.pages` is set is ever answered so.
- * `requests` are the pages, as `onInput` was handed them; `resend` is the `ResendState` that `resend` sends the call
- * again from, with their answers. The core keeps nothing.
+ * A Legacy `tools/call` whose server answered `-32042` (URL elicitation required): only a call whose
+ * `ctx.answers.pages` is set is ever answered so. `requests` are the pages, as `onInput` was handed them; `resend` is
+ * the `ResendState` that `resend` sends the call again from, with their answers. The core keeps nothing.
  */
 export interface PagesRequired {
   readonly kind: "pages_required";
@@ -373,7 +369,7 @@ export type ListenEnd = "local" | "graceful" | "remote";
 
 /**
  * An open listen (`McpConnection.listen`): what the server honors, how it ends, and a way to end it. The core never opens
- * it again: every end the caller did not ask for is a gap that the caller checks (ADR-0032).
+ * it again: every end the caller did not ask for is a gap that the caller checks.
  */
 export interface Listening {
   /** The part of the filter the server agreed to: for a Legacy server, the URIs it accepted a subscription for. */
@@ -384,7 +380,7 @@ export interface Listening {
   readonly close: Effect.Effect<void>;
 }
 
-/** One connection to one MCP server (The MCP core #394 D7). */
+/** One connection to one MCP server. */
 export interface McpConnection {
   readonly era: ProtocolEra;
   readonly protocolVersion: string;
@@ -452,7 +448,7 @@ export interface McpConnection {
   ) => Effect.Effect<ReadComplete | PagesRequired, McpError>;
   /**
    * One `prompts/get` of prompt `name` with `args`: a read of a server's own template, so it is sent once more after a
-   * cut. The owner's request, never the agent's (`docs/architecture/mcp-in-a-session.md` → Getting a prompt at send).
+   * cut. The owner's request, never the agent's.
    */
   readonly getPrompt: (
     name: string,
@@ -461,7 +457,7 @@ export interface McpConnection {
   ) => Effect.Effect<Complete<GetPromptResult>, McpError>;
   /**
    * One `completion/complete`: suggestions for `argument` of the prompt or resource template `ref` names, given the other
-   * arguments in `context` (`docs/architecture/mcp-in-a-session.md` → Arguments and completions). A server that does not
+   * arguments in `context`. A server that does not
    * declare `completions` is not asked: it fails `Unsupported`. Never sent again after a cut ("Completions are never
    * retried"), and bounded at `MCP_COMPLETION_TIMEOUT_MS` or the entry's lower `timeout`; a caller that interrupts it has
    * the SDK send `notifications/cancelled`. It declares nothing the server could ask a question with.
@@ -473,8 +469,8 @@ export interface McpConnection {
     ctx: McpCallContext,
   ) => Effect.Effect<Complete<CompleteResult>, McpError>;
   /**
-   * Opens a listen for `filter`, telling `onEvent` of each resource update and list change, until `closed`
-   * (`docs/architecture/mcp-in-a-session.md` → Resource watches). A Modern server is sent `subscriptions/listen`, and
+   * Opens a listen for `filter`, telling `onEvent` of each resource update and list change, until `closed`.
+   * A Modern server is sent `subscriptions/listen`, and
    * acknowledges within 10 s or the listen fails `TimedOut`. A Legacy server is sent `resources/subscribe` for each URI
    * (one it refuses is left out of `honored`) with its GET stream open, which carries the list changes; a Legacy server
    * with no session, or that answers the GET stream 405, cannot send updates and fails `Unsupported`. A listen holds
@@ -525,7 +521,7 @@ type CallSent =
   | { readonly kind: "client"; readonly value: CallToolResult | Result }
   | { readonly kind: "url"; readonly answer: UrlRequired };
 
-/** A `tools/call` sent again with the answers to a round of questions (Modern; ADR-0037). */
+/** A `tools/call` sent again with the answers to a round of questions (Modern). */
 interface Retry {
   readonly inputResponses: McpTaskInputResponses;
   readonly requestState?: string;
@@ -853,7 +849,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
     };
 
     if (tokenBearing(target, deps)) {
-      // A token is never sent on to where a redirect points (The MCP core #394, smaller decisions).
+      // A token is never sent on to where a redirect points.
       requestInit.redirect = "manual";
     }
 
@@ -1100,7 +1096,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
         return none;
       }
 
-      // A Legacy question lives only as long as its call: one kept for later is cancelled, or refused (ADR-0037); an
+      // A Legacy question lives only as long as its call: one kept for later is cancelled, or refused; an
       // answer of the other kind is one the Session should never give: a form is cancelled, a sample refused.
       const answer = answerOf(outcome);
 
@@ -1600,7 +1596,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
     });
 
   /**
-   * A Modern round's Sampling request, by `key` (`docs/architecture/mcp-server-requests.md` → Sampling requests): the
+   * A Modern round's Sampling request, by `key`: the
    * call's `onInput` runs it (`sampled`) or keeps it for later (`defer`, only for a call that keeps questions). Anything
    * else ends the call locally, since an `InputResponse` has no error form and a Sampling request has no `cancel`: a
    * refusal, a request the call never offered to answer, and a deferral it cannot keep. The server is told nothing.
@@ -1891,7 +1887,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
       const state = decoded.value;
       const missing = Arr.filter(state.deferred, (key) => answers[key] === undefined);
 
-      // A partial round is never sent (`docs/architecture/mcp-server-requests.md` → Several at once on Modern). The
+      // A partial round is never sent. The
       // caller's fault, not the server's: nothing was sent, so nothing ran.
       if (missing.length > 0) {
         return yield* Unsupported.make({
@@ -2013,7 +2009,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
     const call: CallToolRequestParams = {
       name: params.tool.name,
       arguments: { ...params.arguments },
-      // A round's answers and the server's state go back as top-level params (Modern only; ADR-0037).
+      // A round's answers and the server's state go back as top-level params (Modern only).
       ...retry,
     };
 
@@ -2255,7 +2251,7 @@ export const connect = Effect.fn("mcp.connect")(function* (target: McpTarget, de
     cancel: (taskId, ctx) => taskCommand("tasks/cancel", { taskId }, ctx),
   };
 
-  /** A read's own bound: the page timeout, or the entry's `timeout` when that is lower (#394 D15). */
+  /** A read's own bound: the page timeout, or the entry's `timeout` when that is lower. */
   const readTimeoutMs = () => Math.min(target.timeoutMs ?? PAGE_TIMEOUT_MS, PAGE_TIMEOUT_MS);
 
   /**
@@ -2813,7 +2809,7 @@ const progressOf =
     onProgress(notice);
   };
 
-/** Whether a token is in play, so redirects are never followed (The MCP core #394, smaller decisions). */
+/** Whether a token is in play, so redirects are never followed. */
 const tokenBearing = (target: McpTarget, deps: McpDeps) =>
   deps.auth !== undefined ||
   Arr.some(Record.keys(target.headers ?? {}), (name) => name.toLowerCase() === "authorization");
@@ -2977,7 +2973,7 @@ const authState = (
         ),
       onUnauthorized: () => {
         if (sent === undefined) {
-          // No token was sent, so asking again changes nothing: the server wants a sign-in (#390).
+          // No token was sent, so asking again changes nothing: the server wants a sign-in.
           return Promise.reject(
             signInRequired("The server requires signing in", false, challenge()),
           );

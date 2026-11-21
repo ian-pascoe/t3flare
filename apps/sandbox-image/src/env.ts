@@ -1,8 +1,8 @@
 // What the Workspace DO gives each Container command; no Node imports, so the agents Worker can import it.
 /**
  * The directory of the image's own files that commands read. Its earlier path, which the image keeps a copy at for one
- * release (`image/Dockerfile`): a Container started on the previous image has no `/usr/local/share/t3flare`. Moves to
- * `/usr/local/share/t3flare` once every Container runs the new image.
+ * release (`image/Dockerfile`): on a Container started on the previous image, `/usr/local/share/t3flare` lacks
+ * `mise.toml` and `command.bash`. Moves to `/usr/local/share/t3flare` once every Container runs the new image.
  */
 export const IMAGE_SHARE = "/usr/local/share/cloudpid";
 

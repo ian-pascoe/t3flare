@@ -1,4 +1,4 @@
-// `McpWorker`'s compatibility (`docs/development/workers.md` → Effect Workers and plain Workers), in a module that imports
+// `McpWorker`'s compatibility, in a module that imports
 // nothing, so that its deploy (`resource.ts`) and its workerd tests (`vitest.config.ts`) run with the same.
 
 /**

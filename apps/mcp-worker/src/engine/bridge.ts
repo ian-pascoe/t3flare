@@ -1,7 +1,7 @@
 /**
- * A stdio server reached through the Container bridge (`docs/architecture/mcp-connections.md` → The stdio bridge,
- * Failures and cuts; #382 D5): the `fetch` the core is given for a stdio target, which hands each request to the
- * Workspaces Worker's `WorkspaceMcpBridge` (`MCP_BRIDGE`), and what the engine does with what comes back.
+ * A stdio server reached through the Container bridge: the `fetch` the core is given for a stdio target, which hands
+ * each request to the Workspaces Worker's `WorkspaceMcpBridge` (`MCP_BRIDGE`), and what the engine does with what comes
+ * back.
  *
  * - **Every response must be the bridge's:** it carries `x-t3flare-bridge: <level>`. One below `MCP_BRIDGE_MIN_LEVEL`
  *   (or with none) fails the call as `Unsupported`, "this Container runs an older bridge; restart it", which the host reads as the
@@ -16,8 +16,7 @@
  * - **The spawn id** of the last response about the child (`x-t3flare-spawn`) goes back to the host, which learns of a
  *   restart from it.
  * - **Uses:** a POST is a use of the Container and may start it when the target says `start`; a GET (the Legacy stream) never does either.
- *   A listen's connection is `quiet`: none of its requests is a use or starts a Container, a POST included
- *   (`docs/architecture/mcp-in-a-session.md` → Resource watches, Stdio).
+ *   A listen's connection is `quiet`: none of its requests is a use or starts a Container, a POST included.
  */
 // @effect-diagnostics asyncFunction:off newPromise:off missingPipeableSignature:off globalTimers:off -- the bridge is reached with Promises, over Requests and Responses, and a status read is bounded by a timer.
 import type { McpDeps } from "@t3flare/mcp";
@@ -49,8 +48,7 @@ import type { McpBridgeBinding } from "./binding.ts";
 
 /**
  * The lowest bridge level the engine talks to. It rises, at least 7 days after the image that carries the new level
- * reached prod, when a change of the bridge's wire contract has to be told from an older bridge
- * (`docs/architecture/mcp.md` → Deploys).
+ * reached prod, when a change of the bridge's wire contract has to be told from an older bridge.
  */
 export const MCP_BRIDGE_MIN_LEVEL = 1;
 

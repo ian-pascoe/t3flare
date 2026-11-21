@@ -2,12 +2,9 @@
  * `@t3flare/mcp/oauth`: pi-mcp's `oauth` functions and t3flare's local additions, for the sign-in code in the
  * Registry and the main Worker. It never imports the SDK; its test (`sdk-isolation.test.ts`) fails if it comes to.
  *
- * `docs/architecture/mcp-sign-in.md` → Tokens reach the host object (Code), Client registration, Sign-out;
- * `docs/architecture/mcp.md` → Packages and objects.
- *
  * What comes from pi-mcp is named one by one: its `oauth` entry also holds `McpOAuthProvider`, `OAuthCallbackServer`
  * (`node:http`) and `authorizeMcp`, which t3flare never uses (`authorizeMcp` drops the client and the tokens on
- * `invalid_client`). The additions pi-mcp lacks live here, and go to pi as an issue first (The MCP core #394 D6): RFC 7009
+ * `invalid_client`). The additions pi-mcp lacks live here, and go to pi as an issue first: RFC 7009
  * revocation, `client_secret_expires_at` and the issuer pin, and the size bounds the Registry holds sign-ins to.
  * The `client_credentials` grant is in `./oauth-client-credentials.ts` and the `private_key_jwt` assertion in `./client-assertion.ts`, re-exported here.
  */
@@ -69,7 +66,7 @@ export type {
   TokenRequestOptions,
 } from "@earendil-works/pi-mcp/oauth";
 
-/** An access or refresh token is held to this many bytes (→ Bounds). */
+/** An access or refresh token is held to this many bytes. */
 export const MAX_TOKEN_BYTES = 16 * 1024;
 
 const encoder = new TextEncoder();
@@ -79,7 +76,7 @@ export const byteLength = (text: string): number => encoder.encode(text).byteLen
 
 // The issuer pin ------------------------------------------------------------------------------------------------------
 
-/** An issuer as it is compared: one trailing `/` trimmed (`oauth.issuer`, → The `oauth` fields). */
+/** An issuer as it is compared: one trailing `/` trimmed (`oauth.issuer`). */
 export const normalizeIssuer = (issuer: string): string =>
   issuer.endsWith("/") ? issuer.slice(0, -1) : issuer;
 
@@ -277,7 +274,7 @@ const revoke = async (
 };
 
 /**
- * Sign-out's RFC 7009 revocation (→ Sign-out): the refresh token, then the access token, `REVOCATION_TIMEOUT_MS` each,
+ * Sign-out's RFC 7009 revocation: the refresh token, then the access token, `REVOCATION_TIMEOUT_MS` each,
  * through `fetch`. Best effort: each result says whether it went through, and none is thrown. `undefined` when the
  * server advertises no revocation endpoint. No token reaches a result or an error.
  */

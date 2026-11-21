@@ -1,6 +1,6 @@
 // @effect-diagnostics globalTimers:off globalConsole:off
-// The Workspace DO syncs files for its terminals (step 2b, ADR-0021): computer syncs only around
-// its own commands, and a shell's writes would otherwise never reach the DO (t3's status, diffs, checkpoints).
+// The Workspace DO syncs files for its terminals (step 2b, ADR-0021): computer syncs only around its own commands, and
+// a shell's writes would otherwise never reach the DO (t3's status, diffs, checkpoints).
 //
 // - Pull (Container → DO): soon after a prompt returns or a shell exits; 1 s after output goes quiet, backing off while
 //   such pulls find nothing (a chatty process would otherwise pull every 2 s forever, review F9); at most one every 2 s.
