@@ -19,17 +19,23 @@ could change either. The Owner decided:
    Session.
 2. **A change applies to what is already waiting.** Every purge date is computed when it is read, from when the thing
    became unreferenced or was removed plus the Grace as it is now; a Tombstone no longer carries a date of its own, only
-   whether it has one. The Sweep reads the Grace from the stored settings at each run, so a change needs no reset.
+   whether it has one. A mark no Sweep cleared while a thread held the Workspace is stale, so a Workspace's Grace runs
+   from the later of its unreferenced mark and the latest t3 deletion (of a project or a thread) that released it, and
+   a dated Tombstone's from the later of its removal and that release. The Sweep reads the Grace from the stored
+   settings at each run, so a change needs no reset.
 3. **`T3FLARE_SWEEP_PURGE` is retired**; the setting rules every Stage, `prod` included. `T3FLARE_SWEEP_GRACE_MS` stays,
    as a Stage's override of the days for tests.
 4. **Turning purging on starts a full Grace for everything.** Nothing is purged sooner than one Grace after purging was
-   last turned on, and a Stage's first Sweep under this ADR counts as turning it on. A Deployment whose `prod` only
+   last turned on, and a Stage's first Sweep under this ADR counts as turning it on. Two kinds of row are exempt, since
+   neither waits out a Grace: a row left in `deleting` (a Purge already under way) and a `provisioning` or `failed` row
+   more than an hour old, which nothing references. A Deployment whose `prod` only
    reported until now therefore gets a Grace of warning, on the Settings page, before anything goes. With purging off
    the Sweep still marks and clears what nothing references, and finishes a Purge already under way; it starts none.
    Turning purging off forgets when it was turned on at once, so off and on again starts a new Grace.
 5. **A deletion wakes the Sweep; nothing else purges on a schedule.** A Layer over t3's events asks the Environment DO
    to run the Sweep when a project or a thread is deleted, so what the deletion left unreferenced is marked then, not up
-   to a day later. The Sweep's next run is the earlier of a day ahead and the earliest purge date, on the one alarm. A
+   to a day later. The Sweep's next run is the earlier of a day ahead and the earliest purge date, on the one alarm, or
+   five minutes ahead when the Sweep leaves a row in `deleting`; never sooner than a minute ahead. A
    purge on its date is therefore the Sweep's, behind its reference read, which fails closed. The Environment DO runs
    a woken Sweep after 5 s of quiet, since one project deletion emits an event per thread, and a wake during a Sweep
    runs one more after it. A change to the Grace wakes the Sweep too, since it moves every date.

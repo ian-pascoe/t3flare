@@ -178,7 +178,7 @@ The Environment's pass over the Workspace registry, daily and after a project or
 _Avoid_: garbage collection, cleanup job
 
 **Purge**:
-The removal for good of a Workspace: its files, its Container and its deleted threads' Sessions. The Sweep purges past the Grace; the Owner purges at once, on the Settings page or by answering an agent's asking. Nothing purges a Workspace something references.
+The destruction for good of a Workspace: its files, its Container and its deleted threads' Sessions. The Sweep purges past the Grace; the Owner purges at once, on the Settings page or by answering an agent's asking. Nothing but the admin route purges a Workspace something references.
 _Avoid_: delete (t3's, of a project or thread, which removes no files), remove (t3's worktree removal, which may leave a Tombstone), wipe
 
 **Grace**:

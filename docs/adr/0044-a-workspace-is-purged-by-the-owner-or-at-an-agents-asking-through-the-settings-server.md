@@ -20,12 +20,14 @@ behind the admin token. The Owner wanted them on the Settings page, and wanted a
    t3 project.
 3. **Purging a project's Workspace purges its Worktree Workspaces too**, Tombstones included, and is refused whole if
    any of them is referenced. When nothing references a project's Workspace no live thread references its worktrees
-   either, so they would only wait out the same Grace.
+   either, so they would only wait out the same Grace. A Worktree Workspace can be purged alone, without its project's.
 4. **The page's actions are the Owner's own acts, not Settings changes**: behind the page's write guard, the Purge
    besides behind the Workspace's name typed, each written to the audit log under a `workspaces` entity. They are never
-   Open changes. The Sweep's own purges are written there too, one entry per Workspace, each naming the Sessions it
-   destroyed. The typed name is the Workspace's own (a project's folder name, a worktree's last path segment), not the
-   t3 project's title, which a deleted project may share with a live one.
+   Open changes. The Sweep's own purges are written there too, one entry per Workspace, each with the count of Sessions
+   it destroyed, and so are the admin routes' purges, restores and stops, with the caller `admin`. The typed name is the
+   Workspace's own (a project's folder name, a worktree's last path segment), not the t3 project's title, which a
+   deleted project may share with a live one. It is the page's guard only: a Purge asked through the Settings server
+   asks no typed name, since the Owner answers it as an Open change (5).
 5. **The Settings server gets `list_workspaces` and `purge_workspace`.** A Purge asked through it is always asked,
    whatever the thread's mode, and waits as an **Open change**: the Owner-only card or the Change page for t3flare's own
    agents, the client's Elicitation mode for an Owner client. It names no revision; what it is bound to is checked when

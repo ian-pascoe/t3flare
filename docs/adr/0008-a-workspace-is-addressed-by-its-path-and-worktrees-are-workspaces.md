@@ -38,7 +38,7 @@ A cloud Project is one repo. Its files live in a Workspace: a Workspace DO holdi
   reports only, until `T3FLARE_SWEEP_PURGE=1`. t3 re-creating a worktree at a tombstone's path restores it.
 - **What does not carry over.** The project's copy of a worktree's branch does not advance while the worktree lives.
 
-## Refinement (2026-11-21, not built)
+## Refinement (2026-11-21)
 
 The 7-day grace becomes the **Grace**, an Environment setting; `T3FLARE_SWEEP_PURGE` is retired; a deleted project or
 thread wakes the sweep, which also runs on the earliest purge date
