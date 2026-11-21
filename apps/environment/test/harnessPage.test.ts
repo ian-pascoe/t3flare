@@ -1,7 +1,7 @@
 // The Settings page's structure (SPI-1086): a snapshot of its markup from the fixture state, and checks over the
 // parsed tags (balanced, ids unique, every section in the navigation, every control named), every state it draws, the
 // CSP's limits (no inline style or handler, one script), and escaping of hostile strings in every server-supplied field.
-import { BUILTIN_TOOLS, EMPTY_HARNESS, resolveHarness } from "@t3flare/harness-registry";
+import { applyToolsChange, BUILTIN_TOOLS, EMPTY_HARNESS, resolveHarness } from "@t3flare/harness-registry";
 import { describe, expect, it } from "vitest";
 
 import { escapeHtml, type McpRow, renderPage, type SkillsView } from "../src/harness/page.ts";
@@ -182,6 +182,17 @@ describe("harness page", () => {
     expect(tools).toContain('<select class="sel-sm" data-tool-exposure="codemode" aria-label="codemode exposure"><option value="direct" selected title="in every request">direct</option><option value="hidden" title="not offered">hidden</option></select>');
     expect(tools).toContain('<option value="hidden" selected title="not offered">hidden</option>');
     expect(tools).toContain('<span class="pill" title="Every tool hidden">Off</span>');
+  });
+
+  it("says an extension's settings do nothing while every one of its tools is hidden", () => {
+    const hidden = applyToolsChange(EMPTY_HARNESS, { tools: Object.fromEntries(["terminal_start", "terminal_send", "terminal_stop", "terminal_list", "terminal_wait"].map((tool) => [tool, "hidden"])) });
+    if (!hidden.ok) throw new Error(hidden.error);
+    const terminals = (resolved: ReturnType<typeof resolveHarness>) => {
+      const tools = section(renderPage(fixturePage({ resolved })), "tools");
+      return tools.slice(tools.indexOf('data-extension="termctrl"'), tools.indexOf("</form>", tools.indexOf('data-extension="termctrl"')));
+    };
+    expect(terminals(resolveHarness(hidden.harness))).toContain("Every tool is hidden, so the extension is not installed and these settings do nothing until a tool is offered.");
+    expect(terminals(resolveHarness(EMPTY_HARNESS))).not.toContain("Every tool is hidden");
   });
 
   it("draws t3's tools on the always-on t3-code card: t3's hints as defaults, waits never codemode, denied tools named", () => {

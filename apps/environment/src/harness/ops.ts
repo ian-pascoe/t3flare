@@ -26,6 +26,7 @@ import {
   resolveHarness,
   settingOf,
   type StoredHarness,
+  T3_SERVER,
   type ToolsChange,
   withoutQuery,
 } from "@t3flare/harness-registry";
@@ -122,13 +123,21 @@ export const changeTools = (deps: OpsDeps, change: ToolsChange, options: OpOptio
   const stale = moved("Harness", before.revision, options.expectedRevision);
   if (stale !== undefined) return stale;
   deps.store.save(applied.harness);
-  const named = [...(change.preset === undefined ? [] : [`preset ${change.preset}`]), ...Object.keys(change.tools ?? {}), ...Object.keys(change.t3?.tools ?? {}).map((tool) => `t3-code/${tool}`), ...(change.t3?.exposure === undefined ? [] : ["t3-code"])];
+  // A preset sets MCP servers' Exposures too, and drops an entry the set ignores as any change to the set does.
+  if (change.preset !== undefined) dropIgnored(deps, before, applied.harness);
+  const named = [
+    ...(change.preset === undefined ? [] : [`preset ${change.preset}`]),
+    ...Object.keys(change.tools ?? {}),
+    ...Object.keys(change.t3?.tools ?? {}).map((tool) => `${T3_SERVER}/${tool}`),
+    ...(change.t3?.exposure === undefined ? [] : [T3_SERVER]),
+  ];
+  const servers = (harness: StoredHarness) => (change.preset === undefined ? {} : { mcp: harness.mcp?.servers ?? {} });
   audit(deps, options.actor, {
     entity: "harness",
     action: "tools.change",
     target: named.join(", ") || "tools",
-    before: { tools: before.global.tools ?? {}, t3: before.global.t3 ?? {} },
-    after: { tools: applied.harness.global.tools ?? {}, t3: applied.harness.global.t3 ?? {} },
+    before: { tools: before.global.tools ?? {}, t3: before.global.t3 ?? {}, ...servers(before) },
+    after: { tools: applied.harness.global.tools ?? {}, t3: applied.harness.global.t3 ?? {}, ...servers(applied.harness) },
   });
   return { ok: true, revision: applied.harness.revision, resolved: resolveHarness(applied.harness) };
 };

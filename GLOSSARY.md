@@ -265,7 +265,7 @@ _Avoid_: MCP proxy, bridge
 **Exposure**:
 How a Durable agent is offered a tool: `direct` (in its tool list), `deferred` (found by a search), `codemode`
 (from scripts only) or `hidden`. Every tool has one: an MCP server's tools, t3's own, and the built-in tools, whose
-extension runs while any of its tools is not `hidden` (ADR-0042). A preset sets every tool's that is not hidden at once.
+extension runs while any of its tools is not `hidden` (ADR-0042). A preset sets every tool that is not hidden and is not a switch (`codemode`, `tool_search`) at once, MCP servers' included.
 
 **Tool class**:
 Read or write: the tool's own `readOnlyHint` (true is read; anything else, write), unless the Owner overrides it in

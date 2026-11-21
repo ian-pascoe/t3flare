@@ -15,7 +15,7 @@ import {
 } from "./mcp.ts";
 
 import { fieldProblem, type SettingEntry, type SettingValue } from "./fields.ts";
-import { legacyResolvedTools, type ResolvedTools, resolveTools, type ToolsLayer } from "./tools.ts";
+import { EXPOSURES, legacyResolvedTools, type ResolvedTools, resolveTools, type ToolsLayer } from "./tools.ts";
 
 export * from "./mcp.ts";
 export * from "./fields.ts";
@@ -324,8 +324,6 @@ export type McpChange =
   | { readonly op: "class"; readonly server: string; readonly tool: string; readonly class: ToolClass | null }
   | { readonly op: "add"; readonly server: string; readonly url: string; readonly auth: ServerAuth }
   | { readonly op: "remove"; readonly server: string };
-
-const EXPOSURES: ReadonlyArray<Exposure> = ["direct", "deferred", "codemode", "hidden"];
 
 /** `url` as a direct server may have it (plan §5.3, review M5): HTTPS, a name not an IP literal, no userinfo, no port games. */
 export const directUrlProblem = (url: string): string | undefined => {

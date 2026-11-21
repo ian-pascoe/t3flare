@@ -9,8 +9,8 @@
 import { applyEnvironmentChange, type EnvironmentChange, ENVIRONMENT_SETTINGS, resolveEnvironment, settingOf, type StoredEnvironment } from "./environment.ts";
 import type { SettingTier } from "./fields.ts";
 import { EXTENSIONS, type HarnessChange, type McpChange, mcpServersOf, resolveHarness, type StoredHarness } from "./index.ts";
-import { type Exposure, ownEntry, type ToolClass } from "./mcp.ts";
-import { applyToolsChange, movedTools, resolveTools, type ToolsChange } from "./tools.ts";
+import { type Exposure, ownEntry, SETTINGS_SERVER, type ToolClass } from "./mcp.ts";
+import { applyToolsChange, movedServerTools, movedTools, resolveTools, type ToolsChange } from "./tools.ts";
 
 export type ChangeTier = "free" | "asked";
 
@@ -41,7 +41,13 @@ export type TierInput =
       /** A tool's own class from its `readOnlyHint`, undefined when unknown (not listed, or no inventory). */
       readonly hintedClass?: (server: string, tool: string) => ToolClass | undefined;
     }
-  | { readonly entity: "tools"; readonly stored: StoredHarness; readonly change: ToolsChange }
+  | {
+      readonly entity: "tools";
+      readonly stored: StoredHarness;
+      readonly change: ToolsChange;
+      /** Whether t3 asks for its tool in every request (`anthropic/alwaysLoad`), undefined when unknown (not listed). */
+      readonly asksForDirect?: (tool: string) => boolean | undefined;
+    }
   | { readonly entity: "environment"; readonly stored: StoredEnvironment; readonly change: EnvironmentChange }
   | { readonly entity: "skills"; readonly change: SkillsTierChange };
 
@@ -163,12 +169,28 @@ const mcpTier = (stored: StoredHarness, change: McpTierChange, hintedClass: (ser
 };
 
 /** Each tool's Exposure before and after, as MCP tools' are judged: widening is asked, narrowing free. */
-const toolsTier = (stored: StoredHarness, change: ToolsChange): TierVerdict => {
+const toolsTier = (stored: StoredHarness, change: ToolsChange, asksForDirect: (tool: string) => boolean | undefined): TierVerdict => {
   const applied = applyToolsChange(stored, change);
   // Malformed: the change function refuses it; until then it is asked.
   if (!applied.ok) return { tier: "asked", reasons: [applied.error] };
-  const moves = movedTools(resolveTools(stored.global), resolveTools(applied.harness.global));
-  return verdictOf(moves.map((move) => ({ asked: rankOf(move.after) > rankOf(move.before), reason: `${move.tool}: Exposure ${move.before} to ${move.after}` })));
+  const moves = movedTools(resolveTools(stored.global), resolveTools(applied.harness.global), asksForDirect);
+  // A preset moves MCP servers' tools too; the Settings server's own entry is asked whichever way (plan D5).
+  const serverParts = movedServerTools(mcpServersOf(stored), mcpServersOf(applied.harness)).map((move) => {
+    const reason = `${move.tool}: Exposure ${move.before} to ${move.after}`;
+    if (move.server === SETTINGS_SERVER) return { asked: true, reason: `${reason} (the Settings server's own entry)` };
+    return { asked: rankOf(move.after) > rankOf(move.before), reason };
+  });
+  return verdictOf([
+    ...moves.flatMap((move) => {
+      const part = { asked: rankOf(move.after) > rankOf(move.before), reason: `${move.tool}: Exposure ${move.before} to ${move.after}` };
+      // Hiding code mode or tool search narrows it but widens the tools that fall back (codemode.ts), MCP servers' too.
+      if (move.after !== "hidden") return [part];
+      if (move.tool === "codemode") return [part, { asked: true, reason: "codemode hidden: a tool set to codemode is offered deferred or direct instead" }];
+      if (move.tool === "tool_search") return [part, { asked: true, reason: "tool_search hidden: a deferred tool is offered direct instead" }];
+      return [part];
+    }),
+    ...serverParts,
+  ]);
 };
 
 const environmentTier = (stored: StoredEnvironment, change: EnvironmentChange): TierVerdict => {
@@ -203,7 +225,7 @@ export const tierOf = (input: TierInput): TierVerdict => {
     case "extension":
       return extensionTier(input.stored, input.change);
     case "tools":
-      return toolsTier(input.stored, input.change);
+      return toolsTier(input.stored, input.change, input.asksForDirect ?? (() => undefined));
     case "mcp":
       return mcpTier(input.stored, input.change, input.hintedClass ?? (() => undefined));
     case "environment":

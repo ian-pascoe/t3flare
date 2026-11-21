@@ -5,7 +5,7 @@
 //
 // `resume` (plan D12) is not among them: it is `RESUME_TOOL`, the Owner-client endpoint's alone in `model` (M5b,
 // SPI-1201), never the in-process server's.
-import { BUILTIN_TOOLS, ENVIRONMENT_SETTINGS, type EnvironmentFieldSchema, EXTENSIONS, OFFERED_PRESETS, type ToolClass } from "@t3flare/harness-registry";
+import { BUILTIN_TOOLS, ENVIRONMENT_SETTINGS, type EnvironmentFieldSchema, EXPOSURES, EXTENSIONS, OFFERED_PRESETS, type ToolClass } from "@t3flare/harness-registry";
 
 import { CHANGE_TTL_MS, durationText } from "./changes.ts";
 
@@ -43,8 +43,6 @@ export const OWNER_MODE_INSTRUCTIONS = {
 } as const;
 
 const ASKED_NOTE = "Changes that widen what agents have or can do (the Change tier `asked`) wait for the owner's answer, on his card or the Change page, before they apply; turning things down is `free`.";
-
-const EXPOSURES = ["direct", "deferred", "codemode", "hidden"] as const;
 
 const expectedRevision = (entity: string) => ({ type: "integer", minimum: 0, description: `The ${entity} revision you read (get_settings or a write's result); a moved one is refused with the current revision.` });
 
@@ -145,7 +143,7 @@ export const SETTINGS_TOOLS: ReadonlyArray<SettingsTool> = [
   {
     name: "change_tools",
     class: "write",
-    description: `Sets tools' Exposures (the Harness settings): direct (in every request), deferred (loaded by tool_search), codemode (code mode's scripts only) or hidden; null returns a tool to its default. tools: built-in tools by name (${BUILTIN_TOOLS.map((tool) => tool.name).join(", ")}; codemode and tool_search are direct or hidden). t3: t3's own tools, exposure for those without their own and tools by t3's name (t3_thread_wait and t3_background_wait are never codemode). preset (core, codemode-only, everything) sets every tool that is not hidden first. An extension runs while any of its tools is not hidden. Applies at each thread's next turn. ${ASKED_NOTE}`,
+    description: `Sets tools' Exposures (the Harness settings): direct (in every request), deferred (loaded by tool_search), codemode (code mode's scripts only) or hidden; null returns a tool to its default. tools: built-in tools by name (${BUILTIN_TOOLS.map((tool) => tool.name).join(", ")}; codemode and tool_search are direct or hidden). t3: t3's own tools, exposure for those without their own and tools by t3's name (t3_thread_wait and t3_background_wait are never codemode). preset (core, codemode-only, everything) sets every tool that is not hidden first, MCP servers' included (core defers theirs). An extension runs while any of its tools is not hidden. Applies at each thread's next turn. ${ASKED_NOTE}`,
     inputSchema: {
       type: "object",
       required: ["expectedRevision"],

@@ -40,6 +40,7 @@ import {
   resolveEnvironment,
   resolveHarness,
   SETTINGS_SERVER,
+  t3AsksForDirect,
   type TierVerdict,
   tierOf,
   type ToolClass,
@@ -421,11 +422,12 @@ const planTools = (deps: SettingsServerDeps, args: Readonly<Record<string, unkno
   const stored = deps.ops.store.load();
   const applied = applyToolsChange(stored, change);
   if (!applied.ok) return { refused: applied.error };
+  const asksForDirect = t3AsksForDirect(deps.ops.store.lastT3Tools());
   return {
     ...TARGET.tools,
-    verdict: tierOf({ entity: "tools", stored, change }),
+    verdict: tierOf({ entity: "tools", stored, change, asksForDirect }),
     normalized: { ...change },
-    describe: async () => toolsItems(stored, change),
+    describe: async () => toolsItems(stored, change, asksForDirect),
     run: async (options) => fromOutcome(changeTools(deps.ops, change, options)),
   };
 };

@@ -3,7 +3,7 @@
 // cloudpid ADR-0027's merge (keyed settings merged key by key, lists replaced whole) for the later per-Project overrides.
 import { describe, expect, it } from "vitest";
 
-import { applyChange, applyToolsChange, BUILTIN_TOOLS, EMPTY_HARNESS, extensionOf, EXTENSIONS, resolvedToolsOf, resolveHarness, type StoredHarness, type ToolsChange, withoutQuery } from "./index.ts";
+import { applyChange, applyToolsChange, BUILTIN_TOOLS, mcpServersOf, EMPTY_HARNESS, extensionOf, EXTENSIONS, resolvedToolsOf, resolveHarness, type StoredHarness, type ToolsChange, withoutQuery } from "./index.ts";
 
 describe("resolveHarness", () => {
   it("gives the defaults for empty settings: every tool direct (the core preset), web_search hidden, t3's tools direct", () => {
@@ -158,6 +158,30 @@ describe("applyToolsChange", () => {
     expect(resolved.tools).toMatchObject({ ask_user: "hidden", codemode: "hidden", tool_search: "direct", grep: "deferred", read: "deferred", web_search: "hidden" });
     expect(resolved.t3).toEqual({ exposure: "deferred", tools: { t3_thread_wait: "hidden" } });
     expect(resolveHarness(apply({ preset: "everything" }, before)).tools).toMatchObject({ read: "direct", grep: "direct", ask_user: "hidden" });
+  });
+
+  it("gives a t3 tool the owner offered the preset's Exposure while t3's default is hidden", () => {
+    const before = apply({ t3: { exposure: "hidden", tools: { t3_y: "direct", t3_z: "hidden" } } });
+    expect(resolveHarness(apply({ preset: "codemode-only" }, before)).t3).toEqual({ exposure: "hidden", tools: { t3_y: "deferred", t3_z: "hidden" } });
+    expect(resolveHarness(apply({ preset: "everything" }, before)).t3).toEqual({ exposure: "hidden", tools: { t3_y: "direct", t3_z: "hidden" } });
+  });
+
+  it("applies a preset to MCP servers: each server not hidden takes its Exposure, each tool's own goes back to it", () => {
+    const fixture = { kind: "direct" as const, url: "https://fixture.example/mcp", enabled: true, exposure: "direct" as const, toolExposure: { a: "codemode" as const, b: "hidden" as const } };
+    const shut = { kind: "direct" as const, url: "https://shut.example/mcp", enabled: true, exposure: "hidden" as const, toolExposure: { c: "direct" as const } };
+    const before: StoredHarness = { ...EMPTY_HARNESS, mcp: { servers: { fixture, shut } } };
+    const core = apply({ preset: "core" }, before);
+    expect(mcpServersOf(core)).toMatchObject({ fixture: { exposure: "deferred", toolExposure: { b: "hidden" } }, shut: { exposure: "hidden", toolExposure: { c: "deferred" } }, settings: { exposure: "deferred" } });
+    // The implied Settings server's entry is stored only when the preset moves it.
+    expect(core.mcp?.servers.settings).toBeUndefined();
+    const everything = apply({ preset: "everything" }, before);
+    expect(mcpServersOf(everything)).toMatchObject({ fixture: { exposure: "direct" }, shut: { exposure: "hidden", toolExposure: { c: "direct" } }, settings: { kind: "settings", exposure: "direct" } });
+    expect(apply({ preset: "core" }, EMPTY_HARNESS).mcp).toBeUndefined();
+  });
+
+  it("refuses more t3 tools set one by one than t3 lists", () => {
+    const many = Object.fromEntries(Array.from({ length: 201 }, (_, index) => [`t3_${index}`, "hidden" as const]));
+    expect(applyToolsChange(EMPTY_HARNESS, { t3: { tools: many } })).toEqual({ ok: false, error: "t3 tools: at most 200 set one by one" });
   });
 
   it("refuses an unknown tool or preset, an Exposure a tool cannot have, and a malformed t3 tool name", () => {

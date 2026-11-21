@@ -6,7 +6,7 @@
 // Settings stored before Exposures existed (extension switches, the offered-tools preset, web's `search`) still resolve:
 // a tool with no Exposure of its own takes the one they gave it (`legacyOf`).
 import type { HarnessLayer, StoredHarness } from "./index.ts";
-import { type Exposure, ownEntry } from "./mcp.ts";
+import { defaultSettingsServer, type Exposure, type McpServerSetting, ownEntry, SETTINGS_SERVER } from "./mcp.ts";
 
 /** The offered-tools presets (plan §2.2, OD-T4): the tools a preset offers direct; the others it defers. */
 export const OFFERED_PRESETS = {
@@ -63,6 +63,9 @@ export const t3Exposures = (tool: string): ReadonlyArray<Exposure> => (T3_DIRECT
 
 /** A t3 tool name as t3 lists it. */
 const T3_TOOL_NAME = /^[A-Za-z0-9_.-]{1,64}$/;
+
+/** The most tools t3 lists, and the most of its tools the owner may set one by one. */
+const MAX_T3_TOOLS = 200;
 
 /** The tools' part of a settings layer. */
 export interface ToolsLayer {
@@ -183,15 +186,52 @@ const withEntries = (before: Readonly<Record<string, Exposure>> | undefined, ent
 
 /**
  * `preset` over `layer`: every built-in tool that is not hidden and is not a switch takes the Exposure the preset gives
- * it, and so do t3's tools (their default, and each tool the owner set but did not hide). Hidden tools stay hidden.
+ * it, and so do t3's tools (their default, and each tool the owner set but did not hide). Hidden tools stay hidden. A
+ * t3 tool's own Exposure goes back to the default, or, when the default is hidden, takes the preset's.
  */
 const withPreset = (layer: HarnessLayer, preset: OfferedPreset): HarnessLayer => {
   const current = resolveTools(layer);
   const offered = OFFERED_PRESETS[preset];
   const builtins = BUILTIN_TOOLS.filter((tool) => tool.exposures !== SWITCH && current.tools[tool.name] !== "hidden").map((tool) => [tool.name, offeredExposure(offered, tool.name)] as const);
-  const t3Exposure = current.t3.exposure === "hidden" ? "hidden" : offeredExposure(offered, `mcp__${T3_SERVER}__tool`);
-  const t3Tools = Object.entries(current.t3.tools).filter(([, exposure]) => exposure !== "hidden").map(([tool]) => [tool, null] as const);
+  const t3Preset = offeredExposure(offered, `mcp__${T3_SERVER}__tool`);
+  const t3Exposure = current.t3.exposure === "hidden" ? "hidden" : t3Preset;
+  const t3Tools = Object.entries(current.t3.tools)
+    .filter(([, exposure]) => exposure !== "hidden")
+    .map(([tool]) => [tool, t3Exposure === "hidden" ? t3Preset : null] as const);
   return { ...layer, tools: withEntries(layer.tools, builtins), t3: { exposure: t3Exposure, tools: withEntries(layer.t3?.tools, t3Tools) } };
+};
+
+/** The Exposure `offered` gives an MCP server's tools: a preset names them by server, so any tool name stands for all. */
+const serverExposure = (offered: ReadonlyArray<string>, server: string): Exposure => offeredExposure(offered, `mcp__${server}__tool`);
+
+/**
+ * `preset` over one MCP server, as over t3's tools: its Exposure unless hidden, each tool's own back to it (or, when the
+ * server is hidden, the preset's); hidden tools stay hidden.
+ */
+const presetServer = (offered: ReadonlyArray<string>, name: string, server: McpServerSetting): McpServerSetting => {
+  const exposure = serverExposure(offered, name);
+  const hidden = server.exposure === "hidden";
+  const own = Object.entries(server.toolExposure ?? {}).flatMap(([tool, each]): Array<readonly [string, Exposure]> => (each === "hidden" ? [[tool, each]] : hidden ? [[tool, exposure]] : []));
+  const { toolExposure: _toolExposure, ...rest } = server;
+  return { ...rest, exposure: hidden ? "hidden" : exposure, ...(own.length === 0 ? {} : { toolExposure: Object.fromEntries(own) }) };
+};
+
+/**
+ * `preset` over the stored MCP servers (ADR-0042 §5): every Direct server and the Settings server's entry, the implied
+ * one stored only when the preset moves it. An entry the set ignores (`mcpServersOf`) is kept as it is.
+ */
+const withPresetServers = (stored: StoredHarness, preset: OfferedPreset): StoredHarness["mcp"] => {
+  const offered = OFFERED_PRESETS[preset];
+  const servers = new Map<string, McpServerSetting>(Object.entries(stored.mcp?.servers ?? {}));
+  for (const [name, server] of servers) {
+    if ((name === SETTINGS_SERVER) !== (server.kind === "settings") || (server.kind !== "direct" && server.kind !== "settings")) continue;
+    servers.set(name, presetServer(offered, name, server));
+  }
+  if (servers.get(SETTINGS_SERVER)?.kind !== "settings") {
+    const implied = presetServer(offered, SETTINGS_SERVER, defaultSettingsServer());
+    if (implied.exposure !== defaultSettingsServer().exposure) servers.set(SETTINGS_SERVER, implied);
+  }
+  return servers.size === 0 && stored.mcp === undefined ? undefined : { servers: Object.fromEntries(servers) };
 };
 
 const exposureProblem = (name: string, value: unknown, allowed: ReadonlyArray<Exposure>): string | undefined =>
@@ -220,20 +260,27 @@ export const applyToolsChange = (
     if (problem !== undefined) return { ok: false, error: problem };
   }
   const base = change.preset === undefined ? stored.global : withPreset(stored.global, change.preset);
+  const mcp = change.preset === undefined ? stored.mcp : withPresetServers(stored, change.preset);
   const t3Exposure = change.t3?.exposure ?? base.t3?.exposure;
   const global: HarnessLayer = {
     ...base,
     tools: withEntries(base.tools, named),
     t3: { ...(t3Exposure === undefined ? {} : { exposure: t3Exposure }), tools: withEntries(base.t3?.tools, t3Named) },
   };
-  return { ok: true, harness: { ...stored, revision: stored.revision + 1, global } };
+  if (Object.keys(global.t3?.tools ?? {}).length > MAX_T3_TOOLS) return { ok: false, error: `t3 tools: at most ${MAX_T3_TOOLS} set one by one` };
+  return { ok: true, harness: { ...stored, revision: stored.revision + 1, global, ...(mcp === undefined ? {} : { mcp }) } };
 };
 
-/** The order Exposure widens in (plan D5): `hidden` < `codemode` < `deferred` = `direct`. */
-export const EXPOSURE_RANK: Readonly<Record<Exposure, number>> = { hidden: 0, codemode: 1, deferred: 2, direct: 2 };
-
-/** Each tool whose Exposure moves between two resolved views: its label, before and after. */
-export const movedTools = (before: ResolvedTools, after: ResolvedTools): Array<{ readonly tool: string; readonly before: Exposure; readonly after: Exposure }> => {
+/**
+ * Each tool whose Exposure moves between two resolved views: its label, before and after. `asksForDirect` says whether
+ * t3 asks for one of its tools in every request (direct unless the owner set it); undefined when unknown (not listed),
+ * where a move is judged as widening: not asking before, asking after.
+ */
+export const movedTools = (
+  before: ResolvedTools,
+  after: ResolvedTools,
+  asksForDirect: (tool: string) => boolean | undefined = () => undefined,
+): Array<{ readonly tool: string; readonly before: Exposure; readonly after: Exposure }> => {
   const moves: Array<{ tool: string; before: Exposure; after: Exposure }> = [];
   for (const tool of BUILTIN_TOOLS) {
     const from = before.tools[tool.name]!;
@@ -242,9 +289,32 @@ export const movedTools = (before: ResolvedTools, after: ResolvedTools): Array<{
   }
   if (before.t3.exposure !== after.t3.exposure) moves.push({ tool: `${T3_SERVER} (tools without their own)`, before: before.t3.exposure, after: after.t3.exposure });
   for (const tool of [...new Set([...Object.keys(before.t3.tools), ...Object.keys(after.t3.tools)])].sort()) {
-    const from = ownEntry(before.t3.tools, tool) ?? before.t3.exposure;
-    const to = ownEntry(after.t3.tools, tool) ?? after.t3.exposure;
+    const asks = asksForDirect(tool);
+    const from = ownEntry(before.t3.tools, tool) ?? (asks === true ? "direct" : before.t3.exposure);
+    const to = ownEntry(after.t3.tools, tool) ?? (asks !== false ? "direct" : after.t3.exposure);
     if (from !== to) moves.push({ tool: `${T3_SERVER}/${tool}`, before: from, after: to });
+  }
+  return moves;
+};
+
+/**
+ * Each MCP server's tools whose Exposure moves between two server sets (`mcpServersOf`): the server's default, and each
+ * tool with its own Exposure on either side. A server on one side only is not a move of tools.
+ */
+export const movedServerTools = (
+  before: Readonly<Record<string, McpServerSetting>>,
+  after: Readonly<Record<string, McpServerSetting>>,
+): Array<{ readonly server: string; readonly tool: string; readonly before: Exposure; readonly after: Exposure }> => {
+  const moves: Array<{ server: string; tool: string; before: Exposure; after: Exposure }> = [];
+  for (const [server, from] of Object.entries(before)) {
+    const to = ownEntry(after, server);
+    if (to === undefined) continue;
+    if (from.exposure !== to.exposure) moves.push({ server, tool: `${server} (tools without their own)`, before: from.exposure, after: to.exposure });
+    for (const tool of [...new Set([...Object.keys(from.toolExposure ?? {}), ...Object.keys(to.toolExposure ?? {})])].sort()) {
+      const was = ownEntry(from.toolExposure, tool) ?? from.exposure;
+      const is = ownEntry(to.toolExposure, tool) ?? to.exposure;
+      if (was !== is) moves.push({ server, tool: `${server}/${tool}`, before: was, after: is });
+    }
   }
   return moves;
 };
@@ -266,8 +336,8 @@ export interface T3ToolListing {
   readonly left: ReadonlyArray<string>;
 }
 
-const MAX_T3_TOOLS = 200;
-const MAX_T3_DESCRIPTION = 400;
+/** The longest t3 tool description the panel keeps. */
+export const MAX_T3_DESCRIPTION = 400;
 
 /** `value` as a listing when it is a well-formed one (another Worker's report), its descriptions cut; else undefined. */
 export const t3ToolListing = (value: unknown): T3ToolListing | undefined => {
@@ -284,3 +354,9 @@ export const t3ToolListing = (value: unknown): T3ToolListing | undefined => {
   if (!left.every((name) => typeof name === "string" && T3_TOOL_NAME.test(name))) return undefined;
   return { listedAt, tools: listed, left: left as ReadonlyArray<string> };
 };
+
+/** Whether t3 asks for its tool `tool` in every request, by `listing`; undefined when it is not listed. */
+export const t3AsksForDirect =
+  (listing: T3ToolListing | undefined) =>
+  (tool: string): boolean | undefined =>
+    listing?.tools.find((each) => each.name === tool)?.asksForDirect;

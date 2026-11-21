@@ -3,7 +3,7 @@
 // object per Session), pi-durable's `tool_search`, and each tool's Exposure (harness-registry's tools.ts), set by a wrap:
 // direct, deferred (loaded by `tool_search`), code mode only, or hidden (callable by no one).
 //
-// No rule lives here: every guard is in the tools (the `permissions` wraps, t3-mcp's own check), and pi-durable runs a
+// No guard lives here: every guard is in the tools (the `permissions` wraps, t3-mcp's own check), and pi-durable runs a
 // script's nested call through the registered, wrapped tool, so a call from a script is judged exactly as a direct one.
 // @effect-diagnostics preferEffectArray:off
 import { type CodemodeRemote, type CodemodeSandboxBase, RemoteCodemodeSandbox } from "@earendil-works/pi-codemode/portable";

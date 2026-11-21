@@ -81,7 +81,7 @@ import { SKILLS_EXTENSION, skillsExtension } from "../extensions/skills.ts";
 import { TODO_EXTENSION, TodoDoc, todoExtension } from "../extensions/todo.ts";
 import { WEB_EXTENSION, WEB_NAMESPACE, webExtension } from "../extensions/web.ts";
 import { type SearchTarget, searchChoice } from "../extensions/web/search.ts";
-import { catalogOf, T3_EXTENSION, t3ListingOf, type T3Catalog, t3ExposureOf, t3McpExtension, t3ToolName } from "../extensions/t3-mcp.ts";
+import { catalogOf, T3_EXTENSION, t3ListingOf, type T3Catalog, t3McpExtension, t3RegisteredExposure, t3ToolName } from "../extensions/t3-mcp.ts";
 import { T3McpClient } from "./t3McpClient.ts";
 import { NO_KEY, sessionModels } from "./models.ts";
 import { credentialFailure } from "./credentialFailure.ts";
@@ -330,6 +330,15 @@ export class SessionDO extends DurableObject<SessionEnv> {
     });
   }
 
+  /** Whether this instance reported t3's catalog to the Environment (the panel's t3-code card). */
+  #t3Noted = false;
+
+  /** The panel's t3-code card lists t3's tools as this thread was offered them; a failure only leaves the card older. */
+  #noteT3Tools(catalog: T3Catalog): void {
+    this.#t3Noted = true;
+    this.ctx.waitUntil(environmentStub(this.env.ENVIRONMENT).noteT3Tools(t3ListingOf(catalog, Date.now())).then(() => undefined, () => undefined));
+  }
+
   /**
    * Keeps the credential t3 issued for this provider session (none: the tools are unavailable), and when it changed
    * lists t3's tools with it and installs the extension again if the catalog changed. Never fails the command.
@@ -342,13 +351,17 @@ export class SessionDO extends DurableObject<SessionEnv> {
     }
     const before = kv.get<T3McpCredential>(T3_MCP_KEY);
     kv.put(T3_MCP_KEY, credential);
-    if (before?.authorization === credential.authorization && kv.get(T3_CATALOG_KEY) !== undefined) return;
+    const kept = kv.get<T3Catalog>(T3_CATALOG_KEY);
+    if (before?.authorization === credential.authorization && kept !== undefined) {
+      // A catalog listed before this instance (or before the panel's card existed) is reported once per instance.
+      if (!this.#t3Noted) this.#noteT3Tools(kept);
+      return;
+    }
     try {
       const listed = await this.#t3.listTools();
       if (listed === undefined) return;
       const catalog = catalogOf(listed);
-      // The panel's t3-code card lists t3's tools as this thread was offered them; a failure only leaves the card older.
-      this.ctx.waitUntil(environmentStub(this.env.ENVIRONMENT).noteT3Tools(t3ListingOf(catalog, Date.now())).then(() => undefined, () => undefined));
+      this.#noteT3Tools(catalog);
       if (kv.get<T3Catalog>(T3_CATALOG_KEY)?.hash === catalog.hash) return;
       kv.put(T3_CATALOG_KEY, catalog);
       this.#registryWriter.install(this.#t3Extension(catalog));
@@ -485,10 +498,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
       .tools()
       .flatMap(({ extension, tool }) => {
         if (extension.name === "tool-search") return [];
-        if (extension.name === T3_EXTENSION) {
-          const listed = catalog?.tools.find((each) => t3ToolName(each.name) === tool.name);
-          return [{ name: tool.name, exposure: listed === undefined ? tools.t3.exposure : t3ExposureOf(tools.t3, listed) }];
-        }
+        if (extension.name === T3_EXTENSION) return [{ name: tool.name, exposure: t3RegisteredExposure(tools.t3, catalog, tool.name) }];
         const own = ownEntry(tools.tools, tool.name);
         return [own === undefined ? { name: tool.name } : { name: tool.name, exposure: own }];
       });

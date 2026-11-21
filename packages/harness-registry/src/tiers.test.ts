@@ -177,12 +177,36 @@ describe("tierOf: tools", () => {
     expect(tools(EMPTY_HARNESS, { t3: { exposure: "deferred" } }).tier).toBe("free");
   });
 
+  it("hiding code mode or tool search is asked: the tools set to them fall back to a wider Exposure", () => {
+    expect(tools(EMPTY_HARNESS, { tools: { codemode: "hidden" } })).toEqual({
+      tier: "asked",
+      reasons: ["codemode hidden: a tool set to codemode is offered deferred or direct instead"],
+    });
+    expect(tools(EMPTY_HARNESS, { tools: { tool_search: "hidden" } })).toEqual({ tier: "asked", reasons: ["tool_search hidden: a deferred tool is offered direct instead"] });
+  });
+
+  it("a t3 tool's own Exposure cleared is judged with t3's hint, and as asking for direct when it is unknown", () => {
+    const hidden = withTools({ t3: { exposure: "hidden", tools: { t3_x: "hidden" } } });
+    const hinted = (asks: boolean | undefined) => tierOf({ entity: "tools", stored: hidden, change: { t3: { tools: { t3_x: null } } }, asksForDirect: () => asks });
+    expect(hinted(true)).toEqual({ tier: "asked", reasons: ["t3-code/t3_x: Exposure hidden to direct"] });
+    expect(hinted(undefined).tier).toBe("asked");
+    expect(hinted(false).tier).toBe("unchanged");
+  });
+
   it("a preset is judged by every tool it moves; a change that moves nothing is unchanged", () => {
     expect(tools(EMPTY_HARNESS, { preset: "core" }).tier).toBe("unchanged");
     expect(tools(EMPTY_HARNESS, { tools: { read: "direct" } }).tier).toBe("unchanged");
     expect(tools(EMPTY_HARNESS, { preset: "codemode-only" }).tier).toBe("free");
-    expect(tools(withTools({ preset: "codemode-only" }), { preset: "everything" }).tier).toBe("free");
+    // Deferred to direct ranks alike; only the Settings server's own entry moving makes it asked.
+    expect(tools(withTools({ preset: "codemode-only" }), { preset: "everything" }).reasons).toEqual(["settings (tools without their own): Exposure deferred to direct (the Settings server's own entry)"]);
     expect(tools(withTools({ tools: { read: "codemode" } }), { preset: "core" }).tier).toBe("asked");
+  });
+
+  it("a preset is judged by the MCP servers' tools it moves too, the Settings server's own entry always asked", () => {
+    const fixture = { kind: "direct" as const, url: "https://fixture.example/mcp", enabled: true, exposure: "direct" as const };
+    const withServer: StoredHarness = { ...EMPTY_HARNESS, mcp: { servers: { fixture } } };
+    expect(tools(withServer, { preset: "core" })).toEqual({ tier: "free", reasons: ["fixture (tools without their own): Exposure direct to deferred"] });
+    expect(tools(withServer, { preset: "everything" })).toEqual({ tier: "asked", reasons: ["settings (tools without their own): Exposure deferred to direct (the Settings server's own entry)"] });
   });
 
   it("a malformed change is asked (fails closed)", () => {

@@ -6,6 +6,7 @@
 import {
   applyEnvironmentChange,
   applyToolsChange,
+  movedServerTools,
   movedTools,
   resolveTools,
   type ToolsChange,
@@ -72,11 +73,16 @@ export const extensionItems = (stored: StoredHarness, change: HarnessChange): { 
 };
 
 /** A tools change's items: each tool whose Exposure it moves, against the stored Harness settings. */
-export const toolsItems = (stored: StoredHarness, change: ToolsChange): { readonly items: Array<ChangeItem>; readonly lines: Array<string> } => {
+export const toolsItems = (
+  stored: StoredHarness,
+  change: ToolsChange,
+  asksForDirect?: (tool: string) => boolean | undefined,
+): { readonly items: Array<ChangeItem>; readonly lines: Array<string> } => {
   const applied = applyToolsChange(stored, change);
   if (!applied.ok) return { items: [], lines: [] };
-  const items: Array<ChangeItem> = movedTools(resolveTools(stored.global), resolveTools(applied.harness.global)).map((move) => ({ kind: "scalar", name: `${move.tool}: Exposure`, before: move.before, after: move.after }));
-  return { items, lines: change.preset === undefined ? [] : [`This applies the ${change.preset} preset to every tool that is not hidden.`] };
+  const moves = [...movedTools(resolveTools(stored.global), resolveTools(applied.harness.global), asksForDirect), ...movedServerTools(mcpServersOf(stored), mcpServersOf(applied.harness))];
+  const items: Array<ChangeItem> = moves.map((move) => ({ kind: "scalar", name: `${move.tool}: Exposure`, before: move.before, after: move.after }));
+  return { items, lines: change.preset === undefined ? [] : [`This applies the ${change.preset} preset to every tool that is not hidden, MCP servers' included.`] };
 };
 
 /** An Environment change's items, against the stored Environment settings it changes. */

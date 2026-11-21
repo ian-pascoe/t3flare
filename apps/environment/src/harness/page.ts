@@ -215,16 +215,16 @@ const toolsRow = (resolved: ResolvedHarness, tools: ResolvedTools, entry: Extens
   const save =
     settings.length === 0
       ? ""
-      : `<div class="fields">${settings.join("")}</div><div class="save"><span class="save-note" data-save-note aria-live="polite"></span><button type="submit" class="btn btn-sm" data-save disabled>Save</button></div>`;
+      : `${on ? "" : `<p class="desc">Every tool is hidden, so the extension is not installed and these settings do nothing until a tool is offered.</p>`}<div class="fields">${settings.join("")}</div><div class="save"><span class="save-note" data-save-note aria-live="polite"></span><button type="submit" class="btn btn-sm" data-save disabled>Save</button></div>`;
   return `<form class="row" data-extension="${escapeHtml(entry.id)}" aria-labelledby="${titleId}" novalidate><div><div class="row-title"><h3 id="${titleId}">${escapeHtml(entry.title)}</h3><span class="ident">${escapeHtml(entry.id)}</span></div>
 <p class="desc">${escapeHtml(entry.description)}</p></div><div class="row-control">${on ? `<span class="pill pill-ok">On</span>` : `<span class="pill" title="Every tool hidden">Off</span>`}</div>
 <div class="row-extra"><div class="table-wrap tools-wide"><table class="stacked tools-table"><thead><tr><th scope="col">Tool</th><th scope="col">Exposure</th></tr></thead><tbody>${rows}</tbody></table></div>${save}</div></form>`;
 };
 
 const PRESET_WORDS: Readonly<Record<OfferedPreset, string>> = {
-  core: "every tool direct: about 14.5k tokens of declarations per request",
-  "codemode-only": "every tool deferred, for code mode and tool search: about 3k",
-  everything: "every tool direct",
+  core: "built-in and t3 tools direct, MCP servers' tools deferred",
+  "codemode-only": "every tool deferred, for code mode and tool search",
+  everything: "every tool direct, MCP servers' included",
 };
 
 const toolsSection = (resolved: ResolvedHarness): string => {
@@ -234,7 +234,7 @@ const toolsSection = (resolved: ResolvedHarness): string => {
     .join("");
   return `<section id="tools" aria-labelledby="tools-title">
 <div class="section-head"><h2 id="tools-title">${icon("extensions")}Tools</h2><div class="presets" role="group" aria-label="Presets"><span>Preset</span>${presets}</div></div>
-<p class="section-desc">How each tool reaches the model: <strong>direct</strong> (in every request), <strong>deferred</strong> (loaded by tool_search; scripts call it any time), <strong>codemode</strong> (code mode's scripts only) or <strong>hidden</strong>. An extension runs while any of its tools is not hidden: hiding codemode turns code mode off, hiding web_search turns searching off. A preset sets every tool that is not hidden at once (core: direct; codemode-only: deferred; everything: direct). A change saves at once and applies at each thread's next turn. MCP servers' tools, t3's included, are set on their cards.</p>
+<p class="section-desc">How each tool reaches the model: <strong>direct</strong> (in every request), <strong>deferred</strong> (loaded by tool_search; scripts call it any time), <strong>codemode</strong> (code mode's scripts only) or <strong>hidden</strong>. An extension runs while any of its tools is not hidden: hiding codemode turns code mode off, hiding web_search turns searching off. A preset sets every tool that is not hidden at once, MCP servers' included (core: direct, MCP servers' deferred; codemode-only: deferred; everything: direct). A change saves at once and applies at each thread's next turn. MCP servers' tools, t3's included, are set on their cards.</p>
 <div class="group">${EXTENSIONS.filter((entry) => entry.tools !== undefined)
     .map((entry) => toolsRow(resolved, tools, entry))
     .join("\n")}</div>
