@@ -1,12 +1,13 @@
 // @effect-diagnostics globalDate:off globalConsole:off nodeBuiltinImport:off globalTimers:off
-// The Session push depth check (ADR-0005, 2026-11-21 refinement): many tool-using turns in a row on one Durable thread
-// all complete. Before the refinement, each round trip between the Environment and a Session nested the next one level
+// The Session push depth check (ADR-0005, 2026-11-21 refinement): many tool-using turns in a row in one Durable agent's
+// thread all complete. Before the refinement, each round trip between the Environment and a Session nested the next one level
 // deeper, and a long thread's turn failed with "Subrequest depth limit exceeded" ("did not answer open").
 //
-//   node scripts/stage.ts run <stage> pushdepth [--turns 15] [--out file.json]
+//   node scripts/stage.ts deploy pushdepth
+//   node scripts/stage.ts run pushdepth pushdepth [--turns 15] [--out file.json]
 import * as fs from "node:fs";
 
-import { createProjectAndThread, pair, runsOf, sendMessage, SETTLED, waitFor } from "./lib/client.ts";
+import { createProjectAndThread, enablePiDurable, pair, runsOf, sendMessage, SETTLED, waitFor } from "./lib/client.ts";
 
 const arg = (name: string) => {
   const index = process.argv.indexOf(name);
@@ -16,6 +17,7 @@ const turns = Number(arg("--turns") ?? 15);
 const out = arg("--out");
 
 const cookie = await pair();
+await enablePiDurable(cookie);
 const stamp = Date.now().toString(36);
 const { threadId } = await createProjectAndThread(cookie, {
   title: `pushdepth ${stamp}`,

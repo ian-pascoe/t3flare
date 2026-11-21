@@ -751,7 +751,10 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const work = alarmWork(now, { pushDue: this.#pushDue, housekeepingAt: this.#housekeepingAt });
     this.#pushDue = false;
     let push = work.push;
-    if (work.housekeeping) push = (await this.#keepHouse(harness, now)) || push;
+    if (work.housekeeping && (await this.#housekeeping(harness, now))) {
+      this.#dirty = true;
+      push = true;
+    }
     // From inside the alarm, this request: see `alarmPlan.ts`.
     if (push) {
       this.#pushing = this.#pushing.then(() => this.#push()).catch(() => undefined);
@@ -761,7 +764,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
   }
 
   /** The alarm's housekeeping: resume, turn deadlines, kill retries, the watch. Whether a push is due (retry, liveness). */
-  async #keepHouse(harness: Harness, now: number): Promise<boolean> {
+  async #housekeeping(harness: Harness, now: number): Promise<boolean> {
     this.#noteDiagnostic("alarms");
     harness.resume();
     const turns = this.#turns();
@@ -775,11 +778,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     const live = Object.values(this.#turns()).some(isLive);
     if (live) void this.#watch();
     const lastPush = this.ctx.storage.kv.get<number>(LAST_PUSH_KEY) ?? 0;
-    if (this.ctx.storage.kv.get<number>(RETRY_KEY) !== undefined || (live && now - lastPush >= LIVENESS_PUSH_MS - 5_000)) {
-      this.#dirty = true;
-      return true;
-    }
-    return false;
+    return this.ctx.storage.kv.get<number>(RETRY_KEY) !== undefined || (live && now - lastPush >= LIVENESS_PUSH_MS - 5_000);
   }
 
   // -------------------------------------------------------------------------------------------------------------------
@@ -1280,7 +1279,7 @@ export class SessionDO extends DurableObject<SessionEnv> {
     this.#pushTimer = setTimeout(() => {
       this.#pushTimer = undefined;
       this.#pushDue = true;
-      void this.#arm().catch((error: unknown) => console.warn(JSON.stringify({ t3flare: "session-push-arm-failed", error: String(error).slice(0, 500) })));
+      void this.#arm().catch((error: unknown) => console.warn(JSON.stringify({ t3flare: "session-push-arm-failed", error: String(error).slice(0, 300) })));
     }, delayMs);
   }
 
