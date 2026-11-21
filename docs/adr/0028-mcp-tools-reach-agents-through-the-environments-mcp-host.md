@@ -1,6 +1,6 @@
 # MCP tools reach agents through the Environment's MCP host
 
-Status: accepted (tools step, 2026-11-12). Plan: [`docs-archive-1:docs/steps/tools-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/tools-plan.md) §3–§5, with its review changelog (H1–H3, M1, M3, M5, M7, M9–M13). Tickets: SPI-1001 (MCP part), SPI-1039. The MCP core is t3flare's own package since [ADR-0043](0043-copied-code-is-t3flares-own-with-no-upstream-to-sync.md).
+Status: accepted (tools step, 2026-11-12). Plan: [`docs-archive-1:docs/steps/tools-plan.md`](https://github.com/spiritledsoftware/t3flare/blob/docs-archive-1/docs/steps/tools-plan.md) §3–§5, with its review changelog (H1–H3, M1, M3, M5, M7, M9–M13). Tickets: SPI-1001 (MCP part), SPI-1039. The MCP core is t3flare's own package since [ADR-0045](0045-copied-code-is-t3flares-own-with-no-upstream-to-sync.md).
 
 Agents in t3flare had t3's own tools and nothing else. The owner wants Commissary's tools, and servers he adds himself such as Executor, for every agent kind, without a third-party server's credential ever reaching an agent, a Session or a Container.
 
