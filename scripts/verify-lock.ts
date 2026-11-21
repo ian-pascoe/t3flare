@@ -1,3 +1,4 @@
+// @effect-diagnostics globalConsole:off nodeBuiltinImport:off
 // Checks the root pnpm-lock.yaml against t3code's (ADR-0030):
 //
 //  - every t3 importer installs exactly what it installs in t3's lock (the transitive closure, by name@version;

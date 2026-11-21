@@ -10,7 +10,7 @@
   },
   "scripts": {
     "typecheck": "effect-tsgo tsrs --noEmit",
-    "lint": "oxlint --type-aware --deny-warnings src",
+    "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives-severity error src",
     "test": "vitest run"
   },
   "dependencies": {

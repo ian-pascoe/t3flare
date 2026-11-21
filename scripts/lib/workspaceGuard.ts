@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 // Whether a pnpm command may act on NPM_CONFIG_WORKSPACE_DIR (ADR-0030's SPI-1290 refinement). mise exports it once, in the checkout a shell
 // started in; a shell that then cd's into a worktree keeps that path, and pnpm installs and checks the other checkout.
 import { spawnSync } from "node:child_process";

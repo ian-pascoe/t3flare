@@ -15,7 +15,8 @@
     "./globalMise": "./src/globalMise.ts"
   },
   "scripts": {
-    "typecheck": "effect-tsgo tsrs --noEmit"
+    "typecheck": "effect-tsgo tsrs --noEmit",
+    "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives-severity error src"
   },
   "devDependencies": {
     "@types/node": "catalog:"

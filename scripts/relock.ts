@@ -1,3 +1,4 @@
+// @effect-diagnostics globalConsole:off nodeBuiltinImport:off
 // Regenerates the workspace and the lock from the pinned t3code (ADR-0030), the one way to change either:
 //
 //   node scripts/relock.ts              keep t3flare's own resolutions, move what t3 moved

@@ -1,3 +1,4 @@
+// @effect-diagnostics globalConsole:off nodeBuiltinImport:off
 // Refuses a pnpm command whose NPM_CONFIG_WORKSPACE_DIR is another checkout's (ADR-0030's SPI-1290 refinement). `pnpm run check` runs it
 // before vp's tasks. Plain node, no dependencies: in a fresh worktree nothing is installed yet. No install hook runs
 // it, because pnpm runs the root `preinstall` in the target checkout with INIT_CWD, PWD and the working directory all

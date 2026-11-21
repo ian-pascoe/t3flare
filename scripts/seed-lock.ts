@@ -1,3 +1,4 @@
+// @effect-diagnostics globalConsole:off nodeBuiltinImport:off
 // Seeds the root pnpm-lock.yaml from t3code's, so the root installs t3's packages at t3's resolutions (ADR-0030).
 // Run after gen-workspace.ts and before `pnpm install --no-frozen-lockfile`, which keeps every seeded resolution,
 // resolves our own packages, and prunes what nothing uses.

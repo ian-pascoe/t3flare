@@ -1,3 +1,4 @@
+// @effect-diagnostics globalConsole:off nodeBuiltinImport:off
 // `node scripts/updates-ci.ts <command> …`: the steps of the update workflows that decide, check or publish (ADR-0037,
 // ADR-0041; review F1, F2, A1, A3, A5, A12, B1). `plan-t3` and `land-plan` read the Deployment's t3 track from
 // T3FLARE_T3_TRACK (a repository variable). They run in trusted jobs, on runners where no upstream or dependency code ran,

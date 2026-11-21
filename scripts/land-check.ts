@@ -1,3 +1,4 @@
+// @effect-diagnostics globalConsole:off nodeBuiltinImport:off globalFetch:off
 // `node scripts/land-check.ts --ref <candidate> --pin <t3:<tag> | cli:<cli>:<version>> [--base <ref>] [--propose]`
 //
 // May this proposed pin be published as proven, or land (ADR-0037; review F3)? Run by the trusted jobs (`bump.yml`'s

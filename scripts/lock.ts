@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 // Reading pnpm lockfiles (v9) for gen-workspace.ts, seed-lock.ts and verify-lock.ts.
 import * as fs from "node:fs";
 import { parseAllDocuments } from "yaml";
